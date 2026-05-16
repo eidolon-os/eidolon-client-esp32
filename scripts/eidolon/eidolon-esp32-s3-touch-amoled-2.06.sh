@@ -13,11 +13,14 @@
 #
 # Environment:
 #   EIDOLON_PORT      默认串口
-#   EIDOLON_IDF_PATH  ESP-IDF 根目录（优先于自动查找）
-#   IDF_PATH          同上，官方变量名
+#   EIDOLON_IDF_EXPORT  export.sh 的完整路径（最高优先级）
+#   EIDOLON_IDF_PATH    ESP-IDF 根目录
+#   IDF_PATH            同上，官方变量名
 #
-# 可选：在本目录创建 idf.path，写入一行 ESP-IDF 绝对路径
-#   echo ~/esp/esp-idf > scripts/eidolon/idf.path
+# 可选：在本目录创建 idf.path，写入一行 ESP-IDF 根目录，例如：
+#   echo ~/.espressif/v5.5.4/esp-idf > scripts/eidolon/idf.path
+#
+# 未配置时自动查找：idf.path → ~/.espressif/v*/esp-idf（取最新版本）→ ~/esp/esp-idf
 
 set -euo pipefail
 
@@ -68,6 +71,10 @@ idf_ready() {
 
 # Collect candidate export.sh paths (first match wins)
 _idf_export_candidates() {
+  if [[ -n "${EIDOLON_IDF_EXPORT:-}" ]]; then
+    echo "${EIDOLON_IDF_EXPORT}"
+  fi
+
   local cfg="${SCRIPT_DIR}/idf.path"
   if [[ -f "${cfg}" ]]; then
     local line
@@ -86,9 +93,24 @@ _idf_export_candidates() {
 
   local home="${HOME:-}"
   if [[ -n "${home}" ]]; then
+  # Espressif 官方安装器默认路径：~/.espressif/v5.5.4/esp-idf（优先用最新版本）
+    local d
+    shopt -s nullglob
+    local -a espressif_exports=()
+    for d in "${home}"/.espressif/v*/esp-idf/export.sh; do
+      espressif_exports+=("${d}")
+    done
+    if ((${#espressif_exports[@]} > 0)); then
+      local sorted
+      sorted="$(printf '%s\n' "${espressif_exports[@]}" | sort -t'/' -k6 -V -r)"
+      while IFS= read -r d; do
+        [[ -n "${d}" ]] && echo "${d}"
+      done <<<"${sorted}"
+    fi
+    shopt -u nullglob
+
     echo "${home}/esp/esp-idf/export.sh"
     echo "${home}/esp-idf/export.sh"
-    local d
     shopt -s nullglob
     for d in "${home}"/esp/*/export.sh "${home}"/esp-idf-*/export.sh; do
       echo "${d}"
@@ -107,30 +129,46 @@ find_idf_export() {
   return 1
 }
 
-# Auto source ESP-IDF export.sh in current shell
-ensure_idf_env() {
-  if idf_ready; then
+_source_idf_export() {
+  local export_sh="$1"
+  if [[ "${IDF_EXPORT_FILE:-}" == "${export_sh}" ]] && idf_ready; then
     return 0
   fi
-
-  local export_sh=""
-  if ! export_sh="$(find_idf_export)"; then
-    return 1
-  fi
-
   echo ">> 加载 ESP-IDF: ${export_sh}"
   # shellcheck source=/dev/null
   source "${export_sh}"
   IDF_EXPORT_FILE="${export_sh}"
-
   idf_ready
+}
+
+# 在当前 shell 内 source export.sh（脚本子进程可继承环境）
+ensure_idf_env() {
+  local export_sh=""
+
+  # 显式配置（idf.path / EIDOLON_*）优先于 PATH 里已有的 idf.py
+  if [[ -f "${SCRIPT_DIR}/idf.path" || -n "${EIDOLON_IDF_EXPORT:-}" || -n "${EIDOLON_IDF_PATH:-}" ]]; then
+    if export_sh="$(find_idf_export)"; then
+      _source_idf_export "${export_sh}" && return 0
+    fi
+  fi
+
+  if idf_ready; then
+    return 0
+  fi
+
+  if ! export_sh="$(find_idf_export)"; then
+    return 1
+  fi
+
+  _source_idf_export "${export_sh}"
 }
 
 require_idf() {
   if ensure_idf_env; then
     return 0
   fi
-  die "未找到 ESP-IDF。请设置 IDF_PATH 或在本目录创建 idf.path 写入 IDF 根路径"
+  die "未找到 ESP-IDF。请先执行: source ~/.espressif/v5.5.4/esp-idf/export.sh
+或: echo '\$HOME/.espressif/v5.5.4/esp-idf' > ${SCRIPT_DIR}/idf.path"
 }
 
 menu_sep() {
@@ -380,12 +418,29 @@ EOF
 }
 
 configure_target() {
+  local force="${1:-0}"
   require_idf
-  if sdkconfig_has_target; then
+  if [[ "${force}" -eq 0 ]] && sdkconfig_has_target; then
     return 0
   fi
+  # set-target 会触发 fullclean；坏的 build/ 会导致 set-target 失败并留下 esp32 等错误 target
+  if [[ -d "${PROJECT_ROOT}/build" ]] && [[ ! -f "${PROJECT_ROOT}/build/CMakeCache.txt" ]]; then
+    info "移除无效的 build/ 目录"
+    clean_build_dir
+  fi
   info "set-target ${BOARD_TARGET}"
-  run idf.py set-target "${BOARD_TARGET}"
+  if ! (cd "${PROJECT_ROOT}" && idf.py set-target "${BOARD_TARGET}"); then
+    die "set-target ${BOARD_TARGET} 失败。可先选菜单 [17] 清 build，或: rm -rf build sdkconfig 后重试 [3]"
+  fi
+}
+
+verify_board_sdkconfig() {
+  if ! sdkconfig_has_target; then
+    die "sdkconfig 芯片不是 esp32s3。请删除 sdkconfig 与 build/ 后重试菜单 [3]"
+  fi
+  if ! sdkconfig_has_board; then
+    die "sdkconfig 未选中 ${BOARD_NAME}。请在 menuconfig 中选 Waveshare ESP32-S3-Touch-AMOLED-2.06"
+  fi
 }
 
 # 启动时自动：加载 IDF + set-target + 选择本板型
@@ -397,8 +452,18 @@ auto_configure_board() {
     return 1
   fi
 
+  local sdkconfig="${PROJECT_ROOT}/sdkconfig"
+  if [[ -f "${sdkconfig}" ]] && ! sdkconfig_has_target; then
+    [[ "${quiet}" -eq 0 ]] && info "删除非 esp32s3 的旧 sdkconfig"
+    rm -f "${sdkconfig}"
+  fi
+
   configure_target
   ensure_board_sdkconfig
+  if ! sdkconfig_has_target || ! sdkconfig_has_board; then
+    [[ "${quiet}" -eq 0 ]] && echo "提示: 板型未就绪，请选菜单 [3]（或先 rm -rf build sdkconfig）" >&2
+    return 1
+  fi
 
   [[ "${quiet}" -eq 0 ]] && echo ">> 板型已自动配置: ${BOARD_NAME} (${BOARD_PATH})"
   return 0
@@ -419,6 +484,7 @@ cmd_build() {
   [[ "${CLEAN_FIRST}" -eq 1 ]] && clean_build_dir
   configure_target
   ensure_board_sdkconfig
+  verify_board_sdkconfig
   run idf.py \
     -DBOARD_NAME="${BOARD_NAME}" \
     -DBOARD_TYPE="${BOARD_PATH}" \
@@ -544,11 +610,27 @@ cmd_info() {
 }
 
 cmd_setup() {
+  # 等价于（在脚本进程内）:
+  #   source ~/.espressif/v5.5.4/esp-idf/export.sh
+  #   idf.py set-target esp32s3
+  #   + 写入本板型 sdkconfig
   require_idf
+
+  local sdkconfig="${PROJECT_ROOT}/sdkconfig"
+  if [[ -f "${sdkconfig}" ]] && ! sdkconfig_has_target; then
+    info "当前 target 不是 esp32s3，删除旧 sdkconfig: ${sdkconfig}"
+    rm -f "${sdkconfig}"
+  fi
+
+  if [[ -d "${PROJECT_ROOT}/build" ]] && [[ ! -f "${PROJECT_ROOT}/build/CMakeCache.txt" ]]; then
+    clean_build_dir
+  fi
+
   info "强制重新配置板型: ${BOARD_NAME}"
-  run idf.py set-target "${BOARD_TARGET}"
+  configure_target 1
   ensure_board_sdkconfig
-  echo ">> 板型配置已更新"
+  verify_board_sdkconfig
+  echo ">> 板型配置已更新 (target=esp32s3, board=${BOARD_NAME})"
 }
 
 cmd_clean() {
@@ -621,7 +703,7 @@ show_banner() {
       idf_status="已加载"
     fi
   else
-    idf_status="未找到 (可创建 scripts/eidolon/idf.path)"
+    idf_status="未找到 (~/.espressif/v*/esp-idf 或 idf.path)"
   fi
 
   if [[ -n "${PORT}" ]]; then
@@ -646,7 +728,7 @@ show_banner() {
   menu_sep "信息"
   echo "  [1]  查看 USB 串口列表"
   echo "  [2]  查看板子 / 分区信息"
-  echo "  [3]  重新应用板型配置 (set-target + sdkconfig)"
+  echo "  [3]  重新应用板型配置 (source IDF + set-target esp32s3 + 本板 sdkconfig)"
   echo ""
   menu_sep "编译 / 烧录"
   echo "  [4]  编译固件"
@@ -689,12 +771,13 @@ run_menu_task() {
 interactive_menu() {
   INTERACTIVE=1
 
-  if [[ "${BOARD_AUTO_CONFIGURED}" -eq 0 ]]; then
-    echo "正在自动配置板型 ${BOARD_NAME} ..."
-    auto_configure_board 0 || true
-    BOARD_AUTO_CONFIGURED=1
-    echo ""
+  # 启动只做轻量检查，不自动 set-target（避免一进脚本就跑 cmake / 拉组件）
+  if sdkconfig_has_target && sdkconfig_has_board; then
+    echo "板型已就绪: ${BOARD_NAME} (esp32s3)"
+  else
+    echo "提示: 尚未完成板型配置。首次请选菜单 [3]，或直接选 [4] 编译（会自动配置）。"
   fi
+  echo ""
 
   while true; do
     reset_task_flags
@@ -713,10 +796,12 @@ interactive_menu() {
         run_menu_task cmd_setup || true
         ;;
       4)
+        auto_configure_board 0 || true
         run_menu_task cmd_build || true
         ;;
       5)
         CLEAN_FIRST=1
+        auto_configure_board 0 || true
         run_menu_task cmd_build || true
         ;;
       6)
@@ -734,6 +819,7 @@ interactive_menu() {
         run_menu_task cmd_monitor || true
         ;;
       10)
+        auto_configure_board 0 || true
         run_menu_task cmd_run || true
         ;;
       11)
@@ -802,7 +888,7 @@ Commands:
   erase | clean | menuconfig | merge-bin
 
 ESP-IDF:
-  脚本会自动 source export.sh（IDF_PATH / idf.path / ~/esp/esp-idf）
+  脚本会自动 source export.sh（默认 ~/.espressif/v*/esp-idf 取最新版）
 EOF
 }
 
@@ -860,7 +946,7 @@ main() {
   if [[ $# -eq 0 ]]; then
     if ! ensure_idf_env >/dev/null 2>&1; then
       echo "提示: 未自动找到 ESP-IDF，部分功能不可用。" >&2
-      echo "      可执行: echo '\$HOME/esp/esp-idf' > ${SCRIPT_DIR}/idf.path" >&2
+      echo "      可执行: echo '\$HOME/.espressif/v5.5.4/esp-idf' > ${SCRIPT_DIR}/idf.path" >&2
       echo ""
     fi
     interactive_menu
