@@ -983,4 +983,42 @@ menu "TAIJIPAI_S3_CONFIG"
         启动双声道
 endmenu
 
+menu "Eidolon Hub"
+    depends on BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_2_06
+
+    config EIDOLON_HUB_MODE
+        bool "Enable Eidolon Hub mDNS discovery and config"
+        default y
+        help
+            After WiFi connects, discover Eidolon Hub via mDNS and fetch LiveKit
+            config from GET /api/config. Does not use Xiaozhi cloud OTA URL for
+            mqtt/websocket. Firmware upgrade from Hub is phase 2.
+
+    config EIDOLON_MDNS_SERVICE_TYPE
+        string "mDNS service type (without ._tcp suffix)"
+        default "_eidolon-hub"
+        depends on EIDOLON_HUB_MODE
+
+    config EIDOLON_MDNS_QUERY_TIMEOUT_MS
+        int "mDNS query timeout (ms)"
+        default 8000
+        depends on EIDOLON_HUB_MODE
+
+    config EIDOLON_MDNS_PROBE_RETRIES
+        int "Fast mDNS probe retries when browse is empty"
+        default 3
+        depends on EIDOLON_HUB_MODE
+
+    config EIDOLON_MDNS_MAX_RETRIES
+        int "Hub activation max retries"
+        default 10
+        depends on EIDOLON_HUB_MODE
+
+    config EIDOLON_CONFIG_HTTP_TIMEOUT_MS
+        int "Hub config HTTP timeout (ms)"
+        default 15000
+        depends on EIDOLON_HUB_MODE
+
+endmenu
+
 endmenu

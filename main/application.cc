@@ -10,6 +10,11 @@
 #include "assets.h"
 #include "settings.h"
 
+#if CONFIG_EIDOLON_HUB_MODE
+#include "eidolon/hub_activator.h"
+#include <esp_app_desc.h>
+#endif
+
 #include <cstring>
 #include <esp_log.h>
 #include <cJSON.h>
@@ -302,38 +307,53 @@ void Application::HandleActivationDoneEvent() {
     SystemInfo::PrintHeapStats();
     SetDeviceState(kDeviceStateIdle);
 
+    auto display = Board::GetInstance().GetDisplay();
+    auto& board = Board::GetInstance();
+
+#if CONFIG_EIDOLON_HUB_MODE
+    has_server_time_ = false;
+    auto app_desc = esp_app_get_description();
+    std::string message = std::string(Lang::Strings::VERSION) + app_desc->version;
+    display->ShowNotification(message.c_str());
+    display->SetChatMessage("system", "Hub config ready (voice pending)");
+    board.SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);
+    ESP_LOGI(TAG, "Eidolon Hub config loaded; LiveKit protocol not started");
+#else
     has_server_time_ = ota_->HasServerTime();
 
-    auto display = Board::GetInstance().GetDisplay();
     std::string message = std::string(Lang::Strings::VERSION) + ota_->GetCurrentVersion();
     display->ShowNotification(message.c_str());
     display->SetChatMessage("system", "");
 
-    // Release OTA object after activation is complete
     ota_.reset();
-    auto& board = Board::GetInstance();
     board.SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);
 
     Schedule([this]() {
-        // Play the success sound to indicate the device is ready
         audio_service_.PlaySound(Lang::Sounds::OGG_SUCCESS);
     });
+#endif
 }
 
 void Application::ActivationTask() {
-    // Create OTA object for activation process
-    ota_ = std::make_unique<Ota>();
-
-    // Check for new assets version
+#if CONFIG_EIDOLON_HUB_MODE
     CheckAssetsVersion();
 
-    // Check for new firmware version
+    auto display = Board::GetInstance().GetDisplay();
+    eidolon::HubActivator activator;
+    if (!activator.Run(display)) {
+        ESP_LOGE(TAG, "Hub activation failed, staying in activating state");
+        activation_task_handle_ = nullptr;
+        vTaskDelete(NULL);
+        return;
+    }
+#else
+    ota_ = std::make_unique<Ota>();
+
+    CheckAssetsVersion();
     CheckNewVersion();
-
-    // Initialize the protocol
     InitializeProtocol();
+#endif
 
-    // Signal completion to main loop
     xEventGroupSetBits(event_group_, MAIN_EVENT_ACTIVATION_DONE);
 }
 
