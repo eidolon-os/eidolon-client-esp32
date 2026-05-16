@@ -5,6 +5,8 @@
 #include <string>
 
 #include <esp_err.h>
+
+struct cJSON;
 #include "board.h"
 
 class Ota {
@@ -23,6 +25,9 @@ public:
     bool StartUpgrade(std::function<void(int progress, size_t speed)> callback);
     static bool Upgrade(const std::string& firmware_url, std::function<void(int progress, size_t speed)> callback);
     void MarkCurrentVersionValid();
+
+    /** Parse firmware JSON object (Hub or Xiaozhi OTA shape); sets HasNewVersion(). Does not download. */
+    bool ApplyFirmwareSection(const cJSON* firmware);
 
     const std::string& GetFirmwareVersion() const { return firmware_version_; }
     const std::string& GetCurrentVersion() const { return current_version_; }

@@ -6,7 +6,10 @@
 #include "hub_config_client.h"
 #include "hub_config_store.h"
 #include "hub_discovery.h"
+#include "ota.h"
 #include "system_info.h"
+
+#include <cJSON.h>
 
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
@@ -44,9 +47,19 @@ bool HubActivator::Run(Display* display) {
                 store.SaveHubConfig(config, txt.config_url);
 
                 if (client.HasPendingFirmware()) {
-                    ESP_LOGI(TAG, "Firmware %s available at %s (not upgrading in phase 1)",
-                             client.PendingFirmwareVersion().c_str(),
-                             client.PendingFirmwareUrl().c_str());
+                    cJSON* firmware = cJSON_CreateObject();
+                    cJSON_AddStringToObject(firmware, "version",
+                                            client.PendingFirmwareVersion().c_str());
+                    cJSON_AddStringToObject(firmware, "url", client.PendingFirmwareUrl().c_str());
+                    if (client.PendingFirmwareForce()) {
+                        cJSON_AddNumberToObject(firmware, "force", 1);
+                    }
+                    Ota ota;
+                    if (ota.ApplyFirmwareSection(firmware)) {
+                        ESP_LOGI(TAG, "Firmware upgrade pending (phase 2): %s",
+                                 ota.GetFirmwareUrl().c_str());
+                    }
+                    cJSON_Delete(firmware);
                 }
 
                 if (display) {
