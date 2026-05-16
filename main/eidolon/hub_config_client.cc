@@ -12,8 +12,10 @@ namespace eidolon {
 
 namespace {
 
-void ParseOptionalFirmware(cJSON* root, bool* has_pending, std::string* version, std::string* url) {
+void ParseOptionalFirmware(cJSON* root, bool* has_pending, bool* force, std::string* version,
+                           std::string* url) {
     *has_pending = false;
+    *force = false;
     version->clear();
     url->clear();
 
@@ -27,6 +29,10 @@ void ParseOptionalFirmware(cJSON* root, bool* has_pending, std::string* version,
         *has_pending = true;
         *version = ver->valuestring;
         *url = fw_url->valuestring;
+        cJSON* force_item = cJSON_GetObjectItem(firmware, "force");
+        if (cJSON_IsNumber(force_item) && force_item->valueint == 1) {
+            *force = true;
+        }
         ESP_LOGI(TAG, "Hub reported firmware %s (upgrade deferred to phase 2)", version->c_str());
     }
 }
@@ -37,6 +43,7 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
                                  Esp32HubConfig& out) {
     out = Esp32HubConfig{};
     has_pending_firmware_ = false;
+    pending_firmware_force_ = false;
 
     auto network = Board::GetInstance().GetNetwork();
     if (!network) {
@@ -118,8 +125,8 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
         }
     }
 
-    ParseOptionalFirmware(root, &has_pending_firmware_, &pending_firmware_version_,
-                         &pending_firmware_url_);
+    ParseOptionalFirmware(root, &has_pending_firmware_, &pending_firmware_force_,
+                         &pending_firmware_version_, &pending_firmware_url_);
     cJSON_Delete(root);
 
     ESP_LOGI(TAG, "Fetched Hub config for %s", out.identity.c_str());

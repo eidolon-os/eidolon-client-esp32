@@ -91,7 +91,8 @@ X-Device-ID: {MAC，形如 aa:bb:cc:dd:ee:ff}
 
 ## 构建配置
 
-- **CMake**：`CONFIG_EIDOLON_HUB_MODE` 时 `PRIV_REQUIRES mdns`，不修改 `idf_component.yml`。
+- **Component Registry**：ESP-IDF 5.x 使用 `espressif/mdns`（`main/idf_component.yml`）。
+- **CMake**：`CONFIG_EIDOLON_HUB_MODE` 时 `PRIV_REQUIRES espressif__mdns`。
 - **Kconfig**：`main/Kconfig.projbuild` → menu「Eidolon Hub」；2.06 板默认 `EIDOLON_HUB_MODE=y`。
 - **sdkconfig**：Eidolon 脚本写入 `CONFIG_LWIP_DNS_SUPPORT_MDNS_QUERIES=y` 等。
 
