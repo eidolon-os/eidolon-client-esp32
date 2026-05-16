@@ -1031,6 +1031,18 @@ if(CONFIG_BOARD_TYPE_ESP_VOCAT)
     )
 endif()
 
+if(CONFIG_EIDOLON_HUB_MODE)
+    list(APPEND SOURCES
+        "eidolon/hub_activator.cc"
+        "eidolon/hub_config_client.cc"
+        "eidolon/hub_config_store.cc"
+        "eidolon/hub_discovery.cc"
+        "eidolon/hub_txt_parser.cc"
+    )
+    list(APPEND INCLUDE_DIRS "eidolon")
+    list(APPEND MAIN_PRIV_REQUIRES_EXTRA espressif__mdns)
+endif()
+
 idf_component_register(SRCS ${SOURCES}
                     EMBED_FILES ${LANG_SOUNDS} ${COMMON_SOUNDS}
                     INCLUDE_DIRS ${INCLUDE_DIRS}
