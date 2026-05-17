@@ -66,7 +66,7 @@
         .sample_rate        = ESP_AUDIO_SAMPLE_RATE_16K,                                                          \
         .channel            = ESP_AUDIO_MONO,                                                                     \
         .bits_per_sample    = ESP_AUDIO_BIT16,                                                                    \
-        .bitrate            = ESP_OPUS_BITRATE_AUTO,                                                              \
+        .bitrate            = 24000,                                                                               \
         .frame_duration     = (esp_opus_enc_frame_duration_t)AS_OPUS_GET_FRAME_DRU_ENUM(OPUS_FRAME_DURATION_MS),  \
         .application_mode   = ESP_OPUS_ENC_APPLICATION_AUDIO,                                                     \
         .complexity         = 0,                                                                                  \

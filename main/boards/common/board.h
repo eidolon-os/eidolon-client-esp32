@@ -9,6 +9,8 @@
 #include <functional>
 #include <network_interface.h>
 
+#include <driver/i2c_master.h>
+
 #include "led/led.h"
 #include "backlight.h"
 #include "camera.h"
@@ -82,6 +84,9 @@ public:
     virtual void SetPowerSaveLevel(PowerSaveLevel level) = 0;
     virtual std::string GetBoardJson() = 0;
     virtual std::string GetDeviceStatusJson() = 0;
+
+    /** Shared I2C bus for codecs (Eidolon LiveKit media). Default: none. */
+    virtual i2c_master_bus_handle_t GetSharedI2cBus() { return nullptr; }
 };
 
 #define DECLARE_BOARD(BOARD_CLASS_NAME) \

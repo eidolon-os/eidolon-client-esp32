@@ -6,8 +6,9 @@
 
 | 阶段 | 内容 |
 |------|------|
-| **阶段一（当前）** | mDNS 发现 → `GET config_url` → NVS `eidolon`；不接 LiveKit 语音；不接小智云端 OTA 配置 |
-| **阶段二** | `LiveKitProtocol`；Hub `/api/config` 可选 `firmware` + `Ota::Upgrade` |
+| **阶段一** | mDNS 发现 → `GET config_url` → NVS `eidolon`；不接小智云端 OTA 配置 |
+| **阶段二（当前）** | LiveKit 进房与双向语音，见 [livekit-integration_zh.md](livekit-integration_zh.md) |
+| **阶段 2b** | UI 手动进/离房、Hub `firmware` OTA |
 | **长期** | 移除小智 MQTT/WebSocket 协议；固件/资源升级继续复用现有 `Ota` / `Assets` |
 
 ## 激活流程（Eidolon）
@@ -17,7 +18,7 @@ WiFi Connected
   → kDeviceStateActivating
   → CheckAssetsVersion()          # 保留
   → HubActivator::Run()           # mDNS + HTTP + NVS
-  → [成功] MAIN_EVENT_ACTIVATION_DONE → Idle（配置就绪，语音未就绪）
+  → [成功] MAIN_EVENT_ACTIVATION_DONE → Idle →（若启用自动进房）LiveKit InRoom
   → [失败] 保持 Activating，重试/Alert，不播成功音
 ```
 
@@ -105,5 +106,6 @@ X-Device-ID: {MAC，形如 aa:bb:cc:dd:ee:ff}
 
 ## 相关文档
 
+- [LiveKit 集成（阶段二）](livekit-integration_zh.md)
 - [BluFi 配网](blufi_zh.md)
 - Hub 部署：[eidolon_hub/deploy/dev/README.md](https://github.com/eidolon/eidolon_hub/blob/main/deploy/dev/README.md)

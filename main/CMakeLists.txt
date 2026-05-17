@@ -1014,9 +1014,15 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/hub_config_store.cc"
         "eidolon/hub_discovery.cc"
         "eidolon/hub_txt_parser.cc"
+        "eidolon/livekit_board.cc"
+        "eidolon/livekit_session.cc"
+        "eidolon/eidolon_voice_controller.cc"
     )
-    list(APPEND INCLUDE_DIRS "eidolon")
-    list(APPEND MAIN_PRIV_REQUIRES_EXTRA espressif__mdns)
+    list(APPEND INCLUDE_DIRS
+        "eidolon"
+        "${CMAKE_CURRENT_SOURCE_DIR}/boards/waveshare/esp32-s3-touch-amoled-2.06"
+    )
+    list(APPEND MAIN_PRIV_REQUIRES_EXTRA espressif__mdns livekit)
 endif()
 
 idf_component_register(SRCS ${SOURCES}

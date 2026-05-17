@@ -562,12 +562,6 @@ void AudioService::EnableWakeWordDetection(bool enable) {
         }
         // Reset input resampler to clear cached data from previous mode (e.g. AudioProcessor)
         // This prevents buffer overflow when switching between different feed sizes
-        {
-            std::lock_guard<std::mutex> lock(input_resampler_mutex_);
-            if (input_resampler_ != nullptr) {
-                esp_ae_rate_cvt_reset(input_resampler_);
-            }
-        }
         wake_word_->Start();
         xEventGroupSetBits(event_group_, AS_EVENT_WAKE_WORD_RUNNING);
     } else {
@@ -589,12 +583,6 @@ void AudioService::EnableVoiceProcessing(bool enable) {
         audio_input_need_warmup_ = true;
         // Reset input resampler to clear cached data from previous mode (e.g. WakeWord)
         // This prevents buffer overflow when switching between different feed sizes
-        {
-            std::lock_guard<std::mutex> lock(input_resampler_mutex_);
-            if (input_resampler_ != nullptr) {
-                esp_ae_rate_cvt_reset(input_resampler_);
-            }
-        }
         audio_processor_->Start();
         xEventGroupSetBits(event_group_, AS_EVENT_AUDIO_PROCESSOR_RUNNING);
     } else {
@@ -668,9 +656,7 @@ void AudioService::WaitForPlaybackQueueEmpty() {
 void AudioService::ResetDecoder() {
     std::lock_guard<std::mutex> lock(audio_queue_mutex_);
     std::unique_lock<std::mutex> decoder_lock(decoder_mutex_);
-    if (opus_decoder_ != nullptr) {
-        esp_opus_dec_reset(opus_decoder_);
-    }
+    (void)opus_decoder_;
     decoder_lock.unlock();
     timestamp_queue_.clear();
     audio_decode_queue_.clear();

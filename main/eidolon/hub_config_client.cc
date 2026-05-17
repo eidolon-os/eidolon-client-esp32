@@ -63,8 +63,18 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
     http->SetHeader("Accept", "application/json");
     http->SetHeader("User-Agent", SystemInfo::GetUserAgent().c_str());
 
-    if (!http->Open("GET", config_url)) {
-        ESP_LOGE(TAG, "HTTP open failed for %s", config_url.c_str());
+    std::string request_url = config_url;
+    const char* agent_param = "agent_mode=streaming";
+    if (request_url.find('?') != std::string::npos) {
+        request_url += "&";
+        request_url += agent_param;
+    } else {
+        request_url += "?";
+        request_url += agent_param;
+    }
+
+    if (!http->Open("GET", request_url)) {
+        ESP_LOGE(TAG, "HTTP open failed for %s", request_url.c_str());
         return ESP_FAIL;
     }
 

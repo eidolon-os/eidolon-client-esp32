@@ -313,6 +313,8 @@ public:
         InitializeTools();
     }
 
+    virtual i2c_master_bus_handle_t GetSharedI2cBus() override { return i2c_bus_; }
+
     virtual AudioCodec* GetAudioCodec() override {
         static BoxAudioCodec audio_codec(
             i2c_bus_, 
