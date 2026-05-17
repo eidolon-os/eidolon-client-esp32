@@ -63,7 +63,7 @@ bool HubActivator::Run(Display* display) {
                 }
 
                 if (display) {
-                    display->SetChatMessage("system", "Hub config ready (voice pending)");
+                    display->SetChatMessage("system", "Hub config ready");
                 }
                 return true;
             }

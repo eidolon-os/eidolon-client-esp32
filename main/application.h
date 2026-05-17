@@ -40,6 +40,10 @@ enum AecMode {
     kAecOnServerSide,
 };
 
+namespace eidolon {
+class EidolonVoiceController;
+}
+
 class Application {
 public:
     static Application& GetInstance() {
@@ -114,6 +118,11 @@ public:
     AecMode GetAecMode() const { return aec_mode_; }
     void PlaySound(const std::string_view& sound);
     AudioService& GetAudioService() { return audio_service_; }
+
+#if CONFIG_EIDOLON_HUB_MODE
+    void RequestVoiceJoin();
+    void RequestVoiceLeave();
+#endif
     
     /**
      * Reset protocol resources (thread-safe)
@@ -147,6 +156,9 @@ private:
     int clock_ticks_ = 0;
     TaskHandle_t activation_task_handle_ = nullptr;
 
+#if CONFIG_EIDOLON_HUB_MODE
+    eidolon::EidolonVoiceController* voice_controller_ = nullptr;
+#endif
 
     // Event handlers
     void HandleStateChangedEvent();

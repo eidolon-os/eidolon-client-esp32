@@ -11,8 +11,10 @@
 #include "settings.h"
 
 #if CONFIG_EIDOLON_HUB_MODE
+#include "eidolon/eidolon_voice_controller.h"
 #include "eidolon/hub_activator.h"
 #include <esp_app_desc.h>
+#include <livekit.h>
 #endif
 
 #include <cstring>
@@ -52,12 +54,30 @@ Application::Application() {
 }
 
 Application::~Application() {
+#if CONFIG_EIDOLON_HUB_MODE
+    delete voice_controller_;
+    voice_controller_ = nullptr;
+#endif
     if (clock_timer_handle_ != nullptr) {
         esp_timer_stop(clock_timer_handle_);
         esp_timer_delete(clock_timer_handle_);
     }
     vEventGroupDelete(event_group_);
 }
+
+#if CONFIG_EIDOLON_HUB_MODE
+void Application::RequestVoiceJoin() {
+    if (voice_controller_) {
+        voice_controller_->JoinRoom();
+    }
+}
+
+void Application::RequestVoiceLeave() {
+    if (voice_controller_) {
+        voice_controller_->LeaveRoom();
+    }
+}
+#endif
 
 bool Application::SetDeviceState(DeviceState state) {
     return state_machine_.TransitionTo(state);
@@ -73,6 +93,38 @@ void Application::Initialize() {
     // Print board name/version info
     display->SetChatMessage("system", SystemInfo::GetUserAgent().c_str());
 
+#if CONFIG_EIDOLON_HUB_MODE
+    if (livekit_system_init() != LIVEKIT_ERR_NONE) {
+        ESP_LOGE(TAG, "livekit_system_init failed");
+    }
+    voice_controller_ = new eidolon::EidolonVoiceController();
+    voice_controller_->SetOnStateChanged([this](eidolon::VoiceSessionState state) {
+        Schedule([this, state]() {
+            switch (state) {
+            case eidolon::VoiceSessionState::Connecting:
+            case eidolon::VoiceSessionState::Reconnecting:
+                SetDeviceState(kDeviceStateConnecting);
+                break;
+            case eidolon::VoiceSessionState::InRoom:
+                SetDeviceState(kDeviceStateListening);
+                break;
+            case eidolon::VoiceSessionState::ConfigReady:
+            case eidolon::VoiceSessionState::Idle:
+                SetDeviceState(kDeviceStateIdle);
+                break;
+            case eidolon::VoiceSessionState::Error:
+                SetDeviceState(kDeviceStateIdle);
+                break;
+            }
+        });
+    });
+    voice_controller_->SetOnTranscription([this](const std::string& text) {
+        Schedule([this, text]() {
+            auto display = Board::GetInstance().GetDisplay();
+            display->SetChatMessage("assistant", text.c_str());
+        });
+    });
+#else
     // Setup the audio service
     auto codec = board.GetAudioCodec();
     audio_service_.Initialize(codec);
@@ -89,6 +141,7 @@ void Application::Initialize() {
         xEventGroupSetBits(event_group_, MAIN_EVENT_VAD_CHANGE);
     };
     audio_service_.SetCallbacks(callbacks);
+#endif
 
     // Add state change listeners
     state_machine_.AddStateChangeListener([this](DeviceState old_state, DeviceState new_state) {
@@ -289,12 +342,18 @@ void Application::HandleNetworkConnectedEvent() {
 }
 
 void Application::HandleNetworkDisconnectedEvent() {
+#if CONFIG_EIDOLON_HUB_MODE
+    if (voice_controller_) {
+        voice_controller_->OnNetworkLost();
+    }
+#else
     // Close current conversation when network disconnected
     auto state = GetDeviceState();
     if (state == kDeviceStateConnecting || state == kDeviceStateListening || state == kDeviceStateSpeaking) {
         ESP_LOGI(TAG, "Closing audio channel due to network disconnection");
         protocol_->CloseAudioChannel();
     }
+#endif
 
     // Update the status bar immediately to show the network state
     auto display = Board::GetInstance().GetDisplay();
@@ -315,9 +374,11 @@ void Application::HandleActivationDoneEvent() {
     auto app_desc = esp_app_get_description();
     std::string message = std::string(Lang::Strings::VERSION) + app_desc->version;
     display->ShowNotification(message.c_str());
-    display->SetChatMessage("system", "Hub config ready (voice pending)");
-    board.SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);
-    ESP_LOGI(TAG, "Eidolon Hub config loaded; LiveKit protocol not started");
+    display->SetChatMessage("system", "Hub config ready");
+    board.SetPowerSaveLevel(PowerSaveLevel::PERFORMANCE);
+    if (voice_controller_) {
+        voice_controller_->OnHubActivationSucceeded();
+    }
 #else
     has_server_time_ = ota_->HasServerTime();
 

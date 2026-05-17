@@ -56,4 +56,26 @@ bool HubConfigStore::HasValidConfig() const {
     return !settings.GetString("server_url").empty() && !settings.GetString("token").empty();
 }
 
+bool HubConfigStore::Load(Esp32HubConfig& config, std::string* config_url) const {
+    Settings settings(kNvsNamespace, false);
+    std::string server_url = settings.GetString("server_url");
+    std::string token = settings.GetString("token");
+    if (server_url.empty() || token.empty()) {
+        return false;
+    }
+
+    config = Esp32HubConfig{};
+    config.server_url = std::move(server_url);
+    config.token = std::move(token);
+    config.identity = settings.GetString("identity");
+    config.room_name = settings.GetString("room_name");
+    config.sample_rate = settings.GetInt("sample_rate", 16000);
+    config.channels = settings.GetInt("channels", 1);
+
+    if (config_url) {
+        *config_url = settings.GetString("config_url");
+    }
+    return true;
+}
+
 }  // namespace eidolon
