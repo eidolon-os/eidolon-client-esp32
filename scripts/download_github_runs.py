@@ -127,7 +127,7 @@ def rename_artifact(original_name: str, version: str) -> str:
     Rename artifact according to the specified rules.
     
     Rules:
-    - Remove "xiaozhi_" prefix
+    - Remove "eidolon_" or "xiaozhi_" prefix
     - Remove hash suffix (underscore followed by hex string)
     - Add version prefix (e.g., "v2.0.4_")
     - Add .zip extension
@@ -146,10 +146,12 @@ def rename_artifact(original_name: str, version: str) -> str:
     Returns:
         New filename
     """
-    # Remove "xiaozhi_" prefix
+    # Remove CI artifact prefix (eidolon_ or legacy xiaozhi_)
     name = original_name
-    if name.startswith("xiaozhi_"):
-        name = name[len("xiaozhi_"):]
+    for prefix in ("eidolon_", "xiaozhi_"):
+        if name.startswith(prefix):
+            name = name[len(prefix):]
+            break
     
     # Remove known extensions only (not using splitext to avoid issues with
     # names containing dots like "esp32-s3-touch-amoled-2.06")
