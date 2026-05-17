@@ -11,10 +11,11 @@
 #include "settings.h"
 
 #if CONFIG_EIDOLON_HUB_MODE
-#include "eidolon/eidolon_voice_controller.h"
+#include "eidolon/eidolon_device_store.h"
+#include "eidolon/eidolon_ui_presenter.h"
 #include "eidolon/hub_activator.h"
+#include "eidolon/livekit_voice_transport.h"
 #include <esp_app_desc.h>
-#include <livekit.h>
 #endif
 
 #include <cstring>
@@ -55,8 +56,8 @@ Application::Application() {
 
 Application::~Application() {
 #if CONFIG_EIDOLON_HUB_MODE
-    delete voice_controller_;
-    voice_controller_ = nullptr;
+    voice_transport_.reset();
+    ui_presenter_.reset();
 #endif
     if (clock_timer_handle_ != nullptr) {
         esp_timer_stop(clock_timer_handle_);
@@ -66,16 +67,77 @@ Application::~Application() {
 }
 
 #if CONFIG_EIDOLON_HUB_MODE
-void Application::RequestVoiceJoin() {
-    if (voice_controller_) {
-        voice_controller_->JoinRoom();
+bool Application::IsVoiceDetected() const
+{
+    return false;
+}
+
+bool Application::IsMicrophoneEnabled() const
+{
+    return voice_transport_ && voice_transport_->IsMicrophoneEnabled();
+}
+
+void Application::RequestVoiceJoin()
+{
+    if (voice_transport_) {
+        voice_transport_->JoinSession();
     }
 }
 
-void Application::RequestVoiceLeave() {
-    if (voice_controller_) {
-        voice_controller_->LeaveRoom();
+void Application::RequestVoiceLeave()
+{
+    if (voice_transport_) {
+        voice_transport_->LeaveSession();
     }
+}
+
+void Application::ToggleVoiceSession()
+{
+    Schedule([this]() {
+        if (voice_transport_) {
+            voice_transport_->ToggleSession();
+        }
+    });
+}
+
+void Application::ToggleMicrophone()
+{
+    Schedule([this]() {
+        if (!voice_transport_) {
+            return;
+        }
+        if (!voice_transport_->IsInSession()) {
+            auto display = Board::GetInstance().GetDisplay();
+            display->ShowNotification(Lang::Strings::ROOM_NOT_ACTIVE);
+            return;
+        }
+        voice_transport_->SetMicrophoneEnabled(!voice_transport_->IsMicrophoneEnabled());
+        if (ui_presenter_) {
+            ui_presenter_->Apply(voice_transport_->GetSessionState(),
+                                 voice_transport_->IsMicrophoneEnabled());
+        }
+    });
+}
+
+void Application::ApplyEidolonDeviceUi(DeviceState state)
+{
+    auto& board = Board::GetInstance();
+    auto display = board.GetDisplay();
+    board.GetLed()->OnStateChanged();
+
+    switch (state) {
+    case kDeviceStateConnecting:
+        display->SetChatMessage("system", "");
+        break;
+    default:
+        break;
+    }
+    display->UpdateStatusBar(true);
+}
+#else
+bool Application::IsVoiceDetected() const
+{
+    return audio_service_.IsVoiceDetected();
 }
 #endif
 
@@ -91,39 +153,37 @@ void Application::Initialize() {
     auto display = board.GetDisplay();
     display->SetupUI();
     // Print board name/version info
-    display->SetChatMessage("system", SystemInfo::GetUserAgent().c_str());
+    display->SetChatMessage("system", Lang::Strings::INITIALIZING);
 
 #if CONFIG_EIDOLON_HUB_MODE
-    if (livekit_system_init() != LIVEKIT_ERR_NONE) {
-        ESP_LOGE(TAG, "livekit_system_init failed");
+    {
+        eidolon::EidolonDeviceStore device_store;
+        if (!device_store.LoadThemeApplied()) {
+            Settings display_settings("display", true);
+            display_settings.SetString("theme", "eidolon_dark");
+            device_store.MarkThemeApplied();
+        }
     }
-    voice_controller_ = new eidolon::EidolonVoiceController();
-    voice_controller_->SetOnStateChanged([this](eidolon::VoiceSessionState state) {
+
+    ui_presenter_ = std::make_unique<eidolon::EidolonUiPresenter>(*this, *display);
+
+    eidolon::VoiceSessionCallbacks callbacks;
+    callbacks.on_session_state = [this](eidolon::VoiceSessionState state) {
         Schedule([this, state]() {
-            switch (state) {
-            case eidolon::VoiceSessionState::Connecting:
-            case eidolon::VoiceSessionState::Reconnecting:
-                SetDeviceState(kDeviceStateConnecting);
-                break;
-            case eidolon::VoiceSessionState::InRoom:
-                SetDeviceState(kDeviceStateListening);
-                break;
-            case eidolon::VoiceSessionState::ConfigReady:
-            case eidolon::VoiceSessionState::Idle:
-                SetDeviceState(kDeviceStateIdle);
-                break;
-            case eidolon::VoiceSessionState::Error:
-                SetDeviceState(kDeviceStateIdle);
-                break;
+            if (!voice_transport_ || !ui_presenter_) {
+                return;
+            }
+            ui_presenter_->Apply(state, voice_transport_->IsMicrophoneEnabled());
+        });
+    };
+    callbacks.on_transcription = [this](const std::string& text) {
+        Schedule([this, text]() {
+            if (ui_presenter_) {
+                ui_presenter_->OnTranscription(text);
             }
         });
-    });
-    voice_controller_->SetOnTranscription([this](const std::string& text) {
-        Schedule([this, text]() {
-            auto display = Board::GetInstance().GetDisplay();
-            display->SetChatMessage("assistant", text.c_str());
-        });
-    });
+    };
+    voice_transport_ = eidolon::CreateLiveKitVoiceTransport(std::move(callbacks));
 #else
     // Setup the audio service
     auto codec = board.GetAudioCodec();
@@ -275,6 +335,7 @@ void Application::Run() {
             HandleStopListeningEvent();
         }
 
+#if !CONFIG_EIDOLON_HUB_MODE
         if (bits & MAIN_EVENT_SEND_AUDIO) {
             while (auto packet = audio_service_.PopPacketFromSendQueue()) {
                 if (protocol_ && !protocol_->SendAudio(std::move(packet))) {
@@ -293,6 +354,7 @@ void Application::Run() {
                 led->OnStateChanged();
             }
         }
+#endif
 
         if (bits & MAIN_EVENT_SCHEDULE) {
             std::unique_lock<std::mutex> lock(mutex_);
@@ -343,8 +405,8 @@ void Application::HandleNetworkConnectedEvent() {
 
 void Application::HandleNetworkDisconnectedEvent() {
 #if CONFIG_EIDOLON_HUB_MODE
-    if (voice_controller_) {
-        voice_controller_->OnNetworkLost();
+    if (voice_transport_) {
+        voice_transport_->OnNetworkLost();
     }
 #else
     // Close current conversation when network disconnected
@@ -374,10 +436,14 @@ void Application::HandleActivationDoneEvent() {
     auto app_desc = esp_app_get_description();
     std::string message = std::string(Lang::Strings::VERSION) + app_desc->version;
     display->ShowNotification(message.c_str());
-    display->SetChatMessage("system", "Hub config ready");
+    display->SetChatMessage("system", Lang::Strings::EIDOLON_READY);
     board.SetPowerSaveLevel(PowerSaveLevel::PERFORMANCE);
-    if (voice_controller_) {
-        voice_controller_->OnHubActivationSucceeded();
+    if (voice_transport_) {
+        voice_transport_->OnActivationComplete();
+        if (ui_presenter_) {
+            ui_presenter_->Apply(voice_transport_->GetSessionState(),
+                                 voice_transport_->IsMicrophoneEnabled());
+        }
     }
 #else
     has_server_time_ = ota_->HasServerTime();
@@ -734,7 +800,11 @@ void Application::Alert(const char* status, const char* message, const char* emo
 void Application::DismissAlert() {
     if (GetDeviceState() == kDeviceStateIdle) {
         auto display = Board::GetInstance().GetDisplay();
+#if CONFIG_EIDOLON_HUB_MODE
+        display->SetStatus(Lang::Strings::EIDOLON_READY);
+#else
         display->SetStatus(Lang::Strings::STANDBY);
+#endif
         display->SetEmotion("neutral");
         display->SetChatMessage("system", "");
     }
@@ -753,6 +823,13 @@ void Application::StopListening() {
 }
 
 void Application::HandleToggleChatEvent() {
+#if CONFIG_EIDOLON_HUB_MODE
+    auto state = GetDeviceState();
+    if (state == kDeviceStateStarting) {
+        return;
+    }
+    ToggleVoiceSession();
+#else
     auto state = GetDeviceState();
     
     if (state == kDeviceStateActivating) {
@@ -789,6 +866,7 @@ void Application::HandleToggleChatEvent() {
     } else if (state == kDeviceStateListening) {
         protocol_->CloseAudioChannel();
     }
+#endif
 }
 
 void Application::ContinueOpenAudioChannel(ListeningMode mode) {
@@ -941,6 +1019,11 @@ void Application::ContinueWakeWordInvoke(const std::string& wake_word) {
 void Application::HandleStateChangedEvent() {
     DeviceState new_state = state_machine_.GetState();
     clock_ticks_ = 0;
+
+#if CONFIG_EIDOLON_HUB_MODE
+    ApplyEidolonDeviceUi(new_state);
+    return;
+#endif
 
     auto& board = Board::GetInstance();
     auto display = board.GetDisplay();

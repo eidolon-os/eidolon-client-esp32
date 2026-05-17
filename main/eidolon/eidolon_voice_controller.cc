@@ -83,7 +83,7 @@ void EidolonVoiceController::OnHubActivationSucceeded()
         return;
     }
 
-#if CONFIG_EIDOLON_JOIN_ROOM_ON_HUB_READY
+#if CONFIG_EIDOLON_AUTO_JOIN_ON_ACTIVATION
     JoinRoom();
 #endif
 }

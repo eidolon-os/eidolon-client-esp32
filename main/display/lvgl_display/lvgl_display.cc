@@ -8,6 +8,8 @@
 #include "lvgl_display.h"
 #include "board.h"
 #include "application.h"
+
+#include <sdkconfig.h>
 #include "audio_codec.h"
 #include "settings.h"
 #include "assets/lang_config.h"
@@ -122,6 +124,13 @@ void LvglDisplay::UpdateStatusBar(bool update_all) {
             return;
         }
 
+#if CONFIG_EIDOLON_HUB_MODE
+        bool show_mute = !app.IsMicrophoneEnabled();
+        if (show_mute != muted_) {
+            muted_ = show_mute;
+            lv_label_set_text(mute_label_, muted_ ? FONT_AWESOME_VOLUME_XMARK : "");
+        }
+#else
         // Update icon if mute state changes
         if (codec->output_volume() == 0 && !muted_) {
             muted_ = true;
@@ -130,9 +139,11 @@ void LvglDisplay::UpdateStatusBar(bool update_all) {
             muted_ = false;
             lv_label_set_text(mute_label_, "");
         }
+#endif
     }
 
     // Update time
+#if !CONFIG_EIDOLON_HUB_MODE
     if (app.GetDeviceState() == kDeviceStateIdle) {
         if (last_status_update_time_ + std::chrono::seconds(10) < std::chrono::system_clock::now()) {
             // Set status to clock "HH:MM"
@@ -148,6 +159,7 @@ void LvglDisplay::UpdateStatusBar(bool update_all) {
             }
         }
     }
+#endif
 
     esp_pm_lock_acquire(pm_lock_);
     // Update battery icon

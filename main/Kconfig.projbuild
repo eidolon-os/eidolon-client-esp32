@@ -1112,13 +1112,14 @@ menu "Eidolon Hub"
         default 15000
         depends on EIDOLON_HUB_MODE
 
-    config EIDOLON_JOIN_ROOM_ON_HUB_READY
-        bool "Join LiveKit room automatically after Hub activation"
-        default y
+    config EIDOLON_AUTO_JOIN_ON_ACTIVATION
+        bool "Automatically join LiveKit room after device activation"
+        default n
         depends on EIDOLON_HUB_MODE
         help
-            When enabled, EidolonVoiceController joins the LiveKit room as soon as
-            Hub config is saved. Disable for manual join via UI (phase 2b).
+            When enabled, joins the LiveKit room as soon as device activation
+            completes (Hub config saved to NVS). When disabled, use on-screen
+            button or BOOT short press to join manually.
 
     config EIDOLON_LIVEKIT_SPEAKER_VOLUME
         int "LiveKit playback volume (0-100)"
