@@ -853,11 +853,13 @@ if(CONFIG_USE_AUDIO_PROCESSOR)
 else()
     list(APPEND SOURCES "audio/processors/no_audio_processor.cc")
 endif()
-if(CONFIG_IDF_TARGET_ESP32S3 OR CONFIG_IDF_TARGET_ESP32P4)
-    list(APPEND SOURCES "audio/wake_words/afe_wake_word.cc")
-    list(APPEND SOURCES "audio/wake_words/custom_wake_word.cc")
-else()
-    list(APPEND SOURCES "audio/wake_words/esp_wake_word.cc")
+if(NOT CONFIG_EIDOLON_HUB_MODE)
+    if(CONFIG_IDF_TARGET_ESP32S3 OR CONFIG_IDF_TARGET_ESP32P4)
+        list(APPEND SOURCES "audio/wake_words/afe_wake_word.cc")
+        list(APPEND SOURCES "audio/wake_words/custom_wake_word.cc")
+    else()
+        list(APPEND SOURCES "audio/wake_words/esp_wake_word.cc")
+    endif()
 endif()
 
 # Auto Select Additional Sources
@@ -1010,6 +1012,7 @@ endif()
 if(CONFIG_EIDOLON_HUB_MODE)
     list(APPEND SOURCES
         "eidolon/agent_session_tracker.cc"
+        "eidolon/eidolon_audio_input.cc"
         "eidolon/eidolon_device_store.cc"
         "eidolon/eidolon_display_hooks.cc"
         "eidolon/eidolon_lvgl_theme.cc"
@@ -1025,15 +1028,48 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/eidolon_voice_controller.cc"
         "eidolon/ui_state_mapper.cc"
     )
+    if(CONFIG_EIDOLON_WAKE_WORD_ENABLE)
+        set(EIDOLON_MWW_FRONTEND_SRCS
+            "eidolon/wake_word/tensorflow/lite/experimental/microfrontend/lib/frontend.c"
+            "eidolon/wake_word/tensorflow/lite/experimental/microfrontend/lib/frontend_util.c"
+            "eidolon/wake_word/tensorflow/lite/experimental/microfrontend/lib/fft.cc"
+            "eidolon/wake_word/tensorflow/lite/experimental/microfrontend/lib/fft_util.cc"
+            "eidolon/wake_word/tensorflow/lite/experimental/microfrontend/lib/filterbank.c"
+            "eidolon/wake_word/tensorflow/lite/experimental/microfrontend/lib/filterbank_util.c"
+            "eidolon/wake_word/tensorflow/lite/experimental/microfrontend/lib/log_lut.c"
+            "eidolon/wake_word/tensorflow/lite/experimental/microfrontend/lib/log_scale.c"
+            "eidolon/wake_word/tensorflow/lite/experimental/microfrontend/lib/log_scale_util.c"
+            "eidolon/wake_word/tensorflow/lite/experimental/microfrontend/lib/noise_reduction.c"
+            "eidolon/wake_word/tensorflow/lite/experimental/microfrontend/lib/noise_reduction_util.c"
+            "eidolon/wake_word/tensorflow/lite/experimental/microfrontend/lib/pcan_gain_control.c"
+            "eidolon/wake_word/tensorflow/lite/experimental/microfrontend/lib/pcan_gain_control_util.c"
+            "eidolon/wake_word/tensorflow/lite/experimental/microfrontend/lib/window.c"
+            "eidolon/wake_word/tensorflow/lite/experimental/microfrontend/lib/window_util.c"
+            "eidolon/wake_word/tensorflow/lite/experimental/microfrontend/lib/kiss_fft.c"
+            "eidolon/wake_word/tensorflow/lite/experimental/microfrontend/lib/kiss_fftr.c"
+        )
+        list(APPEND SOURCES
+            "eidolon/audio/eidolon_audio_input_service.cc"
+            "eidolon/wake_word/micro_wake_word_detector.cc"
+            "eidolon/wake_word/eidolon_mww.cpp"
+            ${EIDOLON_MWW_FRONTEND_SRCS}
+        )
+        list(APPEND INCLUDE_DIRS "eidolon/wake_word")
+    endif()
     list(APPEND INCLUDE_DIRS
         "eidolon"
         "${CMAKE_CURRENT_SOURCE_DIR}/boards/waveshare/esp32-s3-touch-amoled-2.06"
     )
-    list(APPEND MAIN_PRIV_REQUIRES_EXTRA espressif__mdns livekit)
+    list(APPEND MAIN_PRIV_REQUIRES_EXTRA espressif__mdns livekit espressif__esp-tflite-micro)
+endif()
+
+set(EIDOLON_EMBED_FILES ${LANG_SOUNDS} ${COMMON_SOUNDS})
+if(CONFIG_EIDOLON_HUB_MODE AND CONFIG_EIDOLON_WAKE_WORD_ENABLE)
+    list(APPEND EIDOLON_EMBED_FILES "eidolon/wake_word/models/hey_jarvis.tflite")
 endif()
 
 idf_component_register(SRCS ${SOURCES}
-                    EMBED_FILES ${LANG_SOUNDS} ${COMMON_SOUNDS}
+                    EMBED_FILES ${EIDOLON_EMBED_FILES}
                     INCLUDE_DIRS ${INCLUDE_DIRS}
                     WHOLE_ARCHIVE
                     PRIV_REQUIRES

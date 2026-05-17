@@ -31,7 +31,7 @@ readonly BOARD_PATH="waveshare/esp32-s3-touch-amoled-2.06"
 readonly BOARD_NAME="esp32-s3-touch-amoled-2.06"
 readonly BOARD_TARGET="esp32s3"
 readonly BOARD_KCONFIG="CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_2_06=y"
-readonly PARTITION_CSV="partitions/v2/16m.csv"
+readonly PARTITION_CSV="partitions/v2/16m_eidolon.csv"
 readonly FLASH_SIZE="16MB"
 readonly MONITOR_BAUD="115200"
 readonly SDK_MARKER="# Append by eidolon-esp32-s3-touch-amoled-2.06.sh"
@@ -315,8 +315,8 @@ partition_offset() {
     otadata)  echo "0xd000" ;;
     phy_init) echo "0xf000" ;;
     ota_0)    echo "0x20000" ;;
-    ota_1)    echo "0x410000" ;;
-    assets)   echo "0x800000" ;;
+    ota_1)    echo "0x440000" ;;
+    assets)   echo "0x860000" ;;
     *) die "unknown partition: $1" ;;
   esac
 }
@@ -326,9 +326,9 @@ partition_size() {
     nvs)      echo "0x4000" ;;
     otadata)  echo "0x2000" ;;
     phy_init) echo "0x1000" ;;
-    ota_0)    echo "0x3f0000" ;;
-    ota_1)    echo "0x3f0000" ;;
-    assets)   echo "0x800000" ;;
+    ota_0)    echo "0x420000" ;;
+    ota_1)    echo "0x420000" ;;
+    assets)   echo "0x7A0000" ;;
     *) die "unknown partition: $1" ;;
   esac
 }
@@ -393,9 +393,22 @@ clear_other_board_selections() {
   mv "${tmp}" "${sdkconfig}"
 }
 
+ensure_eidolon_partition_sdkconfig() {
+  local sdkconfig="${PROJECT_ROOT}/sdkconfig"
+  [[ -f "${sdkconfig}" ]] || return 0
+  local want='CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/v2/16m_eidolon.csv"'
+  if grep -q '^CONFIG_PARTITION_TABLE_CUSTOM_FILENAME=' "${sdkconfig}"; then
+    sed -i.bak "s|^CONFIG_PARTITION_TABLE_CUSTOM_FILENAME=.*|${want}|" "${sdkconfig}"
+    rm -f "${sdkconfig}.bak"
+  else
+    printf '%s\n' "${want}" >>"${sdkconfig}"
+  fi
+}
+
 ensure_board_sdkconfig() {
   local sdkconfig="${PROJECT_ROOT}/sdkconfig"
   clear_other_board_selections
+  ensure_eidolon_partition_sdkconfig
 
   if sdkconfig_has_board; then
     return 0
@@ -415,6 +428,9 @@ CONFIG_BT_BLE_BLUFI_ENABLE=y
 CONFIG_MBEDTLS_DHM_C=y
 CONFIG_EIDOLON_HUB_MODE=y
 CONFIG_EIDOLON_AUTO_JOIN_ON_ACTIVATION=n
+CONFIG_EIDOLON_WAKE_WORD_ENABLE=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/v2/16m_eidolon.csv"
+CONFIG_WAKE_WORD_DISABLED=y
 CONFIG_LWIP_DNS_SUPPORT_MDNS_QUERIES=y
 CONFIG_MDNS_MAX_SERVICES=10
 CONFIG_CODEC_I2C_BACKWARD_COMPATIBLE=n

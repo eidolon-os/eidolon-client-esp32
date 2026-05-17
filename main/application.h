@@ -18,6 +18,15 @@
 #include "device_state.h"
 #include "device_state_machine.h"
 
+#if CONFIG_EIDOLON_HUB_MODE
+namespace eidolon {
+enum class VoiceSessionState;
+}
+#if CONFIG_EIDOLON_WAKE_WORD_ENABLE
+#include "eidolon/audio/eidolon_audio_input_service.h"
+#endif
+#endif
+
 // Main event bits
 #define MAIN_EVENT_SCHEDULE             (1 << 0)
 #define MAIN_EVENT_SEND_AUDIO           (1 << 1)
@@ -165,6 +174,11 @@ private:
 #if CONFIG_EIDOLON_HUB_MODE
     std::unique_ptr<eidolon::IVoiceSessionTransport> voice_transport_;
     std::unique_ptr<eidolon::EidolonUiPresenter> ui_presenter_;
+#if CONFIG_EIDOLON_WAKE_WORD_ENABLE
+    std::unique_ptr<EidolonAudioInputService> eidolon_audio_input_service_;
+    void StartEidolonWakeWord();
+    void OnEidolonVoiceSessionState(eidolon::VoiceSessionState state);
+#endif
 #endif
 
     void ApplyEidolonDeviceUi(DeviceState state);
