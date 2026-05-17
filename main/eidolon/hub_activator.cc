@@ -63,7 +63,7 @@ bool HubActivator::Run(Display* display) {
                 }
 
                 if (display) {
-                    display->SetChatMessage("system", "Hub config ready");
+                    display->SetChatMessage("system", Lang::Strings::EIDOLON_READY);
                 }
                 return true;
             }

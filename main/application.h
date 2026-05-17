@@ -41,7 +41,8 @@ enum AecMode {
 };
 
 namespace eidolon {
-class EidolonVoiceController;
+class EidolonUiPresenter;
+class IVoiceSessionTransport;
 }
 
 class Application {
@@ -69,7 +70,10 @@ public:
     void Run();
 
     DeviceState GetDeviceState() const { return state_machine_.GetState(); }
-    bool IsVoiceDetected() const { return audio_service_.IsVoiceDetected(); }
+    bool IsVoiceDetected() const;
+#if CONFIG_EIDOLON_HUB_MODE
+    bool IsMicrophoneEnabled() const;
+#endif
     
     /**
      * Request state transition
@@ -122,6 +126,8 @@ public:
 #if CONFIG_EIDOLON_HUB_MODE
     void RequestVoiceJoin();
     void RequestVoiceLeave();
+    void ToggleVoiceSession();
+    void ToggleMicrophone();
 #endif
     
     /**
@@ -157,8 +163,11 @@ private:
     TaskHandle_t activation_task_handle_ = nullptr;
 
 #if CONFIG_EIDOLON_HUB_MODE
-    eidolon::EidolonVoiceController* voice_controller_ = nullptr;
+    std::unique_ptr<eidolon::IVoiceSessionTransport> voice_transport_;
+    std::unique_ptr<eidolon::EidolonUiPresenter> ui_presenter_;
 #endif
+
+    void ApplyEidolonDeviceUi(DeviceState state);
 
     // Event handlers
     void HandleStateChangedEvent();

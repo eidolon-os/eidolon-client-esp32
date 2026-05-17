@@ -54,6 +54,15 @@
         "HELLO_MY_FRIEND": "你好，我的朋友！",
         "CONNECTION_SUCCESSFUL": "连接成功",
         "FLIGHT_MODE_OFF": "飞行模式已关闭",
-        "FLIGHT_MODE_ON": "飞行模式已开启"
+        "FLIGHT_MODE_ON": "飞行模式已开启",
+        "EIDOLON_READY": "已就绪，轻触开始对话",
+        "ROOM_START": "开始对话",
+        "ROOM_CANCEL": "取消",
+        "ROOM_END": "结束对话",
+        "ROOM_IN_CALL": "通话中",
+        "ROOM_CONNECTING": "正在连接…",
+        "ROOM_NOT_ACTIVE": "请先开始对话",
+        "MIC_MUTED": "麦克风已关闭",
+        "MIC_UNMUTED": "麦克风已开启"
     }
 }

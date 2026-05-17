@@ -10,7 +10,7 @@
 |------|------|
 | 阶段一 | mDNS → `GET config_url` → NVS |
 | **阶段二（本文）** | `EidolonVoiceController` + `LiveKitSession` + 板级 `livekit_board` 媒体管线 |
-| 阶段 2b（计划） | UI 按钮进/离房、`Manual` 策略、Hub 固件 OTA、断线退避 |
+| 阶段 2b | UI 触屏/BOOT 进离房、`Manual` 默认、Hub 固件 OTA、断线退避 |
 
 ## 端到端流程
 
@@ -46,17 +46,31 @@ sequenceDiagram
 
 ## 进房策略
 
-Kconfig：`EIDOLON_JOIN_ROOM_ON_HUB_READY`（默认 **y**）
+Kconfig：`EIDOLON_AUTO_JOIN_ON_ACTIVATION`（默认 **n**）
 
 | 策略 | 行为 |
 |------|------|
-| **OnHubReady**（当前） | Hub 激活成功且 NVS 有效 → 自动 `JoinRoom()` |
-| **Manual**（2b） | 仅 `ConfigReady`；由 UI 调 `Application::RequestVoiceJoin()` |
+| **Manual**（默认） | 激活后 `ConfigReady`，触屏「开始对话」或 BOOT 短按 `ToggleVoiceSession()` |
+| **Auto** | 激活完成且 NVS 有效 → 自动 `JoinRoom()` |
 
-对外 API（已实现）：
+对外 API：
 
-- `Application::RequestVoiceJoin()`
-- `Application::RequestVoiceLeave()`
+- `Application::RequestVoiceJoin()` / `RequestVoiceLeave()`
+- `Application::ToggleVoiceSession()` / `ToggleMicrophone()`（双击 BOOT 静音）
+
+## NVS 与落盘
+
+| 命名空间 | 内容 |
+|----------|------|
+| `eidolon` | Hub/LiveKit：`server_url`, `token`, `config_url`, `room_name` 等（`HubConfigStore`） |
+| `eidolon_device` | 产品偏好：`mic_enabled`（`EidolonDeviceStore`） |
+| `display` | `theme`（默认 `eidolon_dark`） |
+
+写盘时机：Hub 激活 HTTP 200、`RefreshHubConfig` 刷新 token、用户切换麦克风。
+
+**不落盘**：转写历史、是否在房状态、用户级自动进房覆盖。
+
+详见 [ui-assets-v1_zh.md](ui-assets-v1_zh.md)。
 
 ## Web 客户端参考（采纳 / 不采纳）
 
@@ -95,7 +109,10 @@ Kconfig：`EIDOLON_JOIN_ROOM_ON_HUB_READY`（默认 **y**）
 | `main/eidolon/hub_config_store.{h,cc}` | `Load()` |
 | `main/eidolon/hub_config_client.cc` | `agent_mode=streaming` |
 | `main/application.{h,cc}` | 集成 Controller |
-| `main/Kconfig.projbuild` | `EIDOLON_JOIN_ROOM_ON_HUB_READY` 等 |
+| `main/Kconfig.projbuild` | `EIDOLON_AUTO_JOIN_ON_ACTIVATION` 等 |
+| `main/eidolon/livekit_voice_transport.*` | `IVoiceSessionTransport` |
+| `main/eidolon/eidolon_ui_presenter.*` | UI 与 `DeviceState` 映射 |
+| `main/eidolon/eidolon_device_store.*` | 麦克风等偏好 NVS |
 
 ## 测试
 
@@ -103,10 +120,12 @@ Kconfig：`EIDOLON_JOIN_ROOM_ON_HUB_READY`（默认 **y**）
 2. 板子配网后串口：mDNS → HTTP 200 → `LiveKitSession` connecting → connected。
 3. 对设备说话，确认 Agent 回复；`transcription` 可选显示在 assistant 聊天区。
 4. 断网：应 `LeaveRoom` 并回到可重试状态。
-5. 将 `CONFIG_EIDOLON_JOIN_ROOM_ON_HUB_READY=n` 后重编：激活后不进房，可调用 `RequestVoiceJoin()` 验证 Manual 路径。
+5. 默认 `CONFIG_EIDOLON_AUTO_JOIN_ON_ACTIVATION=n`：激活后显示「已就绪」，触屏或 BOOT 短按进房；双击 BOOT 切换麦克风。
+6. 重启后无需重新配网（NVS 含 token）；静音偏好 `mic_enabled` 可恢复。
 
 ## 变更记录
 
 | 日期 | 摘要 |
 |------|------|
 | 2026-05-17 | 阶段二初版：LiveKit SDK 0.3.7、`EidolonVoiceController`、自动进房、文档落盘 |
+| 2026-05-17 | v1：Manual 进房、Presenter/Transport、触屏+BOOT、NVS 偏好、`eidolon_dark` |

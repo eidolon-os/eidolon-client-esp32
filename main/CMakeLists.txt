@@ -325,7 +325,7 @@ elseif(CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_2_06)
     set(BOARD_TYPE "esp32-s3-touch-amoled-2.06")
     set(BUILTIN_TEXT_FONT font_puhui_basic_30_4)
     set(BUILTIN_ICON_FONT font_awesome_30_4)
-    set(DEFAULT_EMOJI_COLLECTION twemoji_64)
+    set(DEFAULT_EMOJI_COLLECTION noto-emoji_64)
 elseif(CONFIG_BOARD_TYPE_WAVESHARE_ESP32_C6_TOUCH_AMOLED_2_06)
     set(MANUFACTURER "waveshare")
     set(BOARD_TYPE "esp32-c6-touch-amoled-2.06")
@@ -1009,6 +1009,11 @@ endif()
 
 if(CONFIG_EIDOLON_HUB_MODE)
     list(APPEND SOURCES
+        "eidolon/agent_session_tracker.cc"
+        "eidolon/eidolon_device_store.cc"
+        "eidolon/eidolon_display_hooks.cc"
+        "eidolon/eidolon_lvgl_theme.cc"
+        "eidolon/eidolon_ui_presenter.cc"
         "eidolon/hub_activator.cc"
         "eidolon/hub_config_client.cc"
         "eidolon/hub_config_store.cc"
@@ -1016,7 +1021,9 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/hub_txt_parser.cc"
         "eidolon/livekit_board.cc"
         "eidolon/livekit_session.cc"
+        "eidolon/livekit_voice_transport.cc"
         "eidolon/eidolon_voice_controller.cc"
+        "eidolon/ui_state_mapper.cc"
     )
     list(APPEND INCLUDE_DIRS
         "eidolon"

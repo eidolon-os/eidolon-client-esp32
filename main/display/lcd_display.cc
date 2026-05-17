@@ -16,6 +16,12 @@
 
 #include "board.h"
 
+#if CONFIG_EIDOLON_HUB_MODE
+#include "eidolon/eidolon_lvgl_theme.h"
+#endif
+
+#include <sdkconfig.h>
+
 #define TAG "LcdDisplay"
 
 LV_FONT_DECLARE(BUILTIN_TEXT_FONT);
@@ -70,10 +76,21 @@ LcdDisplay::LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_
     // Initialize LCD themes
     InitializeLcdThemes();
 
+#if CONFIG_EIDOLON_HUB_MODE
+    eidolon::RegisterEidolonThemes();
+#endif
+
     // Load theme from settings
     Settings settings("display", false);
+#if CONFIG_EIDOLON_HUB_MODE
+    std::string theme_name = settings.GetString("theme", "eidolon_dark");
+#else
     std::string theme_name = settings.GetString("theme", "light");
+#endif
     current_theme_ = LvglThemeManager::GetInstance().GetTheme(theme_name);
+    if (current_theme_ == nullptr) {
+        current_theme_ = LvglThemeManager::GetInstance().GetTheme("light");
+    }
 
     // Create a timer to hide the preview image
     esp_timer_create_args_t preview_timer_args = {
@@ -494,7 +511,11 @@ void LcdDisplay::SetupUI() {
     lv_obj_center(emoji_label_);
     lv_obj_set_style_text_font(emoji_label_, large_icon_font, 0);
     lv_obj_set_style_text_color(emoji_label_, lvgl_theme->text_color(), 0);
+#if CONFIG_EIDOLON_HUB_MODE
+    lv_label_set_text(emoji_label_, "Eidolon");
+#else
     lv_label_set_text(emoji_label_, FONT_AWESOME_MICROCHIP_AI);
+#endif
 }
 #if CONFIG_IDF_TARGET_ESP32P4
 #define  MAX_MESSAGES 40
