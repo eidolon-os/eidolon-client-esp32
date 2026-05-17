@@ -13,6 +13,9 @@ from requests.exceptions import RequestException
 # 切换到项目根目录
 os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Must match CMake project() name in root CMakeLists.txt
+APP_FIRMWARE_BIN = "eidolon.bin"
+
 def get_chip_id_string(chip_id):
     return {
         0x0000: "esp32",
@@ -143,7 +146,7 @@ def read_binary(dir_path):
     image_data = app_data[:image_size]
     
     # extract bin file
-    bin_path = os.path.join(dir_path, "xiaozhi.bin")
+    bin_path = os.path.join(dir_path, APP_FIRMWARE_BIN)
     if not os.path.exists(bin_path):
         print("extract bin file to", bin_path)
         open(bin_path, "wb").write(image_data)
@@ -235,7 +238,7 @@ def main():
                 info = read_binary(folder)
                 target_dir = os.path.join("firmwares", tag)
                 info["tag"] = tag
-                info["url"] = os.path.join(os.environ['OSS_BUCKET_URL'], target_dir, "xiaozhi.bin")
+                info["url"] = os.path.join(os.environ['OSS_BUCKET_URL'], target_dir, APP_FIRMWARE_BIN)
                 open(info_path, "w", encoding="utf-8").write(json.dumps(info, indent=4))
                 # upload all file to oss
                 upload_dir_to_oss(folder, target_dir)
