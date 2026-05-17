@@ -1127,6 +1127,28 @@ menu "Eidolon Hub"
         default 80
         depends on EIDOLON_HUB_MODE
 
+    config EIDOLON_WAKE_WORD_ENABLE
+        bool "Enable microWakeWord (hey jarvis) wake word"
+        default y
+        depends on EIDOLON_HUB_MODE
+        help
+            Independent microWakeWord path using TFLite (not Espressif WakeNet).
+            Say "hey jarvis" to join a LiveKit room when ConfigReady.
+
+    config EIDOLON_WAKE_WORD_THRESHOLD
+        int "microWakeWord probability cutoff (0-255)"
+        range 1 255
+        default 128
+        depends on EIDOLON_WAKE_WORD_ENABLE
+        help
+            Quantized detection threshold. 128 ≈ 0.5 (hey_jarvis model default).
+
+    config EIDOLON_WAKE_WORD_COOLDOWN_MS
+        int "Wake word cooldown between triggers (ms)"
+        range 500 10000
+        default 2000
+        depends on EIDOLON_WAKE_WORD_ENABLE
+
 endmenu
 
 endmenu

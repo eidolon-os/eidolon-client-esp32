@@ -11,11 +11,16 @@
 #include "settings.h"
 
 #if CONFIG_EIDOLON_HUB_MODE
+#include "eidolon/eidolon_audio_input.h"
 #include "eidolon/eidolon_device_store.h"
 #include "eidolon/eidolon_ui_presenter.h"
 #include "eidolon/hub_activator.h"
+#include "eidolon/hub_types.h"
 #include "eidolon/livekit_voice_transport.h"
 #include <esp_app_desc.h>
+#if CONFIG_EIDOLON_WAKE_WORD_ENABLE
+#include "eidolon/audio/eidolon_audio_input_service.h"
+#endif
 #endif
 
 #include <cstring>
@@ -56,6 +61,12 @@ Application::Application() {
 
 Application::~Application() {
 #if CONFIG_EIDOLON_HUB_MODE
+#if CONFIG_EIDOLON_WAKE_WORD_ENABLE
+    if (eidolon_audio_input_service_) {
+        eidolon_audio_input_service_->Stop();
+        eidolon_audio_input_service_.reset();
+    }
+#endif
     voice_transport_.reset();
     ui_presenter_.reset();
 #endif
@@ -119,6 +130,61 @@ void Application::ToggleMicrophone()
     });
 }
 
+#if CONFIG_EIDOLON_WAKE_WORD_ENABLE
+void Application::StartEidolonWakeWord()
+{
+    if (eidolon::EidolonAudioInput::Instance().Init() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init Eidolon audio platform");
+        return;
+    }
+
+    if (!eidolon_audio_input_service_) {
+        eidolon_audio_input_service_ = std::make_unique<EidolonAudioInputService>();
+        auto codec = Board::GetInstance().GetAudioCodec();
+        eidolon_audio_input_service_->Initialize(codec);
+
+        EidolonAudioInputCallbacks callbacks;
+        callbacks.on_wake_word_detected = [this](const std::string& wake_word) {
+            (void)wake_word;
+            Schedule([this]() {
+                if (!voice_transport_) {
+                    return;
+                }
+                if (voice_transport_->GetSessionState() != eidolon::VoiceSessionState::ConfigReady) {
+                    return;
+                }
+                ESP_LOGI(TAG, "Wake word -> ToggleVoiceSession");
+                ToggleVoiceSession();
+            });
+        };
+        eidolon_audio_input_service_->SetCallbacks(callbacks);
+        eidolon_audio_input_service_->Start();
+    }
+
+    eidolon_audio_input_service_->EnableWakeWordDetection(true);
+}
+
+void Application::OnEidolonVoiceSessionState(eidolon::VoiceSessionState state)
+{
+    if (!eidolon_audio_input_service_) {
+        return;
+    }
+
+    switch (state) {
+    case eidolon::VoiceSessionState::Connecting:
+    case eidolon::VoiceSessionState::InRoom:
+    case eidolon::VoiceSessionState::Reconnecting:
+        eidolon_audio_input_service_->EnableWakeWordDetection(false);
+        break;
+    case eidolon::VoiceSessionState::ConfigReady:
+    case eidolon::VoiceSessionState::Idle:
+    case eidolon::VoiceSessionState::Error:
+        eidolon_audio_input_service_->EnableWakeWordDetection(true);
+        break;
+    }
+}
+#endif
+
 void Application::ApplyEidolonDeviceUi(DeviceState state)
 {
     auto& board = Board::GetInstance();
@@ -174,6 +240,9 @@ void Application::Initialize() {
                 return;
             }
             ui_presenter_->Apply(state, voice_transport_->IsMicrophoneEnabled());
+#if CONFIG_EIDOLON_WAKE_WORD_ENABLE
+            OnEidolonVoiceSessionState(state);
+#endif
         });
     };
     callbacks.on_transcription = [this](const std::string& text) {
@@ -445,6 +514,9 @@ void Application::HandleActivationDoneEvent() {
                                  voice_transport_->IsMicrophoneEnabled());
         }
     }
+#if CONFIG_EIDOLON_WAKE_WORD_ENABLE
+    StartEidolonWakeWord();
+#endif
 #else
     has_server_time_ = ota_->HasServerTime();
 
