@@ -16,7 +16,7 @@
 #define TAG "EidolonVoice"
 
 namespace {
-constexpr const char* kClientAudioStateTopic = "client.audio_state";
+constexpr const char* kClientAudioStateTopic = "eidolon.audio_state";
 constexpr int64_t kPlaybackActiveWindowUs = 800 * 1000;
 constexpr TickType_t kAudioStatePublishInterval = pdMS_TO_TICKS(500);
 // Delay before a control-room reconnect attempt after a disconnect.

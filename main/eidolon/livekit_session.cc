@@ -18,7 +18,7 @@ namespace {
 
 constexpr const char* kControlTopic = "eidolon.control";
 constexpr const char* kUiStateTopic = "eidolon.ui_state";
-constexpr const char* kSessionControlTopic = "session_control";
+constexpr const char* kSessionControlTopic = "eidolon.session_control";
 
 LiveKitConnectionState MapConnectionState(livekit_connection_state_t state)
 {
