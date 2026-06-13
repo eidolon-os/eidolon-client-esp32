@@ -22,6 +22,7 @@ enum class VoiceSessionState {
     InRoom,
     Reconnecting,
     Error,
+    Unauthorized,  // revoked or unregistered by admin
 };
 
 class EidolonVoiceController {

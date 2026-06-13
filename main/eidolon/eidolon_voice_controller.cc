@@ -55,24 +55,24 @@ VoiceSessionState EidolonVoiceController::StateForConfig(const Esp32HubConfig& c
         return VoiceSessionState::ConfigReady;
     case HubConfigStatus::Revoked:
     case HubConfigStatus::Unregistered:
-        return VoiceSessionState::Error;
+        return VoiceSessionState::Unauthorized;
     }
     return VoiceSessionState::Error;
 }
 
 bool EidolonVoiceController::HasActiveConfig() const
 {
-    return config_.status == HubConfigStatus::Active && !config_.server_url.empty() &&
-           !config_.token.empty();
+    return config_.status == HubConfigStatus::Active && config_.active.usable();
 }
 
 bool EidolonVoiceController::HasControlConfig() const
 {
     if (config_.status != HubConfigStatus::Active) {
-        return !config_.server_url.empty() && !config_.token.empty();
+        // While pending/waiting, the "active" slot holds the pending room used
+        // as the data-only control channel.
+        return config_.active.usable();
     }
-    return !config_.control_server_url.empty() && !config_.control_token.empty() &&
-           !config_.control_room_name.empty();
+    return config_.control.usable() && !config_.control.room_name.empty();
 }
 
 void EidolonVoiceController::SetState(VoiceSessionState state)
@@ -407,7 +407,7 @@ esp_err_t EidolonVoiceController::JoinRoom()
         return ESP_OK;
     }
 
-    if (config_.server_url.empty() || config_.token.empty()) {
+    if (!config_.active.usable()) {
         if (LoadStoredConfig() != ESP_OK) {
             return ESP_ERR_NOT_FOUND;
         }
@@ -460,12 +460,15 @@ esp_err_t EidolonVoiceController::ConnectControlRoom()
         return ESP_ERR_INVALID_STATE;
     }
 
+    // ConnectDataOnly connects to control_config.active. While pending/waiting
+    // that is already the pending room; once active, point it at the control room
+    // (falling back to the active identity when the control room omits one).
     Esp32HubConfig control_config = config_;
     if (config_.status == HubConfigStatus::Active) {
-        control_config.server_url = config_.control_server_url;
-        control_config.token = config_.control_token;
-        control_config.identity = config_.control_identity.empty() ? config_.identity : config_.control_identity;
-        control_config.room_name = config_.control_room_name;
+        control_config.active = config_.control;
+        if (control_config.active.identity.empty()) {
+            control_config.active.identity = config_.active.identity;
+        }
     }
 
     control_room_ = true;

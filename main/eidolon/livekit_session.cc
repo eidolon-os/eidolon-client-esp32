@@ -242,7 +242,7 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config)
         Disconnect(true);
     }
 
-    identity_ = config.identity;
+    identity_ = config.active.identity;
 
     esp_err_t media_err = eidolon_livekit_board_init();
     if (media_err != ESP_OK) {
@@ -288,11 +288,11 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config)
     RegisterTranscriptionHandler();
     using_media_ = true;
 
-    ESP_LOGI(TAG, "Connecting room=%s identity=%s server=%s", config.room_name.c_str(),
-             config.identity.c_str(), config.server_url.c_str());
+    ESP_LOGI(TAG, "Connecting room=%s identity=%s server=%s", config.active.room_name.c_str(),
+             config.active.identity.c_str(), config.active.server_url.c_str());
 
-    if (livekit_room_connect(room_handle_, config.server_url.c_str(), config.token.c_str()) !=
-        LIVEKIT_ERR_NONE) {
+    if (livekit_room_connect(room_handle_, config.active.server_url.c_str(),
+                             config.active.token.c_str()) != LIVEKIT_ERR_NONE) {
         ESP_LOGE(TAG, "livekit_room_connect failed");
         livekit_room_destroy(room_handle_);
         room_handle_ = nullptr;
@@ -309,7 +309,7 @@ esp_err_t LiveKitSession::ConnectDataOnly(const Esp32HubConfig& config)
         Disconnect(true);
     }
 
-    identity_ = config.identity;
+    identity_ = config.active.identity;
 
     livekit_room_options_t room_options = {};
     room_options.publish = {
@@ -332,10 +332,11 @@ esp_err_t LiveKitSession::ConnectDataOnly(const Esp32HubConfig& config)
     transcription_registered_ = false;
 
     ESP_LOGI(TAG, "Connecting control room=%s identity=%s server=%s",
-             config.room_name.c_str(), config.identity.c_str(), config.server_url.c_str());
+             config.active.room_name.c_str(), config.active.identity.c_str(),
+             config.active.server_url.c_str());
 
-    if (livekit_room_connect(room_handle_, config.server_url.c_str(), config.token.c_str()) !=
-        LIVEKIT_ERR_NONE) {
+    if (livekit_room_connect(room_handle_, config.active.server_url.c_str(),
+                             config.active.token.c_str()) != LIVEKIT_ERR_NONE) {
         ESP_LOGE(TAG, "livekit_room_connect data-only failed");
         livekit_room_destroy(room_handle_);
         room_handle_ = nullptr;
