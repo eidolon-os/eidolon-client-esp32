@@ -12,17 +12,132 @@
 #include <esp_check.h>
 #include <esp_codec_dev.h>
 #include <esp_log.h>
+#include <esp_timer.h>
 #include <av_render_default.h>
+#include <string.h>
 
 #define TAG "EidolonLKBoard"
 
-#define LIVEKIT_I2S_SAMPLE_RATE 16000
 #define LIVEKIT_SPEAKER_VOLUME CONFIG_EIDOLON_LIVEKIT_SPEAKER_VOLUME
 
 static esp_capture_sink_handle_t s_capturer;
-static esp_capture_audio_src_if_t* s_audio_source;
+static esp_capture_audio_src_if_t* s_aec_audio_source;
 static audio_render_handle_t s_audio_renderer;
 static av_render_handle_t s_av_renderer;
+static volatile int64_t s_last_playback_us;
+
+namespace {
+constexpr int kPlaybackPcmMinAvgAbs = 120;
+
+struct GatedAudioSource {
+    esp_capture_audio_src_if_t base;
+    esp_capture_audio_src_if_t* inner;
+    volatile bool enabled;
+};
+
+GatedAudioSource s_gated_audio_source = {};
+
+GatedAudioSource* gated_from_base(esp_capture_audio_src_if_t* src)
+{
+    return reinterpret_cast<GatedAudioSource*>(src);
+}
+
+esp_capture_err_t gated_open(esp_capture_audio_src_if_t* src)
+{
+    auto* gated = gated_from_base(src);
+    return gated->inner->open(gated->inner);
+}
+
+esp_capture_err_t gated_get_support_codecs(esp_capture_audio_src_if_t* src,
+                                           const esp_capture_format_id_t** codecs,
+                                           uint8_t* num)
+{
+    auto* gated = gated_from_base(src);
+    return gated->inner->get_support_codecs(gated->inner, codecs, num);
+}
+
+esp_capture_err_t gated_set_fixed_caps(esp_capture_audio_src_if_t* src,
+                                       const esp_capture_audio_info_t* fixed_caps)
+{
+    auto* gated = gated_from_base(src);
+    if (!gated->inner->set_fixed_caps) {
+        return ESP_CAPTURE_ERR_NOT_SUPPORTED;
+    }
+    return gated->inner->set_fixed_caps(gated->inner, fixed_caps);
+}
+
+esp_capture_err_t gated_negotiate_caps(esp_capture_audio_src_if_t* src,
+                                       esp_capture_audio_info_t* in_caps,
+                                       esp_capture_audio_info_t* out_caps)
+{
+    auto* gated = gated_from_base(src);
+    return gated->inner->negotiate_caps(gated->inner, in_caps, out_caps);
+}
+
+esp_capture_err_t gated_start(esp_capture_audio_src_if_t* src)
+{
+    auto* gated = gated_from_base(src);
+    return gated->inner->start(gated->inner);
+}
+
+esp_capture_err_t gated_read_frame(esp_capture_audio_src_if_t* src,
+                                   esp_capture_stream_frame_t* frame)
+{
+    auto* gated = gated_from_base(src);
+    esp_capture_err_t ret = gated->inner->read_frame(gated->inner, frame);
+    if (ret == ESP_CAPTURE_ERR_OK && !gated->enabled && frame->data && frame->size > 0) {
+        memset(frame->data, 0, frame->size);
+    }
+    return ret;
+}
+
+esp_capture_err_t gated_stop(esp_capture_audio_src_if_t* src)
+{
+    auto* gated = gated_from_base(src);
+    return gated->inner->stop(gated->inner);
+}
+
+esp_capture_err_t gated_close(esp_capture_audio_src_if_t* src)
+{
+    auto* gated = gated_from_base(src);
+    return gated->inner->close(gated->inner);
+}
+
+esp_capture_audio_src_if_t* build_gated_audio_source(esp_capture_audio_src_if_t* inner)
+{
+    s_gated_audio_source = {};
+    s_gated_audio_source.base.open = gated_open;
+    s_gated_audio_source.base.get_support_codecs = gated_get_support_codecs;
+    s_gated_audio_source.base.set_fixed_caps = gated_set_fixed_caps;
+    s_gated_audio_source.base.negotiate_caps = gated_negotiate_caps;
+    s_gated_audio_source.base.start = gated_start;
+    s_gated_audio_source.base.read_frame = gated_read_frame;
+    s_gated_audio_source.base.stop = gated_stop;
+    s_gated_audio_source.base.close = gated_close;
+    s_gated_audio_source.inner = inner;
+    s_gated_audio_source.enabled = true;
+    return &s_gated_audio_source.base;
+}
+}
+
+static int on_audio_render_reference(uint8_t* data, int len, void*)
+{
+    if (data == nullptr || len < static_cast<int>(sizeof(int16_t))) {
+        return 0;
+    }
+
+    const auto* samples = reinterpret_cast<const int16_t*>(data);
+    int sample_count = len / static_cast<int>(sizeof(int16_t));
+    int64_t abs_sum = 0;
+    for (int i = 0; i < sample_count; ++i) {
+        int sample = samples[i];
+        abs_sum += sample < 0 ? -sample : sample;
+    }
+    if ((abs_sum / sample_count) >= kPlaybackPcmMinAvgAbs) {
+        s_last_playback_us = esp_timer_get_time();
+    }
+    return 0;
+}
 
 static esp_err_t build_capturer(esp_codec_dev_handle_t record_handle)
 {
@@ -30,23 +145,28 @@ static esp_err_t build_capturer(esp_codec_dev_handle_t record_handle)
         .record_handle = record_handle,
         .channel = 4,
         .channel_mask = 1 | 2,
+        .data_on_vad = true,
     };
-    s_audio_source = esp_capture_new_audio_aec_src(&aec_cfg);
-    if (!s_audio_source) {
+    s_aec_audio_source = esp_capture_new_audio_aec_src(&aec_cfg);
+    if (!s_aec_audio_source) {
         return ESP_FAIL;
     }
 
+    esp_capture_audio_src_if_t* gated_source = build_gated_audio_source(s_aec_audio_source);
     esp_capture_cfg_t cfg = {
         .sync_mode = ESP_CAPTURE_SYNC_MODE_AUDIO,
-        .audio_src = s_audio_source,
+        .audio_src = gated_source,
     };
     return esp_capture_open(&cfg, &s_capturer);
 }
 
-static esp_err_t build_renderer(esp_codec_dev_handle_t play_handle)
+static esp_err_t build_renderer(esp_codec_dev_handle_t play_handle, uint32_t output_sample_rate)
 {
     i2s_render_cfg_t i2s_cfg = {
         .play_handle = play_handle,
+        .cb = on_audio_render_reference,
+        .fixed_clock = false,
+        .ctx = nullptr,
     };
     s_audio_renderer = av_render_alloc_i2s_render(&i2s_cfg);
     if (!s_audio_renderer) {
@@ -65,8 +185,8 @@ static esp_err_t build_renderer(esp_codec_dev_handle_t play_handle)
     }
 
     av_render_audio_frame_info_t frame_info = {};
-    frame_info.sample_rate = LIVEKIT_I2S_SAMPLE_RATE;
-    frame_info.channel = 2;
+    frame_info.sample_rate = output_sample_rate;
+    frame_info.channel = 1;
     frame_info.bits_per_sample = 16;
     av_render_set_fixed_frame_info(s_av_renderer, &frame_info);
     return ESP_OK;
@@ -93,17 +213,31 @@ extern "C" esp_err_t eidolon_livekit_board_init(void)
     auto* codec = audio_in.Codec();
     if (codec) {
         std::lock_guard<std::mutex> lock(audio_in.Mutex());
+        if (codec->input_enabled()) {
+            codec->EnableInput(false);
+        }
+        if (codec->output_enabled()) {
+            codec->EnableOutput(false);
+        }
         codec->SetOutputVolume(LIVEKIT_SPEAKER_VOLUME);
-        codec->EnableOutput(true);
     }
 
     esp_audio_enc_register_default();
     esp_audio_dec_register_default();
 
     ESP_RETURN_ON_ERROR(build_capturer(rec), TAG, "capturer");
-    ESP_RETURN_ON_ERROR(build_renderer(play), TAG, "renderer");
+    uint32_t output_sample_rate = codec && codec->output_sample_rate() > 0
+                                      ? static_cast<uint32_t>(codec->output_sample_rate())
+                                      : 16000;
+    s_last_playback_us = 0;
+    ESP_RETURN_ON_ERROR(build_renderer(play, output_sample_rate), TAG, "renderer");
 
-    ESP_LOGI(TAG, "LiveKit board media ready (shared codec @ %d Hz)", LIVEKIT_I2S_SAMPLE_RATE);
+    if (codec) {
+        ESP_LOGI(TAG, "LiveKit board media ready (input=%d Hz, output=%d Hz)",
+                 codec->input_sample_rate(), codec->output_sample_rate());
+    } else {
+        ESP_LOGI(TAG, "LiveKit board media ready");
+    }
     return ESP_OK;
 }
 
@@ -117,6 +251,39 @@ extern "C" av_render_handle_t eidolon_livekit_board_get_renderer(void)
     return s_av_renderer;
 }
 
+extern "C" int64_t eidolon_livekit_board_last_playback_us(void)
+{
+    return s_last_playback_us;
+}
+
+extern "C" esp_err_t eidolon_livekit_board_set_capture_enabled(bool enabled)
+{
+    if (!s_aec_audio_source) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    bool previous = s_gated_audio_source.enabled;
+    s_gated_audio_source.enabled = enabled;
+    if (previous != enabled) {
+        ESP_LOGI(TAG, "LiveKit capture gate %s", enabled ? "open" : "muted");
+    }
+    return ESP_OK;
+}
+
+extern "C" esp_err_t eidolon_livekit_board_flush_playback(void)
+{
+    if (!s_av_renderer) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    int ret = av_render_flush(s_av_renderer);
+    if (ret != ESP_MEDIA_ERR_OK) {
+        ESP_LOGW(TAG, "Failed to flush LiveKit playback: %d", ret);
+        return ESP_FAIL;
+    }
+    s_last_playback_us = 0;
+    ESP_LOGI(TAG, "LiveKit playback flushed");
+    return ESP_OK;
+}
+
 extern "C" void eidolon_livekit_board_deinit(void)
 {
     if (s_av_renderer) {
@@ -128,10 +295,8 @@ extern "C" void eidolon_livekit_board_deinit(void)
         esp_capture_close(s_capturer);
         s_capturer = nullptr;
     }
-    s_audio_source = nullptr;
+    s_aec_audio_source = nullptr;
+    s_gated_audio_source = {};
+    s_last_playback_us = 0;
 
-    auto* codec = eidolon::EidolonAudioInput::Instance().Codec();
-    if (codec) {
-        codec->EnableOutput(false);
-    }
 }

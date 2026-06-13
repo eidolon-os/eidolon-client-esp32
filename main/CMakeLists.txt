@@ -1012,9 +1012,11 @@ endif()
 if(CONFIG_EIDOLON_HUB_MODE)
     list(APPEND SOURCES
         "eidolon/agent_session_tracker.cc"
+        "eidolon/control_protocol.cc"
         "eidolon/eidolon_audio_input.cc"
         "eidolon/eidolon_device_store.cc"
         "eidolon/eidolon_display_hooks.cc"
+        "eidolon/device_identity.cc"
         "eidolon/eidolon_lvgl_theme.cc"
         "eidolon/eidolon_ui_presenter.cc"
         "eidolon/hub_activator.cc"

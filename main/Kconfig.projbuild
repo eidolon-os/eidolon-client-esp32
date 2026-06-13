@@ -836,6 +836,24 @@ config USE_DEVICE_AEC
     help
         To work properly, device-side AEC requires a clean output reference path from the speaker signal and physical acoustic isolation between the microphone and speaker.
 
+choice EIDOLON_DEVICE_AEC_AFE_MODE
+    prompt "Device-Side AEC AFE Mode"
+    default EIDOLON_DEVICE_AEC_AFE_MODE_LOW_COST
+    depends on USE_DEVICE_AEC
+    help
+        Select the ESP-SR AFE mode used by the device-side AEC capture source.
+        Low cost is safer for RAM/CPU headroom. High performance can improve
+        echo suppression quality on ESP32-S3/P4 boards with PSRAM, but should
+        be validated on the target board under real playback volume.
+
+    config EIDOLON_DEVICE_AEC_AFE_MODE_LOW_COST
+        bool "Low cost"
+
+    config EIDOLON_DEVICE_AEC_AFE_MODE_HIGH_PERF
+        bool "High performance"
+
+endchoice
+
 config USE_SERVER_AEC
     bool "Enable Server-Side AEC (Unstable)"
     default n
@@ -1027,6 +1045,15 @@ menu "Eidolon Hub"
             When enabled, joins the LiveKit room as soon as device activation
             completes (Hub config saved to NVS). When disabled, use on-screen
             button or BOOT short press to join manually.
+
+    config EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN
+        bool "Development mode: disable idle PMIC power-off"
+        default n
+        depends on EIDOLON_HUB_MODE
+        help
+            Keep the board powered while developing over USB. Product builds
+            should leave this disabled so battery idle auto-shutdown remains
+            active.
 
     config EIDOLON_LIVEKIT_SPEAKER_VOLUME
         int "LiveKit playback volume (0-100)"

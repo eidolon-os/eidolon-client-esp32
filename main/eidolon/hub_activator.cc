@@ -21,6 +21,26 @@
 
 namespace eidolon {
 
+namespace {
+
+const char* ActivationMessageForStatus(HubConfigStatus status)
+{
+    switch (status) {
+    case HubConfigStatus::PendingApproval:
+        return Lang::Strings::EIDOLON_WAITING_APPROVAL;
+    case HubConfigStatus::WaitingBinding:
+        return Lang::Strings::EIDOLON_WAITING_BINDING;
+    case HubConfigStatus::Active:
+        return Lang::Strings::EIDOLON_READY;
+    case HubConfigStatus::Revoked:
+    case HubConfigStatus::Unregistered:
+        return Lang::Strings::ERROR;
+    }
+    return Lang::Strings::ERROR;
+}
+
+}  // namespace
+
 bool HubActivator::Run(Display* display) {
     auto& app = Application::GetInstance();
     const int max_retries = CONFIG_EIDOLON_MDNS_MAX_RETRIES;
@@ -63,7 +83,7 @@ bool HubActivator::Run(Display* display) {
                 }
 
                 if (display) {
-                    display->SetChatMessage("system", Lang::Strings::EIDOLON_READY);
+                    display->SetChatMessage("system", ActivationMessageForStatus(config.status));
                 }
                 return true;
             }

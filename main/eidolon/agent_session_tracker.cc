@@ -2,25 +2,45 @@
 
 namespace eidolon {
 
-void AgentSessionTracker::OnTranscription(const std::string& text)
+void AgentSessionTracker::OnTranscription(const TranscriptionEvent& event)
 {
-    if (text.empty()) {
+    if (event.text.empty()) {
         return;
     }
-    last_transcription_ = text;
-    phase_ = AgentPhase::UserSpeaking;
+    last_transcription_ = event.text;
+    last_transcription_source_ = event.source;
+
+    switch (event.source) {
+    case TranscriptionSource::User:
+        phase_ = AgentPhase::UserSpeaking;
+        break;
+    case TranscriptionSource::Agent:
+        phase_ = AgentPhase::AgentSpeaking;
+        break;
+    case TranscriptionSource::System:
+    case TranscriptionSource::Unknown:
+    default:
+        break;
+    }
+}
+
+void AgentSessionTracker::OnAgentPhase(AgentPhase phase)
+{
+    phase_ = phase;
 }
 
 void AgentSessionTracker::OnRoomConnected()
 {
     phase_ = AgentPhase::Silent;
     last_transcription_.clear();
+    last_transcription_source_ = TranscriptionSource::Unknown;
 }
 
 void AgentSessionTracker::OnRoomDisconnected()
 {
     phase_ = AgentPhase::Silent;
     last_transcription_.clear();
+    last_transcription_source_ = TranscriptionSource::Unknown;
 }
 
 }  // namespace eidolon

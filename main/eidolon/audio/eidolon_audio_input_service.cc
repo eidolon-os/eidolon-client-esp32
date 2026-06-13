@@ -73,7 +73,6 @@ bool EidolonAudioInputService::ReadAudioData(std::vector<int16_t>& data, int sam
     }
 
     data.resize(samples);
-    std::lock_guard<std::mutex> lock(platform.Mutex());
     if (!platform.ReadMonoPcm16k(data.data(), samples)) {
         return false;
     }

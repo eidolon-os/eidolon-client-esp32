@@ -161,7 +161,8 @@ void Application::StartEidolonWakeWord()
         eidolon_audio_input_service_->Start();
     }
 
-    eidolon_audio_input_service_->EnableWakeWordDetection(true);
+    OnEidolonVoiceSessionState(voice_transport_ ? voice_transport_->GetSessionState()
+                                                : eidolon::VoiceSessionState::Idle);
 }
 
 void Application::OnEidolonVoiceSessionState(eidolon::VoiceSessionState state)
@@ -174,12 +175,15 @@ void Application::OnEidolonVoiceSessionState(eidolon::VoiceSessionState state)
     case eidolon::VoiceSessionState::Connecting:
     case eidolon::VoiceSessionState::InRoom:
     case eidolon::VoiceSessionState::Reconnecting:
-        eidolon_audio_input_service_->EnableWakeWordDetection(false);
-        break;
+    case eidolon::VoiceSessionState::PendingApproval:
+    case eidolon::VoiceSessionState::WaitingBinding:
     case eidolon::VoiceSessionState::ConfigReady:
     case eidolon::VoiceSessionState::Idle:
     case eidolon::VoiceSessionState::Error:
-        eidolon_audio_input_service_->EnableWakeWordDetection(true);
+        // The current ESP32 LiveKit SDK path keeps a lightweight audio
+        // publisher open even in the standby control room. Until that can be
+        // truly data-only, local wake word must not read the same codec input.
+        eidolon_audio_input_service_->EnableWakeWordDetection(false);
         break;
     }
 }
@@ -245,10 +249,17 @@ void Application::Initialize() {
 #endif
         });
     };
-    callbacks.on_transcription = [this](const std::string& text) {
-        Schedule([this, text]() {
+    callbacks.on_transcription = [this](const eidolon::TranscriptionEvent& event) {
+        Schedule([this, event]() {
             if (ui_presenter_) {
-                ui_presenter_->OnTranscription(text);
+                ui_presenter_->OnTranscription(event);
+            }
+        });
+    };
+    callbacks.on_agent_phase = [this](eidolon::AgentPhase phase) {
+        Schedule([this, phase]() {
+            if (ui_presenter_) {
+                ui_presenter_->OnAgentPhase(phase);
             }
         });
     };
@@ -505,7 +516,6 @@ void Application::HandleActivationDoneEvent() {
     auto app_desc = esp_app_get_description();
     std::string message = std::string(Lang::Strings::VERSION) + app_desc->version;
     display->ShowNotification(message.c_str());
-    display->SetChatMessage("system", Lang::Strings::EIDOLON_READY);
     board.SetPowerSaveLevel(PowerSaveLevel::PERFORMANCE);
     if (voice_transport_) {
         voice_transport_->OnActivationComplete();
@@ -1364,4 +1374,3 @@ void Application::ResetProtocol() {
         protocol_.reset();
     });
 }
-

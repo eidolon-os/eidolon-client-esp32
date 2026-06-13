@@ -1,6 +1,7 @@
 #include "hub_config_client.h"
 
 #include "board.h"
+#include "device_identity.h"
 #include "system_info.h"
 
 #include <cJSON.h>
@@ -57,12 +58,6 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
         return ESP_ERR_NO_MEM;
     }
 
-    http->SetHeader("X-Device-ID", device_id.c_str());
-    http->SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
-    http->SetHeader("Client-Id", Board::GetInstance().GetUuid().c_str());
-    http->SetHeader("Accept", "application/json");
-    http->SetHeader("User-Agent", SystemInfo::GetUserAgent().c_str());
-
     std::string request_url = config_url;
     const char* agent_param = "agent_mode=streaming";
     if (request_url.find('?') != std::string::npos) {
@@ -72,6 +67,24 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
         request_url += "?";
         request_url += agent_param;
     }
+
+    SignedRequestHeaders signed_headers;
+    esp_err_t sign_err = DeviceIdentity::GetInstance().SignGetRequest(
+        EidolonSignedGetPathQuery(request_url), device_id, signed_headers);
+    if (sign_err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to sign Hub config request");
+        return sign_err;
+    }
+
+    http->SetHeader("X-Device-ID", device_id.c_str());
+    http->SetHeader("X-Device-Nonce", signed_headers.nonce.c_str());
+    http->SetHeader("X-Device-Timestamp", signed_headers.timestamp.c_str());
+    http->SetHeader("X-Device-Public-Key", signed_headers.public_key.c_str());
+    http->SetHeader("X-Device-Signature", signed_headers.signature.c_str());
+    http->SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
+    http->SetHeader("Client-Id", Board::GetInstance().GetUuid().c_str());
+    http->SetHeader("Accept", "application/json");
+    http->SetHeader("User-Agent", SystemInfo::GetUserAgent().c_str());
 
     if (!http->Open("GET", request_url)) {
         ESP_LOGE(TAG, "HTTP open failed for %s", request_url.c_str());
@@ -107,6 +120,11 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
         return ESP_ERR_INVALID_RESPONSE;
     }
 
+    cJSON* status_json = cJSON_GetObjectItem(root, "status");
+    if (cJSON_IsString(status_json)) {
+        out.status = ParseHubConfigStatus(status_json->valuestring);
+    }
+
     cJSON* server_url = cJSON_GetObjectItem(config, "server_url");
     cJSON* token = cJSON_GetObjectItem(config, "token");
     cJSON* identity = cJSON_GetObjectItem(config, "identity");
@@ -122,6 +140,29 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
     out.token = token->valuestring;
     out.identity = identity->valuestring;
     out.room_name = room_name->valuestring;
+
+    cJSON* control = cJSON_GetObjectItem(config, "control");
+    if (cJSON_IsObject(control)) {
+        cJSON* control_server_url = cJSON_GetObjectItem(control, "server_url");
+        cJSON* control_token = cJSON_GetObjectItem(control, "token");
+        cJSON* control_identity = cJSON_GetObjectItem(control, "identity");
+        cJSON* control_room_name = cJSON_GetObjectItem(control, "room_name");
+        if (cJSON_IsString(control_server_url) && cJSON_IsString(control_token) &&
+            cJSON_IsString(control_identity) && cJSON_IsString(control_room_name)) {
+            out.control_server_url = control_server_url->valuestring;
+            out.control_token = control_token->valuestring;
+            out.control_identity = control_identity->valuestring;
+            out.control_room_name = control_room_name->valuestring;
+        }
+    }
+
+    cJSON* device = cJSON_GetObjectItem(root, "device");
+    if (cJSON_IsObject(device)) {
+        cJSON* fingerprint = cJSON_GetObjectItem(device, "fingerprint");
+        if (cJSON_IsString(fingerprint)) {
+            out.device_fingerprint = fingerprint->valuestring;
+        }
+    }
 
     cJSON* audio = cJSON_GetObjectItem(config, "audio");
     if (cJSON_IsObject(audio)) {
@@ -139,7 +180,8 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
                          &pending_firmware_version_, &pending_firmware_url_);
     cJSON_Delete(root);
 
-    ESP_LOGI(TAG, "Fetched Hub config for %s", out.identity.c_str());
+    ESP_LOGI(TAG, "Fetched Hub config for %s status=%s", out.identity.c_str(),
+             HubConfigStatusToString(out.status));
     return ESP_OK;
 }
 

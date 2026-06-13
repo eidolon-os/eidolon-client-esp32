@@ -628,6 +628,18 @@ void AudioService::SetCallbacks(AudioServiceCallbacks& callbacks) {
 }
 
 void AudioService::PlaySound(const std::string_view& ogg) {
+    if (ogg.empty()) {
+        return;
+    }
+    if (codec_ == nullptr || audio_power_timer_ == nullptr || opus_decoder_ == nullptr) {
+        ESP_LOGW(TAG, "Skip sound playback before audio service is initialized");
+        return;
+    }
+    if (ogg.size() < 4 || std::memcmp(ogg.data(), "OggS", 4) != 0) {
+        ESP_LOGW(TAG, "Skip invalid sound payload, size=%zu", ogg.size());
+        return;
+    }
+
     if (!codec_->output_enabled()) {
         esp_timer_stop(audio_power_timer_);
         esp_timer_start_periodic(audio_power_timer_, AUDIO_POWER_CHECK_INTERVAL_MS * 1000);
@@ -647,7 +659,10 @@ void AudioService::PlaySound(const std::string_view& ogg) {
         PushPacketToDecodeQueue(std::move(packet), true);
     });
     demuxer->Reset();
-    demuxer->Process(buf, size);
+    size_t processed = demuxer->Process(buf, size);
+    if (processed == 0) {
+        ESP_LOGW(TAG, "Sound payload was not consumed by Ogg demuxer");
+    }
 }
 
 bool AudioService::IsIdle() {

@@ -16,17 +16,21 @@ public:
     EidolonUiPresenter(Application& app, Display& display);
 
     void Apply(VoiceSessionState session_state, bool mic_enabled);
-    void OnTranscription(const std::string& text);
+    void OnTranscription(const TranscriptionEvent& event);
+    void OnAgentPhase(AgentPhase phase);
 
     AgentSessionTracker& tracker() { return tracker_; }
 
 private:
+    void Reapply();
     void ApplySnapshot(const EidolonUiSnapshot& snapshot);
     DeviceState MapToDeviceState(VoiceSessionState session_state) const;
 
     Application& app_;
     Display& display_;
     AgentSessionTracker tracker_;
+    VoiceSessionState session_state_ = VoiceSessionState::Idle;
+    bool mic_enabled_ = true;
 };
 
 }  // namespace eidolon

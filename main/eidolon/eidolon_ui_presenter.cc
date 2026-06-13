@@ -26,6 +26,8 @@ DeviceState EidolonUiPresenter::MapToDeviceState(VoiceSessionState session_state
         return kDeviceStateConnecting;
     case VoiceSessionState::InRoom:
         return kDeviceStateListening;
+    case VoiceSessionState::PendingApproval:
+    case VoiceSessionState::WaitingBinding:
     case VoiceSessionState::ConfigReady:
     case VoiceSessionState::Idle:
     case VoiceSessionState::Error:
@@ -36,15 +38,21 @@ DeviceState EidolonUiPresenter::MapToDeviceState(VoiceSessionState session_state
 
 void EidolonUiPresenter::Apply(VoiceSessionState session_state, bool mic_enabled)
 {
+    session_state_ = session_state;
+    mic_enabled_ = mic_enabled;
+
     if (session_state == VoiceSessionState::InRoom) {
         tracker_.OnRoomConnected();
-    } else if (session_state == VoiceSessionState::ConfigReady ||
+    } else if (session_state == VoiceSessionState::PendingApproval ||
+               session_state == VoiceSessionState::WaitingBinding ||
+               session_state == VoiceSessionState::ConfigReady ||
                session_state == VoiceSessionState::Idle) {
         tracker_.OnRoomDisconnected();
     }
 
     auto snapshot = UiStateMapper::Map(session_state, tracker_.GetPhase(),
-                                       tracker_.LastTranscription(), mic_enabled);
+                                       tracker_.LastTranscription(),
+                                       tracker_.LastTranscriptionSource(), mic_enabled);
     ApplySnapshot(snapshot);
 
     auto device_state = MapToDeviceState(session_state);
@@ -53,10 +61,44 @@ void EidolonUiPresenter::Apply(VoiceSessionState session_state, bool mic_enabled
     }
 }
 
-void EidolonUiPresenter::OnTranscription(const std::string& text)
+void EidolonUiPresenter::OnTranscription(const TranscriptionEvent& event)
 {
-    tracker_.OnTranscription(text);
-    display_.SetChatMessage("assistant", text.c_str());
+    if (event.source == TranscriptionSource::User && !event.is_final) {
+        Reapply();
+        return;
+    }
+
+    tracker_.OnTranscription(event);
+    const char* role = "assistant";
+    switch (event.source) {
+    case TranscriptionSource::User:
+        role = "user";
+        break;
+    case TranscriptionSource::System:
+        role = "system";
+        break;
+    case TranscriptionSource::Agent:
+    case TranscriptionSource::Unknown:
+    default:
+        role = "assistant";
+        break;
+    }
+    display_.SetChatMessage(role, event.text.c_str());
+    Reapply();
+}
+
+void EidolonUiPresenter::OnAgentPhase(AgentPhase phase)
+{
+    tracker_.OnAgentPhase(phase);
+    Reapply();
+}
+
+void EidolonUiPresenter::Reapply()
+{
+    auto snapshot = UiStateMapper::Map(session_state_, tracker_.GetPhase(),
+                                       tracker_.LastTranscription(),
+                                       tracker_.LastTranscriptionSource(), mic_enabled_);
+    ApplySnapshot(snapshot);
 }
 
 static const char* ButtonLabel(VoiceSessionButtonState state)
@@ -80,7 +122,7 @@ void EidolonUiPresenter::ApplySnapshot(const EidolonUiSnapshot& snapshot)
     display_.SetEmotion(snapshot.emotion);
 
     if (snapshot.subtitle != nullptr && snapshot.subtitle[0] != '\0') {
-        display_.SetChatMessage("assistant", snapshot.subtitle);
+        display_.SetChatMessage(snapshot.subtitle_role, snapshot.subtitle);
     }
 
     if (snapshot.button_state == VoiceSessionButtonState::Hidden) {
