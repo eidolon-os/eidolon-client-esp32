@@ -180,9 +180,10 @@ void Application::OnEidolonVoiceSessionState(eidolon::VoiceSessionState state)
     case eidolon::VoiceSessionState::ConfigReady:
     case eidolon::VoiceSessionState::Idle:
     case eidolon::VoiceSessionState::Error:
-        // The current ESP32 LiveKit SDK path keeps a lightweight audio
-        // publisher open even in the standby control room. Until that can be
-        // truly data-only, local wake word must not read the same codec input.
+        // Wake word is kept in the build but intentionally disabled for now.
+        // During a voice session the codec input is owned by the LiveKit AFE
+        // capture path (EidolonAfeCapture); re-enabling wake word needs the
+        // single-reader fan-out described in the AEC architecture doc.
         eidolon_audio_input_service_->EnableWakeWordDetection(false);
         break;
     }

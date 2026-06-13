@@ -11,6 +11,8 @@
 
 namespace eidolon {
 
+struct ControlCommand;
+
 enum class VoiceSessionState {
     Idle,
     PendingApproval,
@@ -53,6 +55,10 @@ private:
     void HandleRoomJoinCommand(const std::string& command_id);
     void HandlePlaybackStopCommand(const std::string& command_id);
     void HandleIdleTimeoutCommand();
+    // Acks `command` as accepted, then runs `handler` on a short-lived task.
+    // Replies "failed/TASK_CREATE_FAILED" if the task cannot be created.
+    void SpawnCommandTask(const char* task_name, const ControlCommand& command,
+                          void (EidolonVoiceController::*handler)(const std::string&));
     void ScheduleControlReconnect(const char* reason);
     void StartAudioStatePublisher();
     void StopAudioStatePublisher();

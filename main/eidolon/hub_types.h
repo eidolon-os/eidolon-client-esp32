@@ -43,8 +43,8 @@ inline const char* HubConfigStatusToString(HubConfigStatus status) {
 }
 
 inline HubConfigStatus ParseHubConfigStatus(const std::string& status) {
-    if (status == "pending_approval") {
-        return HubConfigStatus::PendingApproval;
+    if (status == "active") {
+        return HubConfigStatus::Active;
     }
     if (status == "waiting_binding") {
         return HubConfigStatus::WaitingBinding;
@@ -55,7 +55,9 @@ inline HubConfigStatus ParseHubConfigStatus(const std::string& status) {
     if (status == "unregistered") {
         return HubConfigStatus::Unregistered;
     }
-    return HubConfigStatus::Active;
+    // "pending_approval" and any unrecognized value fall through here. Default to
+    // the most conservative state: never grant voice on an unknown status.
+    return HubConfigStatus::PendingApproval;
 }
 
 struct HubTxtRecord {

@@ -169,50 +169,13 @@ void EidolonVoiceController::OnControlCommand(const std::string& payload)
         return;
     }
     if (command.op == "room.join") {
-        session_.PublishData(kControlTopic,
-                             BuildControlAck(command, SystemInfo::GetMacAddress(), "accepted", "OK"));
-
-        struct JoinTaskArgs {
-            EidolonVoiceController* self;
-            std::string command_id;
-        };
-        auto* args = new JoinTaskArgs{this, command.id};
-        BaseType_t created = xTaskCreate([](void* arg) {
-            auto* args = static_cast<JoinTaskArgs*>(arg);
-            args->self->HandleRoomJoinCommand(args->command_id);
-            delete args;
-            vTaskDelete(NULL);
-        }, "eidolon_join", 4096, args, 3, nullptr);
-        if (created != pdPASS) {
-            delete args;
-            session_.PublishData(kControlTopic,
-                                 BuildControlAck(command, SystemInfo::GetMacAddress(), "failed",
-                                                 "TASK_CREATE_FAILED"));
-        }
+        SpawnCommandTask("eidolon_join", command, &EidolonVoiceController::HandleRoomJoinCommand);
         return;
     }
 
     if (command.op == "playback.stop") {
-        session_.PublishData(kControlTopic,
-                             BuildControlAck(command, SystemInfo::GetMacAddress(), "accepted", "OK"));
-
-        struct PlaybackStopTaskArgs {
-            EidolonVoiceController* self;
-            std::string command_id;
-        };
-        auto* args = new PlaybackStopTaskArgs{this, command.id};
-        BaseType_t created = xTaskCreate([](void* arg) {
-            auto* args = static_cast<PlaybackStopTaskArgs*>(arg);
-            args->self->HandlePlaybackStopCommand(args->command_id);
-            delete args;
-            vTaskDelete(NULL);
-        }, "eidolon_playback", 4096, args, 3, nullptr);
-        if (created != pdPASS) {
-            delete args;
-            session_.PublishData(kControlTopic,
-                                 BuildControlAck(command, SystemInfo::GetMacAddress(), "failed",
-                                                 "TASK_CREATE_FAILED"));
-        }
+        SpawnCommandTask("eidolon_playback", command,
+                         &EidolonVoiceController::HandlePlaybackStopCommand);
         return;
     }
 
@@ -224,20 +187,28 @@ void EidolonVoiceController::OnControlCommand(const std::string& payload)
         return;
     }
 
+    SpawnCommandTask("eidolon_ctrl", command, &EidolonVoiceController::HandleConfigRefreshCommand);
+}
+
+void EidolonVoiceController::SpawnCommandTask(
+    const char* task_name, const ControlCommand& command,
+    void (EidolonVoiceController::*handler)(const std::string&))
+{
     session_.PublishData(kControlTopic,
                          BuildControlAck(command, SystemInfo::GetMacAddress(), "accepted", "OK"));
 
-    struct RefreshTaskArgs {
+    struct CommandTaskArgs {
         EidolonVoiceController* self;
         std::string command_id;
+        void (EidolonVoiceController::*handler)(const std::string&);
     };
-    auto* args = new RefreshTaskArgs{this, command.id};
+    auto* args = new CommandTaskArgs{this, command.id, handler};
     BaseType_t created = xTaskCreate([](void* arg) {
-        auto* args = static_cast<RefreshTaskArgs*>(arg);
-        args->self->HandleConfigRefreshCommand(args->command_id);
-        delete args;
+        auto* a = static_cast<CommandTaskArgs*>(arg);
+        (a->self->*a->handler)(a->command_id);
+        delete a;
         vTaskDelete(NULL);
-    }, "eidolon_ctrl", 4096, args, 3, nullptr);
+    }, task_name, 4096, args, 3, nullptr);
     if (created != pdPASS) {
         delete args;
         session_.PublishData(kControlTopic,
