@@ -61,6 +61,8 @@
         "EIDOLON_WAITING_APPROVAL_HINT": "请在 Admin 设备页批准此设备",
         "EIDOLON_WAITING_BINDING": "等待绑定 Agent",
         "EIDOLON_WAITING_BINDING_HINT": "设备已批准，请在 Admin 绑定 Agent",
+        "EIDOLON_UNAUTHORIZED": "设备未授权",
+        "EIDOLON_UNAUTHORIZED_HINT": "请在 Admin 重新批准或重新注册此设备",
         "ROOM_START": "开始对话",
         "ROOM_CANCEL": "取消",
         "ROOM_END": "结束对话",

@@ -68,16 +68,22 @@ struct HubTxtRecord {
     std::string hub_version;
 };
 
-struct Esp32HubConfig {
-    HubConfigStatus status = HubConfigStatus::Active;
+// A single LiveKit room the device can connect to.
+struct RoomConfig {
     std::string server_url;
     std::string token;
     std::string identity;
     std::string room_name;
-    std::string control_server_url;
-    std::string control_token;
-    std::string control_identity;
-    std::string control_room_name;
+
+    bool usable() const { return !server_url.empty() && !token.empty(); }
+};
+
+struct Esp32HubConfig {
+    HubConfigStatus status = HubConfigStatus::Active;
+    // `active` holds the pending room while pending/waiting, and the voice room
+    // once active. `control` is the per-device control room (only when active).
+    RoomConfig active;
+    RoomConfig control;
     std::string device_fingerprint;
     int sample_rate = 16000;
     int channels = 1;

@@ -61,6 +61,8 @@
         "EIDOLON_WAITING_APPROVAL_HINT": "Approve this device in Admin",
         "EIDOLON_WAITING_BINDING": "Waiting for Agent binding",
         "EIDOLON_WAITING_BINDING_HINT": "Device approved. Bind an Agent in Admin",
+        "EIDOLON_UNAUTHORIZED": "Device not authorized",
+        "EIDOLON_UNAUTHORIZED_HINT": "Re-approve or re-register this device in Admin",
         "ROOM_START": "Start conversation",
         "ROOM_CANCEL": "Cancel",
         "ROOM_END": "End conversation",

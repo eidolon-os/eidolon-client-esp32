@@ -60,10 +60,17 @@ EidolonUiSnapshot UiStateMapper::Map(VoiceSessionState session_state,
         snapshot.button_state = VoiceSessionButtonState::Start;
         snapshot.emotion = "sad";
         break;
+    case VoiceSessionState::Unauthorized:
+        snapshot.status_text = Lang::Strings::EIDOLON_UNAUTHORIZED;
+        snapshot.subtitle = Lang::Strings::EIDOLON_UNAUTHORIZED_HINT;
+        snapshot.button_state = VoiceSessionButtonState::Hidden;
+        snapshot.emotion = "neutral";
+        break;
     }
 
     if (!last_transcription.empty() && session_state != VoiceSessionState::PendingApproval &&
-        session_state != VoiceSessionState::WaitingBinding) {
+        session_state != VoiceSessionState::WaitingBinding &&
+        session_state != VoiceSessionState::Unauthorized) {
         snapshot.subtitle = last_transcription.c_str();
         switch (last_transcription_source) {
         case TranscriptionSource::User:

@@ -41,20 +41,20 @@ esp_err_t HubConfigStore::SaveHubConfig(const Esp32HubConfig& config, const std:
     Settings settings(kNvsNamespace, true);
     settings.SetString("config_url", config_url);
     settings.SetString("config_status", HubConfigStatusToString(config.status));
-    settings.SetString("server_url", config.server_url);
-    settings.SetString("token", config.token);
-    settings.SetString("identity", config.identity);
-    settings.SetString("room_name", config.room_name);
-    settings.SetString("ctrl_url", config.control_server_url);
-    settings.SetString("ctrl_token", config.control_token);
-    settings.SetString("ctrl_id", config.control_identity);
-    settings.SetString("ctrl_room", config.control_room_name);
+    settings.SetString("server_url", config.active.server_url);
+    settings.SetString("token", config.active.token);
+    settings.SetString("identity", config.active.identity);
+    settings.SetString("room_name", config.active.room_name);
+    settings.SetString("ctrl_url", config.control.server_url);
+    settings.SetString("ctrl_token", config.control.token);
+    settings.SetString("ctrl_id", config.control.identity);
+    settings.SetString("ctrl_room", config.control.room_name);
     settings.SetString("fingerprint", config.device_fingerprint);
     settings.SetInt("sample_rate", config.sample_rate);
     settings.SetInt("channels", config.channels);
     ESP_LOGI(TAG, "Saved Hub config identity=%s status=%s room=%s server=%s",
-             config.identity.c_str(), HubConfigStatusToString(config.status),
-             config.room_name.c_str(), config.server_url.c_str());
+             config.active.identity.c_str(), HubConfigStatusToString(config.status),
+             config.active.room_name.c_str(), config.active.server_url.c_str());
     return ESP_OK;
 }
 
@@ -73,14 +73,14 @@ bool HubConfigStore::Load(Esp32HubConfig& config, std::string* config_url) const
 
     config = Esp32HubConfig{};
     config.status = ParseHubConfigStatus(settings.GetString("config_status", "active"));
-    config.server_url = std::move(server_url);
-    config.token = std::move(token);
-    config.identity = settings.GetString("identity");
-    config.room_name = settings.GetString("room_name");
-    config.control_server_url = settings.GetString("ctrl_url");
-    config.control_token = settings.GetString("ctrl_token");
-    config.control_identity = settings.GetString("ctrl_id");
-    config.control_room_name = settings.GetString("ctrl_room");
+    config.active.server_url = std::move(server_url);
+    config.active.token = std::move(token);
+    config.active.identity = settings.GetString("identity");
+    config.active.room_name = settings.GetString("room_name");
+    config.control.server_url = settings.GetString("ctrl_url");
+    config.control.token = settings.GetString("ctrl_token");
+    config.control.identity = settings.GetString("ctrl_id");
+    config.control.room_name = settings.GetString("ctrl_room");
     config.device_fingerprint = settings.GetString("fingerprint");
     config.sample_rate = settings.GetInt("sample_rate", 16000);
     config.channels = settings.GetInt("channels", 1);

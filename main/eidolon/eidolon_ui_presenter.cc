@@ -46,7 +46,8 @@ void EidolonUiPresenter::Apply(VoiceSessionState session_state, bool mic_enabled
     } else if (session_state == VoiceSessionState::PendingApproval ||
                session_state == VoiceSessionState::WaitingBinding ||
                session_state == VoiceSessionState::ConfigReady ||
-               session_state == VoiceSessionState::Idle) {
+               session_state == VoiceSessionState::Idle ||
+               session_state == VoiceSessionState::Unauthorized) {
         tracker_.OnRoomDisconnected();
     }
 

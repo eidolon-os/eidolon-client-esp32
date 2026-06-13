@@ -56,6 +56,7 @@ void LiveKitVoiceTransport::ToggleSession()
     switch (state) {
     case VoiceSessionState::PendingApproval:
     case VoiceSessionState::WaitingBinding:
+    case VoiceSessionState::Unauthorized:
         ESP_LOGI(TAG, "Pairing state may be stale, refreshing before voice join");
         JoinSession();
         break;

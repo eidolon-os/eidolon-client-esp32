@@ -136,10 +136,10 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
         return ESP_ERR_INVALID_RESPONSE;
     }
 
-    out.server_url = server_url->valuestring;
-    out.token = token->valuestring;
-    out.identity = identity->valuestring;
-    out.room_name = room_name->valuestring;
+    out.active.server_url = server_url->valuestring;
+    out.active.token = token->valuestring;
+    out.active.identity = identity->valuestring;
+    out.active.room_name = room_name->valuestring;
 
     cJSON* control = cJSON_GetObjectItem(config, "control");
     if (cJSON_IsObject(control)) {
@@ -149,10 +149,10 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
         cJSON* control_room_name = cJSON_GetObjectItem(control, "room_name");
         if (cJSON_IsString(control_server_url) && cJSON_IsString(control_token) &&
             cJSON_IsString(control_identity) && cJSON_IsString(control_room_name)) {
-            out.control_server_url = control_server_url->valuestring;
-            out.control_token = control_token->valuestring;
-            out.control_identity = control_identity->valuestring;
-            out.control_room_name = control_room_name->valuestring;
+            out.control.server_url = control_server_url->valuestring;
+            out.control.token = control_token->valuestring;
+            out.control.identity = control_identity->valuestring;
+            out.control.room_name = control_room_name->valuestring;
         }
     }
 
@@ -180,7 +180,7 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
                          &pending_firmware_version_, &pending_firmware_url_);
     cJSON_Delete(root);
 
-    ESP_LOGI(TAG, "Fetched Hub config for %s status=%s", out.identity.c_str(),
+    ESP_LOGI(TAG, "Fetched Hub config for %s status=%s", out.active.identity.c_str(),
              HubConfigStatusToString(out.status));
     return ESP_OK;
 }
