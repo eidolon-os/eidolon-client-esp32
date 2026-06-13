@@ -194,7 +194,13 @@ private:
     PowerSaveTimer* power_save_timer_;
 
     void InitializePowerSaveTimer() {
-        power_save_timer_ = new PowerSaveTimer(-1, 60, 300);
+        constexpr int kSecondsToSleep = 60;
+#if CONFIG_EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN
+        constexpr int kSecondsToShutdown = -1;
+#else
+        constexpr int kSecondsToShutdown = 300;
+#endif
+        power_save_timer_ = new PowerSaveTimer(-1, kSecondsToSleep, kSecondsToShutdown);
         power_save_timer_->OnEnterSleepMode([this]() {
             GetDisplay()->SetPowerSaveMode(true);
             GetBacklight()->SetBrightness(20); });

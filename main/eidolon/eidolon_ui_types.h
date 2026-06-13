@@ -12,6 +12,19 @@ enum class AgentPhase {
     AgentSpeaking,
 };
 
+enum class TranscriptionSource {
+    Unknown,
+    User,
+    Agent,
+    System,
+};
+
+struct TranscriptionEvent {
+    TranscriptionSource source = TranscriptionSource::Unknown;
+    std::string text;
+    bool is_final = false;
+};
+
 enum class VoiceSessionButtonState {
     Hidden,
     Start,
@@ -22,6 +35,7 @@ enum class VoiceSessionButtonState {
 struct EidolonUiSnapshot {
     const char* status_text = "";
     const char* subtitle = "";
+    const char* subtitle_role = "system";
     const char* emotion = "neutral";
     VoiceSessionButtonState button_state = VoiceSessionButtonState::Start;
     bool show_mute_icon = false;

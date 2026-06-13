@@ -22,6 +22,9 @@ LiveKitVoiceTransport::LiveKitVoiceTransport(VoiceSessionCallbacks cb)
     if (cb.on_transcription) {
         controller_->SetOnTranscription(std::move(cb.on_transcription));
     }
+    if (cb.on_agent_phase) {
+        controller_->SetOnAgentPhase(std::move(cb.on_agent_phase));
+    }
     controller_->SetMicEnabled(mic_enabled_);
 }
 
@@ -51,6 +54,11 @@ void LiveKitVoiceTransport::ToggleSession()
 {
     auto state = controller_->GetState();
     switch (state) {
+    case VoiceSessionState::PendingApproval:
+    case VoiceSessionState::WaitingBinding:
+        ESP_LOGI(TAG, "Pairing state may be stale, refreshing before voice join");
+        JoinSession();
+        break;
     case VoiceSessionState::ConfigReady:
     case VoiceSessionState::Idle:
     case VoiceSessionState::Error:
@@ -61,7 +69,7 @@ void LiveKitVoiceTransport::ToggleSession()
         LeaveSession();
         break;
     case VoiceSessionState::InRoom:
-        LeaveSession();
+        ESP_LOGI(TAG, "Voice room already active; touch is passive in product mode");
         break;
     }
 }

@@ -6,7 +6,8 @@
             "name": "esp32-s3-touch-amoled-2.06",
             "sdkconfig_append": [
                 "CONFIG_USE_WECHAT_MESSAGE_STYLE=n",
-                "CONFIG_EIDOLON_AUTO_JOIN_ON_ACTIVATION=n"
+                "CONFIG_EIDOLON_AUTO_JOIN_ON_ACTIVATION=n",
+                "CONFIG_EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN=y"
             ]
         }
     ]

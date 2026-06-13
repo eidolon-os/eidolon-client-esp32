@@ -11,6 +11,7 @@ public:
     static EidolonUiSnapshot Map(VoiceSessionState session_state,
                                  AgentPhase agent_phase,
                                  const std::string& last_transcription,
+                                 TranscriptionSource last_transcription_source,
                                  bool mic_enabled);
 };
 

@@ -315,8 +315,8 @@ partition_offset() {
     otadata)  echo "0xd000" ;;
     phy_init) echo "0xf000" ;;
     ota_0)    echo "0x20000" ;;
-    ota_1)    echo "0x440000" ;;
-    assets)   echo "0x860000" ;;
+    ota_1)    echo "0x470000" ;;
+    assets)   echo "0x8c0000" ;;
     *) die "unknown partition: $1" ;;
   esac
 }
@@ -326,9 +326,9 @@ partition_size() {
     nvs)      echo "0x4000" ;;
     otadata)  echo "0x2000" ;;
     phy_init) echo "0x1000" ;;
-    ota_0)    echo "0x420000" ;;
-    ota_1)    echo "0x420000" ;;
-    assets)   echo "0x7A0000" ;;
+    ota_0)    echo "0x450000" ;;
+    ota_1)    echo "0x450000" ;;
+    assets)   echo "0x740000" ;;
     *) die "unknown partition: $1" ;;
   esac
 }
@@ -405,12 +405,67 @@ ensure_eidolon_partition_sdkconfig() {
   fi
 }
 
+set_sdkconfig_bool() {
+  local key="$1"
+  local value="$2"
+  local sdkconfig="${PROJECT_ROOT}/sdkconfig"
+  [[ -f "${sdkconfig}" ]] || return 0
+
+  local tmp
+  tmp="$(mktemp)"
+  awk -v key="${key}" '
+    $0 == "CONFIG_" key "=y" { next }
+    $0 == "# CONFIG_" key " is not set" { next }
+    { print }
+  ' "${sdkconfig}" >"${tmp}"
+  if [[ "${value}" == "y" ]]; then
+    printf 'CONFIG_%s=y\n' "${key}" >>"${tmp}"
+  else
+    printf '# CONFIG_%s is not set\n' "${key}" >>"${tmp}"
+  fi
+  mv "${tmp}" "${sdkconfig}"
+}
+
+ensure_eidolon_trim_sdkconfig() {
+  # Keep provisioning available. The current hotspot/web flow is temporary, and
+  # future builds still need the Blufi/BLE provisioning capability.
+  set_sdkconfig_bool USE_ESP_BLUFI_WIFI_PROVISIONING y
+  set_sdkconfig_bool BT_ENABLED y
+  set_sdkconfig_bool BT_BLUEDROID_ENABLED y
+  set_sdkconfig_bool BT_BLE_42_FEATURES_SUPPORTED y
+  set_sdkconfig_bool BT_BLE_50_FEATURES_SUPPORTED n
+  set_sdkconfig_bool BT_BLE_BLUFI_ENABLE y
+  set_sdkconfig_bool MBEDTLS_DHM_C y
+
+  # Keep this board optimized for app partition size. Perf mode was only useful
+  # during early bring-up and leaves very little OTA headroom.
+  set_sdkconfig_bool COMPILER_OPTIMIZATION_PERF n
+  set_sdkconfig_bool COMPILER_OPTIMIZATION_SIZE y
+
+  # LiveKit/Hub TLS only needs common public roots in the normal deployment.
+  # Full Mozilla bundle costs ~70KB of flash; switch back to FULL for private CA.
+  set_sdkconfig_bool MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL n
+  set_sdkconfig_bool MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_CMN y
+
+  # This toolkit is used mostly while the board is on USB for flash/monitor.
+  # Keep product builds unchanged; only script-managed dev builds avoid PMIC
+  # idle power-off so the serial port stays enumerated.
+  set_sdkconfig_bool EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN y
+
+  # The Waveshare ESP32-S3 board has PSRAM and is currently being tuned for
+  # speaker/mic echo. Use the stronger AFE path in script-managed dev builds;
+  # the Kconfig default remains LOW_COST for conservative product builds.
+  set_sdkconfig_bool EIDOLON_DEVICE_AEC_AFE_MODE_LOW_COST n
+  set_sdkconfig_bool EIDOLON_DEVICE_AEC_AFE_MODE_HIGH_PERF y
+}
+
 ensure_board_sdkconfig() {
   local sdkconfig="${PROJECT_ROOT}/sdkconfig"
   clear_other_board_selections
   ensure_eidolon_partition_sdkconfig
 
   if sdkconfig_has_board; then
+    ensure_eidolon_trim_sdkconfig
     return 0
   fi
 
@@ -420,21 +475,16 @@ ensure_board_sdkconfig() {
 ${SDK_MARKER}
 ${BOARD_KCONFIG}
 CONFIG_USE_WECHAT_MESSAGE_STYLE=n
-CONFIG_BT_ENABLED=y
-CONFIG_BT_BLUEDROID_ENABLED=y
-CONFIG_BT_BLE_42_FEATURES_SUPPORTED=y
-CONFIG_BT_BLE_50_FEATURES_SUPPORTED=n
-CONFIG_BT_BLE_BLUFI_ENABLE=y
-CONFIG_MBEDTLS_DHM_C=y
 CONFIG_EIDOLON_HUB_MODE=y
 CONFIG_EIDOLON_AUTO_JOIN_ON_ACTIVATION=n
+CONFIG_EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN=y
+CONFIG_EIDOLON_DEVICE_AEC_AFE_MODE_HIGH_PERF=y
 CONFIG_EIDOLON_WAKE_WORD_ENABLE=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/v2/16m_eidolon.csv"
 CONFIG_WAKE_WORD_DISABLED=y
 CONFIG_LWIP_DNS_SUPPORT_MDNS_QUERIES=y
 CONFIG_MDNS_MAX_SERVICES=10
 CONFIG_CODEC_I2C_BACKWARD_COMPATIBLE=n
-CONFIG_COMPILER_OPTIMIZATION_PERF=y
 CONFIG_ESP_WS_CLIENT_ENABLE_DYNAMIC_BUFFER=y
 CONFIG_ESP_WS_CLIENT_SEPARATE_TX_LOCK=y
 CONFIG_ESP32S3_DATA_CACHE_64KB=y
@@ -452,6 +502,7 @@ CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
 CONFIG_SPIRAM=y
 EOF
+  ensure_eidolon_trim_sdkconfig
 }
 
 configure_target() {
