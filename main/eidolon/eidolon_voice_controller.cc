@@ -19,6 +19,12 @@ namespace {
 constexpr const char* kClientAudioStateTopic = "client.audio_state";
 constexpr int64_t kPlaybackActiveWindowUs = 800 * 1000;
 constexpr TickType_t kAudioStatePublishInterval = pdMS_TO_TICKS(500);
+// Delay before a control-room reconnect attempt after a disconnect.
+constexpr TickType_t kControlReconnectDelay = pdMS_TO_TICKS(1000);
+// Let the control-room ack flush before switching to the voice room.
+constexpr TickType_t kRoomJoinSettleDelay = pdMS_TO_TICKS(500);
+// Let the "succeeded" ack flush before reconnecting the control room.
+constexpr TickType_t kActiveAckSettleDelay = pdMS_TO_TICKS(100);
 
 const char* AgentPhaseName(eidolon::AgentPhase phase)
 {
@@ -142,7 +148,7 @@ void EidolonVoiceController::ScheduleControlReconnect(const char* reason)
 
     BaseType_t created = xTaskCreate([](void* arg) {
         auto* self = static_cast<EidolonVoiceController*>(arg);
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(kControlReconnectDelay);
         self->ConnectControlRoom();
         self->control_reconnect_pending_ = false;
         vTaskDelete(NULL);
@@ -168,26 +174,31 @@ void EidolonVoiceController::OnControlCommand(const std::string& payload)
             BuildControlAck(command, SystemInfo::GetMacAddress(), "expired", "COMMAND_EXPIRED"));
         return;
     }
-    if (command.op == "room.join") {
-        SpawnCommandTask("eidolon_join", command, &EidolonVoiceController::HandleRoomJoinCommand);
-        return;
+    // Op dispatch registry. Add a row to support a new op; each handler runs on
+    // a short-lived task via SpawnCommandTask. Defined as a static local so it
+    // can take the address of private member handlers.
+    struct ControlOpHandler {
+        const char* op;
+        const char* task_name;
+        void (EidolonVoiceController::*handler)(const std::string&);
+    };
+    static const ControlOpHandler kControlOps[] = {
+        {"config.refresh", "eidolon_ctrl", &EidolonVoiceController::HandleConfigRefreshCommand},
+        {"room.join", "eidolon_join", &EidolonVoiceController::HandleRoomJoinCommand},
+        {"playback.stop", "eidolon_playback", &EidolonVoiceController::HandlePlaybackStopCommand},
+    };
+
+    for (const auto& entry : kControlOps) {
+        if (command.op == entry.op) {
+            SpawnCommandTask(entry.task_name, command, entry.handler);
+            return;
+        }
     }
 
-    if (command.op == "playback.stop") {
-        SpawnCommandTask("eidolon_playback", command,
-                         &EidolonVoiceController::HandlePlaybackStopCommand);
-        return;
-    }
-
-    if (command.op != "config.refresh") {
-        ESP_LOGI(TAG, "Unsupported control command op=%s", command.op.c_str());
-        session_.PublishData(
-            kControlTopic,
-            BuildControlAck(command, SystemInfo::GetMacAddress(), "unsupported", "UNSUPPORTED_OP"));
-        return;
-    }
-
-    SpawnCommandTask("eidolon_ctrl", command, &EidolonVoiceController::HandleConfigRefreshCommand);
+    ESP_LOGI(TAG, "Unsupported control command op=%s", command.op.c_str());
+    session_.PublishData(
+        kControlTopic,
+        BuildControlAck(command, SystemInfo::GetMacAddress(), "unsupported", "UNSUPPORTED_OP"));
 }
 
 void EidolonVoiceController::SpawnCommandTask(
@@ -255,7 +266,7 @@ void EidolonVoiceController::HandleConfigRefreshCommand(const std::string& comma
         session_.PublishData(kControlTopic,
                              BuildControlAck(command, SystemInfo::GetMacAddress(), "succeeded",
                                              "OK", "", "{\"status\":\"active\"}"));
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(kActiveAckSettleDelay);
         ConnectControlRoom();
         return;
     }
@@ -271,7 +282,7 @@ void EidolonVoiceController::HandleRoomJoinCommand(const std::string& command_id
     ControlCommand command;
     command.id = command_id;
     command.op = "room.join";
-    vTaskDelay(pdMS_TO_TICKS(500));
+    vTaskDelay(kRoomJoinSettleDelay);
 
     esp_err_t err = JoinRoom();
     if (err != ESP_OK) {
