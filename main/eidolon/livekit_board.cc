@@ -3,6 +3,7 @@
 #include "livekit_board.h"
 
 #include "audio_codec.h"
+#include "audio/eidolon_afe_capture.h"
 #include "eidolon_audio_input.h"
 
 #include <esp_audio_dec_default.h>
@@ -21,7 +22,7 @@
 #define LIVEKIT_SPEAKER_VOLUME CONFIG_EIDOLON_LIVEKIT_SPEAKER_VOLUME
 
 static esp_capture_sink_handle_t s_capturer;
-static esp_capture_audio_src_if_t* s_aec_audio_source;
+static eidolon::EidolonAfeCapture* s_afe_capture;
 static audio_render_handle_t s_audio_renderer;
 static av_render_handle_t s_av_renderer;
 static volatile int64_t s_last_playback_us;
@@ -139,20 +140,21 @@ static int on_audio_render_reference(uint8_t* data, int len, void*)
     return 0;
 }
 
-static esp_err_t build_capturer(esp_codec_dev_handle_t record_handle)
+static esp_err_t build_capturer(AudioCodec* codec)
 {
-    esp_capture_audio_aec_src_cfg_t aec_cfg = {
-        .record_handle = record_handle,
-        .channel = 4,
-        .channel_mask = 1 | 2,
-        .data_on_vad = true,
-    };
-    s_aec_audio_source = esp_capture_new_audio_aec_src(&aec_cfg);
-    if (!s_aec_audio_source) {
-        return ESP_FAIL;
+    // Device-side AEC runs in EidolonAfeCapture (xiaozhi AfeAudioProcessor, voice
+    // profile). The cancelled PCM is exposed as a push-based esp_capture source,
+    // replacing esp_capture's wake-word-tuned AEC source.
+    if (s_afe_capture == nullptr) {
+        s_afe_capture = new eidolon::EidolonAfeCapture();
+    }
+    esp_err_t err = s_afe_capture->Start(codec);
+    if (err != ESP_OK) {
+        return err;
     }
 
-    esp_capture_audio_src_if_t* gated_source = build_gated_audio_source(s_aec_audio_source);
+    esp_capture_audio_src_if_t* gated_source =
+        build_gated_audio_source(s_afe_capture->CaptureSource());
     esp_capture_cfg_t cfg = {
         .sync_mode = ESP_CAPTURE_SYNC_MODE_AUDIO,
         .audio_src = gated_source,
@@ -203,19 +205,18 @@ extern "C" esp_err_t eidolon_livekit_board_init(void)
         ESP_RETURN_ON_ERROR(audio_in.Init(), TAG, "audio platform");
     }
 
-    esp_codec_dev_handle_t rec = audio_in.RecordHandle();
     esp_codec_dev_handle_t play = audio_in.PlaybackHandle();
-    if (!rec || !play) {
-        ESP_LOGE(TAG, "Codec record/play handles not available");
+    auto* codec = audio_in.Codec();
+    if (!play || !codec) {
+        ESP_LOGE(TAG, "Codec playback handle / codec not available");
         return ESP_ERR_INVALID_STATE;
     }
 
-    auto* codec = audio_in.Codec();
-    if (codec) {
+    {
         std::lock_guard<std::mutex> lock(audio_in.Mutex());
-        if (codec->input_enabled()) {
-            codec->EnableInput(false);
-        }
+        // Output is driven by av_render through the raw play handle, so keep the
+        // codec's own output path closed. Input stays managed by the codec
+        // because EidolonAfeCapture reads mic+reference PCM through it.
         if (codec->output_enabled()) {
             codec->EnableOutput(false);
         }
@@ -225,7 +226,7 @@ extern "C" esp_err_t eidolon_livekit_board_init(void)
     esp_audio_enc_register_default();
     esp_audio_dec_register_default();
 
-    ESP_RETURN_ON_ERROR(build_capturer(rec), TAG, "capturer");
+    ESP_RETURN_ON_ERROR(build_capturer(codec), TAG, "capturer");
     uint32_t output_sample_rate = codec && codec->output_sample_rate() > 0
                                       ? static_cast<uint32_t>(codec->output_sample_rate())
                                       : 16000;
@@ -258,7 +259,7 @@ extern "C" int64_t eidolon_livekit_board_last_playback_us(void)
 
 extern "C" esp_err_t eidolon_livekit_board_set_capture_enabled(bool enabled)
 {
-    if (!s_aec_audio_source) {
+    if (!s_capturer) {
         return ESP_ERR_INVALID_STATE;
     }
     bool previous = s_gated_audio_source.enabled;
@@ -295,8 +296,11 @@ extern "C" void eidolon_livekit_board_deinit(void)
         esp_capture_close(s_capturer);
         s_capturer = nullptr;
     }
-    s_aec_audio_source = nullptr;
+    if (s_afe_capture) {
+        s_afe_capture->Stop();
+        delete s_afe_capture;
+        s_afe_capture = nullptr;
+    }
     s_gated_audio_source = {};
     s_last_playback_us = 0;
-
 }
