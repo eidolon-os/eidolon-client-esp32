@@ -18,7 +18,11 @@
 namespace {
 constexpr const char* kClientAudioStateTopic = "eidolon.audio_state";
 constexpr int64_t kPlaybackActiveWindowUs = 800 * 1000;
-constexpr TickType_t kAudioStatePublishInterval = pdMS_TO_TICKS(500);
+// Poll the audio state fast so a barge-in (near-end speech) edge reaches the
+// channel within ~one poll, but only emit an unchanged heartbeat every
+// kAudioStateHeartbeatUs to avoid flooding lossy packets at the poll rate.
+constexpr TickType_t kAudioStatePublishInterval = pdMS_TO_TICKS(80);
+constexpr int64_t kAudioStateHeartbeatUs = 500 * 1000;
 // Delay before a control-room reconnect attempt after a disconnect.
 constexpr TickType_t kControlReconnectDelay = pdMS_TO_TICKS(1000);
 // Let the control-room ack flush before switching to the voice room.
@@ -538,21 +542,44 @@ void EidolonVoiceController::PublishClientAudioState(bool playback_active)
     char payload[280];
     int64_t now_us = esp_timer_get_time();
     uint32_t client_ts_ms = static_cast<uint32_t>(now_us / 1000);
-    bool mic_muted = !mic_enabled_;
+
+    // Full-duplex barge-in: the mic stays open during agent playback so the AFE
+    // can tell genuine user speech from residual echo on the AEC-cleaned signal.
+    //   - user explicitly muted        -> mic_muted (always)
+    //   - playback + no near-end speech -> mic_muted, so the channel drops echo
+    //   - playback + near-end speech    -> NOT muted + manual_interrupt, so the
+    //                                      channel hard-interrupts and admits the
+    //                                      barge-in turn
+    //   - idle (no playback)            -> normal listening
+    bool near_end = playback_active && mic_enabled_ && eidolon_livekit_board_near_end_active();
+    bool mic_muted = !mic_enabled_ || (playback_active && !near_end);
+    bool manual_interrupt = near_end;
+
+    // Keep the mic capture path open whenever the user hasn't muted: gating it
+    // during playback would clip the onset of a barge-in before the AFE VAD has
+    // had a chance to flag it. Echo is suppressed at the channel via mic_muted.
     eidolon_livekit_board_set_capture_enabled(mic_enabled_);
+
     bool state_changed = !audio_state_sent_ ||
                          playback_active != last_audio_playback_active_ ||
-                         mic_muted != last_audio_mic_muted_;
+                         mic_muted != last_audio_mic_muted_ ||
+                         manual_interrupt != last_audio_manual_interrupt_;
+    // Fast poll, throttled heartbeat: nothing changed and the heartbeat isn't due
+    // yet, so don't emit a packet (last_audio_* already equals the current state).
+    if (!state_changed && (now_us - last_audio_publish_us_) < kAudioStateHeartbeatUs) {
+        return;
+    }
     uint32_t seq = ++audio_state_seq_;
     int written = snprintf(
         payload,
         sizeof(payload),
         "{\"type\":\"client.audio_state\",\"seq\":%lu,\"input_mode\":\"auto\","
         "\"playback_state\":\"%s\",\"mic_muted\":%s,"
-        "\"manual_interrupt\":false,\"ptt\":false,\"client_ts_ms\":%lu}",
+        "\"manual_interrupt\":%s,\"ptt\":false,\"client_ts_ms\":%lu}",
         static_cast<unsigned long>(seq),
         playback_active ? "agent_speaking" : "idle",
         mic_muted ? "true" : "false",
+        manual_interrupt ? "true" : "false",
         static_cast<unsigned long>(client_ts_ms));
     if (written <= 0 || written >= static_cast<int>(sizeof(payload))) {
         return;
@@ -565,6 +592,8 @@ void EidolonVoiceController::PublishClientAudioState(bool playback_active)
     audio_state_sent_ = true;
     last_audio_playback_active_ = playback_active;
     last_audio_mic_muted_ = mic_muted;
+    last_audio_manual_interrupt_ = manual_interrupt;
+    last_audio_publish_us_ = now_us;
 }
 
 bool EidolonVoiceController::PlaybackActiveRecently() const

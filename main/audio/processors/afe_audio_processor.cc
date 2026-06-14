@@ -2,6 +2,8 @@
 #include <esp_log.h>
 
 #define PROCESSOR_RUNNING 0x01
+#define PROCESSOR_QUIT    0x02  // ask the internal task to exit its loop
+#define PROCESSOR_DONE    0x04  // internal task has exited (set right before return)
 
 #define TAG "AfeAudioProcessor"
 
@@ -58,7 +60,11 @@ void AfeAudioProcessor::Initialize(AudioCodec* codec, int frame_duration_ms, srm
 
 #ifdef CONFIG_USE_DEVICE_AEC
     afe_config->aec_init = true;
-    afe_config->vad_init = false;
+    // Keep VAD initialized alongside AEC so the AEC-cleaned signal still yields a
+    // near-end voice-activity state (used for full-duplex barge-in detection).
+    // xiaozhi's own path disables VAD at runtime via EnableDeviceAec(true); the
+    // Eidolon capture path keeps it on and never calls EnableDeviceAec.
+    afe_config->vad_init = true;
 #else
     afe_config->aec_init = false;
     afe_config->vad_init = true;
@@ -75,8 +81,15 @@ void AfeAudioProcessor::Initialize(AudioCodec* codec, int frame_duration_ms, srm
 }
 
 AfeAudioProcessor::~AfeAudioProcessor() {
+    // The internal AudioProcessorTask runs fetch_with_delay() on afe_data_, so it
+    // must be stopped and joined BEFORE we free afe_data_, otherwise it dereferences
+    // freed AFE state (LoadProhibited/StoreProhibited). Initialize() may not have
+    // run (no task / no afe_data_), so only join when afe_data_ exists.
     if (afe_data_ != nullptr) {
+        xEventGroupSetBits(event_group_, PROCESSOR_QUIT);
+        xEventGroupWaitBits(event_group_, PROCESSOR_DONE, pdFALSE, pdTRUE, pdMS_TO_TICKS(2000));
         afe_iface_->destroy(afe_data_);
+        afe_data_ = nullptr;
     }
     vEventGroupDelete(event_group_);
 }
@@ -139,10 +152,21 @@ void AfeAudioProcessor::AudioProcessorTask() {
         feed_size, fetch_size);
 
     while (true) {
-        xEventGroupWaitBits(event_group_, PROCESSOR_RUNNING, pdFALSE, pdTRUE, portMAX_DELAY);
+        EventBits_t bits = xEventGroupWaitBits(
+            event_group_, PROCESSOR_RUNNING | PROCESSOR_QUIT, pdFALSE, pdFALSE, portMAX_DELAY);
+        if (bits & PROCESSOR_QUIT) {
+            break;
+        }
 
-        auto res = afe_iface_->fetch_with_delay(afe_data_, portMAX_DELAY);
-        if ((xEventGroupGetBits(event_group_) & PROCESSOR_RUNNING) == 0) {
+        // Finite timeout (not portMAX_DELAY) so the loop stays responsive to QUIT
+        // even when no audio is being fed; an active session returns a frame well
+        // before the timeout, so this adds no latency during real processing.
+        auto res = afe_iface_->fetch_with_delay(afe_data_, pdMS_TO_TICKS(100));
+        EventBits_t cur = xEventGroupGetBits(event_group_);
+        if (cur & PROCESSOR_QUIT) {
+            break;
+        }
+        if ((cur & PROCESSOR_RUNNING) == 0) {
             continue;
         }
         if (res == nullptr || res->ret_value == ESP_FAIL) {
@@ -184,6 +208,10 @@ void AfeAudioProcessor::AudioProcessorTask() {
             }
         }
     }
+
+    // Signal the destructor that the loop has exited and afe_data_ is no longer
+    // touched, so it is safe to destroy.
+    xEventGroupSetBits(event_group_, PROCESSOR_DONE);
 }
 
 void AfeAudioProcessor::EnableDeviceAec(bool enable) {
@@ -198,4 +226,13 @@ void AfeAudioProcessor::EnableDeviceAec(bool enable) {
         afe_iface_->disable_aec(afe_data_);
         afe_iface_->enable_vad(afe_data_);
     }
+}
+
+void AfeAudioProcessor::EnableAecKeepVad() {
+#if CONFIG_USE_DEVICE_AEC
+    afe_iface_->enable_aec(afe_data_);
+    afe_iface_->enable_vad(afe_data_);
+#else
+    ESP_LOGE(TAG, "Device AEC is not supported");
+#endif
 }

@@ -257,6 +257,11 @@ extern "C" int64_t eidolon_livekit_board_last_playback_us(void)
     return s_last_playback_us;
 }
 
+extern "C" bool eidolon_livekit_board_near_end_active(void)
+{
+    return s_afe_capture != nullptr && s_afe_capture->NearEndActiveRecently();
+}
+
 extern "C" esp_err_t eidolon_livekit_board_set_capture_enabled(bool enabled)
 {
     if (!s_capturer) {
@@ -296,10 +301,11 @@ extern "C" void eidolon_livekit_board_deinit(void)
         esp_capture_close(s_capturer);
         s_capturer = nullptr;
     }
+    // Keep the EidolonAfeCapture instance alive across sessions: its embedded
+    // AfeAudioProcessor owns a long-lived AFE task that cannot be safely torn
+    // down. Stop() idles it; build_capturer reuses the same instance next time.
     if (s_afe_capture) {
         s_afe_capture->Stop();
-        delete s_afe_capture;
-        s_afe_capture = nullptr;
     }
     s_gated_audio_source = {};
     s_last_playback_us = 0;

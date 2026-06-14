@@ -83,6 +83,8 @@ private:
     bool audio_state_sent_ = false;
     bool last_audio_playback_active_ = false;
     bool last_audio_mic_muted_ = false;
+    bool last_audio_manual_interrupt_ = false;
+    int64_t last_audio_publish_us_ = 0;
     AgentPhase agent_phase_ = AgentPhase::Silent;
     StateCallback on_state_changed_;
     std::function<void(AgentPhase)> on_agent_phase_;
