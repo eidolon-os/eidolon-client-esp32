@@ -44,14 +44,26 @@ public:
     // esp_capture audio source the LiveKit publisher reads cancelled PCM from.
     esp_capture_audio_src_if_t* CaptureSource() { return pcm_source_.Interface(); }
 
+    // True when the AFE detected near-end (real user) speech on the AEC-cleaned
+    // signal within a short hangover window. Used to tell echo from genuine
+    // barge-in during agent playback.
+    bool NearEndActiveRecently() const;
+
 private:
     void ReadLoop();
+    void OnVadState(bool speaking);
 
     PcmPushCaptureSource pcm_source_;
     std::unique_ptr<AfeAudioProcessor> afe_;
     AudioCodec* codec_ = nullptr;
     TaskHandle_t read_task_ = nullptr;
     volatile bool running_ = false;
+    volatile int64_t last_near_end_us_ = 0;
+    // Energy-gate state for near-end detection on the AEC-cleaned output (OnOutput).
+    double rms_sumsq_ = 0.0;
+    int rms_count_ = 0;
+    int near_end_run_ = 0;   // consecutive windows over threshold (persistence)
+    int rms_log_div_ = 0;    // throttles the diagnostic RMS log
 };
 
 }  // namespace eidolon
