@@ -200,6 +200,19 @@ void BoxAudioCodec::EnableInput(bool enable) {
             .mclk_multiple = 0,
         };
         if (input_reference_) {
+            // AEC reference channel = ES7210 ch1.
+            //
+            // NOTE (2026-06-16, measured on-device): this board's intended
+            // hardware AEC reference is ES7210 MIC3 (ch2), fed from the NS4150B PA
+            // output through the "AEC" attenuator network (schematic). But MIC3 is
+            // crosstalk-contaminated with the near-end mic (ch1≈ch0/25 even with
+            // the speaker silent), so feeding it to the AFE AEC cancels the user's
+            // OWN speech (out RMS drops to ~8 during near-end → STT gets silence).
+            // MIC2 (ch1) is unpopulated on this board, so keeping ch1 here leaves
+            // the AEC with a silent reference: near-end is preserved (ASR works)
+            // and residual playback echo is handled server-side (evidence-gated
+            // barge-in). Do NOT switch to MASK(2) without first solving the MIC3
+            // reference contamination.
             fs.channel_mask |= ESP_CODEC_DEV_MAKE_CHANNEL_MASK(1);
         }
         ESP_ERROR_CHECK(esp_codec_dev_open(input_dev_, &fs));

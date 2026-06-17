@@ -27,6 +27,22 @@ static audio_render_handle_t s_audio_renderer;
 static av_render_handle_t s_av_renderer;
 static volatile int64_t s_last_playback_us;
 
+// Software AEC reference ring. Holds the PCM sent to the DAC (captured at the
+// i2s render boundary) so the AFE AEC has a clean reference — this board's
+// hardware reference channel (ES7210 MIC3) is crosstalk-contaminated and unusable.
+// SPSC: produced by on_audio_render_reference (render thread), consumed by the
+// AFE capture read loop via eidolon_livekit_board_pull_playback_reference.
+// Monotonic indices, masked on access; pow2 size for cheap masking.
+static constexpr size_t kRefRingSamples = 8192;  // pow2, ~0.5 s @ 16 kHz
+static int16_t s_ref_ring[kRefRingSamples];
+static volatile size_t s_ref_write;  // monotonic write index (render thread)
+// Playback→mic echo latency (av_render FIFO + DAC + acoustic), measured on-device
+// by cross-correlating the played PCM against the mic echo (~68 ms). The reference
+// is fed this far behind the write head so it aligns with the echo and the AFE
+// AEC's short adaptive filter only covers the small residual. Tune if the board /
+// render buffering changes.
+static constexpr size_t kRefDelaySamples = 1088;  // ~68 ms @ 16 kHz
+
 namespace {
 constexpr int kPlaybackPcmMinAvgAbs = 120;
 
@@ -137,6 +153,13 @@ static int on_audio_render_reference(uint8_t* data, int len, void*)
     if ((abs_sum / sample_count) >= kPlaybackPcmMinAvgAbs) {
         s_last_playback_us = esp_timer_get_time();
     }
+    // Push the played PCM into the software AEC reference ring (single producer).
+    size_t w = s_ref_write;
+    for (int i = 0; i < sample_count; ++i) {
+        s_ref_ring[w & (kRefRingSamples - 1)] = samples[i];
+        ++w;
+    }
+    s_ref_write = w;
     return 0;
 }
 
@@ -255,6 +278,31 @@ extern "C" av_render_handle_t eidolon_livekit_board_get_renderer(void)
 extern "C" int64_t eidolon_livekit_board_last_playback_us(void)
 {
     return s_last_playback_us;
+}
+
+extern "C" int eidolon_livekit_board_pull_playback_reference(int16_t* out, int num_samples)
+{
+    if (out == nullptr || num_samples <= 0) {
+        return 0;
+    }
+    const size_t w = s_ref_write;
+    const size_t need = kRefDelaySamples + static_cast<size_t>(num_samples);
+    // Feed the `num_samples` that were played ~kRefDelaySamples ago (anchored to
+    // the write head each call, so it stays delay-locked even if producer/consumer
+    // rates jitter — no free-running drift). Idle playback (no recent push) → no
+    // echo to cancel → silent reference.
+    const bool playing = (esp_timer_get_time() - s_last_playback_us) < 150 * 1000;
+    if (playing && w >= need) {
+        const size_t start = w - need;  // == (w - kRefDelaySamples) - num_samples
+        for (int i = 0; i < num_samples; ++i) {
+            out[i] = s_ref_ring[(start + static_cast<size_t>(i)) & (kRefRingSamples - 1)];
+        }
+        return num_samples;
+    }
+    for (int i = 0; i < num_samples; ++i) {
+        out[i] = 0;
+    }
+    return 0;
 }
 
 extern "C" bool eidolon_livekit_board_near_end_active(void)
