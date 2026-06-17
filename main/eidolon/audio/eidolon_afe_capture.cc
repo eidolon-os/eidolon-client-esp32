@@ -1,6 +1,7 @@
 #include "eidolon_afe_capture.h"
 
 #include "audio_codec.h"
+#include "livekit_board.h"
 #include "processors/afe_audio_processor.h"
 
 #include <esp_log.h>
@@ -45,6 +46,14 @@ constexpr int64_t kNearEndHangoverUs = 700 * 1000;
 constexpr int kRmsWindowSamples = 1600;       // ~100 ms @ 16 kHz
 constexpr double kNearEndRmsThreshold = 120.0;
 constexpr int kNearEndMinWindows = 2;         // ~200 ms sustained
+// Suppress near-end detection for this long after the AFE starts. The AEC3
+// adaptive filter has not converged yet, so the first playback (the welcome
+// message) leaks strong, un-cancelled echo that would otherwise trip the gate
+// and cut off / pollute the welcome. During this window near_end stays false,
+// so mic_muted stays true and the channel drops the (echo) audio — i.e. the
+// device is gracefully half-duplex until the AEC settles, with no separate
+// "hard mute" state.
+constexpr int64_t kNearEndStartupSuppressUs = 2000 * 1000;
 
 #if CONFIG_USE_AUDIO_DEBUGGER
 // Echo-quantification taps (diagnostic). Streams three raw 16 kHz mono PCM
@@ -141,11 +150,13 @@ esp_err_t EidolonAfeCapture::Start(AudioCodec* codec) {
         rms_count_ += data.size();
         if (rms_count_ >= kRmsWindowSamples) {  // ~100 ms @ 16 kHz
             double rms = sqrt(rms_sumsq_ / rms_count_);
-            if (rms > kNearEndRmsThreshold) {
+            int64_t now = esp_timer_get_time();
+            bool in_startup = (now - afe_start_us_) < kNearEndStartupSuppressUs;
+            if (rms > kNearEndRmsThreshold && !in_startup) {
                 // Require persistence so a lone residual-echo spike can't trip it;
                 // sustained speech crosses the threshold for many windows.
                 if (++near_end_run_ >= kNearEndMinWindows) {
-                    last_near_end_us_ = esp_timer_get_time();
+                    last_near_end_us_ = now;
                 }
             } else {
                 near_end_run_ = 0;
@@ -170,6 +181,9 @@ esp_err_t EidolonAfeCapture::Start(AudioCodec* codec) {
 #endif
 
     running_ = true;
+    // Mark the AEC start for the near-end startup-suppression window (AEC3 needs
+    // a couple seconds to converge; the welcome message plays during that window).
+    afe_start_us_ = esp_timer_get_time();
     afe_->Start();
     // Enable AEC but keep VAD running (unlike EnableDeviceAec(true), which would
     // disable VAD) so we retain the near-end voice-activity signal for barge-in.
@@ -225,6 +239,18 @@ void EidolonAfeCapture::ReadLoop() {
         if (warmup > 0) {
             --warmup;  // drain but don't feed yet (let codec/AEC settle)
             continue;
+        }
+        // Software AEC reference: this board's hardware reference (ES7210 MIC3) is
+        // crosstalk-contaminated, so overwrite the dead ch1 (unpopulated MIC2) with
+        // the PCM that was sent to the speaker. The AFE AEC (input_format "MR") then
+        // cancels echo against a clean reference; its delay estimator absorbs the
+        // small DAC+acoustic offset. Idle playback yields silence (no echo).
+        if (channels >= 2) {
+            int16_t ref[kReadFramesPerChannel];
+            eidolon_livekit_board_pull_playback_reference(ref, kReadFramesPerChannel);
+            for (int i = 0; i < kReadFramesPerChannel; ++i) {
+                data[static_cast<size_t>(i) * channels + 1] = ref[i];
+            }
         }
 #if CONFIG_USE_AUDIO_DEBUGGER
         {

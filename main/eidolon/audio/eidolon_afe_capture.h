@@ -59,6 +59,7 @@ private:
     TaskHandle_t read_task_ = nullptr;
     volatile bool running_ = false;
     volatile int64_t last_near_end_us_ = 0;
+    volatile int64_t afe_start_us_ = 0;  // AEC start, for near-end startup suppression
     // Energy-gate state for near-end detection on the AEC-cleaned output (OnOutput).
     double rms_sumsq_ = 0.0;
     int rms_count_ = 0;

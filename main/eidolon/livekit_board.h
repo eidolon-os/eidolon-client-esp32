@@ -15,6 +15,12 @@ esp_err_t eidolon_livekit_board_init(void);
 esp_capture_handle_t eidolon_livekit_board_get_capturer(void);
 av_render_handle_t eidolon_livekit_board_get_renderer(void);
 int64_t eidolon_livekit_board_last_playback_us(void);
+// Drain `num_samples` of the most-recent playback PCM (the signal sent to the
+// DAC) for use as the AEC software reference. Fills `out` (16 kHz mono int16);
+// pads with silence on underrun (playback idle). Returns samples actually
+// available. SPSC: producer is the i2s render callback, consumer is the AFE
+// capture read loop.
+int eidolon_livekit_board_pull_playback_reference(int16_t* out, int num_samples);
 // True when the AFE detected near-end (real user) speech on the AEC-cleaned mic
 // within a short hangover window. Used to distinguish genuine barge-in from echo
 // during agent playback.
