@@ -452,11 +452,13 @@ ensure_eidolon_trim_sdkconfig() {
   # idle power-off so the serial port stays enumerated.
   set_sdkconfig_bool EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN y
 
-  # The Waveshare ESP32-S3 board has PSRAM and is currently being tuned for
-  # speaker/mic echo. Use the stronger AFE path in script-managed dev builds;
-  # the Kconfig default remains LOW_COST for conservative product builds.
-  set_sdkconfig_bool EIDOLON_DEVICE_AEC_AFE_MODE_LOW_COST n
-  set_sdkconfig_bool EIDOLON_DEVICE_AEC_AFE_MODE_HIGH_PERF y
+  # AFE mode: LOW_COST. HIGH_PERF (AFE_TYPE_VC) cannot keep real time on this
+  # board once the LiveKit/WebRTC stack is also running — the AFE task saturates
+  # a core (task_wdt on audio_communica), latency and PSRAM use grow, and the
+  # conversation stalls. LOW_COST runs in real time and still cancels echo via
+  # the confirmed hardware mic+playback reference channel.
+  set_sdkconfig_bool EIDOLON_DEVICE_AEC_AFE_MODE_LOW_COST y
+  set_sdkconfig_bool EIDOLON_DEVICE_AEC_AFE_MODE_HIGH_PERF n
 }
 
 ensure_board_sdkconfig() {
