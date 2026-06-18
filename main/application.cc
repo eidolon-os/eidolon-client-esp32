@@ -181,6 +181,7 @@ void Application::OnEidolonVoiceSessionState(eidolon::VoiceSessionState state)
     case eidolon::VoiceSessionState::Idle:
     case eidolon::VoiceSessionState::Error:
     case eidolon::VoiceSessionState::Unauthorized:
+    case eidolon::VoiceSessionState::ServerUnreachable:
         // Wake word is kept in the build but intentionally disabled for now.
         // During a voice session the codec input is owned by the LiveKit AFE
         // capture path (EidolonAfeCapture); re-enabling wake word needs the

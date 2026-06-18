@@ -63,6 +63,8 @@
         "EIDOLON_WAITING_BINDING_HINT": "Device approved. Bind an Agent in Admin",
         "EIDOLON_UNAUTHORIZED": "Device not authorized",
         "EIDOLON_UNAUTHORIZED_HINT": "Re-approve or re-register this device in Admin",
+        "EIDOLON_SERVER_UNREACHABLE": "Cannot reach server",
+        "EIDOLON_SERVER_UNREACHABLE_HINT": "Reconnecting... check the Hub is online and on the same network",
         "ROOM_START": "Start conversation",
         "ROOM_CANCEL": "Cancel",
         "ROOM_END": "End conversation",
