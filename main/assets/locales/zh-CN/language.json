@@ -63,6 +63,8 @@
         "EIDOLON_WAITING_BINDING_HINT": "设备已批准，请在 Admin 绑定 Agent",
         "EIDOLON_UNAUTHORIZED": "设备未授权",
         "EIDOLON_UNAUTHORIZED_HINT": "请在 Admin 重新批准或重新注册此设备",
+        "EIDOLON_SERVER_UNREACHABLE": "无法连接服务器",
+        "EIDOLON_SERVER_UNREACHABLE_HINT": "正在重连... 请确认 Hub 在线且与设备在同一网络",
         "ROOM_START": "开始对话",
         "ROOM_CANCEL": "取消",
         "ROOM_END": "结束对话",

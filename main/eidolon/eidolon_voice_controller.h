@@ -22,7 +22,8 @@ enum class VoiceSessionState {
     InRoom,
     Reconnecting,
     Error,
-    Unauthorized,  // revoked or unregistered by admin
+    Unauthorized,       // revoked or unregistered by admin
+    ServerUnreachable,  // repeated connect failures; re-discovery exhausted
 };
 
 class EidolonVoiceController {
@@ -44,6 +45,10 @@ public:
 private:
     esp_err_t LoadStoredConfig();
     esp_err_t RefreshHubConfig();
+    // Re-query mDNS for the Hub, and if its address changed, adopt the new
+    // config_url and re-fetch config. Recovers from a Hub IP change (DHCP /
+    // network move) that left the cached address dead.
+    esp_err_t RediscoverHub();
     esp_err_t ConnectControlRoom();
     bool HasActiveConfig() const;
     bool HasControlConfig() const;
@@ -77,6 +82,9 @@ private:
     bool control_room_ = false;
     bool switching_to_voice_ = false;
     bool control_reconnect_pending_ = false;
+    // Consecutive reconnect attempts since the last successful connect. Drives
+    // backoff, when to re-discover the Hub, and the ServerUnreachable UI.
+    int reconnect_attempts_ = 0;
     volatile bool audio_state_task_stop_ = false;
     bool audio_state_task_running_ = false;
     uint32_t audio_state_seq_ = 0;

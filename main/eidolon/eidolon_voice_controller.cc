@@ -4,6 +4,7 @@
 #include "control_protocol.h"
 #include "hub_config_client.h"
 #include "hub_config_store.h"
+#include "hub_discovery.h"
 #include "livekit_board.h"
 #include "system_info.h"
 
@@ -23,8 +24,30 @@ constexpr int64_t kPlaybackActiveWindowUs = 800 * 1000;
 // kAudioStateHeartbeatUs to avoid flooding lossy packets at the poll rate.
 constexpr TickType_t kAudioStatePublishInterval = pdMS_TO_TICKS(80);
 constexpr int64_t kAudioStateHeartbeatUs = 500 * 1000;
-// Delay before a control-room reconnect attempt after a disconnect.
-constexpr TickType_t kControlReconnectDelay = pdMS_TO_TICKS(1000);
+// Reconnect backoff: the Nth attempt waits min(1s << N, 30s) so transient
+// blips recover fast while a down/moved Hub is not hammered.
+constexpr uint32_t kReconnectBaseDelayMs = 1000;
+constexpr uint32_t kReconnectMaxDelayMs = 30000;
+// After this many consecutive failures, re-query mDNS before each reconnect —
+// the Hub IP may have changed (DHCP / network move), making the cached address
+// dead. The first attempt stays fast (cached address) for the common transient
+// case.
+constexpr int kReconnectRediscoverAfter = 1;
+// After this many consecutive failures, surface "cannot reach server" in the UI
+// (keep retrying in the background so it self-heals when the Hub returns).
+constexpr int kReconnectUnreachableAfter = 2;
+
+TickType_t ReconnectDelayForAttempt(int attempt)
+{
+    uint32_t ms = kReconnectBaseDelayMs;
+    for (int i = 0; i < attempt && ms < kReconnectMaxDelayMs; ++i) {
+        ms <<= 1;
+    }
+    if (ms > kReconnectMaxDelayMs) {
+        ms = kReconnectMaxDelayMs;
+    }
+    return pdMS_TO_TICKS(ms);
+}
 // Let the control-room ack flush before switching to the voice room.
 constexpr TickType_t kRoomJoinSettleDelay = pdMS_TO_TICKS(500);
 // Let the "succeeded" ack flush before reconnecting the control room.
@@ -95,11 +118,24 @@ void EidolonVoiceController::OnLiveKitState(LiveKitConnectionState lk_state)
 {
     if (control_room_) {
         StopAudioStatePublisher();
-        if (lk_state == LiveKitConnectionState::Failed) {
-            ESP_LOGW(TAG, "Control room connection failed");
-        }
-        if (!switching_to_voice_) {
+        switch (lk_state) {
+        case LiveKitConnectionState::Connected:
+            reconnect_attempts_ = 0;  // recovered: control room is back
             SetState(StateForConfig(config_));
+            break;
+        case LiveKitConnectionState::Failed:
+            ESP_LOGW(TAG, "Control room connection failed");
+            ScheduleControlReconnect("control_failed");
+            break;
+        case LiveKitConnectionState::Disconnected:
+            ScheduleControlReconnect("control_disconnected");
+            break;
+        case LiveKitConnectionState::Connecting:
+        case LiveKitConnectionState::Reconnecting:
+            // Mid-attempt: keep the current status. Don't clobber a shown
+            // ServerUnreachable with a transient "ready"; Connected clears it,
+            // the reconnect task escalates it.
+            break;
         }
         return;
     }
@@ -109,6 +145,7 @@ void EidolonVoiceController::OnLiveKitState(LiveKitConnectionState lk_state)
         SetState(VoiceSessionState::Connecting);
         break;
     case LiveKitConnectionState::Connected:
+        reconnect_attempts_ = 0;  // recovered: voice room is up
         SetState(VoiceSessionState::InRoom);
         StartAudioStatePublisher();
         break;
@@ -148,15 +185,38 @@ void EidolonVoiceController::ScheduleControlReconnect(const char* reason)
     }
 
     control_reconnect_pending_ = true;
-    ESP_LOGI(TAG, "Scheduling control room reconnect after %s", reason ? reason : "disconnect");
+    ESP_LOGI(TAG, "Scheduling control room reconnect after %s (attempt %d)",
+             reason ? reason : "disconnect", reconnect_attempts_);
 
+    // Stack is sized for the rediscovery path (mDNS + HTTPS config fetch +
+    // mbedtls signing), which runs inside this task once attempts pass the
+    // threshold.
     BaseType_t created = xTaskCreate([](void* arg) {
         auto* self = static_cast<EidolonVoiceController*>(arg);
-        vTaskDelay(kControlReconnectDelay);
-        self->ConnectControlRoom();
+        int attempt = self->reconnect_attempts_;
+        vTaskDelay(ReconnectDelayForAttempt(attempt));
+
+        if (attempt >= kReconnectRediscoverAfter) {
+            // The Hub address may have changed; re-query mDNS and re-fetch
+            // config before reconnecting (best-effort, errors are logged).
+            self->RediscoverHub();
+        }
+        if (attempt >= kReconnectUnreachableAfter) {
+            self->SetState(VoiceSessionState::ServerUnreachable);
+        }
+        self->reconnect_attempts_ = attempt + 1;
+
+        // Keep the guard up across ConnectControlRoom so its internal
+        // synchronous Disconnect can't trigger a spurious re-schedule. Clear it
+        // afterward so the (async) Failed callback drives the next attempt; if
+        // the connect failed synchronously, drive it ourselves.
+        esp_err_t err = self->ConnectControlRoom();
         self->control_reconnect_pending_ = false;
+        if (err != ESP_OK) {
+            self->ScheduleControlReconnect("control_retry");
+        }
         vTaskDelete(NULL);
-    }, "eidolon_ctrl_re", 4096, this, 3, nullptr);
+    }, "eidolon_ctrl_re", 8192, this, 3, nullptr);
 
     if (created != pdPASS) {
         control_reconnect_pending_ = false;
@@ -359,6 +419,27 @@ esp_err_t EidolonVoiceController::RefreshHubConfig()
     return ESP_OK;
 }
 
+esp_err_t EidolonVoiceController::RediscoverHub()
+{
+    HubDiscovery discovery;
+    HubTxtRecord txt;
+    esp_err_t err = discovery.Discover(txt);
+    if (err != ESP_OK || txt.config_url.empty()) {
+        ESP_LOGW(TAG, "Hub rediscovery failed: %s", esp_err_to_name(err));
+        return err != ESP_OK ? err : ESP_ERR_NOT_FOUND;
+    }
+    if (txt.config_url != config_url_) {
+        ESP_LOGI(TAG, "Hub address changed: '%s' -> '%s'", config_url_.c_str(),
+                 txt.config_url.c_str());
+        config_url_ = txt.config_url;
+        HubConfigStore store;
+        store.SaveTxtRecord(txt);
+    }
+    // Re-fetch from the (possibly new) URL: server_url/token/control room are all
+    // derived from the Hub address and stale if it moved.
+    return RefreshHubConfig();
+}
+
 void EidolonVoiceController::OnHubActivationSucceeded()
 {
     session_.SetOnStateChanged([this](LiveKitConnectionState s) { OnLiveKitState(s); });
@@ -397,6 +478,7 @@ void EidolonVoiceController::OnNetworkLost()
 {
     StopAudioStatePublisher();
     control_room_ = false;
+    reconnect_attempts_ = 0;  // distinct cause; reconnect starts fresh on restore
     session_.Disconnect(true);
     SetState(StateForConfig(config_));
 }

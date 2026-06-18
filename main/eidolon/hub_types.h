@@ -79,7 +79,9 @@ struct RoomConfig {
 };
 
 struct Esp32HubConfig {
-    HubConfigStatus status = HubConfigStatus::Active;
+    // Default to the most conservative status: a config that has not been
+    // explicitly populated/parsed must never grant voice access.
+    HubConfigStatus status = HubConfigStatus::PendingApproval;
     // `active` holds the pending room while pending/waiting, and the voice room
     // once active. `control` is the per-device control room (only when active).
     RoomConfig active;

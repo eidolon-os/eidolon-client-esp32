@@ -63,6 +63,7 @@ void LiveKitVoiceTransport::ToggleSession()
     case VoiceSessionState::ConfigReady:
     case VoiceSessionState::Idle:
     case VoiceSessionState::Error:
+    case VoiceSessionState::ServerUnreachable:
         JoinSession();
         break;
     case VoiceSessionState::Connecting:
