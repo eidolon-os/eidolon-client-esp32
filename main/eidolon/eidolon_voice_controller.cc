@@ -2,6 +2,7 @@
 
 #include "board.h"
 #include "control_protocol.h"
+#include "eidolon_topics.h"
 #include "hub_config_client.h"
 #include "hub_config_store.h"
 #include "hub_discovery.h"
@@ -17,7 +18,6 @@
 #define TAG "EidolonVoice"
 
 namespace {
-constexpr const char* kClientAudioStateTopic = "eidolon.audio_state";
 constexpr int64_t kPlaybackActiveWindowUs = 800 * 1000;
 // Poll the audio state fast so a barge-in (near-end speech) edge reaches the
 // channel within ~one poll, but only emit an unchanged heartbeat every

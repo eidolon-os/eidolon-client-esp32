@@ -3,9 +3,10 @@
 
 #include <string>
 
+#include "eidolon_topics.h"
+
 namespace eidolon {
 
-constexpr const char* kControlTopic = "eidolon.control";
 constexpr int kControlProtocolVersion = 1;
 
 struct ControlCommand {

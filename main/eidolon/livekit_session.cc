@@ -1,5 +1,6 @@
 #include "livekit_session.h"
 
+#include "eidolon_topics.h"
 #include "livekit_board.h"
 
 #include <cJSON.h>
@@ -15,10 +16,6 @@
 namespace eidolon {
 
 namespace {
-
-constexpr const char* kControlTopic = "eidolon.control";
-constexpr const char* kUiStateTopic = "eidolon.ui_state";
-constexpr const char* kSessionControlTopic = "eidolon.session_control";
 
 LiveKitConnectionState MapConnectionState(livekit_connection_state_t state)
 {
@@ -232,7 +229,7 @@ void LiveKitSession::RegisterTranscriptionHandler()
         .on_recv = OnTextStreamChunk,
         .ctx = this,
     };
-    livekit_room_data_stream_topic_register(room_handle_, "transcription", &handler);
+    livekit_room_data_stream_topic_register(room_handle_, kTranscriptionTopic, &handler);
     transcription_registered_ = true;
 }
 
@@ -365,7 +362,7 @@ esp_err_t LiveKitSession::Disconnect(bool release_media)
     ESP_LOGI(TAG, "Disconnecting room (release_media=%d)", release_media ? 1 : 0);
 
     if (transcription_registered_) {
-        livekit_room_data_stream_topic_unregister(room_handle_, "transcription");
+        livekit_room_data_stream_topic_unregister(room_handle_, kTranscriptionTopic);
         transcription_registered_ = false;
     }
 
