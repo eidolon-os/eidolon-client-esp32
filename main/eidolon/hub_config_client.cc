@@ -85,6 +85,18 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
     http->SetHeader("Client-Id", Board::GetInstance().GetUuid().c_str());
     http->SetHeader("Accept", "application/json");
     http->SetHeader("User-Agent", SystemInfo::GetUserAgent().c_str());
+    // Declare the board's interaction capability so the Hub can stamp the session
+    // mode into the LiveKit token metadata (Phase 4) and channel can pick the turn
+    // policy (Phase 5). Hardware-determined: boards without usable AEC are PTT-only.
+    // Not part of the signed canonical request — a hint, not a security artifact
+    // (the authoritative per-device override is the admin path). Hub defaults to
+    // half_duplex when absent, so sending it makes the device authoritative rather
+    // than relying on that default.
+#if CONFIG_EIDOLON_INTERACTION_MODE_PTT
+    http->SetHeader("X-Device-Interaction-Mode", "half_duplex");
+#else
+    http->SetHeader("X-Device-Interaction-Mode", "full_duplex");
+#endif
 
     if (!http->Open("GET", request_url)) {
         ESP_LOGE(TAG, "HTTP open failed for %s", request_url.c_str());
