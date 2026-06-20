@@ -50,6 +50,16 @@ void LiveKitVoiceTransport::LeaveSession()
     controller_->LeaveRoom();
 }
 
+void LiveKitVoiceTransport::PttPress()
+{
+    controller_->OnPttPressed();
+}
+
+void LiveKitVoiceTransport::PttRelease()
+{
+    controller_->OnPttReleased();
+}
+
 void LiveKitVoiceTransport::ToggleSession()
 {
     auto state = controller_->GetState();

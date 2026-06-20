@@ -22,6 +22,9 @@ public:
     void LeaveSession() override;
     bool IsInSession() const override;
 
+    void PttPress() override;
+    void PttRelease() override;
+
     void SetMicrophoneEnabled(bool enabled) override;
     bool IsMicrophoneEnabled() const override;
 

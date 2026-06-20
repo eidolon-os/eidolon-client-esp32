@@ -29,11 +29,6 @@ public:
     size_t GetFeedSize() override;
     void EnableDeviceAec(bool enable) override;
 
-    // Enable the AEC stage while keeping VAD running. Plain EnableDeviceAec(true)
-    // disables VAD; full-duplex barge-in needs the near-end voice-activity signal
-    // on the AEC-cleaned audio, so the Eidolon capture path uses this instead.
-    void EnableAecKeepVad();
-
 private:
     EventGroupHandle_t event_group_ = nullptr;
     const esp_afe_sr_iface_t* afe_iface_ = nullptr;

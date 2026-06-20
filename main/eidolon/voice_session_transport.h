@@ -29,6 +29,11 @@ public:
     virtual void LeaveSession() = 0;
     virtual bool IsInSession() const = 0;
 
+    // Push-to-talk (hold-to-talk): press opens the mic (joining the room first if
+    // needed); release closes it and signals end-of-turn. No-ops outside PTT mode.
+    virtual void PttPress() = 0;
+    virtual void PttRelease() = 0;
+
     virtual void SetMicrophoneEnabled(bool enabled) = 0;
     virtual bool IsMicrophoneEnabled() const = 0;
 

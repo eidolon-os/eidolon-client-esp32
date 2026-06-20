@@ -60,11 +60,7 @@ void AfeAudioProcessor::Initialize(AudioCodec* codec, int frame_duration_ms, srm
 
 #ifdef CONFIG_USE_DEVICE_AEC
     afe_config->aec_init = true;
-    // Keep VAD initialized alongside AEC so the AEC-cleaned signal still yields a
-    // near-end voice-activity state (used for full-duplex barge-in detection).
-    // xiaozhi's own path disables VAD at runtime via EnableDeviceAec(true); the
-    // Eidolon capture path keeps it on and never calls EnableDeviceAec.
-    afe_config->vad_init = true;
+    afe_config->vad_init = false;
 #else
     afe_config->aec_init = false;
     afe_config->vad_init = true;
@@ -226,13 +222,4 @@ void AfeAudioProcessor::EnableDeviceAec(bool enable) {
         afe_iface_->disable_aec(afe_data_);
         afe_iface_->enable_vad(afe_data_);
     }
-}
-
-void AfeAudioProcessor::EnableAecKeepVad() {
-#if CONFIG_USE_DEVICE_AEC
-    afe_iface_->enable_aec(afe_data_);
-    afe_iface_->enable_vad(afe_data_);
-#else
-    ESP_LOGE(TAG, "Device AEC is not supported");
-#endif
 }

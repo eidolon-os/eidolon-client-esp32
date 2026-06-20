@@ -130,6 +130,32 @@ void Application::ToggleMicrophone()
     });
 }
 
+void Application::PttPress()
+{
+    Schedule([this]() {
+        if (!voice_transport_) {
+            return;
+        }
+        voice_transport_->PttPress();
+        if (ui_presenter_) {
+            ui_presenter_->SetPttRecording(true);
+        }
+    });
+}
+
+void Application::PttRelease()
+{
+    Schedule([this]() {
+        if (!voice_transport_) {
+            return;
+        }
+        voice_transport_->PttRelease();
+        if (ui_presenter_) {
+            ui_presenter_->SetPttRecording(false);
+        }
+    });
+}
+
 #if CONFIG_EIDOLON_WAKE_WORD_ENABLE
 void Application::StartEidolonWakeWord()
 {

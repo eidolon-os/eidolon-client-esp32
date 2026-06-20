@@ -18,6 +18,8 @@ public:
     void Apply(VoiceSessionState session_state, bool mic_enabled);
     void OnTranscription(const TranscriptionEvent& event);
     void OnAgentPhase(AgentPhase phase);
+    // Push-to-talk: the user is currently holding the talk button (mic recording).
+    void SetPttRecording(bool recording);
 
     AgentSessionTracker& tracker() { return tracker_; }
 
@@ -31,6 +33,7 @@ private:
     AgentSessionTracker tracker_;
     VoiceSessionState session_state_ = VoiceSessionState::Idle;
     bool mic_enabled_ = true;
+    bool ptt_recording_ = false;
 };
 
 }  // namespace eidolon

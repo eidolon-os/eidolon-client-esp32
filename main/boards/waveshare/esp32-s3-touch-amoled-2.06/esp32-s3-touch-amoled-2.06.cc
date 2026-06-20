@@ -150,10 +150,20 @@ public:
         lv_obj_center(voice_session_btn_label_);
 
         lv_obj_add_event_cb(voice_session_btn_, [](lv_event_t* e) {
-            if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+            lv_event_code_t code = lv_event_get_code(e);
+#if CONFIG_EIDOLON_INTERACTION_MODE_PTT
+            // Hold-to-talk: press opens the mic (joins first if idle), release sends.
+            if (code == LV_EVENT_PRESSED) {
+                Application::GetInstance().PttPress();
+            } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
+                Application::GetInstance().PttRelease();
+            }
+#else
+            if (code == LV_EVENT_CLICKED) {
                 Application::GetInstance().ToggleVoiceSession();
             }
-        }, LV_EVENT_CLICKED, nullptr);
+#endif
+        }, LV_EVENT_ALL, nullptr);
 
         eidolon::SetVoiceSessionButtonUpdater([this](eidolon::VoiceSessionButtonState state, const char* label) {
             UpdateVoiceSessionButton(state, label);
@@ -244,6 +254,35 @@ private:
     }
 
     void InitializeButtons() {
+#if CONFIG_EIDOLON_INTERACTION_MODE_PTT
+        // Hold-to-talk: BOOT press opens the mic (joins first if idle), release
+        // sends. A short click while still starting up enters Wi-Fi config.
+        boot_button_.OnPressDown([this]() {
+            auto& app = Application::GetInstance();
+            if (app.GetDeviceState() == kDeviceStateStarting) {
+                return;
+            }
+            app.PttPress();
+        });
+
+        boot_button_.OnPressUp([this]() {
+            auto& app = Application::GetInstance();
+            if (app.GetDeviceState() == kDeviceStateStarting) {
+                return;
+            }
+            app.PttRelease();
+        });
+
+        boot_button_.OnClick([this]() {
+            if (Application::GetInstance().GetDeviceState() == kDeviceStateStarting) {
+                EnterWifiConfigMode();
+            }
+        });
+
+        boot_button_.OnDoubleClick([this]() {
+            Application::GetInstance().ToggleMicrophone();
+        });
+#else
         boot_button_.OnClick([this]() {
             auto& app = Application::GetInstance();
             if (app.GetDeviceState() == kDeviceStateStarting) {
@@ -256,6 +295,7 @@ private:
         boot_button_.OnDoubleClick([this]() {
             Application::GetInstance().ToggleMicrophone();
         });
+#endif
     }
 
     void InitializeSH8601Display() {

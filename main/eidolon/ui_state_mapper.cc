@@ -8,7 +8,8 @@ EidolonUiSnapshot UiStateMapper::Map(VoiceSessionState session_state,
                                      AgentPhase agent_phase,
                                      const std::string& last_transcription,
                                      TranscriptionSource last_transcription_source,
-                                     bool mic_enabled)
+                                     bool mic_enabled,
+                                     bool ptt_recording)
 {
     EidolonUiSnapshot snapshot;
     snapshot.show_mute_icon = !mic_enabled;
@@ -16,9 +17,20 @@ EidolonUiSnapshot UiStateMapper::Map(VoiceSessionState session_state,
     switch (session_state) {
     case VoiceSessionState::Idle:
     case VoiceSessionState::ConfigReady:
+#if CONFIG_EIDOLON_INTERACTION_MODE_PTT
+        // Hold-to-talk from the ready screen: holding joins the room and records
+        // in one gesture (no separate "start" tap first).
+        snapshot.button_state = VoiceSessionButtonState::Talk;
+        snapshot.button_label = ptt_recording ? Lang::Strings::EIDOLON_PTT_RELEASE
+                                              : Lang::Strings::EIDOLON_PTT_HOLD;
+        snapshot.status_text = ptt_recording ? Lang::Strings::LISTENING
+                                            : Lang::Strings::EIDOLON_PTT_HOLD;
+        snapshot.emotion = ptt_recording ? "happy" : "neutral";
+#else
         snapshot.status_text = Lang::Strings::EIDOLON_READY;
         snapshot.button_state = VoiceSessionButtonState::Start;
         snapshot.emotion = "neutral";
+#endif
         break;
     case VoiceSessionState::PendingApproval:
         snapshot.status_text = Lang::Strings::EIDOLON_WAITING_APPROVAL;
@@ -39,6 +51,36 @@ EidolonUiSnapshot UiStateMapper::Map(VoiceSessionState session_state,
         snapshot.emotion = "neutral";
         break;
     case VoiceSessionState::InRoom:
+#if CONFIG_EIDOLON_INTERACTION_MODE_PTT
+        // Push-to-talk: the talk button stays visible in-room (hold to record,
+        // release to send). Its label flips with whether the user is holding.
+        snapshot.button_state = VoiceSessionButtonState::Talk;
+        snapshot.button_label = ptt_recording ? Lang::Strings::EIDOLON_PTT_RELEASE
+                                              : Lang::Strings::EIDOLON_PTT_HOLD;
+        if (ptt_recording) {
+            snapshot.status_text = Lang::Strings::LISTENING;
+            snapshot.emotion = "happy";
+        } else {
+            switch (agent_phase) {
+            case AgentPhase::AgentThinking:
+                snapshot.status_text = Lang::Strings::PROCESSING;
+                snapshot.emotion = "thinking";
+                break;
+            case AgentPhase::AgentSpeaking:
+                snapshot.status_text = Lang::Strings::SPEAKING;
+                snapshot.emotion = "happy";
+                break;
+            case AgentPhase::UserSpeaking:
+            case AgentPhase::Silent:
+            default:
+                // Idle: invite the user to hold the button.
+                snapshot.status_text = Lang::Strings::EIDOLON_PTT_HOLD;
+                snapshot.emotion = "neutral";
+                break;
+            }
+        }
+        break;
+#else
         snapshot.button_state = VoiceSessionButtonState::Hidden;
         snapshot.emotion = "neutral";
         switch (agent_phase) {
@@ -55,6 +97,7 @@ EidolonUiSnapshot UiStateMapper::Map(VoiceSessionState session_state,
             break;
         }
         break;
+#endif
     case VoiceSessionState::Error:
         snapshot.status_text = Lang::Strings::ERROR;
         snapshot.button_state = VoiceSessionButtonState::Start;

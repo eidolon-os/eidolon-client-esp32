@@ -137,6 +137,8 @@ public:
     void RequestVoiceLeave();
     void ToggleVoiceSession();
     void ToggleMicrophone();
+    void PttPress();
+    void PttRelease();
 #endif
     
     /**

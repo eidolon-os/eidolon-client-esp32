@@ -1148,6 +1148,17 @@ menu "Eidolon Hub"
             should leave this disabled so battery idle auto-shutdown remains
             active.
 
+    config EIDOLON_INTERACTION_MODE_PTT
+        bool "Push-to-talk (hold to talk), half-duplex"
+        default y
+        depends on EIDOLON_HUB_MODE
+        help
+            Hold a button to talk, release to send (walkie-talkie). The mic is
+            closed except while held, so a board with no usable echo cancellation
+            never records its own playback, and the turn boundary is explicit
+            (no VAD/EOT guessing). Disable for full-duplex (open mic + EOT +
+            barge-in) on boards with good hardware AEC.
+
     config EIDOLON_LIVEKIT_SPEAKER_VOLUME
         int "LiveKit playback volume (0-100)"
         range 0 100

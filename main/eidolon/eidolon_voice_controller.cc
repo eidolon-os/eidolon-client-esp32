@@ -625,27 +625,30 @@ void EidolonVoiceController::PublishClientAudioState(bool playback_active)
     int64_t now_us = esp_timer_get_time();
     uint32_t client_ts_ms = static_cast<uint32_t>(now_us / 1000);
 
-    // Full-duplex barge-in: the mic stays open during agent playback so the AFE
-    // can tell genuine user speech from residual echo on the AEC-cleaned signal.
-    //   - user explicitly muted        -> mic_muted (always)
-    //   - playback + no near-end speech -> mic_muted, so the channel drops echo
-    //   - playback + near-end speech    -> NOT muted + manual_interrupt, so the
-    //                                      channel hard-interrupts and admits the
-    //                                      barge-in turn
-    //   - idle (no playback)            -> normal listening
-    bool near_end = playback_active && mic_enabled_ && eidolon_livekit_board_near_end_active();
-    bool mic_muted = !mic_enabled_ || (playback_active && !near_end);
-    bool manual_interrupt = near_end;
+    bool ptt_held = ptt_mode_ && ptt_active_;
+    bool mic_muted;
+    bool capture_on;
+    if (ptt_mode_) {
+        // Push-to-talk (half-duplex): the mic is open ONLY while the button is
+        // held. Closed otherwise, so playback is never recorded and the turn
+        // boundary is explicit (the ptt false edge tells the server "I'm done").
+        capture_on = mic_enabled_ && ptt_active_;
+        mic_muted = !capture_on;
+    } else {
+        // Auto open-mic (full-duplex): the mic is closed only while the agent is
+        // speaking (no usable barge-in echo cancellation on this board).
+        capture_on = mic_enabled_ && !playback_active;
+        mic_muted = !mic_enabled_ || playback_active;
+    }
 
-    // Keep the mic capture path open whenever the user hasn't muted: gating it
-    // during playback would clip the onset of a barge-in before the AFE VAD has
-    // had a chance to flag it. Echo is suppressed at the channel via mic_muted.
-    eidolon_livekit_board_set_capture_enabled(mic_enabled_);
+    // Physically gate the capture path to match so no unwanted audio reaches the
+    // channel.
+    eidolon_livekit_board_set_capture_enabled(capture_on);
 
     bool state_changed = !audio_state_sent_ ||
                          playback_active != last_audio_playback_active_ ||
                          mic_muted != last_audio_mic_muted_ ||
-                         manual_interrupt != last_audio_manual_interrupt_;
+                         ptt_held != last_audio_ptt_;
     // Fast poll, throttled heartbeat: nothing changed and the heartbeat isn't due
     // yet, so don't emit a packet (last_audio_* already equals the current state).
     if (!state_changed && (now_us - last_audio_publish_us_) < kAudioStateHeartbeatUs) {
@@ -655,13 +658,14 @@ void EidolonVoiceController::PublishClientAudioState(bool playback_active)
     int written = snprintf(
         payload,
         sizeof(payload),
-        "{\"type\":\"client.audio_state\",\"seq\":%lu,\"input_mode\":\"auto\","
+        "{\"type\":\"client.audio_state\",\"seq\":%lu,\"input_mode\":\"%s\","
         "\"playback_state\":\"%s\",\"mic_muted\":%s,"
-        "\"manual_interrupt\":%s,\"ptt\":false,\"client_ts_ms\":%lu}",
+        "\"ptt\":%s,\"client_ts_ms\":%lu}",
         static_cast<unsigned long>(seq),
+        ptt_mode_ ? "ptt" : "auto",
         playback_active ? "agent_speaking" : "idle",
         mic_muted ? "true" : "false",
-        manual_interrupt ? "true" : "false",
+        ptt_held ? "true" : "false",
         static_cast<unsigned long>(client_ts_ms));
     if (written <= 0 || written >= static_cast<int>(sizeof(payload))) {
         return;
@@ -674,7 +678,7 @@ void EidolonVoiceController::PublishClientAudioState(bool playback_active)
     audio_state_sent_ = true;
     last_audio_playback_active_ = playback_active;
     last_audio_mic_muted_ = mic_muted;
-    last_audio_manual_interrupt_ = manual_interrupt;
+    last_audio_ptt_ = ptt_held;
     last_audio_publish_us_ = now_us;
 }
 
@@ -703,6 +707,39 @@ esp_err_t EidolonVoiceController::SetMicEnabled(bool enabled)
     }
     ESP_LOGI(TAG, "Mic enabled=%d", enabled ? 1 : 0);
     return ESP_OK;
+}
+
+void EidolonVoiceController::OnPttPressed()
+{
+    if (!ptt_mode_) {
+        return;
+    }
+    ptt_active_ = true;
+    // First press brings up the room. Capture opens once connected, when the
+    // audio-state publisher runs and gates the mic on ptt_active_ (still true).
+    if (state_ != VoiceSessionState::InRoom) {
+        ESP_LOGI(TAG, "PTT press: joining room");
+        JoinRoom();
+        return;
+    }
+    ESP_LOGI(TAG, "PTT press: mic open");
+    PublishClientAudioState(AgentOutputActiveRecently());
+}
+
+void EidolonVoiceController::OnPttReleased()
+{
+    if (!ptt_mode_) {
+        return;
+    }
+    ptt_active_ = false;
+    // The ptt=false edge tells the server the user's turn is complete and closes
+    // the capture gate.
+    if (session_.IsConnected() && !control_room_) {
+        ESP_LOGI(TAG, "PTT release: mic closed, turn committed");
+        PublishClientAudioState(AgentOutputActiveRecently());
+    } else {
+        eidolon_livekit_board_set_capture_enabled(false);
+    }
 }
 
 void EidolonVoiceController::SetOnTranscription(std::function<void(const TranscriptionEvent&)> cb)

@@ -66,6 +66,8 @@
         "EIDOLON_SERVER_UNREACHABLE": "无法连接服务器",
         "EIDOLON_SERVER_UNREACHABLE_HINT": "正在重连... 请确认 Hub 在线且与设备在同一网络",
         "ROOM_START": "开始对话",
+        "EIDOLON_PTT_HOLD": "说话",
+        "EIDOLON_PTT_RELEASE": "聆听中",
         "ROOM_CANCEL": "取消",
         "ROOM_END": "结束对话",
         "ROOM_INTERRUPT": "打断",

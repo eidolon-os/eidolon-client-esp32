@@ -54,7 +54,8 @@ void EidolonUiPresenter::Apply(VoiceSessionState session_state, bool mic_enabled
 
     auto snapshot = UiStateMapper::Map(session_state, tracker_.GetPhase(),
                                        tracker_.LastTranscription(),
-                                       tracker_.LastTranscriptionSource(), mic_enabled);
+                                       tracker_.LastTranscriptionSource(), mic_enabled,
+                                       ptt_recording_);
     ApplySnapshot(snapshot);
 
     auto device_state = MapToDeviceState(session_state);
@@ -95,11 +96,21 @@ void EidolonUiPresenter::OnAgentPhase(AgentPhase phase)
     Reapply();
 }
 
+void EidolonUiPresenter::SetPttRecording(bool recording)
+{
+    if (ptt_recording_ == recording) {
+        return;
+    }
+    ptt_recording_ = recording;
+    Reapply();
+}
+
 void EidolonUiPresenter::Reapply()
 {
     auto snapshot = UiStateMapper::Map(session_state_, tracker_.GetPhase(),
                                        tracker_.LastTranscription(),
-                                       tracker_.LastTranscriptionSource(), mic_enabled_);
+                                       tracker_.LastTranscriptionSource(), mic_enabled_,
+                                       ptt_recording_);
     ApplySnapshot(snapshot);
 }
 
@@ -112,6 +123,9 @@ static const char* ButtonLabel(VoiceSessionButtonState state)
         return Lang::Strings::ROOM_CANCEL;
     case VoiceSessionButtonState::End:
         return Lang::Strings::ROOM_END;
+    case VoiceSessionButtonState::Talk:
+        // Label is dynamic (hold vs release) and supplied via snapshot.button_label.
+        return Lang::Strings::EIDOLON_PTT_HOLD;
     case VoiceSessionButtonState::Hidden:
     default:
         return "";
@@ -130,7 +144,9 @@ void EidolonUiPresenter::ApplySnapshot(const EidolonUiSnapshot& snapshot)
     if (snapshot.button_state == VoiceSessionButtonState::Hidden) {
         UpdateVoiceSessionButton(VoiceSessionButtonState::Hidden, "");
     } else {
-        UpdateVoiceSessionButton(snapshot.button_state, ButtonLabel(snapshot.button_state));
+        const char* label = snapshot.button_label != nullptr ? snapshot.button_label
+                                                             : ButtonLabel(snapshot.button_state);
+        UpdateVoiceSessionButton(snapshot.button_state, label);
     }
 }
 

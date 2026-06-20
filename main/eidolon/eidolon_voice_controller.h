@@ -37,6 +37,15 @@ public:
     esp_err_t LeaveRoom();
     esp_err_t SetMicEnabled(bool enabled);
 
+    // Push-to-talk (hold-to-talk). Press opens the mic (joining the room first if
+    // needed) and marks the turn as in progress; release closes the mic and the
+    // ptt=false edge tells the server the turn is complete. No-op when PTT mode
+    // is disabled (CONFIG_EIDOLON_INTERACTION_MODE_PTT off → full-duplex/auto).
+    void OnPttPressed();
+    void OnPttReleased();
+    bool IsPttMode() const { return ptt_mode_; }
+    bool IsPttHeld() const { return ptt_active_; }
+
     VoiceSessionState GetState() const { return state_; }
     void SetOnStateChanged(StateCallback cb) { on_state_changed_ = std::move(cb); }
     void SetOnTranscription(std::function<void(const TranscriptionEvent&)> cb);
@@ -79,6 +88,15 @@ private:
     std::string config_url_;
     VoiceSessionState state_ = VoiceSessionState::Idle;
     bool mic_enabled_ = true;
+    // Interaction mode: push-to-talk (half-duplex) vs auto open-mic (full-duplex).
+    // Compile-time per board via Kconfig; runtime field keeps the branch readable.
+    bool ptt_mode_ =
+#if CONFIG_EIDOLON_INTERACTION_MODE_PTT
+        true;
+#else
+        false;
+#endif
+    bool ptt_active_ = false;  // PTT: button currently held (mic open this turn)
     bool control_room_ = false;
     bool switching_to_voice_ = false;
     bool control_reconnect_pending_ = false;
@@ -91,7 +109,7 @@ private:
     bool audio_state_sent_ = false;
     bool last_audio_playback_active_ = false;
     bool last_audio_mic_muted_ = false;
-    bool last_audio_manual_interrupt_ = false;
+    bool last_audio_ptt_ = false;
     int64_t last_audio_publish_us_ = 0;
     AgentPhase agent_phase_ = AgentPhase::Silent;
     StateCallback on_state_changed_;

@@ -30,6 +30,7 @@ enum class VoiceSessionButtonState {
     Start,
     Cancel,
     End,
+    Talk,  // push-to-talk: visible in-room, label set via button_label (hold/release)
 };
 
 struct EidolonUiSnapshot {
@@ -38,6 +39,9 @@ struct EidolonUiSnapshot {
     const char* subtitle_role = "system";
     const char* emotion = "neutral";
     VoiceSessionButtonState button_state = VoiceSessionButtonState::Start;
+    // When set, overrides the default label for button_state. Used by the PTT
+    // Talk button whose label depends on whether the user is currently holding.
+    const char* button_label = nullptr;
     bool show_mute_icon = false;
 };
 

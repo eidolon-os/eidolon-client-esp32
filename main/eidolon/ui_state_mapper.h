@@ -12,7 +12,8 @@ public:
                                  AgentPhase agent_phase,
                                  const std::string& last_transcription,
                                  TranscriptionSource last_transcription_source,
-                                 bool mic_enabled);
+                                 bool mic_enabled,
+                                 bool ptt_recording = false);
 };
 
 }  // namespace eidolon

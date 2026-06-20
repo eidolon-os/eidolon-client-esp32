@@ -66,6 +66,8 @@
         "EIDOLON_SERVER_UNREACHABLE": "Cannot reach server",
         "EIDOLON_SERVER_UNREACHABLE_HINT": "Reconnecting... check the Hub is online and on the same network",
         "ROOM_START": "Start conversation",
+        "EIDOLON_PTT_HOLD": "Talk",
+        "EIDOLON_PTT_RELEASE": "Listening",
         "ROOM_CANCEL": "Cancel",
         "ROOM_END": "End conversation",
         "ROOM_INTERRUPT": "Interrupt",
