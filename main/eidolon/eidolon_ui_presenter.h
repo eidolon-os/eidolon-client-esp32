@@ -6,14 +6,16 @@
 #include "eidolon_ui_types.h"
 #include "eidolon_voice_controller.h"
 
+#include <esp_timer.h>
+
 class Application;
-class Display;
 
 namespace eidolon {
 
 class EidolonUiPresenter {
 public:
-    EidolonUiPresenter(Application& app, Display& display);
+    explicit EidolonUiPresenter(Application& app);
+    ~EidolonUiPresenter();
 
     void Apply(VoiceSessionState session_state, bool mic_enabled);
     void OnTranscription(const TranscriptionEvent& event);
@@ -27,13 +29,19 @@ private:
     void Reapply();
     void ApplySnapshot(const EidolonUiSnapshot& snapshot);
     DeviceState MapToDeviceState(VoiceSessionState session_state) const;
+    // Bridge the gap between PTT release and the agent's first thinking/speaking
+    // signal: hold a "processing" state so the UI never flashes back to standby.
+    void BeginCommitting();
+    void ClearCommitting();
+    static void CommitTimeoutCb(void* arg);
 
     Application& app_;
-    Display& display_;
     AgentSessionTracker tracker_;
     VoiceSessionState session_state_ = VoiceSessionState::Idle;
     bool mic_enabled_ = true;
     bool ptt_recording_ = false;
+    bool ptt_committing_ = false;
+    esp_timer_handle_t commit_timer_ = nullptr;
 };
 
 }  // namespace eidolon

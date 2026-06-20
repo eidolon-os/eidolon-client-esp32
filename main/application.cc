@@ -136,6 +136,12 @@ void Application::PttPress()
         if (!voice_transport_) {
             return;
         }
+        // Hold-to-talk only applies once in the room. While not connected the talk
+        // button acts as a "connect" button (tap) — ignore the hold so we don't
+        // flash recording UI or drop a half-captured first utterance.
+        if (!voice_transport_->IsInSession()) {
+            return;
+        }
         voice_transport_->PttPress();
         if (ui_presenter_) {
             ui_presenter_->SetPttRecording(true);
@@ -147,6 +153,9 @@ void Application::PttRelease()
 {
     Schedule([this]() {
         if (!voice_transport_) {
+            return;
+        }
+        if (!voice_transport_->IsInSession()) {
             return;
         }
         voice_transport_->PttRelease();
@@ -264,7 +273,7 @@ void Application::Initialize() {
         }
     }
 
-    ui_presenter_ = std::make_unique<eidolon::EidolonUiPresenter>(*this, *display);
+    ui_presenter_ = std::make_unique<eidolon::EidolonUiPresenter>(*this);
 
     eidolon::VoiceSessionCallbacks callbacks;
     callbacks.on_session_state = [this](eidolon::VoiceSessionState state) {

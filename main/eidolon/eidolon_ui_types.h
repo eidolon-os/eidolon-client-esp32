@@ -3,6 +3,8 @@
 
 #include <string>
 
+#include "eidolon_flows.h"
+
 namespace eidolon {
 
 enum class AgentPhase {
@@ -34,6 +36,14 @@ enum class VoiceSessionButtonState {
 };
 
 struct EidolonUiSnapshot {
+    // Explicit flow projection (the four decoupled flows). The view renders the
+    // mode badge / connection status / turn intent from these; the const char*
+    // fields below are the resolved text/emotion for the current view.
+    InteractionMode mode = InteractionMode::Streaming;
+    PairingStatus pairing = PairingStatus::Active;
+    ConnectionPhase connection = ConnectionPhase::Offline;
+    TurnPhase turn = TurnPhase::Idle;
+
     const char* status_text = "";
     const char* subtitle = "";
     const char* subtitle_role = "system";

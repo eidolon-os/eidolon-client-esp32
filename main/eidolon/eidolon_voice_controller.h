@@ -2,6 +2,7 @@
 #define EIDOLON_VOICE_CONTROLLER_H_
 
 #include <esp_err.h>
+#include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <functional>
@@ -75,6 +76,24 @@ private:
     void SpawnCommandTask(const char* task_name, const ControlCommand& command,
                           void (EidolonVoiceController::*handler)(const std::string&));
     void ScheduleControlReconnect(const char* reason);
+    // Connect watchdog: a connect/reconnect attempt that never reaches a terminal
+    // LiveKit state (Connected/Failed/Disconnected) would otherwise leave the
+    // session stuck in Connecting/Reconnecting forever. Armed whenever the state
+    // is (Re)connecting, disarmed on any other state; on timeout it tears down the
+    // hung attempt and reschedules a reconnect. Mode-agnostic (PTT and full-duplex
+    // share this connection path).
+    void ArmConnectWatchdog();
+    void DisarmConnectWatchdog();
+    void HandleConnectTimeout();
+    static void ConnectWatchdogCb(void* arg);
+    // Idle auto-leave (PTT only): after a stretch in-room with no PTT activity and
+    // no agent output, leave the voice room (back to the control room / ready
+    // state) so the server can release the agent session. Re-armed on any activity;
+    // re-entering the room is an explicit user action (tap to connect). Full-duplex
+    // keeps the server-side idle policy instead.
+    void UpdateIdleAutoLeave();
+    void HandleIdleAutoLeave();
+    static void IdleLeaveCb(void* arg);
     void StartAudioStatePublisher();
     void StopAudioStatePublisher();
     void AudioStatePublisherTask();
@@ -103,6 +122,8 @@ private:
     // Consecutive reconnect attempts since the last successful connect. Drives
     // backoff, when to re-discover the Hub, and the ServerUnreachable UI.
     int reconnect_attempts_ = 0;
+    esp_timer_handle_t connect_watchdog_ = nullptr;
+    esp_timer_handle_t idle_leave_timer_ = nullptr;
     volatile bool audio_state_task_stop_ = false;
     bool audio_state_task_running_ = false;
     uint32_t audio_state_seq_ = 0;

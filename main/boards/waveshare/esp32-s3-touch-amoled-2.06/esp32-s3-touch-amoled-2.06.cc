@@ -19,8 +19,8 @@
 #include <driver/spi_master.h>
 #include "settings.h"
 #include "assets/lang_config.h"
-#include "eidolon/eidolon_display_hooks.h"
-#include "eidolon/eidolon_ui_types.h"
+#include "eidolon/eidolon_view.h"
+#include "eidolon/views/amoled_206_ptt_view.h"
 
 #include <esp_lcd_touch_ft5x06.h>
 #include <esp_lvgl_port.h>
@@ -111,20 +111,6 @@ public:
         // to ensure lvgl objects are created before accessing them
     }
 
-    void UpdateVoiceSessionButton(eidolon::VoiceSessionButtonState state, const char* label)
-    {
-        if (voice_session_btn_ == nullptr || voice_session_btn_label_ == nullptr) {
-            return;
-        }
-        DisplayLockGuard lock(this);
-        if (state == eidolon::VoiceSessionButtonState::Hidden) {
-            lv_obj_add_flag(voice_session_btn_, LV_OBJ_FLAG_HIDDEN);
-            return;
-        }
-        lv_obj_remove_flag(voice_session_btn_, LV_OBJ_FLAG_HIDDEN);
-        lv_label_set_text(voice_session_btn_label_, label != nullptr ? label : "");
-    }
-
     virtual void SetupUI() override {
         // Call parent SetupUI() first to create all lvgl objects
         SpiLcdDisplay::SetupUI();
@@ -135,44 +121,22 @@ public:
         lv_display_add_event_cb(display_, rounder_event_cb, LV_EVENT_INVALIDATE_AREA, NULL);
 
         auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
-        auto text_font = lvgl_theme->text_font()->font();
 
-        voice_session_btn_ = lv_btn_create(lv_screen_active());
-        lv_obj_set_width(voice_session_btn_, LV_HOR_RES * 80 / 100);
-        lv_obj_set_height(voice_session_btn_, 56);
-        lv_obj_align(voice_session_btn_, LV_ALIGN_BOTTOM_MID, 0, -24);
-        lv_obj_set_style_radius(voice_session_btn_, 12, 0);
-        lv_obj_set_style_bg_color(voice_session_btn_, lvgl_theme->user_bubble_color(), 0);
-
-        voice_session_btn_label_ = lv_label_create(voice_session_btn_);
-        lv_label_set_text(voice_session_btn_label_, Lang::Strings::ROOM_START);
-        lv_obj_set_style_text_font(voice_session_btn_label_, text_font, 0);
-        lv_obj_center(voice_session_btn_label_);
-
-        lv_obj_add_event_cb(voice_session_btn_, [](lv_event_t* e) {
-            lv_event_code_t code = lv_event_get_code(e);
-#if CONFIG_EIDOLON_INTERACTION_MODE_PTT
-            // Hold-to-talk: press opens the mic (joins first if idle), release sends.
-            if (code == LV_EVENT_PRESSED) {
-                Application::GetInstance().PttPress();
-            } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
-                Application::GetInstance().PttRelease();
-            }
-#else
-            if (code == LV_EVENT_CLICKED) {
-                Application::GetInstance().ToggleVoiceSession();
-            }
-#endif
-        }, LV_EVENT_ALL, nullptr);
-
-        eidolon::SetVoiceSessionButtonUpdater([this](eidolon::VoiceSessionButtonState state, const char* label) {
-            UpdateVoiceSessionButton(state, label);
-        });
+        // The eidolon UI (large hold-to-talk button + mode badge) lives in a
+        // per-device view; the presenter renders to it. We hold the display lock
+        // here, so Build() must not take it again.
+        eidolon::Amoled206PttView::BuildContext ctx;
+        ctx.parent = lv_screen_active();
+        ctx.font = lvgl_theme->text_font()->font();
+        ctx.accent_color = lvgl_theme->user_bubble_color();
+        ctx.display = this;
+        eidolon_view_ = new eidolon::Amoled206PttView();
+        eidolon_view_->Build(ctx);
+        eidolon::SetEidolonView(eidolon_view_);
     }
 
 private:
-    lv_obj_t* voice_session_btn_ = nullptr;
-    lv_obj_t* voice_session_btn_label_ = nullptr;
+    eidolon::Amoled206PttView* eidolon_view_ = nullptr;
 };
 
 class CustomBacklight : public Backlight {
@@ -274,9 +238,14 @@ private:
         });
 
         boot_button_.OnClick([this]() {
-            if (Application::GetInstance().GetDeviceState() == kDeviceStateStarting) {
+            auto& app = Application::GetInstance();
+            if (app.GetDeviceState() == kDeviceStateStarting) {
                 EnterWifiConfigMode();
+                return;
             }
+            // A tap connects when idle (the room comes up first, then hold to
+            // talk); in-room a tap is a no-op, the press/release above drive PTT.
+            app.ToggleVoiceSession();
         });
 
         boot_button_.OnDoubleClick([this]() {

@@ -1,12 +1,20 @@
 #include "eidolon_lvgl_theme.h"
 
+#include "lvgl_font.h"
 #include "lvgl_theme.h"
 
 #include <sdkconfig.h>
 
 #include <lvgl.h>
+#include <memory>
 
 #if CONFIG_EIDOLON_HUB_MODE
+
+// Tiny supplementary font: only the ~23 CJK glyphs the eidolon UI needs that the
+// base subset font lacks (按住松开发送打断处理 etc.). It falls back to the base
+// text font for every other glyph, so this adds ~4KB instead of swapping in the
+// full multi-MB font.
+LV_FONT_DECLARE(font_eidolon_ui_30);
 
 namespace eidolon {
 
@@ -33,7 +41,19 @@ void RegisterEidolonThemes()
     eidolon_dark->set_system_text_color(lv_color_hex(0xE6EDF3));
     eidolon_dark->set_border_color(lv_color_hex(0x30363D));
     eidolon_dark->set_low_battery_color(lv_color_hex(0xF85149));
-    eidolon_dark->set_text_font(light->text_font());
+    // Supplementary glyphs + runtime fallback to the base subset font. Copy the
+    // const generated descriptor into a mutable static so we can point its
+    // fallback at the active base font; the copied glyph/cmap pointers stay valid.
+    static lv_font_t eidolon_text_font;
+    static std::shared_ptr<LvglBuiltInFont> eidolon_text;
+    if (light->text_font() && light->text_font()->font() != nullptr) {
+        eidolon_text_font = font_eidolon_ui_30;
+        eidolon_text_font.fallback = light->text_font()->font();
+        eidolon_text = std::make_shared<LvglBuiltInFont>(&eidolon_text_font);
+        eidolon_dark->set_text_font(eidolon_text);
+    } else {
+        eidolon_dark->set_text_font(light->text_font());
+    }
     eidolon_dark->set_icon_font(light->icon_font());
     eidolon_dark->set_large_icon_font(light->large_icon_font());
     if (light->emoji_collection()) {

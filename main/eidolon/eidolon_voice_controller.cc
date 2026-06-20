@@ -36,6 +36,14 @@ constexpr int kReconnectRediscoverAfter = 1;
 // After this many consecutive failures, surface "cannot reach server" in the UI
 // (keep retrying in the background so it self-heals when the Hub returns).
 constexpr int kReconnectUnreachableAfter = 2;
+// A connect/reconnect attempt that never reaches a terminal LiveKit state within
+// this long is treated as hung and force-recovered. Generous enough to cover a
+// slow mDNS + HTTPS + connect on a healthy-but-slow network.
+constexpr uint64_t kConnectWatchdogUs = 25ULL * 1000 * 1000;
+// PTT: leave the voice room after this long in-room with no PTT activity and no
+// agent output, so the server can release the agent session. Re-connecting is an
+// explicit tap. Tunable; 30-45s feels responsive without churning on short pauses.
+constexpr uint64_t kIdleAutoLeaveUs = 40ULL * 1000 * 1000;
 
 TickType_t ReconnectDelayForAttempt(int attempt)
 {
@@ -109,6 +117,14 @@ void EidolonVoiceController::SetState(VoiceSessionState state)
     }
     state_ = state;
     ESP_LOGI(TAG, "Voice session state -> %d", static_cast<int>(state));
+    // The watchdog runs only while an attempt is in flight; any terminal state
+    // (InRoom / ConfigReady / Error / ...) disarms it.
+    if (state == VoiceSessionState::Connecting || state == VoiceSessionState::Reconnecting) {
+        ArmConnectWatchdog();
+    } else {
+        DisarmConnectWatchdog();
+    }
+    UpdateIdleAutoLeave();  // arms in-room/idle, disarms on leaving the room
     if (on_state_changed_) {
         on_state_changed_(state);
     }
@@ -222,6 +238,115 @@ void EidolonVoiceController::ScheduleControlReconnect(const char* reason)
         control_reconnect_pending_ = false;
         ESP_LOGW(TAG, "Failed to create control reconnect task");
     }
+}
+
+void EidolonVoiceController::ArmConnectWatchdog()
+{
+    if (connect_watchdog_ == nullptr) {
+        esp_timer_create_args_t args = {};
+        args.callback = &EidolonVoiceController::ConnectWatchdogCb;
+        args.arg = this;
+        args.dispatch_method = ESP_TIMER_TASK;
+        args.name = "eidolon_conn_wd";
+        if (esp_timer_create(&args, &connect_watchdog_) != ESP_OK) {
+            connect_watchdog_ = nullptr;
+            return;
+        }
+    }
+    esp_timer_stop(connect_watchdog_);  // restart the window for this attempt
+    esp_timer_start_once(connect_watchdog_, kConnectWatchdogUs);
+}
+
+void EidolonVoiceController::DisarmConnectWatchdog()
+{
+    if (connect_watchdog_ != nullptr) {
+        esp_timer_stop(connect_watchdog_);
+    }
+}
+
+void EidolonVoiceController::ConnectWatchdogCb(void* arg)
+{
+    // Run recovery on a dedicated task: it does session teardown + may spawn the
+    // rediscovery reconnect, which needs more stack than the esp_timer task.
+    auto* self = static_cast<EidolonVoiceController*>(arg);
+    BaseType_t created = xTaskCreate([](void* a) {
+        static_cast<EidolonVoiceController*>(a)->HandleConnectTimeout();
+        vTaskDelete(nullptr);
+    }, "eidolon_conn_wd", 8192, self, 3, nullptr);
+    if (created != pdPASS) {
+        ESP_LOGW(TAG, "Failed to create connect-watchdog recovery task");
+    }
+}
+
+void EidolonVoiceController::HandleConnectTimeout()
+{
+    // Re-check on the recovery task: the attempt may have completed between the
+    // timer firing and now.
+    if (state_ != VoiceSessionState::Connecting && state_ != VoiceSessionState::Reconnecting) {
+        return;
+    }
+    ESP_LOGW(TAG, "Connect watchdog fired (stuck in state %d); forcing reconnect",
+             static_cast<int>(state_));
+    StopAudioStatePublisher();
+    // Drop the in-flight guards so ScheduleControlReconnect isn't suppressed, then
+    // tear down the hung session and fall back to a stable base state.
+    switching_to_voice_ = false;
+    control_reconnect_pending_ = false;
+    session_.Disconnect(true);
+    control_room_ = false;
+    SetState(StateForConfig(config_));  // leaves (Re)connecting -> disarms watchdog
+    ScheduleControlReconnect("connect_timeout");
+}
+
+void EidolonVoiceController::UpdateIdleAutoLeave()
+{
+    // Idle = in the voice room, PTT mode, nobody holding the button, and the agent
+    // is not producing output. Any of those changing re-evaluates the timer.
+    bool idle = ptt_mode_ && state_ == VoiceSessionState::InRoom && !control_room_ &&
+                !ptt_active_ && agent_phase_ == AgentPhase::Silent;
+    if (idle) {
+        if (idle_leave_timer_ == nullptr) {
+            esp_timer_create_args_t args = {};
+            args.callback = &EidolonVoiceController::IdleLeaveCb;
+            args.arg = this;
+            args.dispatch_method = ESP_TIMER_TASK;
+            args.name = "eidolon_idle_lv";
+            if (esp_timer_create(&args, &idle_leave_timer_) != ESP_OK) {
+                idle_leave_timer_ = nullptr;
+                return;
+            }
+        }
+        esp_timer_stop(idle_leave_timer_);
+        esp_timer_start_once(idle_leave_timer_, kIdleAutoLeaveUs);
+    } else if (idle_leave_timer_ != nullptr) {
+        esp_timer_stop(idle_leave_timer_);
+    }
+}
+
+void EidolonVoiceController::IdleLeaveCb(void* arg)
+{
+    // LeaveRoom does network teardown + a control-room reconnect; run it off the
+    // esp_timer task on a stack sized like the other reconnect paths.
+    auto* self = static_cast<EidolonVoiceController*>(arg);
+    BaseType_t created = xTaskCreate([](void* a) {
+        static_cast<EidolonVoiceController*>(a)->HandleIdleAutoLeave();
+        vTaskDelete(nullptr);
+    }, "eidolon_idle_lv", 8192, self, 3, nullptr);
+    if (created != pdPASS) {
+        ESP_LOGW(TAG, "Failed to create idle auto-leave task");
+    }
+}
+
+void EidolonVoiceController::HandleIdleAutoLeave()
+{
+    // Re-check: activity may have resumed between the timer firing and now.
+    if (!(ptt_mode_ && state_ == VoiceSessionState::InRoom && !control_room_ &&
+          !ptt_active_ && agent_phase_ == AgentPhase::Silent)) {
+        return;
+    }
+    ESP_LOGI(TAG, "Idle auto-leave: leaving voice room after %llus idle",
+             kIdleAutoLeaveUs / 1000000ULL);
+    LeaveRoom();  // -> control room / ConfigReady; re-connect is an explicit tap
 }
 
 void EidolonVoiceController::OnControlCommand(const std::string& payload)
@@ -351,6 +476,13 @@ void EidolonVoiceController::HandleRoomJoinCommand(const std::string& command_id
     esp_err_t err = JoinRoom();
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Control-triggered room join failed: %s", esp_err_to_name(err));
+        // Reply with a failed ACK so the caller isn't left waiting on the earlier
+        // "accepted" (aligns with config.refresh / playback.stop). Success stays
+        // implicit: the room connection completes asynchronously and surfaces as
+        // the InRoom state, not a synchronous "completed" here.
+        session_.PublishData(kControlTopic,
+                             BuildControlAck(command, SystemInfo::GetMacAddress(), "failed",
+                                             "ROOM_JOIN_FAILED", esp_err_to_name(err)));
     }
 }
 
@@ -461,17 +593,19 @@ void EidolonVoiceController::OnHubActivationSucceeded()
         }
     }
 
+    // PTT (half-duplex): land in the ready state on the lightweight control room —
+    // entering the voice room (which plays the welcome) is an explicit tap, so the
+    // device never boots straight into an open session. Full-duplex may auto-join
+    // the voice room on activation (open mic) when the board opts in.
 #if CONFIG_EIDOLON_AUTO_JOIN_ON_ACTIVATION
-    if (HasActiveConfig()) {
+    if (!ptt_mode_ && HasActiveConfig()) {
         JoinRoom();
-    } else {
-        ConnectControlRoom();
+        return;
     }
-#else
+#endif
     if (HasControlConfig()) {
         ConnectControlRoom();
     }
-#endif
 }
 
 void EidolonVoiceController::OnNetworkLost()
@@ -715,11 +849,13 @@ void EidolonVoiceController::OnPttPressed()
         return;
     }
     ptt_active_ = true;
-    // First press brings up the room. Capture opens once connected, when the
-    // audio-state publisher runs and gates the mic on ptt_active_ (still true).
+    UpdateIdleAutoLeave();  // active: cancel the idle countdown
+    // Hold-to-talk only applies in-room. Entering the room is an explicit tap
+    // (the talk button is a "connect" button until connected) — a press while not
+    // in-room is ignored rather than silently joining and dropping the first words.
     if (state_ != VoiceSessionState::InRoom) {
-        ESP_LOGI(TAG, "PTT press: joining room");
-        JoinRoom();
+        ptt_active_ = false;
+        ESP_LOGI(TAG, "PTT press ignored: not in room (tap to connect first)");
         return;
     }
     ESP_LOGI(TAG, "PTT press: mic open");
@@ -740,6 +876,7 @@ void EidolonVoiceController::OnPttReleased()
     } else {
         eidolon_livekit_board_set_capture_enabled(false);
     }
+    UpdateIdleAutoLeave();  // turn done: start the idle countdown (if agent silent)
 }
 
 void EidolonVoiceController::SetOnTranscription(std::function<void(const TranscriptionEvent&)> cb)
@@ -762,6 +899,7 @@ void EidolonVoiceController::HandleAgentPhase(AgentPhase phase)
         if (session_.IsConnected() && !control_room_) {
             PublishClientAudioState(AgentOutputActiveRecently());
         }
+        UpdateIdleAutoLeave();  // agent busy disarms; back to silent arms the timer
     }
     if (on_agent_phase_) {
         on_agent_phase_(phase);
