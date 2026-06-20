@@ -362,6 +362,14 @@ esp_err_t EidolonVoiceController::RefreshHubConfig()
     HubConfigClient client;
     Esp32HubConfig fresh;
     esp_err_t err = client.Fetch(config_url_, SystemInfo::GetMacAddress(), fresh);
+    if (err == ESP_ERR_NOT_ALLOWED) {
+        // Hub rejected our signed identity (401/403). Stop bouncing on the same
+        // rejected key; show "awaiting re-approval" (admin must re-approve / the
+        // device must re-enroll). Recovers on a later successful fetch or reboot.
+        ESP_LOGW(TAG, "Hub rejected device identity; awaiting re-approval");
+        SetState(VoiceSessionState::Unauthorized);
+        return err;
+    }
     if (err != ESP_OK) {
         return err;
     }

@@ -97,7 +97,17 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
 
     if (status != 200) {
         ESP_LOGE(TAG, "HTTP status %d for %s", status, config_url.c_str());
-        return status == 422 ? ESP_ERR_INVALID_ARG : ESP_FAIL;
+        if (status == 422) {
+            return ESP_ERR_INVALID_ARG;
+        }
+        // 401/403 = the Hub rejected this device's signed identity (e.g. the P-256
+        // key changed after a reflash, or admin revoked it). Surface it distinctly
+        // so the controller can show "awaiting re-approval" instead of retrying the
+        // same rejected identity forever.
+        if (status == 401 || status == 403) {
+            return ESP_ERR_NOT_ALLOWED;
+        }
+        return ESP_FAIL;
     }
 
     cJSON* root = cJSON_Parse(body.c_str());
