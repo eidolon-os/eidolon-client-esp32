@@ -4,8 +4,10 @@
 #include <esp_err.h>
 #include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
 #include <freertos/task.h>
 #include <functional>
+#include <string>
 
 #include "hub_types.h"
 #include "livekit_session.h"
@@ -27,9 +29,18 @@ enum class VoiceSessionState {
     ServerUnreachable,  // repeated connect failures; re-discovery exhausted
 };
 
+// Single-task actor. Every external entry point (PTT, join/leave, mic, network,
+// activation) and every LiveKit/SDK callback only *posts an event*; all state is
+// mutated exclusively on the one controller task that drains the event queue, so
+// there are no data races and no scattered per-command/reconnect/audio tasks.
+// Mode-agnostic: half-duplex (PTT) and full-duplex (barge-in) share this loop and
+// differ only inside a few handlers (mic gating, PTT events, idle auto-leave).
 class EidolonVoiceController {
 public:
     using StateCallback = std::function<void(VoiceSessionState)>;
+
+    EidolonVoiceController();
+    ~EidolonVoiceController();
 
     void OnHubActivationSucceeded();
     void OnNetworkLost();
@@ -38,69 +49,103 @@ public:
     esp_err_t LeaveRoom();
     esp_err_t SetMicEnabled(bool enabled);
 
-    // Push-to-talk (hold-to-talk). Press opens the mic (joining the room first if
-    // needed) and marks the turn as in progress; release closes the mic and the
-    // ptt=false edge tells the server the turn is complete. No-op when PTT mode
-    // is disabled (CONFIG_EIDOLON_INTERACTION_MODE_PTT off → full-duplex/auto).
+    // Push-to-talk (hold-to-talk). Press opens the mic while held; release closes
+    // it and the ptt=false edge tells the server the turn is complete. No-op when
+    // PTT mode is disabled (full-duplex/auto).
     void OnPttPressed();
     void OnPttReleased();
     bool IsPttMode() const { return ptt_mode_; }
     bool IsPttHeld() const { return ptt_active_; }
 
+    // Read directly off the controller-owned field. state_ is a word-sized enum
+    // written only on the controller task; a cross-thread read is benign (returns a
+    // recent value) and the authoritative decisions re-check state on the task.
     VoiceSessionState GetState() const { return state_; }
     void SetOnStateChanged(StateCallback cb) { on_state_changed_ = std::move(cb); }
     void SetOnTranscription(std::function<void(const TranscriptionEvent&)> cb);
     void SetOnAgentPhase(std::function<void(AgentPhase)> cb);
 
 private:
+    // ---- Event loop ----
+    enum class EventType {
+        Activation,
+        NetworkLost,
+        Join,
+        Leave,
+        SetMic,
+        PttPress,
+        PttRelease,
+        LiveKitState,
+        ControlCommand,
+        SessionControl,
+        AgentPhaseChanged,
+        AudioTick,
+        ReconnectTick,
+        ConnectTimeout,
+        IdleLeave,
+    };
+    struct Event {
+        EventType type;
+        LiveKitConnectionState lk_state = LiveKitConnectionState::Disconnected;
+        AgentPhase phase = AgentPhase::Silent;
+        bool flag = false;
+        std::string* payload = nullptr;  // owned; the loop deletes it after dispatch
+    };
+    static void TaskTrampoline(void* arg);
+    void ControllerLoop();
+    void Enqueue(Event ev);  // thread-safe; frees ev.payload if the queue is full
+    void Dispatch(const Event& ev);
+
+    // ---- Handlers (run only on the controller task) ----
+    void DoActivation();
+    void DoNetworkLost();
+    esp_err_t DoJoinRoom();
+    esp_err_t DoLeaveRoom();
+    void DoSetMicEnabled(bool enabled);
+    void DoPttPressed();
+    void DoPttReleased();
+    void DoLiveKitState(LiveKitConnectionState lk_state);
+    void DoControlCommand(const std::string& payload);
+    void DoSessionControl(const std::string& payload);
+    void DoAgentPhase(AgentPhase phase);
+    void DoAudioTick();
+    void DoReconnectTick();
+    void DoConnectTimeout();
+    void DoIdleAutoLeave();
+
+    // ---- Internal helpers (controller task only) ----
     esp_err_t LoadStoredConfig();
     esp_err_t RefreshHubConfig();
-    // Re-query mDNS for the Hub, and if its address changed, adopt the new
-    // config_url and re-fetch config. Recovers from a Hub IP change (DHCP /
-    // network move) that left the cached address dead.
     esp_err_t RediscoverHub();
     esp_err_t ConnectControlRoom();
     bool HasActiveConfig() const;
     bool HasControlConfig() const;
     VoiceSessionState StateForConfig(const Esp32HubConfig& config) const;
     void SetState(VoiceSessionState state);
-    void OnLiveKitState(LiveKitConnectionState lk_state);
-    void OnControlCommand(const std::string& payload);
-    void OnSessionControl(const std::string& payload);
     void HandleConfigRefreshCommand(const std::string& command_id);
     void HandleRoomJoinCommand(const std::string& command_id);
     void HandlePlaybackStopCommand(const std::string& command_id);
     void HandleIdleTimeoutCommand();
-    // Acks `command` as accepted, then runs `handler` on a short-lived task.
-    // Replies "failed/TASK_CREATE_FAILED" if the task cannot be created.
-    void SpawnCommandTask(const char* task_name, const ControlCommand& command,
-                          void (EidolonVoiceController::*handler)(const std::string&));
+    void AckCommand(const ControlCommand& command, const char* status, const char* code,
+                    const char* detail = "", const char* result = "");
+
+    // Reconnect (timer-driven backoff) + connect watchdog + idle auto-leave. Each
+    // timer callback just posts an event; the work runs on the controller task.
     void ScheduleControlReconnect(const char* reason);
-    // Connect watchdog: a connect/reconnect attempt that never reaches a terminal
-    // LiveKit state (Connected/Failed/Disconnected) would otherwise leave the
-    // session stuck in Connecting/Reconnecting forever. Armed whenever the state
-    // is (Re)connecting, disarmed on any other state; on timeout it tears down the
-    // hung attempt and reschedules a reconnect. Mode-agnostic (PTT and full-duplex
-    // share this connection path).
     void ArmConnectWatchdog();
     void DisarmConnectWatchdog();
-    void HandleConnectTimeout();
-    static void ConnectWatchdogCb(void* arg);
-    // Idle auto-leave (PTT only): after a stretch in-room with no PTT activity and
-    // no agent output, leave the voice room (back to the control room / ready
-    // state) so the server can release the agent session. Re-armed on any activity;
-    // re-entering the room is an explicit user action (tap to connect). Full-duplex
-    // keeps the server-side idle policy instead.
     void UpdateIdleAutoLeave();
-    void HandleIdleAutoLeave();
+    static void ReconnectTimerCb(void* arg);
+    static void ConnectWatchdogCb(void* arg);
     static void IdleLeaveCb(void* arg);
+
+    // Audio-state publisher (timer-driven tick on the controller task).
     void StartAudioStatePublisher();
     void StopAudioStatePublisher();
-    void AudioStatePublisherTask();
+    static void AudioTimerCb(void* arg);
     void PublishClientAudioState(bool playback_active);
     bool PlaybackActiveRecently() const;
     bool AgentOutputActiveRecently() const;
-    void HandleAgentPhase(AgentPhase phase);
 
     LiveKitSession session_;
     Esp32HubConfig config_;
@@ -122,10 +167,7 @@ private:
     // Consecutive reconnect attempts since the last successful connect. Drives
     // backoff, when to re-discover the Hub, and the ServerUnreachable UI.
     int reconnect_attempts_ = 0;
-    esp_timer_handle_t connect_watchdog_ = nullptr;
-    esp_timer_handle_t idle_leave_timer_ = nullptr;
-    volatile bool audio_state_task_stop_ = false;
-    bool audio_state_task_running_ = false;
+    bool audio_publisher_active_ = false;
     uint32_t audio_state_seq_ = 0;
     bool audio_state_sent_ = false;
     bool last_audio_playback_active_ = false;
@@ -133,6 +175,14 @@ private:
     bool last_audio_ptt_ = false;
     int64_t last_audio_publish_us_ = 0;
     AgentPhase agent_phase_ = AgentPhase::Silent;
+
+    QueueHandle_t event_queue_ = nullptr;
+    TaskHandle_t task_ = nullptr;
+    esp_timer_handle_t audio_timer_ = nullptr;
+    esp_timer_handle_t reconnect_timer_ = nullptr;
+    esp_timer_handle_t connect_watchdog_ = nullptr;
+    esp_timer_handle_t idle_leave_timer_ = nullptr;
+
     StateCallback on_state_changed_;
     std::function<void(AgentPhase)> on_agent_phase_;
 };
