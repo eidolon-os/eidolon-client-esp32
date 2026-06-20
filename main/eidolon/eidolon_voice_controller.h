@@ -163,6 +163,12 @@ private:
     bool ptt_active_ = false;  // PTT: button currently held (mic open this turn)
     bool control_room_ = false;
     bool switching_to_voice_ = false;
+    // Set when we intentionally disconnect the control room to switch to the voice
+    // room. Because LiveKit callbacks are now delivered through the event queue, the
+    // control room's Disconnected event arrives after control_room_ has flipped to
+    // false; this flag lets DoLiveKitState swallow that one expected teardown
+    // instead of misreading it as a voice-room drop and bouncing back to ready.
+    bool expect_control_teardown_ = false;
     bool control_reconnect_pending_ = false;
     // Consecutive reconnect attempts since the last successful connect. Drives
     // backoff, when to re-discover the Hub, and the ServerUnreachable UI.

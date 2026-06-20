@@ -427,6 +427,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state)
         break;
     case LiveKitConnectionState::Connected:
         reconnect_attempts_ = 0;  // recovered: voice room is up
+        expect_control_teardown_ = false;  // join handoff complete
         SetState(VoiceSessionState::InRoom);
         StartAudioStatePublisher();
         break;
@@ -447,6 +448,14 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state)
         }
         break;
     case LiveKitConnectionState::Disconnected:
+        if (expect_control_teardown_) {
+            // This is the intentional control-room disconnect from a join handoff,
+            // not a voice-room drop. Swallow it; the voice Connecting/Connected
+            // events that follow drive the real state.
+            expect_control_teardown_ = false;
+            ESP_LOGI(TAG, "Ignoring expected control-room teardown during join");
+            break;
+        }
         StopAudioStatePublisher();
         agent_phase_ = AgentPhase::Silent;
         if (state_ != VoiceSessionState::Idle && state_ != VoiceSessionState::ConfigReady &&
@@ -838,7 +847,12 @@ esp_err_t EidolonVoiceController::DoJoinRoom()
 
     switching_to_voice_ = true;
     SetState(VoiceSessionState::Connecting);
+    expect_control_teardown_ = false;
     if (control_room_) {
+        // The control room's Disconnected event will be delivered through the queue
+        // after control_room_ flips below; flag it so DoLiveKitState ignores that
+        // one expected teardown rather than treating it as a voice-room drop.
+        expect_control_teardown_ = true;
         session_.Disconnect(true);
     }
     control_room_ = false;
