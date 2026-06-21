@@ -158,10 +158,12 @@ EidolonUiSnapshot UiStateMapper::Map(VoiceSessionState session_state,
                                      TranscriptionSource last_transcription_source,
                                      bool mic_enabled,
                                      bool ptt_recording,
-                                     bool ptt_committing)
+                                     bool ptt_committing,
+                                     VoiceInputPolicy input_policy)
 {
     EidolonUiSnapshot snapshot;
     snapshot.show_mute_icon = !mic_enabled;
+    snapshot.input_policy = input_policy;
     snapshot.mode = CurrentInteractionMode();
     snapshot.pairing = PairingStatusFor(session_state);
     snapshot.connection = ConnectionPhaseFor(session_state);

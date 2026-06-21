@@ -56,6 +56,16 @@ enum class TurnPhase {
     AgentSpeaking,
 };
 
+// Cross-cutting input capability. Barge-in is a capability of LIVE/full-duplex
+// input, not a third user-facing mode: the top chrome still says LIVE. The default
+// is None; boards/controllers should only advance this when capture, AEC, and the
+// server path actually support interruption.
+enum class InterruptPhase {
+    None,
+    Available,
+    Interrupting,
+};
+
 inline InteractionMode CurrentInteractionMode()
 {
 #if CONFIG_EIDOLON_INTERACTION_MODE_PTT

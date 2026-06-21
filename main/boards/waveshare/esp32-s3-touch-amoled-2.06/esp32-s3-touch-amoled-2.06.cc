@@ -122,7 +122,7 @@ public:
 
         auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
 
-        // The eidolon UI (large hold-to-talk button + mode badge) lives in a
+        // The eidolon UI (pressable voice ring + mode badge) lives in a
         // per-device view; the presenter renders to it. We hold the display lock
         // here, so Build() must not take it again.
         eidolon::Amoled206PttView::BuildContext ctx;
@@ -130,13 +130,29 @@ public:
         ctx.font = lvgl_theme->text_font()->font();
         ctx.accent_color = lvgl_theme->user_bubble_color();
         ctx.display = this;
+        ctx.legacy_status_label = status_label_;
+        ctx.legacy_emoji_box = emoji_box_;
         eidolon_view_ = new eidolon::Amoled206PttView();
         eidolon_view_->Build(ctx);
+        eidolon_top_chrome_owned_ = true;
         eidolon::SetEidolonView(eidolon_view_);
+    }
+
+    void SetStatus(const char* status) override {
+        if (!eidolon_top_chrome_owned_) {
+            SpiLcdDisplay::SetStatus(status);
+            return;
+        }
+        DisplayLockGuard lock(this);
+        if (status_label_ != nullptr) {
+            lv_label_set_text(status_label_, "");
+            lv_obj_add_flag(status_label_, LV_OBJ_FLAG_HIDDEN);
+        }
     }
 
 private:
     eidolon::Amoled206PttView* eidolon_view_ = nullptr;
+    bool eidolon_top_chrome_owned_ = false;
 };
 
 class CustomBacklight : public Backlight {

@@ -14,7 +14,8 @@ public:
                                  TranscriptionSource last_transcription_source,
                                  bool mic_enabled,
                                  bool ptt_recording = false,
-                                 bool ptt_committing = false);
+                                 bool ptt_committing = false,
+                                 VoiceInputPolicy input_policy = {});
 };
 
 }  // namespace eidolon

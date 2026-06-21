@@ -27,6 +27,11 @@ struct TranscriptionEvent {
     bool is_final = false;
 };
 
+struct VoiceInputPolicy {
+    bool barge_in_enabled = false;
+    InterruptPhase interrupt = InterruptPhase::None;
+};
+
 enum class VoiceSessionButtonState {
     Hidden,
     Start,
@@ -53,6 +58,7 @@ struct EidolonUiSnapshot {
     // Talk button whose label depends on whether the user is currently holding.
     const char* button_label = nullptr;
     bool show_mute_icon = false;
+    VoiceInputPolicy input_policy;
 };
 
 }  // namespace eidolon
