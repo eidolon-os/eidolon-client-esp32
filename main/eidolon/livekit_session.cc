@@ -185,7 +185,12 @@ void LiveKitSession::HandleStateChanged(livekit_connection_state_t state)
     if (mapped == LiveKitConnectionState::Connected) {
         last_failure_reason_ = LIVEKIT_FAILURE_REASON_NONE;
     }
-    ESP_LOGI(TAG, "Room state: %s", livekit_connection_state_str(state));
+    // room_kind is inferred from whether this connection publishes/subscribes
+    // media (voice) or is data-only (control), so the SDK-level transition lines
+    // align with the controller's [lifecycle] logs by identity + room_kind.
+    ESP_LOGI(TAG, "[lifecycle] room state=%s room_kind=%s identity=%s",
+             livekit_connection_state_str(state), using_media_ ? "voice" : "control",
+             identity_.c_str());
 
     if (mapped == LiveKitConnectionState::Failed || mapped == LiveKitConnectionState::Reconnecting) {
         livekit_failure_reason_t reason = livekit_room_get_failure_reason(room_handle_);

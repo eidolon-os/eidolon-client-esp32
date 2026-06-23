@@ -15,7 +15,8 @@ public:
                                  bool mic_enabled,
                                  bool ptt_recording = false,
                                  bool ptt_committing = false,
-                                 VoiceInputPolicy input_policy = {});
+                                 VoiceInputPolicy input_policy = {},
+                                 EndReason end_reason = EndReason::None);
 };
 
 }  // namespace eidolon

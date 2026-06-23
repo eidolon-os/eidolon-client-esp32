@@ -57,6 +57,7 @@
         "LOADING_ASSETS": "Loading assets...",
         "HELLO_MY_FRIEND": "Hello, my friend!",
         "EIDOLON_READY": "Standby",
+        "EIDOLON_SESSION_ENDED": "Conversation ended · standing by",
         "EIDOLON_WAITING_APPROVAL": "Waiting for approval",
         "EIDOLON_WAITING_APPROVAL_HINT": "Approve this device in Admin",
         "EIDOLON_WAITING_BINDING": "Waiting for Agent",

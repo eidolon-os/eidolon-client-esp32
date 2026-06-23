@@ -17,7 +17,8 @@ public:
     explicit EidolonUiPresenter(Application& app);
     ~EidolonUiPresenter();
 
-    void Apply(VoiceSessionState session_state, bool mic_enabled);
+    void Apply(VoiceSessionState session_state, bool mic_enabled,
+               EndReason end_reason = EndReason::None);
     void OnTranscription(const TranscriptionEvent& event);
     void OnAgentPhase(AgentPhase phase);
     // Push-to-talk: the user is currently holding the talk button (mic recording).
@@ -38,6 +39,7 @@ private:
     Application& app_;
     AgentSessionTracker tracker_;
     VoiceSessionState session_state_ = VoiceSessionState::Idle;
+    EndReason end_reason_ = EndReason::None;
     bool mic_enabled_ = true;
     bool ptt_recording_ = false;
     bool ptt_committing_ = false;

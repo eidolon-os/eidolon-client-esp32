@@ -9,6 +9,7 @@
 #include "livekit_board.h"
 #include "system_info.h"
 
+#include <cJSON.h>
 #include <esp_log.h>
 #include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
@@ -65,6 +66,23 @@ uint64_t ReconnectDelayUs(int attempt)
         ms = kReconnectMaxDelayMs;
     }
     return static_cast<uint64_t>(ms) * 1000ULL;
+}
+
+const char* LiveKitConnectionStateName(eidolon::LiveKitConnectionState state)
+{
+    switch (state) {
+    case eidolon::LiveKitConnectionState::Disconnected:
+        return "Disconnected";
+    case eidolon::LiveKitConnectionState::Connecting:
+        return "Connecting";
+    case eidolon::LiveKitConnectionState::Connected:
+        return "Connected";
+    case eidolon::LiveKitConnectionState::Reconnecting:
+        return "Reconnecting";
+    case eidolon::LiveKitConnectionState::Failed:
+        return "Failed";
+    }
+    return "unknown";
 }
 
 const char* AgentPhaseName(eidolon::AgentPhase phase)
@@ -167,6 +185,9 @@ void EidolonVoiceController::Dispatch(const Event& ev)
     case EventType::NetworkLost:
         DoNetworkLost();
         break;
+    case EventType::NetworkRestored:
+        DoNetworkRestored();
+        break;
     case EventType::Join:
         DoJoinRoom();
         break;
@@ -183,7 +204,7 @@ void EidolonVoiceController::Dispatch(const Event& ev)
         DoPttReleased();
         break;
     case EventType::LiveKitState:
-        DoLiveKitState(ev.lk_state);
+        DoLiveKitState(ev.lk_state, ev.generation);
         break;
     case EventType::ControlCommand:
         if (ev.payload != nullptr) {
@@ -229,6 +250,13 @@ void EidolonVoiceController::OnNetworkLost()
 {
     Event ev;
     ev.type = EventType::NetworkLost;
+    Enqueue(ev);
+}
+
+void EidolonVoiceController::OnNetworkRestored()
+{
+    Event ev;
+    ev.type = EventType::NetworkRestored;
     Enqueue(ev);
 }
 
@@ -322,13 +350,74 @@ bool EidolonVoiceController::HasControlConfig() const
     return config_.control.usable() && !config_.control.room_name.empty();
 }
 
-void EidolonVoiceController::SetState(VoiceSessionState state)
+const char* EidolonVoiceController::VoiceStateName(VoiceSessionState state)
+{
+    switch (state) {
+    case VoiceSessionState::Idle:
+        return "Idle";
+    case VoiceSessionState::PendingApproval:
+        return "PendingApproval";
+    case VoiceSessionState::WaitingBinding:
+        return "WaitingBinding";
+    case VoiceSessionState::ConfigReady:
+        return "ConfigReady";
+    case VoiceSessionState::Connecting:
+        return "Connecting";
+    case VoiceSessionState::InRoom:
+        return "InRoom";
+    case VoiceSessionState::Reconnecting:
+        return "Reconnecting";
+    case VoiceSessionState::Error:
+        return "Error";
+    case VoiceSessionState::Unauthorized:
+        return "Unauthorized";
+    case VoiceSessionState::ServerUnreachable:
+        return "ServerUnreachable";
+    }
+    return "Unknown";
+}
+
+const char* EidolonVoiceController::CurrentRoomKind() const
+{
+    if (control_room_) {
+        return "control";
+    }
+    if (session_.IsConnected() || state_ == VoiceSessionState::Connecting ||
+        state_ == VoiceSessionState::InRoom || state_ == VoiceSessionState::Reconnecting) {
+        return "voice";
+    }
+    return "none";
+}
+
+uint32_t EidolonVoiceController::BeginSessionGeneration(const char* room_kind)
+{
+    session_generation_ += 1;
+    ESP_LOGI(TAG, "[lifecycle] begin gen=%lu room_kind=%s (state=%s)",
+             static_cast<unsigned long>(session_generation_), room_kind,
+             VoiceStateName(state_));
+    return session_generation_;
+}
+
+void EidolonVoiceController::MarkSessionSuperseded(const char* reason)
+{
+    session_generation_ += 1;
+    ESP_LOGI(TAG, "[lifecycle] superseded gen=%lu reason=%s (state=%s)",
+             static_cast<unsigned long>(session_generation_), reason ? reason : "unspecified",
+             VoiceStateName(state_));
+}
+
+void EidolonVoiceController::SetState(VoiceSessionState state, const char* reason)
 {
     if (state_ == state) {
         return;
     }
+    VoiceSessionState prev = state_;
     state_ = state;
-    ESP_LOGI(TAG, "Voice session state -> %d", static_cast<int>(state));
+    // [lifecycle] is the grep anchor for aligning client transitions with the
+    // channel's room-lifecycle logs by room_name + timestamp (plan Phase 0).
+    ESP_LOGI(TAG, "[lifecycle] SetState %s -> %s reason=%s room_kind=%s gen=%lu",
+             VoiceStateName(prev), VoiceStateName(state), reason ? reason : "unspecified",
+             CurrentRoomKind(), static_cast<unsigned long>(session_generation_));
     // The watchdog runs only while an attempt is in flight; any terminal state
     // (InRoom / ConfigReady / Error / ...) disarms it.
     if (state == VoiceSessionState::Connecting || state == VoiceSessionState::Reconnecting) {
@@ -347,10 +436,10 @@ esp_err_t EidolonVoiceController::LoadStoredConfig()
     HubConfigStore store;
     if (!store.Load(config_, &config_url_)) {
         ESP_LOGE(TAG, "No valid Hub config in NVS");
-        SetState(VoiceSessionState::Error);
+        SetState(VoiceSessionState::Error, "no_stored_config");
         return ESP_ERR_NOT_FOUND;
     }
-    SetState(StateForConfig(config_));
+    SetState(StateForConfig(config_), "config_loaded");
     return ESP_OK;
 }
 
@@ -367,7 +456,7 @@ esp_err_t EidolonVoiceController::RefreshHubConfig()
         // rejected key; show "awaiting re-approval" (admin must re-approve / the
         // device must re-enroll). Recovers on a later successful fetch or reboot.
         ESP_LOGW(TAG, "Hub rejected device identity; awaiting re-approval");
-        SetState(VoiceSessionState::Unauthorized);
+        SetState(VoiceSessionState::Unauthorized, "hub_rejected_identity");
         return err;
     }
     if (err != ESP_OK) {
@@ -376,7 +465,7 @@ esp_err_t EidolonVoiceController::RefreshHubConfig()
     HubConfigStore store;
     store.SaveHubConfig(fresh, config_url_);
     config_ = std::move(fresh);
-    SetState(StateForConfig(config_));
+    SetState(StateForConfig(config_), "config_refreshed");
     return ESP_OK;
 }
 
@@ -403,14 +492,47 @@ esp_err_t EidolonVoiceController::RediscoverHub()
 
 // ============================ LiveKit state handler ============================
 
-void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state)
+void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
+                                           uint32_t event_generation)
 {
+    const char* lk_name = LiveKitConnectionStateName(lk_state);
+    bool stale = event_generation != session_generation_;
+    // [lifecycle] full attribution of every LiveKit event: which plane the
+    // controller thinks it is on, the generation the event was emitted under vs
+    // the current one (mismatch == a superseded connection's late event leaking
+    // in — the cause of the JOIN bounce), the last SDK failure reason, and the
+    // room names involved so this aligns with the channel logs.
+    ESP_LOGI(TAG,
+             "[lifecycle] lk_event=%s room_kind=%s event_gen=%lu cur_gen=%lu%s "
+             "state=%s switching=%d failure=%s voice_room=%s control_room=%s",
+             lk_name, control_room_ ? "control" : "voice",
+             static_cast<unsigned long>(event_generation),
+             static_cast<unsigned long>(session_generation_), stale ? " STALE" : "",
+             VoiceStateName(state_), switching_to_voice_ ? 1 : 0,
+             livekit_failure_reason_str(session_.LastFailureReason()),
+             config_.active.room_name.c_str(), config_.control.room_name.c_str());
+
+    // Generation gate (plan §3.2): every connect (voice or control) bumps
+    // session_generation_; the callback snapshots the generation it fired under.
+    // An event whose generation is not the current one belongs to a superseded
+    // connection — e.g. the old control room's late Disconnected/Failed during a
+    // JOIN handoff, or a hung attempt we already abandoned. Dropping it here is
+    // what stops the InRoom→Ready bounce; it replaces the old single-shot
+    // expect_control_teardown_ heuristic, which only masked exactly one
+    // Disconnected and missed Failed / reordered / multi-event teardowns.
+    if (stale) {
+        ESP_LOGI(TAG, "[lifecycle] dropping stale lk_event=%s (event_gen=%lu cur_gen=%lu)",
+                 lk_name, static_cast<unsigned long>(event_generation),
+                 static_cast<unsigned long>(session_generation_));
+        return;
+    }
+
     if (control_room_) {
         StopAudioStatePublisher();
         switch (lk_state) {
         case LiveKitConnectionState::Connected:
             reconnect_attempts_ = 0;  // recovered: control room is back
-            SetState(StateForConfig(config_));
+            SetState(StateForConfig(config_), "control_connected");
             break;
         case LiveKitConnectionState::Failed:
             ESP_LOGW(TAG, "Control room connection failed");
@@ -431,45 +553,47 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state)
 
     switch (lk_state) {
     case LiveKitConnectionState::Connecting:
-        SetState(VoiceSessionState::Connecting);
+        SetState(VoiceSessionState::Connecting, "voice_connecting");
         break;
     case LiveKitConnectionState::Connected:
         reconnect_attempts_ = 0;  // recovered: voice room is up
-        expect_control_teardown_ = false;  // join handoff complete
-        SetState(VoiceSessionState::InRoom);
+        SetState(VoiceSessionState::InRoom, "voice_connected");
         StartAudioStatePublisher();
         break;
     case LiveKitConnectionState::Reconnecting:
-        SetState(VoiceSessionState::Reconnecting);
+        SetState(VoiceSessionState::Reconnecting, "voice_reconnecting");
         break;
     case LiveKitConnectionState::Failed:
         StopAudioStatePublisher();
         agent_phase_ = AgentPhase::Silent;
         if (session_.LastFailureReason() == LIVEKIT_FAILURE_REASON_ROOM_DELETED ||
             session_.LastFailureReason() == LIVEKIT_FAILURE_REASON_ROOM_CLOSED) {
-            ESP_LOGI(TAG, "Voice room closed by server, returning to control room");
-            SetState(StateForConfig(config_));
+            // [lifecycle] Room Deleted/Closed: the server tore down the voice room.
+            // Today the client cannot tell a normal end (idle/proactive done) from a
+            // failed join — both land here. Phase 1 distinguishes them via the
+            // session_end{reason} packet the channel now sends before deleting.
+            ESP_LOGI(TAG,
+                     "[lifecycle] voice room closed by server (failure=%s) room=%s; "
+                     "returning to control room",
+                     livekit_failure_reason_str(session_.LastFailureReason()),
+                     config_.active.room_name.c_str());
+            SetState(StateForConfig(config_), "voice_room_closed");
             ScheduleControlReconnect("voice_room_closed");
         } else {
-            SetState(VoiceSessionState::Error);
+            SetState(VoiceSessionState::Error, "voice_failed");
             ScheduleControlReconnect("voice_failed");
         }
         break;
     case LiveKitConnectionState::Disconnected:
-        if (expect_control_teardown_) {
-            // This is the intentional control-room disconnect from a join handoff,
-            // not a voice-room drop. Swallow it; the voice Connecting/Connected
-            // events that follow drive the real state.
-            expect_control_teardown_ = false;
-            ESP_LOGI(TAG, "Ignoring expected control-room teardown during join");
-            break;
-        }
+        // A control-room teardown during a JOIN handoff is now dropped by the
+        // generation gate above (it carries the pre-bump generation), so anything
+        // reaching here under the current generation is a genuine voice-room drop.
         StopAudioStatePublisher();
         agent_phase_ = AgentPhase::Silent;
         if (state_ != VoiceSessionState::Idle && state_ != VoiceSessionState::ConfigReady &&
             state_ != VoiceSessionState::PendingApproval &&
             state_ != VoiceSessionState::WaitingBinding) {
-            SetState(StateForConfig(config_));
+            SetState(StateForConfig(config_), "voice_disconnected");
         }
         ScheduleControlReconnect("voice_disconnected");
         break;
@@ -521,7 +645,7 @@ void EidolonVoiceController::DoReconnectTick()
         RediscoverHub();
     }
     if (attempt >= kReconnectUnreachableAfter) {
-        SetState(VoiceSessionState::ServerUnreachable);
+        SetState(VoiceSessionState::ServerUnreachable, "reconnect_exhausted");
     }
     reconnect_attempts_ = attempt + 1;
 
@@ -583,7 +707,11 @@ void EidolonVoiceController::DoConnectTimeout()
     control_reconnect_pending_ = false;
     session_.Disconnect(true);
     control_room_ = false;
-    SetState(StateForConfig(config_));  // leaves (Re)connecting -> disarms watchdog
+    // Supersede the hung attempt so any of its late callbacks are dropped rather
+    // than accepted after we fall back (the next ConnectControlRoom bumps again).
+    MarkSessionSuperseded("connect_timeout");
+    // leaves (Re)connecting -> disarms watchdog
+    SetState(StateForConfig(config_), "connect_timeout");
     ScheduleControlReconnect("connect_timeout");
 }
 
@@ -678,14 +806,52 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload)
     AckCommand(command, "unsupported", "UNSUPPORTED_OP");
 }
 
+EndReason EidolonVoiceController::ParseEndReason(const std::string& payload)
+{
+    // Channel sends {"type":"session_end","reason":"<reason>"} on
+    // eidolon.session_control before tearing the room down. Legacy channels sent
+    // {"type":"idle_timeout","reason":"idle_timeout"} — treat that as a normal end.
+    EndReason reason = EndReason::None;
+    cJSON* root = cJSON_Parse(payload.c_str());
+    if (!root) {
+        return reason;
+    }
+    cJSON* type_item = cJSON_GetObjectItem(root, "type");
+    cJSON* reason_item = cJSON_GetObjectItem(root, "reason");
+    const char* type = cJSON_IsString(type_item) ? type_item->valuestring : "";
+    const char* r = cJSON_IsString(reason_item) ? reason_item->valuestring : "";
+
+    if (strcmp(type, "session_end") == 0) {
+        if (strcmp(r, "idle_normal_end") == 0) {
+            reason = EndReason::IdleNormalEnd;
+        } else if (strcmp(r, "proactive_done") == 0) {
+            reason = EndReason::ProactiveDone;
+        } else if (strcmp(r, "user_left") == 0) {
+            reason = EndReason::UserLeft;
+        } else if (strcmp(r, "superseded") == 0) {
+            reason = EndReason::Superseded;
+        } else if (strcmp(r, "error") == 0) {
+            reason = EndReason::Error;
+        } else {
+            // Unknown reason from a newer channel: treat as a normal end (return
+            // to Ready) rather than guessing an error.
+            reason = EndReason::IdleNormalEnd;
+        }
+    } else if (strcmp(type, "idle_timeout") == 0 || strcmp(r, "idle_timeout") == 0) {
+        reason = EndReason::IdleNormalEnd;  // legacy
+    }
+    cJSON_Delete(root);
+    return reason;
+}
+
 void EidolonVoiceController::DoSessionControl(const std::string& payload)
 {
-    if (payload.find("idle_timeout") == std::string::npos) {
+    EndReason reason = ParseEndReason(payload);
+    if (reason == EndReason::None) {
         ESP_LOGI(TAG, "Ignoring unsupported session_control payload");
         return;
     }
-    ESP_LOGI(TAG, "Session control -> idle timeout");
-    HandleIdleTimeoutCommand();
+    HandleSessionEnd(reason);
 }
 
 void EidolonVoiceController::HandleConfigRefreshCommand(const std::string& command_id)
@@ -751,11 +917,35 @@ void EidolonVoiceController::HandlePlaybackStopCommand(const std::string& comman
 
 void EidolonVoiceController::HandleIdleTimeoutCommand()
 {
+    // Retained for the legacy idle path; routed through the unified handler.
+    HandleSessionEnd(EndReason::IdleNormalEnd);
+}
+
+void EidolonVoiceController::HandleSessionEnd(EndReason reason)
+{
+    static const char* kReasonNames[] = {"none",       "idle_normal_end", "proactive_done",
+                                         "user_left", "superseded",      "error"};
+    const char* reason_name = kReasonNames[static_cast<int>(reason)];
+    // Record the reason so the UI can show "已结束待命" / error chrome instead of an
+    // unexplained return to JOIN, then tear the voice room down gracefully and
+    // fall back to the (always-on) control room for reachability. The device is
+    // still reachable on control even after an error, so we do NOT force the
+    // Error connection state; the reason drives the UI text orthogonally (§3.2).
+    last_end_reason_ = reason;
+    ESP_LOGI(TAG,
+             "[lifecycle] session_end reason=%s; leaving voice for control (gen=%lu room=%s)",
+             reason_name, static_cast<unsigned long>(session_generation_),
+             config_.active.room_name.c_str());
+
     StopAudioStatePublisher();
     control_reconnect_pending_ = true;
     session_.Disconnect(true);
     control_room_ = false;
-    SetState(StateForConfig(config_));
+    // Supersede the torn-down voice room so its trailing ROOM_DELETED/Disconnected
+    // (which the server emits right after this packet) is dropped by the
+    // generation gate instead of being read as a fresh voice-room drop.
+    MarkSessionSuperseded("session_end");
+    SetState(StateForConfig(config_), "session_end");
     control_reconnect_pending_ = false;
     ConnectControlRoom();
 }
@@ -769,6 +959,11 @@ void EidolonVoiceController::DoActivation()
         Event ev;
         ev.type = EventType::LiveKitState;
         ev.lk_state = s;
+        // Snapshot the generation here, on the SDK callback task, so a teardown
+        // event emitted by a superseded connection carries that connection's
+        // generation rather than whatever is current by the time the controller
+        // task dispatches it.
+        ev.generation = session_generation_;
         Enqueue(ev);
     });
     session_.SetOnControlCommand([this](const std::string& payload) {
@@ -816,7 +1011,46 @@ void EidolonVoiceController::DoNetworkLost()
     control_room_ = false;
     reconnect_attempts_ = 0;  // distinct cause; reconnect starts fresh on restore
     session_.Disconnect(true);
-    SetState(StateForConfig(config_));
+    // Supersede so late callbacks from the dropped connection don't resurrect a
+    // stale state once the network returns and we reconnect.
+    MarkSessionSuperseded("network_lost");
+    SetState(StateForConfig(config_), "network_lost");
+}
+
+void EidolonVoiceController::DoNetworkRestored()
+{
+    ESP_LOGI(TAG, "Network restored; refreshing Hub discovery/config");
+    control_reconnect_pending_ = false;
+    reconnect_attempts_ = 0;
+    if (reconnect_timer_ != nullptr) {
+        esp_timer_stop(reconnect_timer_);
+    }
+
+    if (config_url_.empty() && LoadStoredConfig() != ESP_OK) {
+        ESP_LOGW(TAG, "Network restored but no stored Hub config is available");
+        return;
+    }
+
+    esp_err_t err = RediscoverHub();
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Hub rediscovery after network restore failed: %s", esp_err_to_name(err));
+        err = RefreshHubConfig();
+    }
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Hub config refresh after network restore failed: %s", esp_err_to_name(err));
+        ScheduleControlReconnect("network_restore_refresh_failed");
+        return;
+    }
+
+    if (HasControlConfig()) {
+        err = ConnectControlRoom();
+        if (err != ESP_OK) {
+            ScheduleControlReconnect("network_restore_connect_failed");
+        }
+        return;
+    }
+
+    SetState(StateForConfig(config_), "network_restored");
 }
 
 esp_err_t EidolonVoiceController::DoJoinRoom()
@@ -838,44 +1072,50 @@ esp_err_t EidolonVoiceController::DoJoinRoom()
     if (!HasActiveConfig()) {
         ESP_LOGI(TAG, "Config status=%s, refreshing before join",
                  HubConfigStatusToString(config_.status));
-        SetState(VoiceSessionState::Connecting);
+        SetState(VoiceSessionState::Connecting, "join_refresh_config");
         esp_err_t refresh_err = RefreshHubConfig();
         if (refresh_err != ESP_OK) {
             ESP_LOGW(TAG, "Join blocked: config refresh failed: %s", esp_err_to_name(refresh_err));
-            SetState(StateForConfig(config_));
+            SetState(StateForConfig(config_), "join_refresh_failed");
             return refresh_err;
         }
         if (!HasActiveConfig()) {
             ESP_LOGW(TAG, "Join blocked: config status=%s",
                      HubConfigStatusToString(config_.status));
-            SetState(StateForConfig(config_));
+            SetState(StateForConfig(config_), "join_blocked_inactive");
             return ESP_ERR_INVALID_STATE;
         }
     }
 
     switching_to_voice_ = true;
-    SetState(VoiceSessionState::Connecting);
-    expect_control_teardown_ = false;
+    // Fresh session: drop any end reason from the previous conversation so the
+    // connecting/ready chrome doesn't show a stale "已结束".
+    last_end_reason_ = EndReason::None;
+    SetState(VoiceSessionState::Connecting, "join_requested");
     if (control_room_) {
-        // The control room's Disconnected event will be delivered through the queue
-        // after control_room_ flips below; flag it so DoLiveKitState ignores that
-        // one expected teardown rather than treating it as a voice-room drop.
-        expect_control_teardown_ = true;
+        // Tear down the control room first. Its Disconnected/Failed events are
+        // emitted here, still under the current (control) generation; we bump to
+        // the voice generation only afterwards, so those late events are dropped
+        // by the generation gate in DoLiveKitState rather than misread as a
+        // voice-room drop. Disconnect() is synchronous (waits for DISCONNECTED +
+        // a short grace), so they are enqueued before the bump below.
         session_.Disconnect(true);
     }
     control_room_ = false;
+    BeginSessionGeneration("voice");
     esp_err_t err = session_.Connect(config_);
     switching_to_voice_ = false;
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Connect failed, refreshing Hub token");
         if (RefreshHubConfig() == ESP_OK) {
             switching_to_voice_ = true;
+            BeginSessionGeneration("voice");
             err = session_.Connect(config_);
             switching_to_voice_ = false;
         }
     }
     if (err != ESP_OK) {
-        SetState(VoiceSessionState::Error);
+        SetState(VoiceSessionState::Error, "join_connect_failed");
     }
     return err;
 }
@@ -898,12 +1138,13 @@ esp_err_t EidolonVoiceController::ConnectControlRoom()
     }
 
     control_room_ = true;
+    BeginSessionGeneration("control");
     esp_err_t err = session_.ConnectDataOnly(control_config);
     if (err != ESP_OK) {
         control_room_ = false;
         ESP_LOGW(TAG, "Connect control room failed: %s", esp_err_to_name(err));
     }
-    SetState(StateForConfig(config_));
+    SetState(StateForConfig(config_), "control_connect");
     return err;
 }
 
@@ -916,7 +1157,7 @@ esp_err_t EidolonVoiceController::DoLeaveRoom()
     if (reconnect_control) {
         ConnectControlRoom();
     } else if (state_ != VoiceSessionState::Idle) {
-        SetState(StateForConfig(config_));
+        SetState(StateForConfig(config_), "leave_room");
     }
     return err;
 }

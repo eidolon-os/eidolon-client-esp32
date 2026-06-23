@@ -21,6 +21,20 @@ enum class TranscriptionSource {
     System,
 };
 
+// Why a voice session ended, as reported by the channel's session_end{reason}
+// packet (plan §3.2). Orthogonal to ConnectionPhase: it lets the UI tell a
+// normal end of conversation ("已结束待命") apart from a JOIN failure ("Error"),
+// instead of inferring intent from a bare LiveKit ROOM_DELETED. Reserved values
+// (ProactiveDone/Superseded) are wired for Phase 3 proactive.
+enum class EndReason {
+    None,           // no end pending / fresh session
+    IdleNormalEnd,  // server idle watchdog — conversation ended normally
+    ProactiveDone,  // proactive report finished (Phase 3)
+    UserLeft,       // the other side left / job shut down
+    Superseded,     // replaced by a newer session (silent switch)
+    Error,          // server tore the session down on an error
+};
+
 struct TranscriptionEvent {
     TranscriptionSource source = TranscriptionSource::Unknown;
     std::string text;

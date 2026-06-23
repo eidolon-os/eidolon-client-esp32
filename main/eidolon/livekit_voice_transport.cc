@@ -40,6 +40,11 @@ void LiveKitVoiceTransport::OnNetworkLost()
     controller_->OnNetworkLost();
 }
 
+void LiveKitVoiceTransport::OnNetworkRestored()
+{
+    controller_->OnNetworkRestored();
+}
+
 void LiveKitVoiceTransport::JoinSession()
 {
     controller_->JoinRoom();
@@ -106,6 +111,11 @@ bool LiveKitVoiceTransport::IsMicrophoneEnabled() const
 VoiceSessionState LiveKitVoiceTransport::GetSessionState() const
 {
     return controller_->GetState();
+}
+
+EndReason LiveKitVoiceTransport::LastEndReason() const
+{
+    return controller_->LastEndReason();
 }
 
 std::unique_ptr<IVoiceSessionTransport> CreateLiveKitVoiceTransport(VoiceSessionCallbacks cb)

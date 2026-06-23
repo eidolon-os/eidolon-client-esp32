@@ -84,9 +84,11 @@ DeviceState EidolonUiPresenter::MapToDeviceState(VoiceSessionState session_state
     }
 }
 
-void EidolonUiPresenter::Apply(VoiceSessionState session_state, bool mic_enabled)
+void EidolonUiPresenter::Apply(VoiceSessionState session_state, bool mic_enabled,
+                               EndReason end_reason)
 {
     session_state_ = session_state;
+    end_reason_ = end_reason;
     mic_enabled_ = mic_enabled;
 
     if (session_state == VoiceSessionState::InRoom) {
@@ -103,7 +105,7 @@ void EidolonUiPresenter::Apply(VoiceSessionState session_state, bool mic_enabled
     auto snapshot = UiStateMapper::Map(session_state, tracker_.GetPhase(),
                                        tracker_.LastTranscription(),
                                        tracker_.LastTranscriptionSource(), mic_enabled,
-                                       ptt_recording_, ptt_committing_);
+                                       ptt_recording_, ptt_committing_, {}, end_reason_);
     ApplySnapshot(snapshot);
 
     auto device_state = MapToDeviceState(session_state);
@@ -172,7 +174,7 @@ void EidolonUiPresenter::Reapply()
     auto snapshot = UiStateMapper::Map(session_state_, tracker_.GetPhase(),
                                        tracker_.LastTranscription(),
                                        tracker_.LastTranscriptionSource(), mic_enabled_,
-                                       ptt_recording_, ptt_committing_);
+                                       ptt_recording_, ptt_committing_, {}, end_reason_);
     ApplySnapshot(snapshot);
 }
 

@@ -44,6 +44,7 @@ public:
 
     void OnHubActivationSucceeded();
     void OnNetworkLost();
+    void OnNetworkRestored();
 
     esp_err_t JoinRoom();
     esp_err_t LeaveRoom();
@@ -61,6 +62,11 @@ public:
     // written only on the controller task; a cross-thread read is benign (returns a
     // recent value) and the authoritative decisions re-check state on the task.
     VoiceSessionState GetState() const { return state_; }
+    // Why the last voice session ended (None until the channel reports one via
+    // session_end). Read by the UI to distinguish a normal end from a JOIN
+    // failure. Word-sized enum written only on the controller task; a cross-thread
+    // read is benign (recent value).
+    EndReason LastEndReason() const { return last_end_reason_; }
     void SetOnStateChanged(StateCallback cb) { on_state_changed_ = std::move(cb); }
     void SetOnTranscription(std::function<void(const TranscriptionEvent&)> cb);
     void SetOnAgentPhase(std::function<void(AgentPhase)> cb);
@@ -70,6 +76,7 @@ private:
     enum class EventType {
         Activation,
         NetworkLost,
+        NetworkRestored,
         Join,
         Leave,
         SetMic,
@@ -89,6 +96,12 @@ private:
         LiveKitConnectionState lk_state = LiveKitConnectionState::Disconnected;
         AgentPhase phase = AgentPhase::Silent;
         bool flag = false;
+        // Snapshot of session_generation_ taken when the SDK callback fired (on the
+        // SDK task), so DoLiveKitState can tell whether a LiveKit event belongs to
+        // the connection attempt that is still current or to a superseded one whose
+        // late teardown event would otherwise be misattributed (Phase 0: logged;
+        // Phase 1: dropped on mismatch).
+        uint32_t generation = 0;
         std::string* payload = nullptr;  // owned; the loop deletes it after dispatch
     };
     static void TaskTrampoline(void* arg);
@@ -99,12 +112,13 @@ private:
     // ---- Handlers (run only on the controller task) ----
     void DoActivation();
     void DoNetworkLost();
+    void DoNetworkRestored();
     esp_err_t DoJoinRoom();
     esp_err_t DoLeaveRoom();
     void DoSetMicEnabled(bool enabled);
     void DoPttPressed();
     void DoPttReleased();
-    void DoLiveKitState(LiveKitConnectionState lk_state);
+    void DoLiveKitState(LiveKitConnectionState lk_state, uint32_t event_generation);
     void DoControlCommand(const std::string& payload);
     void DoSessionControl(const std::string& payload);
     void DoAgentPhase(AgentPhase phase);
@@ -121,11 +135,30 @@ private:
     bool HasActiveConfig() const;
     bool HasControlConfig() const;
     VoiceSessionState StateForConfig(const Esp32HubConfig& config) const;
-    void SetState(VoiceSessionState state);
+    void SetState(VoiceSessionState state, const char* reason = "unspecified");
+    // Begin a new connection attempt: bump session_generation_, remember which
+    // plane (control/voice) it is for, and log the transition. Every event from a
+    // prior generation is, by definition, stale. Returns the new generation.
+    uint32_t BeginSessionGeneration(const char* room_kind);
+    // Abandon the current connection without immediately starting a new one: bump
+    // the generation so any in-flight events from the connection we are tearing
+    // down (a hung attempt, a network drop) are dropped by the generation gate
+    // rather than accepted after we have moved on. Used by teardown paths that do
+    // not synchronously call Begin*Generation themselves.
+    void MarkSessionSuperseded(const char* reason);
+    // Plane that the live session currently belongs to ("control"/"voice"/"none"),
+    // for diagnostic log attribution.
+    const char* CurrentRoomKind() const;
+    static const char* VoiceStateName(VoiceSessionState state);
     void HandleConfigRefreshCommand(const std::string& command_id);
     void HandleRoomJoinCommand(const std::string& command_id);
     void HandlePlaybackStopCommand(const std::string& command_id);
     void HandleIdleTimeoutCommand();
+    // Parse and act on a session_end{reason} packet from the channel: record the
+    // reason for the UI, tear the voice room down gracefully, and pick the
+    // resulting state (Ready for a normal end, Error for a server error).
+    void HandleSessionEnd(EndReason reason);
+    static EndReason ParseEndReason(const std::string& payload);
     void AckCommand(const ControlCommand& command, const char* status, const char* code,
                     const char* detail = "", const char* result = "");
 
@@ -163,13 +196,17 @@ private:
     bool ptt_active_ = false;  // PTT: button currently held (mic open this turn)
     bool control_room_ = false;
     bool switching_to_voice_ = false;
-    // Set when we intentionally disconnect the control room to switch to the voice
-    // room. Because LiveKit callbacks are now delivered through the event queue, the
-    // control room's Disconnected event arrives after control_room_ has flipped to
-    // false; this flag lets DoLiveKitState swallow that one expected teardown
-    // instead of misreading it as a voice-room drop and bouncing back to ready.
-    bool expect_control_teardown_ = false;
     bool control_reconnect_pending_ = false;
+    // Monotonic attempt id, bumped at the start of every voice/control connect.
+    // The state-changed callback snapshots it into the event so a late teardown
+    // from a superseded connection can be recognised (Phase 0 logs the mismatch;
+    // Phase 1 drops it). Also the seed for the proactive wake "generation" the
+    // plan reserves for Phase 3.
+    uint32_t session_generation_ = 0;
+    // Why the last voice session ended; surfaced to the UI. Cleared (→ None) when
+    // a new voice room is requested/connected so an old reason never bleeds into
+    // a fresh session's chrome.
+    EndReason last_end_reason_ = EndReason::None;
     // Consecutive reconnect attempts since the last successful connect. Drives
     // backoff, when to re-discover the Hub, and the ServerUnreachable UI.
     int reconnect_attempts_ = 0;

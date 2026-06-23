@@ -23,6 +23,7 @@ public:
 
     virtual void OnActivationComplete() = 0;
     virtual void OnNetworkLost() = 0;
+    virtual void OnNetworkRestored() = 0;
 
     virtual void ToggleSession() = 0;
     virtual void JoinSession() = 0;
@@ -38,6 +39,10 @@ public:
     virtual bool IsMicrophoneEnabled() const = 0;
 
     virtual VoiceSessionState GetSessionState() const = 0;
+    // Why the last voice session ended (EndReason::None until the channel reports
+    // one). Lets the UI distinguish a normal end of conversation from a join
+    // failure.
+    virtual EndReason LastEndReason() const = 0;
 };
 
 std::unique_ptr<IVoiceSessionTransport> CreateLiveKitVoiceTransport(VoiceSessionCallbacks cb);

@@ -125,7 +125,8 @@ void Application::ToggleMicrophone()
         voice_transport_->SetMicrophoneEnabled(!voice_transport_->IsMicrophoneEnabled());
         if (ui_presenter_) {
             ui_presenter_->Apply(voice_transport_->GetSessionState(),
-                                 voice_transport_->IsMicrophoneEnabled());
+                                 voice_transport_->IsMicrophoneEnabled(),
+                                 voice_transport_->LastEndReason());
         }
     });
 }
@@ -281,7 +282,8 @@ void Application::Initialize() {
             if (!voice_transport_ || !ui_presenter_) {
                 return;
             }
-            ui_presenter_->Apply(state, voice_transport_->IsMicrophoneEnabled());
+            ui_presenter_->Apply(state, voice_transport_->IsMicrophoneEnabled(),
+                                 voice_transport_->LastEndReason());
 #if CONFIG_EIDOLON_WAKE_WORD_ENABLE
             OnEidolonVoiceSessionState(state);
 #endif
@@ -514,6 +516,12 @@ void Application::HandleNetworkConnectedEvent() {
             app->activation_task_handle_ = nullptr;
             vTaskDelete(NULL);
         }, "activation", 4096 * 2, this, 2, &activation_task_handle_);
+    } else {
+#if CONFIG_EIDOLON_HUB_MODE
+        if (voice_transport_) {
+            voice_transport_->OnNetworkRestored();
+        }
+#endif
     }
 
     // Update the status bar immediately to show the network state
@@ -559,7 +567,8 @@ void Application::HandleActivationDoneEvent() {
         voice_transport_->OnActivationComplete();
         if (ui_presenter_) {
             ui_presenter_->Apply(voice_transport_->GetSessionState(),
-                                 voice_transport_->IsMicrophoneEnabled());
+                                 voice_transport_->IsMicrophoneEnabled(),
+                                 voice_transport_->LastEndReason());
         }
     }
 #if CONFIG_EIDOLON_WAKE_WORD_ENABLE

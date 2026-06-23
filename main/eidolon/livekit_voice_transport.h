@@ -16,6 +16,7 @@ public:
 
     void OnActivationComplete() override;
     void OnNetworkLost() override;
+    void OnNetworkRestored() override;
 
     void ToggleSession() override;
     void JoinSession() override;
@@ -29,6 +30,7 @@ public:
     bool IsMicrophoneEnabled() const override;
 
     VoiceSessionState GetSessionState() const override;
+    EndReason LastEndReason() const override;
 
     EidolonVoiceController* controller() { return controller_.get(); }
 
