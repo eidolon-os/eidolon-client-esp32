@@ -9,6 +9,10 @@
 
 #include "application.h"
 
+#if CONFIG_EIDOLON_AEC_QUALIFICATION
+#include "aec_qualification.h"
+#endif
+
 #define TAG "main"
 
 extern "C" void app_main(void)
@@ -22,8 +26,12 @@ extern "C" void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
+#if CONFIG_EIDOLON_AEC_QUALIFICATION
+    RunAecQualification();
+#else
     // Initialize and run the application
     auto& app = Application::GetInstance();
     app.Initialize();
     app.Run();  // This function runs the main event loop and never returns
+#endif
 }

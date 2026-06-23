@@ -10,6 +10,7 @@ sdkconfig
 dependencies.lock
 .env
 releases/
+reports/aec_qualification/
 main/assets/lang_config.h
 main/mmap_generate_emoji.h
 .DS_Store

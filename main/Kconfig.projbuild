@@ -960,6 +960,16 @@ config USE_AUDIO_DEBUGGER
     help
         Enable audio debugger, send audio data through UDP to the host machine
 
+config EIDOLON_AEC_QUALIFICATION
+    bool "Enable standalone AEC qualification mode"
+    default n
+    depends on USE_DEVICE_AEC
+    help
+        Boot into a standalone USB-serial AEC qualification runner instead of
+        the normal application. This mode does not connect to WiFi or LiveKit;
+        it plays deterministic test audio, captures raw/reference/AEC PCM, and
+        emits framed test events for the host-side qualification script.
+
 menu "WiFi Configuration Method"
     help
         WiFi Configuration Method Selection
