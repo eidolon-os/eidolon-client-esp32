@@ -129,7 +129,11 @@ private:
 
     // ---- Internal helpers (controller task only) ----
     esp_err_t LoadStoredConfig();
-    esp_err_t RefreshHubConfig();
+    // Fetch fresh Hub config (server_url/token/room_name/...). persist=true also
+    // writes it to NVS; the per-JOIN refresh passes persist=false because each
+    // JOIN now gets a unique nonce'd voice room+token (so NVS dedup would never
+    // hit and every JOIN would needlessly wear flash).
+    esp_err_t RefreshHubConfig(bool persist = true);
     esp_err_t RediscoverHub();
     esp_err_t ConnectControlRoom();
     bool HasActiveConfig() const;

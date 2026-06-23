@@ -443,7 +443,7 @@ esp_err_t EidolonVoiceController::LoadStoredConfig()
     return ESP_OK;
 }
 
-esp_err_t EidolonVoiceController::RefreshHubConfig()
+esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist)
 {
     if (config_url_.empty()) {
         return ESP_ERR_INVALID_STATE;
@@ -462,8 +462,13 @@ esp_err_t EidolonVoiceController::RefreshHubConfig()
     if (err != ESP_OK) {
         return err;
     }
-    HubConfigStore store;
-    store.SaveHubConfig(fresh, config_url_);
+    if (persist) {
+        // The voice room name now carries a per-session nonce, so persisting on
+        // every refresh would defeat NVS dedup and wear flash; the per-JOIN
+        // refresh passes persist=false and keeps the fresh creds in RAM only.
+        HubConfigStore store;
+        store.SaveHubConfig(fresh, config_url_);
+    }
     config_ = std::move(fresh);
     SetState(StateForConfig(config_), "config_refreshed");
     return ESP_OK;
@@ -1069,22 +1074,31 @@ esp_err_t EidolonVoiceController::DoJoinRoom()
         }
     }
 
+    // Every JOIN mints a FRESH per-session voice room (device-<id>-<nonce>) +
+    // scoped token by re-fetching the Hub config. Root-cause fix for the
+    // rapid-rejoin "Room Deleted" race: a previous session's late delete-by-name
+    // (the old agent deletes device-<id> on device-left/shutdown) can no longer
+    // tear down this session's uniquely-named room. RAM-only (persist=false) so
+    // the changing nonce does not wear NVS. Done BEFORE moving to Connecting so
+    // RefreshHubConfig's internal SetState(ConfigReady) stays a no-op.
+    esp_err_t refresh_err = RefreshHubConfig(/*persist=*/false);
+    if (refresh_err == ESP_ERR_NOT_ALLOWED) {
+        // Hub revoked this identity; RefreshHubConfig already surfaced
+        // Unauthorized. Don't attempt to join on a rejected key.
+        return refresh_err;
+    }
+    if (refresh_err != ESP_OK) {
+        // Hub unreachable: fall back to the cached room+token — degraded (reuses
+        // the last room, so the delete race can reappear) but keeps JOIN working
+        // offline. The race only bites under Hub-up churn anyway.
+        ESP_LOGW(TAG, "Join: Hub config refresh failed (%s); using cached room=%s",
+                 esp_err_to_name(refresh_err), config_.active.room_name.c_str());
+    }
     if (!HasActiveConfig()) {
-        ESP_LOGI(TAG, "Config status=%s, refreshing before join",
+        ESP_LOGW(TAG, "Join blocked: config status=%s",
                  HubConfigStatusToString(config_.status));
-        SetState(VoiceSessionState::Connecting, "join_refresh_config");
-        esp_err_t refresh_err = RefreshHubConfig();
-        if (refresh_err != ESP_OK) {
-            ESP_LOGW(TAG, "Join blocked: config refresh failed: %s", esp_err_to_name(refresh_err));
-            SetState(StateForConfig(config_), "join_refresh_failed");
-            return refresh_err;
-        }
-        if (!HasActiveConfig()) {
-            ESP_LOGW(TAG, "Join blocked: config status=%s",
-                     HubConfigStatusToString(config_.status));
-            SetState(StateForConfig(config_), "join_blocked_inactive");
-            return ESP_ERR_INVALID_STATE;
-        }
+        SetState(StateForConfig(config_), "join_blocked_inactive");
+        return refresh_err != ESP_OK ? refresh_err : ESP_ERR_INVALID_STATE;
     }
 
     switching_to_voice_ = true;
@@ -1107,7 +1121,7 @@ esp_err_t EidolonVoiceController::DoJoinRoom()
     switching_to_voice_ = false;
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Connect failed, refreshing Hub token");
-        if (RefreshHubConfig() == ESP_OK) {
+        if (RefreshHubConfig(/*persist=*/false) == ESP_OK) {
             switching_to_voice_ = true;
             BeginSessionGeneration("voice");
             err = session_.Connect(config_);
