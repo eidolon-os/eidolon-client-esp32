@@ -13,8 +13,10 @@
 #include <vector>
 
 #include <esp_heap_caps.h>
+#include <esp_err.h>
 #include <esp_log.h>
 #include <esp_timer.h>
+#include <driver/usb_serial_jtag.h>
 #include <mbedtls/base64.h>
 
 #include <freertos/FreeRTOS.h>
@@ -78,6 +80,10 @@ void EmitEvent(const char* type, const std::string& fields = "")
     }
     fputs(line.c_str(), stdout);
     fflush(stdout);
+#if !CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+    usb_serial_jtag_write_bytes(line.data(), line.size(), pdMS_TO_TICKS(20));
+    usb_serial_jtag_wait_tx_done(pdMS_TO_TICKS(20));
+#endif
 }
 
 void EmitAudioFrame(const char* case_id, const char* stream_id, uint32_t seq,
@@ -101,6 +107,10 @@ void EmitAudioFrame(const char* case_id, const char* stream_id, uint32_t seq,
     line += "\"}\n";
     fputs(line.c_str(), stdout);
     fflush(stdout);
+#if !CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+    usb_serial_jtag_write_bytes(line.data(), line.size(), pdMS_TO_TICKS(20));
+    usb_serial_jtag_wait_tx_done(pdMS_TO_TICKS(20));
+#endif
 }
 
 int16_t ClampToI16(float sample)
@@ -310,6 +320,12 @@ private:
 
 void RunAecQualification()
 {
+    usb_serial_jtag_driver_config_t usb_serial_config = USB_SERIAL_JTAG_DRIVER_CONFIG_DEFAULT();
+    esp_err_t usb_serial_ret = usb_serial_jtag_driver_install(&usb_serial_config);
+    if (usb_serial_ret != ESP_OK) {
+        ESP_LOGW(TAG, "USB Serial/JTAG driver install failed: %s", esp_err_to_name(usb_serial_ret));
+    }
+
     ESP_LOGI(TAG, "Starting standalone AEC qualification runner");
     AecQualificationRunner runner;
     runner.Run();

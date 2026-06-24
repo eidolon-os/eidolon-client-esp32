@@ -200,18 +200,14 @@ void BoxAudioCodec::EnableInput(bool enable) {
             .mclk_multiple = 0,
         };
         if (input_reference_) {
-            // AEC reference channel = ES7210 ch1 (MIC2, unpopulated → silent).
-            //
-            // This board's intended hardware AEC reference is ES7210 MIC3 (ch2),
-            // fed from the NS4150B PA output through the "AEC" attenuator network
-            // (schematic). Measured on-device, MIC3 is crosstalk-contaminated with
-            // the near-end mic (ch1≈ch0/25 even with the speaker silent), so feeding
-            // it to the AFE AEC cancels the user's OWN speech. We therefore keep the
-            // silent MIC2 as the reference: the AFE AEC sees silence and is a no-op,
-            // which is correct for the half-duplex baseline (the mic is closed while
-            // the agent plays, so there is no echo to cancel). Do NOT switch to
-            // MASK(2) without first solving the MIC3 reference contamination.
+#if CONFIG_EIDOLON_AEC_QUALIFICATION && CONFIG_BOARD_TYPE_ESP_BOX_3
+            fs.channel_mask |= ESP_CODEC_DEV_MAKE_CHANNEL_MASK(CONFIG_EIDOLON_AEC_QUALIFICATION_BOX_REF_CHANNEL);
+#else
+            // AEC qualification on ESP-BOX-3 validated ES7210 channel 1 as the
+            // effective playback reference with the current codec channel order.
+            // Keep normal firmware aligned with the upstream/xiaozhi mapping.
             fs.channel_mask |= ESP_CODEC_DEV_MAKE_CHANNEL_MASK(1);
+#endif
         }
         ESP_ERROR_CHECK(esp_codec_dev_open(input_dev_, &fs));
         ESP_ERROR_CHECK(esp_codec_dev_set_in_channel_gain(input_dev_, ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0), input_gain_));

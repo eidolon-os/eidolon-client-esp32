@@ -970,6 +970,17 @@ config EIDOLON_AEC_QUALIFICATION
         it plays deterministic test audio, captures raw/reference/AEC PCM, and
         emits framed test events for the host-side qualification script.
 
+config EIDOLON_AEC_QUALIFICATION_BOX_REF_CHANNEL
+    int "ESP-BOX style ES7210 reference channel for AEC qualification"
+    default 1
+    range 1 3
+    depends on EIDOLON_AEC_QUALIFICATION && BOARD_TYPE_ESP_BOX_3
+    help
+        Select the ES7210 channel used as playback reference during standalone
+        AEC qualification on ESP-BOX style boards. Channel 1 is the validated
+        ESP-BOX-3 playback reference with the current codec channel ordering.
+        Channels 2 and 3 are exposed only for qualification comparison.
+
 menu "WiFi Configuration Method"
     help
         WiFi Configuration Method Selection
