@@ -76,3 +76,8 @@ CONFIG_LV_USE_WIN=n
 CONFIG_LV_BUILD_EXAMPLES=n
 CONFIG_LV_BUILD_DEMOS=n
 
+
+# LiveKit JWT (room grant + participant_metadata incl. session_intent) rides the
+# WS Upgrade Authorization header; the default 1024 handshake buffer overflowed
+# (request 1037 > 1024). 4096 gives headroom for proactive + future metadata.
+CONFIG_WS_BUFFER_SIZE=4096

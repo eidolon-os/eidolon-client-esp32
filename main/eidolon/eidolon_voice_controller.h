@@ -154,9 +154,12 @@ private:
     // for diagnostic log attribution.
     const char* CurrentRoomKind() const;
     static const char* VoiceStateName(VoiceSessionState state);
-    void HandleConfigRefreshCommand(const std::string& command_id);
-    void HandleRoomJoinCommand(const std::string& command_id);
-    void HandlePlaybackStopCommand(const std::string& command_id);
+    // Control-op handlers. Each receives the command id (for the ACK) and the
+    // raw JSON ``payload`` string (op-specific args). room.join reads the
+    // session_intent out of the payload; the others ignore it.
+    void HandleConfigRefreshCommand(const std::string& command_id, const std::string& payload);
+    void HandleRoomJoinCommand(const std::string& command_id, const std::string& payload);
+    void HandlePlaybackStopCommand(const std::string& command_id, const std::string& payload);
     void HandleIdleTimeoutCommand();
     // Parse and act on a session_end{reason} packet from the channel: record the
     // reason for the UI, tear the voice room down gracefully, and pick the
@@ -198,6 +201,11 @@ private:
         false;
 #endif
     bool ptt_active_ = false;  // PTT: button currently held (mic open this turn)
+    // Session intent for the NEXT voice JOIN, set by a proactive room.join
+    // control command and consumed (then cleared) by DoJoinRoom so it rides the
+    // token-fetch as the X-Device-Session-Intent header. Empty for a normal user
+    // JOIN. Controller-task only.
+    std::string pending_session_intent_;
     bool control_room_ = false;
     bool switching_to_voice_ = false;
     bool control_reconnect_pending_ = false;

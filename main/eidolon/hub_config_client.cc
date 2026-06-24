@@ -41,7 +41,7 @@ void ParseOptionalFirmware(cJSON* root, bool* has_pending, bool* force, std::str
 }  // namespace
 
 esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::string& device_id,
-                                 Esp32HubConfig& out) {
+                                 Esp32HubConfig& out, const std::string& session_intent) {
     out = Esp32HubConfig{};
     has_pending_firmware_ = false;
     pending_firmware_force_ = false;
@@ -97,6 +97,13 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
 #else
     http->SetHeader("X-Device-Interaction-Mode", "full_duplex");
 #endif
+    // Why this session exists (Phase 3 proactive wake). Only sent when set, so a
+    // normal JOIN omits it and the Hub defaults to user_initiated. Like the mode
+    // header, it is an unsigned hint — the Hub validates it, and a bad value can
+    // only ever yield a *less* surprising (non-proactive) session.
+    if (!session_intent.empty()) {
+        http->SetHeader("X-Device-Session-Intent", session_intent.c_str());
+    }
 
     if (!http->Open("GET", request_url)) {
         ESP_LOGE(TAG, "HTTP open failed for %s", request_url.c_str());

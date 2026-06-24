@@ -450,7 +450,10 @@ esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist)
     }
     HubConfigClient client;
     Esp32HubConfig fresh;
-    esp_err_t err = client.Fetch(config_url_, SystemInfo::GetMacAddress(), fresh);
+    // pending_session_intent_ is set only by a proactive room.join and is empty
+    // otherwise, so a normal refresh/JOIN sends no intent (Hub → user_initiated).
+    esp_err_t err = client.Fetch(config_url_, SystemInfo::GetMacAddress(), fresh,
+                                 pending_session_intent_);
     if (err == ESP_ERR_NOT_ALLOWED) {
         // Hub rejected our signed identity (401/403). Stop bouncing on the same
         // rejected key; show "awaiting re-approval" (admin must re-approve / the
@@ -791,7 +794,7 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload)
     // per-command worker task); blocking work just queues other events briefly.
     struct ControlOpHandler {
         const char* op;
-        void (EidolonVoiceController::*handler)(const std::string&);
+        void (EidolonVoiceController::*handler)(const std::string&, const std::string&);
     };
     static const ControlOpHandler kControlOps[] = {
         {"config.refresh", &EidolonVoiceController::HandleConfigRefreshCommand},
@@ -802,7 +805,7 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload)
     for (const auto& entry : kControlOps) {
         if (command.op == entry.op) {
             AckCommand(command, "accepted", "OK");
-            (this->*entry.handler)(command.id);
+            (this->*entry.handler)(command.id, command.payload);
             return;
         }
     }
@@ -859,7 +862,8 @@ void EidolonVoiceController::DoSessionControl(const std::string& payload)
     HandleSessionEnd(reason);
 }
 
-void EidolonVoiceController::HandleConfigRefreshCommand(const std::string& command_id)
+void EidolonVoiceController::HandleConfigRefreshCommand(const std::string& command_id,
+                                                        const std::string& /*payload*/)
 {
     ESP_LOGI(TAG, "Control command -> refresh Hub config");
     ControlCommand command;
@@ -883,15 +887,40 @@ void EidolonVoiceController::HandleConfigRefreshCommand(const std::string& comma
     ConnectControlRoom();
 }
 
-void EidolonVoiceController::HandleRoomJoinCommand(const std::string& command_id)
+void EidolonVoiceController::HandleRoomJoinCommand(const std::string& command_id,
+                                                   const std::string& payload)
 {
-    ESP_LOGI(TAG, "Control command -> join voice room");
+    // A proactive wake (Phase 3) arrives as room.join with a payload that carries
+    // session_intent ("proactive_initiated"). Stash it so the JOIN's token-fetch
+    // declares it to the Hub (→ token metadata → channel suppresses the welcome).
+    // A plain user-initiated room.join has no payload; pending stays empty.
+    pending_session_intent_.clear();
+    if (!payload.empty()) {
+        cJSON* root = cJSON_Parse(payload.c_str());
+        if (root != nullptr) {
+            const cJSON* intent = cJSON_GetObjectItem(root, "session_intent");
+            if (cJSON_IsString(intent) && intent->valuestring != nullptr) {
+                const char* value = intent->valuestring;
+                if (strcmp(value, "proactive_initiated") == 0) {
+                    pending_session_intent_ = value;
+                } else {
+                    ESP_LOGW(TAG, "Ignoring unsupported session_intent=%s", value);
+                }
+            }
+            cJSON_Delete(root);
+        }
+    }
+    ESP_LOGI(TAG, "Control command -> join voice room (intent=%s)",
+             pending_session_intent_.empty() ? "user" : pending_session_intent_.c_str());
     ControlCommand command;
     command.id = command_id;
     command.op = "room.join";
     vTaskDelay(kRoomJoinSettleDelay);
 
     esp_err_t err = DoJoinRoom();
+    // One-shot: clear after the JOIN (incl. DoJoinRoom's internal connect-retry,
+    // which re-fetches) so the intent never leaks into a later reconnect/refresh.
+    pending_session_intent_.clear();
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Control-triggered room join failed: %s", esp_err_to_name(err));
         // Reply with a failed ACK so the caller isn't left waiting on the earlier
@@ -901,7 +930,8 @@ void EidolonVoiceController::HandleRoomJoinCommand(const std::string& command_id
     }
 }
 
-void EidolonVoiceController::HandlePlaybackStopCommand(const std::string& command_id)
+void EidolonVoiceController::HandlePlaybackStopCommand(const std::string& command_id,
+                                                       const std::string& /*payload*/)
 {
     ESP_LOGI(TAG, "Control command -> stop playback");
     ControlCommand command;
