@@ -1116,7 +1116,7 @@ menu "TAIJIPAI_S3_CONFIG"
 endmenu
 
 menu "Eidolon Hub"
-    depends on BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_2_06
+    depends on BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_2_06 || BOARD_TYPE_ESP_BOX_3
 
     config EIDOLON_HUB_MODE
         bool "Enable Eidolon Hub mDNS discovery and config"

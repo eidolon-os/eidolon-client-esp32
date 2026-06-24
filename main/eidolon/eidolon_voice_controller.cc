@@ -1279,10 +1279,10 @@ void EidolonVoiceController::PublishClientAudioState(bool playback_active)
         capture_on = mic_enabled_ && ptt_active_;
         mic_muted = !capture_on;
     } else {
-        // Auto open-mic (full-duplex): the mic is closed only while the agent is
-        // speaking (no usable barge-in echo cancellation on this board).
-        capture_on = mic_enabled_ && !playback_active;
-        mic_muted = !mic_enabled_ || playback_active;
+        // Auto open-mic (full-duplex): keep capture open during playback so
+        // device-side AEC can support barge-in.
+        capture_on = mic_enabled_;
+        mic_muted = !mic_enabled_;
     }
 
     // Physically gate the capture path to match so no unwanted audio reaches the

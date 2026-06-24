@@ -39,8 +39,15 @@ void AfeAudioProcessor::Initialize(AudioCodec* codec, int frame_duration_ms, srm
     char* ns_model_name = esp_srmodel_filter(models, ESP_NSNET_PREFIX, NULL);
     char* vad_model_name = esp_srmodel_filter(models, ESP_VADN_PREFIX, NULL);
     
-    afe_config_t* afe_config = afe_config_init(input_format.c_str(), NULL, AFE_TYPE_VC, AFE_MODE_HIGH_PERF);
-    afe_config->aec_mode = AEC_MODE_VOIP_HIGH_PERF;
+#if CONFIG_EIDOLON_DEVICE_AEC_AFE_MODE_HIGH_PERF
+    afe_mode_t afe_mode = AFE_MODE_HIGH_PERF;
+    aec_mode_t aec_mode = AEC_MODE_VOIP_HIGH_PERF;
+#else
+    afe_mode_t afe_mode = AFE_MODE_LOW_COST;
+    aec_mode_t aec_mode = AEC_MODE_VOIP_LOW_COST;
+#endif
+    afe_config_t* afe_config = afe_config_init(input_format.c_str(), NULL, AFE_TYPE_VC, afe_mode);
+    afe_config->aec_mode = aec_mode;
     afe_config->vad_mode = VAD_MODE_0;
     afe_config->vad_min_noise_ms = 100;
     if (vad_model_name != nullptr) {
