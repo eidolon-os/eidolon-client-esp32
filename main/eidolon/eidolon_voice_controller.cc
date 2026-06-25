@@ -797,9 +797,9 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload)
         void (EidolonVoiceController::*handler)(const std::string&, const std::string&);
     };
     static const ControlOpHandler kControlOps[] = {
-        {"config.refresh", &EidolonVoiceController::HandleConfigRefreshCommand},
-        {"room.join", &EidolonVoiceController::HandleRoomJoinCommand},
-        {"playback.stop", &EidolonVoiceController::HandlePlaybackStopCommand},
+        {kControlOpConfigRefresh, &EidolonVoiceController::HandleConfigRefreshCommand},
+        {kControlOpRoomJoin, &EidolonVoiceController::HandleRoomJoinCommand},
+        {kControlOpPlaybackStop, &EidolonVoiceController::HandlePlaybackStopCommand},
     };
 
     for (const auto& entry : kControlOps) {
@@ -829,16 +829,16 @@ EndReason EidolonVoiceController::ParseEndReason(const std::string& payload)
     const char* type = cJSON_IsString(type_item) ? type_item->valuestring : "";
     const char* r = cJSON_IsString(reason_item) ? reason_item->valuestring : "";
 
-    if (strcmp(type, "session_end") == 0) {
-        if (strcmp(r, "idle_normal_end") == 0) {
+    if (strcmp(type, kSessionEndType) == 0) {
+        if (strcmp(r, kSessionEndIdleNormal) == 0) {
             reason = EndReason::IdleNormalEnd;
-        } else if (strcmp(r, "proactive_done") == 0) {
+        } else if (strcmp(r, kSessionEndProactiveDone) == 0) {
             reason = EndReason::ProactiveDone;
-        } else if (strcmp(r, "user_left") == 0) {
+        } else if (strcmp(r, kSessionEndUserLeft) == 0) {
             reason = EndReason::UserLeft;
-        } else if (strcmp(r, "superseded") == 0) {
+        } else if (strcmp(r, kSessionEndSuperseded) == 0) {
             reason = EndReason::Superseded;
-        } else if (strcmp(r, "error") == 0) {
+        } else if (strcmp(r, kSessionEndError) == 0) {
             reason = EndReason::Error;
         } else {
             // Unknown reason from a newer channel: treat as a normal end (return
@@ -868,7 +868,7 @@ void EidolonVoiceController::HandleConfigRefreshCommand(const std::string& comma
     ESP_LOGI(TAG, "Control command -> refresh Hub config");
     ControlCommand command;
     command.id = command_id;
-    command.op = "config.refresh";
+    command.op = kControlOpConfigRefresh;
 
     if (RefreshHubConfig() != ESP_OK) {
         ESP_LOGW(TAG, "Control-triggered config refresh failed");
@@ -901,7 +901,7 @@ void EidolonVoiceController::HandleRoomJoinCommand(const std::string& command_id
             const cJSON* intent = cJSON_GetObjectItem(root, "session_intent");
             if (cJSON_IsString(intent) && intent->valuestring != nullptr) {
                 const char* value = intent->valuestring;
-                if (strcmp(value, "proactive_initiated") == 0) {
+                if (strcmp(value, kSessionIntentProactive) == 0) {
                     pending_session_intent_ = value;
                 } else {
                     ESP_LOGW(TAG, "Ignoring unsupported session_intent=%s", value);
@@ -914,7 +914,7 @@ void EidolonVoiceController::HandleRoomJoinCommand(const std::string& command_id
              pending_session_intent_.empty() ? "user" : pending_session_intent_.c_str());
     ControlCommand command;
     command.id = command_id;
-    command.op = "room.join";
+    command.op = kControlOpRoomJoin;
     vTaskDelay(kRoomJoinSettleDelay);
 
     esp_err_t err = DoJoinRoom();
@@ -936,7 +936,7 @@ void EidolonVoiceController::HandlePlaybackStopCommand(const std::string& comman
     ESP_LOGI(TAG, "Control command -> stop playback");
     ControlCommand command;
     command.id = command_id;
-    command.op = "playback.stop";
+    command.op = kControlOpPlaybackStop;
 
     esp_err_t flush_err = eidolon_livekit_board_flush_playback();
     if (flush_err != ESP_OK) {
@@ -958,8 +958,12 @@ void EidolonVoiceController::HandleIdleTimeoutCommand()
 
 void EidolonVoiceController::HandleSessionEnd(EndReason reason)
 {
-    static const char* kReasonNames[] = {"none",       "idle_normal_end", "proactive_done",
-                                         "user_left", "superseded",      "error"};
+    static const char* kReasonNames[] = {"none",
+                                         kSessionEndIdleNormal,
+                                         kSessionEndProactiveDone,
+                                         kSessionEndUserLeft,
+                                         kSessionEndSuperseded,
+                                         kSessionEndError};
     const char* reason_name = kReasonNames[static_cast<int>(reason)];
     // Record the reason so the UI can show "已结束待命" / error chrome instead of an
     // unexplained return to JOIN, then tear the voice room down gracefully and
@@ -1302,12 +1306,14 @@ void EidolonVoiceController::PublishClientAudioState(bool playback_active)
     int written = snprintf(
         payload,
         sizeof(payload),
-        "{\"type\":\"client.audio_state\",\"seq\":%lu,\"input_mode\":\"%s\","
+        "{\"schema_v\":%d,\"type\":\"%s\",\"seq\":%lu,\"input_mode\":\"%s\","
         "\"playback_state\":\"%s\",\"mic_muted\":%s,"
         "\"ptt\":%s,\"client_ts_ms\":%lu}",
+        kWireSchemaVersion,
+        kClientAudioStateType,
         static_cast<unsigned long>(seq),
-        ptt_mode_ ? "ptt" : "auto",
-        playback_active ? "agent_speaking" : "idle",
+        ptt_mode_ ? kInputModePtt : kInputModeAuto,
+        playback_active ? kPlaybackStateAgentSpeaking : kPlaybackStateIdle,
         mic_muted ? "true" : "false",
         ptt_held ? "true" : "false",
         static_cast<unsigned long>(client_ts_ms));

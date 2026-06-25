@@ -2,6 +2,7 @@
 
 #include "board.h"
 #include "device_identity.h"
+#include "eidolon_topics.h"
 #include "system_info.h"
 
 #include <cJSON.h>
@@ -93,9 +94,9 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
     // half_duplex when absent, so sending it makes the device authoritative rather
     // than relying on that default.
 #if CONFIG_EIDOLON_INTERACTION_MODE_PTT
-    http->SetHeader("X-Device-Interaction-Mode", "half_duplex");
+    http->SetHeader("X-Device-Interaction-Mode", kInteractionModeHalfDuplex);
 #else
-    http->SetHeader("X-Device-Interaction-Mode", "full_duplex");
+    http->SetHeader("X-Device-Interaction-Mode", kInteractionModeFullDuplex);
 #endif
     // Why this session exists (Phase 3 proactive wake). Only sent when set, so a
     // normal JOIN omits it and the Hub defaults to user_initiated. Like the mode
