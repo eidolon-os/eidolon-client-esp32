@@ -35,6 +35,11 @@ public:
     virtual void SetOutputVolume(int volume) override;
     virtual void EnableInput(bool enable) override;
     virtual void EnableOutput(bool enable) override;
+
+#if CONFIG_EIDOLON_HUB_MODE
+    esp_codec_dev_handle_t GetInputDeviceHandle() const { return input_dev_; }
+    esp_codec_dev_handle_t GetOutputDeviceHandle() const { return output_dev_; }
+#endif
 };
 
 #endif // _ES8388_AUDIO_CODEC_H

@@ -6,7 +6,9 @@
 #include "config.h"
 #include "i2c_device.h"
 #include "led/single_led.h"
+#if !CONFIG_EIDOLON_HUB_MODE
 #include "esp_video.h"
+#endif
 
 #include <esp_log.h>
 #include <esp_lcd_panel_vendor.h>
@@ -49,7 +51,9 @@ private:
     Button boot_button_;
     LcdDisplay* display_;
     XL9555* xl9555_;
+#if !CONFIG_EIDOLON_HUB_MODE
     EspVideo* camera_;
+#endif
 
     void InitializeI2c() {
         // Initialize I2C peripheral
@@ -132,6 +136,7 @@ private:
 
     // 初始化摄像头：ov2640；
     // 根据正点原子官方示例参数
+#if !CONFIG_EIDOLON_HUB_MODE
     void InitializeCamera() {
         xl9555_->SetOutputState(OV_PWDN_IO, 0); // PWDN=低 (上电)
         xl9555_->SetOutputState(OV_RESET_IO, 0); // 确保复位
@@ -181,6 +186,7 @@ private:
 
         camera_ = new EspVideo(video_config);
     }
+#endif
 
 public:
     atk_dnesp32s3() : boot_button_(BOOT_BUTTON_GPIO) {
@@ -188,7 +194,9 @@ public:
         InitializeSpi();
         InitializeSt7789Display();
         InitializeButtons();
+#if !CONFIG_EIDOLON_HUB_MODE
         InitializeCamera();
+#endif
     }
 
     virtual Led* GetLed() override {
@@ -216,10 +224,12 @@ public:
     virtual Display* GetDisplay() override {
         return display_;
     }
-    
+
+#if !CONFIG_EIDOLON_HUB_MODE
     virtual Camera* GetCamera() override {
         return camera_;
     }
+#endif
 };
 
 DECLARE_BOARD(atk_dnesp32s3);
