@@ -1042,6 +1042,7 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/control_protocol.cc"
         "eidolon/eidolon_audio_input.cc"
         "eidolon/eidolon_device_store.cc"
+        "eidolon/eidolon_local_feedback.cc"
         "eidolon/device_identity.cc"
         "eidolon/eidolon_lvgl_theme.cc"
         "eidolon/fonts/font_eidolon_ui_30.c"

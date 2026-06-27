@@ -160,6 +160,7 @@ private:
     void HandleConfigRefreshCommand(const std::string& command_id, const std::string& payload);
     void HandleRoomJoinCommand(const std::string& command_id, const std::string& payload);
     void HandlePlaybackStopCommand(const std::string& command_id, const std::string& payload);
+    void HandleDeviceIdentifyCommand(const std::string& command_id, const std::string& payload);
     void HandleIdleTimeoutCommand();
     // Parse and act on a session_end{reason} packet from the channel: record the
     // reason for the UI, tear the voice room down gracefully, and pick the

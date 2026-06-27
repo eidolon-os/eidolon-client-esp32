@@ -3,6 +3,7 @@
 #include "board.h"
 #include "control_protocol.h"
 #include "eidolon_topics.h"
+#include "eidolon_local_feedback.h"
 #include "hub_config_client.h"
 #include "hub_config_store.h"
 #include "hub_discovery.h"
@@ -800,6 +801,7 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload)
         {kControlOpConfigRefresh, &EidolonVoiceController::HandleConfigRefreshCommand},
         {kControlOpRoomJoin, &EidolonVoiceController::HandleRoomJoinCommand},
         {kControlOpPlaybackStop, &EidolonVoiceController::HandlePlaybackStopCommand},
+        {kControlOpDeviceIdentify, &EidolonVoiceController::HandleDeviceIdentifyCommand},
     };
 
     for (const auto& entry : kControlOps) {
@@ -947,6 +949,30 @@ void EidolonVoiceController::HandlePlaybackStopCommand(const std::string& comman
 
     DoAgentPhase(AgentPhase::Silent);
     PublishClientAudioState(false);
+    AckCommand(command, "completed", "OK");
+}
+
+void EidolonVoiceController::HandleDeviceIdentifyCommand(const std::string& command_id,
+                                                         const std::string& /*payload*/)
+{
+    ESP_LOGI(TAG, "Control command -> identify device");
+    ControlCommand command;
+    command.id = command_id;
+    command.op = kControlOpDeviceIdentify;
+
+    if (!control_room_) {
+        ESP_LOGW(TAG, "Identify ignored outside control room");
+        AckCommand(command, "failed", "IDENTIFY_REQUIRES_CONTROL_ROOM");
+        return;
+    }
+
+    esp_err_t tone_err = PlayIdentifyFeedback();
+    if (tone_err != ESP_OK) {
+        ESP_LOGW(TAG, "Control-triggered identify tone failed: %s", esp_err_to_name(tone_err));
+        AckCommand(command, "failed", "IDENTIFY_TONE_FAILED", esp_err_to_name(tone_err));
+        return;
+    }
+
     AckCommand(command, "completed", "OK");
 }
 

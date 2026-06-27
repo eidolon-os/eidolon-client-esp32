@@ -43,6 +43,7 @@ inline constexpr const char* kSessionEndSuperseded = "superseded";
 inline constexpr const char* kControlOpRoomJoin = "room.join";
 inline constexpr const char* kControlOpPlaybackStop = "playback.stop";
 inline constexpr const char* kControlOpConfigRefresh = "config.refresh";
+inline constexpr const char* kControlOpDeviceIdentify = "device.identify";
 
 // Session metadata enums — declared via X-Device-Interaction-Mode /
 // X-Device-Session-Intent headers; hub stamps them into the LiveKit token.

@@ -38,6 +38,10 @@ idf_ready() {
   command -v idf.py >/dev/null 2>&1
 }
 
+idf_tools_ready() {
+  idf_ready && command -v ninja >/dev/null 2>&1 && [[ -n "${IDF_PYTHON_ENV_PATH:-}" ]]
+}
+
 idf_export_candidates() {
   [[ -n "${EIDOLON_IDF_EXPORT:-}" ]] && echo "${EIDOLON_IDF_EXPORT}"
 
@@ -69,7 +73,7 @@ idf_export_candidates() {
 }
 
 ensure_idf_env() {
-  if idf_ready; then
+  if idf_tools_ready; then
     return 0
   fi
 
@@ -79,14 +83,14 @@ ensure_idf_env() {
     info "Loading ESP-IDF: ${export_sh}"
     # shellcheck source=/dev/null
     source "${export_sh}"
-    idf_ready && return 0
+    idf_tools_ready && return 0
   done < <(idf_export_candidates | awk '!seen[$0]++')
 
   return 1
 }
 
 require_idf() {
-  ensure_idf_env || die "ESP-IDF not found. Set EIDOLON_IDF_PATH or source export.sh first."
+  ensure_idf_env || die "ESP-IDF tools not ready. Set EIDOLON_IDF_PATH/EIDOLON_IDF_EXPORT or source export.sh first."
 }
 
 list_ports() {
