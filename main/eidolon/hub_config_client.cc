@@ -60,6 +60,9 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
     }
 
     std::string request_url = config_url;
+    // LiveKit agent dispatch mode stays streaming for ESP32 voice sessions.
+    // Duplex/PTT capability is declared separately below via
+    // X-Device-Interaction-Mode; do not use agent_mode as the barge-in switch.
     const char* agent_param = "agent_mode=streaming";
     if (request_url.find('?') != std::string::npos) {
         request_url += "&";
