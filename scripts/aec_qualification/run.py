@@ -47,6 +47,9 @@ BOARDS_DIR = PROJECT_ROOT / "main" / "boards"
 KCONFIG = PROJECT_ROOT / "main" / "Kconfig.projbuild"
 CMAKE = PROJECT_ROOT / "main" / "CMakeLists.txt"
 DEFAULT_NEAR_AUDIO = PROJECT_ROOT / ".cache" / "aec_qualification" / "near_speech_chirp_v1.wav"
+GENERATED_INCLUDE_DIR = PROJECT_ROOT / ".cache" / "aec_qualification" / "generated"
+FAR_AUDIO_HEADER = GENERATED_INCLUDE_DIR / "aec_qualification_far_audio.h"
+MAX_EMBEDDED_FAR_AUDIO_SECONDS = 8.0
 
 AEC_THRESHOLDS = {
     "barge_in_erle_db": 18.0,
@@ -706,6 +709,141 @@ def prepare_near_audio(source: str | None, out_dir: Path) -> Path:
     return dst
 
 
+def resample_pcm16(samples: list[int], src_rate: int, dst_rate: int = 16000) -> list[int]:
+    if src_rate == dst_rate:
+        return samples
+    if not samples:
+        return []
+    out_len = max(1, int(round(len(samples) * dst_rate / src_rate)))
+    out: list[int] = []
+    for i in range(out_len):
+        pos = i * src_rate / dst_rate
+        left = int(math.floor(pos))
+        right = min(left + 1, len(samples) - 1)
+        frac = pos - left
+        value = samples[left] * (1.0 - frac) + samples[right] * frac
+        out.append(max(-32768, min(32767, int(round(value)))))
+    return out
+
+
+def read_wav_mono_pcm16(path: Path) -> tuple[list[int], int]:
+    with wave.open(str(path), "rb") as wf:
+        if wf.getcomptype() != "NONE":
+            raise SystemExit(f"Far-end audio must be uncompressed PCM WAV: {path}")
+        channels = wf.getnchannels()
+        sample_width = wf.getsampwidth()
+        sample_rate = wf.getframerate()
+        frame_count = wf.getnframes()
+        raw = wf.readframes(frame_count)
+
+    if channels <= 0:
+        raise SystemExit(f"Far-end audio has invalid channel count: {path}")
+    if sample_width != 2:
+        raise SystemExit(
+            f"Far-end audio must be 16-bit PCM WAV; got sample width {sample_width} bytes: {path}"
+        )
+
+    values = struct.unpack(f"<{len(raw) // 2}h", raw)
+    mono: list[int] = []
+    for idx in range(0, len(values), channels):
+        frame = values[idx : idx + channels]
+        mono.append(int(round(sum(frame) / len(frame))))
+    return mono, sample_rate
+
+
+def normalize_pcm16(samples: list[int], target_peak: int = 24576) -> tuple[list[int], float]:
+    peak = max((abs(s) for s in samples), default=0)
+    if peak <= 0:
+        return samples, 1.0
+    gain = min(4.0, target_peak / peak)
+    if abs(gain - 1.0) < 0.01:
+        return samples, 1.0
+    normalized = [max(-32768, min(32767, int(round(s * gain)))) for s in samples]
+    return normalized, gain
+
+
+def pack_pcm16(samples: list[int]) -> bytes:
+    if not samples:
+        return b""
+    return struct.pack(f"<{len(samples)}h", *samples)
+
+
+def write_far_audio_header(samples: list[int] | None, name: str = "synthetic_multitone") -> None:
+    GENERATED_INCLUDE_DIR.mkdir(parents=True, exist_ok=True)
+    if not samples:
+        FAR_AUDIO_HEADER.write_text(
+            "\n".join(
+                [
+                    "#pragma once",
+                    "#define AECQ_FAR_AUDIO_ENABLED 0",
+                    "#define AECQ_FAR_AUDIO_SAMPLE_COUNT 0",
+                    "#define AECQ_FAR_AUDIO_NAME \"synthetic_multitone\"",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        return
+
+    lines = [
+        "#pragma once",
+        "#include <stdint.h>",
+        "#define AECQ_FAR_AUDIO_ENABLED 1",
+        "#define AECQ_FAR_AUDIO_SAMPLE_RATE 16000",
+        f"#define AECQ_FAR_AUDIO_SAMPLE_COUNT {len(samples)}",
+        f"#define AECQ_FAR_AUDIO_NAME {json.dumps(name, ensure_ascii=True)}",
+        "static const int16_t AECQ_FAR_AUDIO_SAMPLES[AECQ_FAR_AUDIO_SAMPLE_COUNT] = {",
+    ]
+    for idx in range(0, len(samples), 12):
+        chunk = samples[idx : idx + 12]
+        lines.append("    " + ", ".join(str(sample) for sample in chunk) + ",")
+    lines.extend(["};", ""])
+    FAR_AUDIO_HEADER.write_text("\n".join(lines), encoding="utf-8")
+
+
+def prepare_far_audio(source: str | None, out_dir: Path) -> dict[str, Any]:
+    if not source:
+        write_far_audio_header(None)
+        return {
+            "enabled": False,
+            "mode": "synthetic_multitone",
+            "header": str(FAR_AUDIO_HEADER),
+        }
+
+    src = Path(source).expanduser().resolve()
+    if not src.exists():
+        raise SystemExit(f"Far-end audio file does not exist: {src}")
+
+    mono, source_rate = read_wav_mono_pcm16(src)
+    samples = resample_pcm16(mono, source_rate, 16000)
+    max_samples = int(MAX_EMBEDDED_FAR_AUDIO_SECONDS * 16000)
+    if len(samples) > max_samples:
+        samples = samples[:max_samples]
+    samples, gain = normalize_pcm16(samples)
+    if not samples:
+        raise SystemExit(f"Far-end audio is empty after conversion: {src}")
+
+    test_audio_dir = out_dir / "test_audio"
+    test_audio_dir.mkdir(parents=True, exist_ok=True)
+    embedded_wav = test_audio_dir / f"{src.stem}.aecq_far_16k.wav"
+    save_wav(embedded_wav, [pack_pcm16(samples)], sample_rate=16000, channels=1)
+    write_far_audio_header(samples, src.name)
+
+    return {
+        "enabled": True,
+        "mode": "embedded_wav",
+        "source_audio": str(src),
+        "embedded_wav": str(embedded_wav),
+        "header": str(FAR_AUDIO_HEADER),
+        "source_sample_rate": source_rate,
+        "sample_rate": 16000,
+        "sample_count": len(samples),
+        "duration_s": len(samples) / 16000.0,
+        "normalization_gain": gain,
+        "max_embedded_duration_s": MAX_EMBEDDED_FAR_AUDIO_SECONDS,
+    }
+
+
 def playback_command(path: Path) -> list[str] | None:
     if sys.platform == "darwin" and shutil_which("afplay"):
         return ["afplay", str(path)]
@@ -764,23 +902,16 @@ def capture(
 
     print(f"Capturing AECQ serial events from {port}...")
     wait_for_port(port)
-    if reset_before_capture:
-        print("Resetting device before capture...")
-        try:
-            reset_port = open_serial(port, 115200, timeout=1)
-        except OSError as exc:
-            raise SystemExit(f"Cannot open serial port {port}: {exc}") from exc
-        with reset_port as ser:
-            pulse_reset(ser)
-        wait_for_port(port)
-        time.sleep(max(0.0, boot_wait_s))
-
     try:
         serial_port = open_serial(port, 115200, timeout=1)
     except OSError as exc:
         raise SystemExit(f"Cannot open serial port {port}: {exc}") from exc
 
     with serial_port as ser, log_path.open("wb") as log:
+        if reset_before_capture:
+            print("Resetting device before capture...")
+            pulse_reset(ser)
+            time.sleep(max(0.0, boot_wait_s))
         deadline = time.time() + timeout_s
         first_byte_deadline = time.time() + 8.0
         saw_bytes = False
@@ -842,6 +973,7 @@ def analyze(
     port: str,
     capture_data: dict[str, Any],
     out_dir: Path,
+    far_audio_info: dict[str, Any],
     box_ref_channel: int | None = None,
 ) -> dict[str, Any]:
     audio: dict[str, dict[str, list[bytes]]] = capture_data["audio"]
@@ -851,6 +983,7 @@ def analyze(
         for event in events
         if event.get("type") == "case_end"
     }
+    ready_event = next((event for event in events if event.get("type") == "ready"), {})
     done = any(event.get("type") == "done" for event in events)
     run_status = "complete" if done else "incomplete"
     if not events:
@@ -957,10 +1090,15 @@ def analyze(
         "threshold_profile": THRESHOLD_PROFILE,
         "test_audio": {
             "near_audio": capture_data.get("near_audio"),
+            "far_audio": far_audio_info,
         },
         "qualification_config": {
             "box_ref_channel": box_ref_channel,
             "metric_source": "device_full_case_energy",
+            "device_far_audio": ready_event.get("far_audio") if isinstance(ready_event, dict) else None,
+            "device_far_audio_embedded": ready_event.get("far_audio_embedded")
+            if isinstance(ready_event, dict)
+            else None,
         },
         "metrics": metrics,
         "derived": {
@@ -1043,6 +1181,7 @@ def write_summary(report: dict[str, Any], out_dir: Path) -> None:
         f"- Port: {report['port']}",
         f"- BOX reference channel: {report.get('qualification_config', {}).get('box_ref_channel')}",
         f"- Metric source: {report.get('qualification_config', {}).get('metric_source', 'unknown')}",
+        f"- Far audio: {report.get('qualification_config', {}).get('device_far_audio', 'unknown')}",
         f"- Run status: {report.get('run_status', 'unknown')}",
         f"- Decision: {report['decision']}",
         f"- Threshold profile: {report.get('threshold_profile', {}).get('name', 'unknown')} "
@@ -1094,7 +1233,14 @@ def main() -> int:
     )
     parser.add_argument("--capture-timeout", type=int, default=180, help="Serial capture timeout in seconds")
     parser.add_argument("--no-capture-reset", action="store_true", help="Do not reset the device after opening serial capture")
-    parser.add_argument("--capture-boot-wait", type=float, default=1.0, help="Seconds to wait after capture reset")
+    parser.add_argument("--capture-boot-wait", type=float, default=0.0, help="Seconds to wait after capture reset")
+    parser.add_argument(
+        "--far-audio",
+        help=(
+            "Far-end 16-bit PCM WAV to embed into the qualification firmware for board-speaker playback; "
+            "defaults to the legacy synthetic multitone"
+        ),
+    )
     parser.add_argument("--near-audio", help="Near-end WAV file to play during barge-in; defaults to generated test audio")
     parser.add_argument("--no-near-playback", action="store_true", help="Disable host playback and use manual near-end audio")
     parser.add_argument(
@@ -1136,8 +1282,13 @@ def main() -> int:
         safe_name = f"{safe_name}-refch{args.box_ref_channel}"
     out_dir = (PROJECT_ROOT / args.out_dir / f"{timestamp}-{safe_name}").resolve()
     build_suffix = safe_name if args.aec_afe_mode == "board" else f"{safe_name}-{args.aec_afe_mode}"
+    if args.far_audio:
+        build_suffix = f"{build_suffix}-farwav"
     build_dir = (PROJECT_ROOT / args.build_dir / build_suffix).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
+    far_audio_info = prepare_far_audio(args.far_audio, out_dir)
+    if args.skip_build and far_audio_info.get("enabled"):
+        print("Warning: --far-audio only changes firmware after a build; --skip-build will use the existing binary.")
 
     if not args.skip_build:
         build_firmware(board, build_dir, out_dir, args.box_ref_channel, args.aec_afe_mode)
@@ -1160,7 +1311,7 @@ def main() -> int:
         not args.no_capture_reset,
         args.capture_boot_wait,
     )
-    report = analyze(board, port, capture_data, out_dir, args.box_ref_channel)
+    report = analyze(board, port, capture_data, out_dir, far_audio_info, args.box_ref_channel)
     (out_dir / "report.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     write_summary(report, out_dir)
 

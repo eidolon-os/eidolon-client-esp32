@@ -22,6 +22,22 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
+#if __has_include("aec_qualification_far_audio.h")
+#include "aec_qualification_far_audio.h"
+#endif
+
+#ifndef AECQ_FAR_AUDIO_ENABLED
+#define AECQ_FAR_AUDIO_ENABLED 0
+#endif
+
+#ifndef AECQ_FAR_AUDIO_SAMPLE_COUNT
+#define AECQ_FAR_AUDIO_SAMPLE_COUNT 0
+#endif
+
+#ifndef AECQ_FAR_AUDIO_NAME
+#define AECQ_FAR_AUDIO_NAME "synthetic_multitone"
+#endif
+
 #define TAG "AecQualification"
 
 namespace {
@@ -124,13 +140,18 @@ int16_t ClampToI16(float sample)
     return static_cast<int16_t>(sample);
 }
 
-void BuildPlaybackFrame(std::vector<int16_t>& frame, int frame_index, bool enabled)
+bool HasEmbeddedFarAudio()
+{
+#if AECQ_FAR_AUDIO_ENABLED
+    return AECQ_FAR_AUDIO_SAMPLE_COUNT > 0;
+#else
+    return false;
+#endif
+}
+
+void BuildSyntheticPlaybackFrame(std::vector<int16_t>& frame, int frame_index)
 {
     frame.resize(kFrameSamples);
-    if (!enabled) {
-        std::fill(frame.begin(), frame.end(), 0);
-        return;
-    }
 
     // Deterministic far-end signal: a speech-like multi-tone with soft envelope.
     const int sample_offset = frame_index * kFrameSamples;
@@ -142,6 +163,28 @@ void BuildPlaybackFrame(std::vector<int16_t>& frame, int frame_index, bool enabl
         float gate = 0.65f + 0.35f * std::sin(2.0f * kPi * 3.7f * t);
         frame[i] = ClampToI16(tone * gate * 10500.0f);
     }
+}
+
+void BuildPlaybackFrame(std::vector<int16_t>& frame, int frame_index, bool enabled)
+{
+    frame.resize(kFrameSamples);
+    if (!enabled) {
+        std::fill(frame.begin(), frame.end(), 0);
+        return;
+    }
+
+#if AECQ_FAR_AUDIO_ENABLED
+    if (AECQ_FAR_AUDIO_SAMPLE_COUNT > 0) {
+        size_t sample_offset = static_cast<size_t>(frame_index) * kFrameSamples;
+        for (int i = 0; i < kFrameSamples; ++i) {
+            frame[i] = AECQ_FAR_AUDIO_SAMPLES[(sample_offset + static_cast<size_t>(i)) %
+                                              AECQ_FAR_AUDIO_SAMPLE_COUNT];
+        }
+        return;
+    }
+#endif
+
+    BuildSyntheticPlaybackFrame(frame, frame_index);
 }
 
 uint64_t Energy(const int16_t* samples, size_t count)
@@ -228,6 +271,9 @@ public:
                   ",\"input_reference\":" + std::string(codec_->input_reference() ? "true" : "false") +
                   ",\"input_sample_rate\":" + std::to_string(codec_->input_sample_rate()) +
                   ",\"output_sample_rate\":" + std::to_string(codec_->output_sample_rate()) +
+                  ",\"far_audio\":\"" AECQ_FAR_AUDIO_NAME "\"" +
+                  ",\"far_audio_embedded\":" + std::string(HasEmbeddedFarAudio() ? "true" : "false") +
+                  ",\"far_audio_samples\":" + std::to_string(AECQ_FAR_AUDIO_SAMPLE_COUNT) +
                   ",\"free_heap\":" + std::to_string(heap_caps_get_free_size(MALLOC_CAP_8BIT)) +
                   ",\"free_internal_heap\":" + std::to_string(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)));
 

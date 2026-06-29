@@ -1099,6 +1099,9 @@ set(EIDOLON_EMBED_FILES ${LANG_SOUNDS} ${COMMON_SOUNDS})
 if(CONFIG_EIDOLON_HUB_MODE AND CONFIG_EIDOLON_WAKE_WORD_ENABLE)
     list(APPEND EIDOLON_EMBED_FILES "eidolon/wake_word/models/hey_jarvis.tflite")
 endif()
+if(CONFIG_EIDOLON_AEC_QUALIFICATION)
+    list(APPEND INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/.cache/aec_qualification/generated")
+endif()
 
 idf_component_register(SRCS ${SOURCES}
                     EMBED_FILES ${EIDOLON_EMBED_FILES}

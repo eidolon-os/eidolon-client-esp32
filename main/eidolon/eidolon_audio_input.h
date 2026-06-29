@@ -3,6 +3,7 @@
 #include <esp_codec_dev.h>
 #include <esp_err.h>
 #include <mutex>
+#include <vector>
 
 class AudioCodec;
 
@@ -20,6 +21,12 @@ public:
     esp_codec_dev_handle_t RecordHandle() const;
     esp_codec_dev_handle_t PlaybackHandle() const;
 
+    /**
+     * Read 16 kHz interleaved PCM while preserving all codec input channels.
+     * `frames` is the number of per-channel samples requested.
+     */
+    bool ReadInterleavedPcm16k(std::vector<int16_t>& data, size_t frames);
+
     /** Read mono 16 kHz PCM (samples = number of int16 mono samples). */
     bool ReadMonoPcm16k(int16_t* buf, size_t samples);
 
@@ -31,6 +38,7 @@ private:
     bool ready_ = false;
     void* resampler_ = nullptr;
     std::mutex resampler_mutex_;
+    std::vector<int16_t> resample_input_buffer_;
 };
 
 }  // namespace eidolon

@@ -1,6 +1,7 @@
 #include "eidolon_afe_capture.h"
 
 #include "audio_codec.h"
+#include "eidolon_audio_input.h"
 #include "processors/afe_audio_processor.h"
 
 #include <esp_log.h>
@@ -74,8 +75,8 @@ esp_err_t EidolonAfeCapture::Start(AudioCodec* codec) {
         return ESP_FAIL;
     }
 
-    ESP_LOGI(TAG, "AFE capture started (channels=%d, %d Hz)", codec_->input_channels(),
-             codec_->input_sample_rate());
+    ESP_LOGI(TAG, "AFE capture started (codec=%d Hz, afe=16000 Hz, channels=%d)",
+             codec_->input_sample_rate(), codec_->input_channels());
     return ESP_OK;
 }
 
@@ -99,12 +100,11 @@ void EidolonAfeCapture::Stop() {
 }
 
 void EidolonAfeCapture::ReadLoop() {
-    const int channels = codec_->input_channels();
+    auto& audio_input = EidolonAudioInput::Instance();
     int warmup = kWarmupFrames;
     std::vector<int16_t> data;
     while (running_) {
-        data.resize(static_cast<size_t>(kReadFramesPerChannel) * channels);
-        if (!codec_->InputData(data)) {
+        if (!audio_input.ReadInterleavedPcm16k(data, kReadFramesPerChannel)) {
             vTaskDelay(pdMS_TO_TICKS(5));
             continue;
         }
