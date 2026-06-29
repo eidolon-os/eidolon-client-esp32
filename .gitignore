@@ -16,6 +16,17 @@ main/mmap_generate_emoji.h
 .DS_Store
 .cache
 **/.trash/
+
+# Benchmark artifacts
+benchmarks/runs/
+benchmark/runs/
+reports/benchmark*/
+reports/*benchmark*/
+reports/*_benchmark_*/
+reports/memory_perf_*/
+reports/memory_quality_*/
+reports/memory_multi_device_*/
+reports/e2e_*/
 *.pyc
 *.bin
 mmap_generate_*.h
