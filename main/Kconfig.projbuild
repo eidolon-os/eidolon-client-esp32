@@ -1183,7 +1183,7 @@ menu "Eidolon Hub"
     config EIDOLON_LIVEKIT_SPEAKER_VOLUME
         int "LiveKit playback volume (0-100)"
         range 0 100
-        default 80
+        default 30
         depends on EIDOLON_HUB_MODE
 
     config EIDOLON_WAKE_WORD_ENABLE

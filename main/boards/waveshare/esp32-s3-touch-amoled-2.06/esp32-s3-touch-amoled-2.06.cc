@@ -235,37 +235,15 @@ private:
 
     void InitializeButtons() {
 #if CONFIG_EIDOLON_INTERACTION_MODE_PTT
-        // Hold-to-talk: BOOT press opens the mic (joins first if idle), release
-        // sends. A short click while still starting up enters Wi-Fi config.
-        boot_button_.OnPressDown([this]() {
-            auto& app = Application::GetInstance();
-            if (app.GetDeviceState() == kDeviceStateStarting) {
-                return;
-            }
-            app.PttPress();
-        });
-
-        boot_button_.OnPressUp([this]() {
-            auto& app = Application::GetInstance();
-            if (app.GetDeviceState() == kDeviceStateStarting) {
-                return;
-            }
-            app.PttRelease();
-        });
-
+        // PTT is intentionally touch-first on this wearable board: the central
+        // on-screen voice ring owns connect / hold-to-talk / release-to-send.
+        // Keep BOOT out of the conversation flow so board-specific button
+        // semantics never conflict with portable touch UI behaviour. During
+        // startup it remains available for Wi-Fi config recovery.
         boot_button_.OnClick([this]() {
-            auto& app = Application::GetInstance();
-            if (app.GetDeviceState() == kDeviceStateStarting) {
+            if (Application::GetInstance().GetDeviceState() == kDeviceStateStarting) {
                 EnterWifiConfigMode();
-                return;
             }
-            // A tap connects when idle (the room comes up first, then hold to
-            // talk); in-room a tap is a no-op, the press/release above drive PTT.
-            app.ToggleVoiceSession();
-        });
-
-        boot_button_.OnDoubleClick([this]() {
-            Application::GetInstance().ToggleMicrophone();
         });
 #else
         boot_button_.OnClick([this]() {
