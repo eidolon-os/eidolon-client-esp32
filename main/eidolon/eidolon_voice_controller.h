@@ -50,9 +50,9 @@ public:
     esp_err_t LeaveRoom();
     esp_err_t SetMicEnabled(bool enabled);
 
-    // Push-to-talk (hold-to-talk). Press opens the mic while held; release closes
-    // it and the ptt=false edge tells the server the turn is complete. No-op when
-    // PTT mode is disabled (full-duplex/auto).
+    // Push-to-talk (hold-to-talk). Press opens the mic; release keeps a short
+    // capture tail, then closes it and sends the ptt=false edge that tells the
+    // server the turn is complete. No-op when PTT mode is disabled.
     void OnPttPressed();
     void OnPttReleased();
     bool IsPttMode() const { return ptt_mode_; }
@@ -82,6 +82,7 @@ private:
         SetMic,
         PttPress,
         PttRelease,
+        PttReleaseTail,
         LiveKitState,
         ControlCommand,
         SessionControl,
@@ -118,6 +119,7 @@ private:
     void DoSetMicEnabled(bool enabled);
     void DoPttPressed();
     void DoPttReleased();
+    void DoPttReleaseTail();
     void DoLiveKitState(LiveKitConnectionState lk_state, uint32_t event_generation);
     void DoControlCommand(const std::string& payload);
     void DoSessionControl(const std::string& payload);
@@ -176,9 +178,12 @@ private:
     void ArmConnectWatchdog();
     void DisarmConnectWatchdog();
     void UpdateIdleAutoLeave();
+    void CancelPttReleaseTail();
+    void FinalizePttRelease(const char* reason);
     static void ReconnectTimerCb(void* arg);
     static void ConnectWatchdogCb(void* arg);
     static void IdleLeaveCb(void* arg);
+    static void PttReleaseTailCb(void* arg);
 
     // Audio-state publisher (timer-driven tick on the controller task).
     void StartAudioStatePublisher();
@@ -201,7 +206,8 @@ private:
 #else
         false;
 #endif
-    bool ptt_active_ = false;  // PTT: button currently held (mic open this turn)
+    bool ptt_active_ = false;  // PTT: held or in the short release tail (mic open)
+    bool ptt_release_tail_pending_ = false;
     // Session intent for the NEXT voice JOIN, set by a proactive room.join
     // control command and consumed (then cleared) by DoJoinRoom so it rides the
     // token-fetch as the X-Device-Session-Intent header. Empty for a normal user
@@ -238,6 +244,7 @@ private:
     esp_timer_handle_t reconnect_timer_ = nullptr;
     esp_timer_handle_t connect_watchdog_ = nullptr;
     esp_timer_handle_t idle_leave_timer_ = nullptr;
+    esp_timer_handle_t ptt_release_tail_timer_ = nullptr;
 
     StateCallback on_state_changed_;
     std::function<void(AgentPhase)> on_agent_phase_;

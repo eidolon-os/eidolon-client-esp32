@@ -426,6 +426,23 @@ set_sdkconfig_bool() {
   mv "${tmp}" "${sdkconfig}"
 }
 
+set_sdkconfig_value() {
+  local key="$1"
+  local value="$2"
+  local sdkconfig="${PROJECT_ROOT}/sdkconfig"
+  [[ -f "${sdkconfig}" ]] || return 0
+
+  local tmp
+  tmp="$(mktemp)"
+  awk -v key="${key}" '
+    $0 ~ "^CONFIG_" key "=" { next }
+    $0 == "# CONFIG_" key " is not set" { next }
+    { print }
+  ' "${sdkconfig}" >"${tmp}"
+  printf 'CONFIG_%s=%s\n' "${key}" "${value}" >>"${tmp}"
+  mv "${tmp}" "${sdkconfig}"
+}
+
 ensure_eidolon_trim_sdkconfig() {
   # Keep provisioning available. The current hotspot/web flow is temporary, and
   # future builds still need the Blufi/BLE provisioning capability.
@@ -451,6 +468,9 @@ ensure_eidolon_trim_sdkconfig() {
   # Keep product builds unchanged; only script-managed dev builds avoid PMIC
   # idle power-off so the serial port stays enumerated.
   set_sdkconfig_bool EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN y
+  set_sdkconfig_bool EIDOLON_INTERACTION_MODE_PTT y
+  set_sdkconfig_value EIDOLON_PTT_RELEASE_TAIL_MS 150
+  set_sdkconfig_value EIDOLON_LIVEKIT_SPEAKER_VOLUME 50
 
   # AFE mode: LOW_COST. HIGH_PERF (AFE_TYPE_VC) cannot keep real time on this
   # board once the LiveKit/WebRTC stack is also running — the AFE task saturates
@@ -480,6 +500,9 @@ CONFIG_USE_WECHAT_MESSAGE_STYLE=n
 CONFIG_EIDOLON_HUB_MODE=y
 CONFIG_EIDOLON_AUTO_JOIN_ON_ACTIVATION=y
 CONFIG_EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN=y
+CONFIG_EIDOLON_INTERACTION_MODE_PTT=y
+CONFIG_EIDOLON_PTT_RELEASE_TAIL_MS=150
+CONFIG_EIDOLON_LIVEKIT_SPEAKER_VOLUME=50
 CONFIG_EIDOLON_DEVICE_AEC_AFE_MODE_HIGH_PERF=y
 CONFIG_EIDOLON_WAKE_WORD_ENABLE=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/v2/16m_eidolon.csv"

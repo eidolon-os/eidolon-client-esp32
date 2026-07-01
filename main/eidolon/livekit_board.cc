@@ -15,6 +15,8 @@
 #include <esp_log.h>
 #include <esp_timer.h>
 #include <av_render_default.h>
+#include <algorithm>
+#include <cmath>
 #include <string.h>
 
 #define TAG "EidolonLKBoard"
@@ -26,9 +28,31 @@ static eidolon::EidolonAfeCapture* s_afe_capture;
 static audio_render_handle_t s_audio_renderer;
 static av_render_handle_t s_av_renderer;
 static volatile int64_t s_last_playback_us;
+static volatile uint32_t s_recent_capture_rms_ppm;
+static volatile uint32_t s_recent_playback_rms_ppm;
 
 namespace {
 constexpr int kPlaybackPcmMinAvgAbs = 120;
+constexpr uint32_t kRmsScalePpm = 1000000;
+
+uint32_t pcm16_rms_ppm(const uint8_t* data, int len)
+{
+    if (data == nullptr || len < static_cast<int>(sizeof(int16_t))) {
+        return 0;
+    }
+    const auto* samples = reinterpret_cast<const int16_t*>(data);
+    const int sample_count = len / static_cast<int>(sizeof(int16_t));
+    int64_t sum_sq = 0;
+    for (int i = 0; i < sample_count; ++i) {
+        const int32_t sample = samples[i];
+        sum_sq += static_cast<int64_t>(sample) * sample;
+    }
+    const double mean_sq = static_cast<double>(sum_sq) / sample_count;
+    const double rms = std::sqrt(mean_sq);
+    const double ppm = rms * kRmsScalePpm / 32768.0;
+    return static_cast<uint32_t>(
+        std::min<double>(kRmsScalePpm, std::max<double>(0.0, ppm)));
+}
 
 struct GatedAudioSource {
     esp_capture_audio_src_if_t base;
@@ -86,8 +110,11 @@ esp_capture_err_t gated_read_frame(esp_capture_audio_src_if_t* src,
 {
     auto* gated = gated_from_base(src);
     esp_capture_err_t ret = gated->inner->read_frame(gated->inner, frame);
-    if (ret == ESP_CAPTURE_ERR_OK && !gated->enabled && frame->data && frame->size > 0) {
-        memset(frame->data, 0, frame->size);
+    if (ret == ESP_CAPTURE_ERR_OK && frame->data && frame->size > 0) {
+        if (!gated->enabled) {
+            memset(frame->data, 0, frame->size);
+        }
+        s_recent_capture_rms_ppm = pcm16_rms_ppm(frame->data, frame->size);
     }
     return ret;
 }
@@ -134,6 +161,7 @@ static int on_audio_render_reference(uint8_t* data, int len, void*)
         int sample = samples[i];
         abs_sum += sample < 0 ? -sample : sample;
     }
+    s_recent_playback_rms_ppm = pcm16_rms_ppm(data, len);
     if ((abs_sum / sample_count) >= kPlaybackPcmMinAvgAbs) {
         s_last_playback_us = esp_timer_get_time();
     }
@@ -231,6 +259,8 @@ extern "C" esp_err_t eidolon_livekit_board_init(void)
                                       ? static_cast<uint32_t>(codec->output_sample_rate())
                                       : 16000;
     s_last_playback_us = 0;
+    s_recent_capture_rms_ppm = 0;
+    s_recent_playback_rms_ppm = 0;
     ESP_RETURN_ON_ERROR(build_renderer(play, output_sample_rate), TAG, "renderer");
 
     if (codec) {
@@ -257,6 +287,16 @@ extern "C" int64_t eidolon_livekit_board_last_playback_us(void)
     return s_last_playback_us;
 }
 
+extern "C" uint32_t eidolon_livekit_board_recent_capture_rms_ppm(void)
+{
+    return s_recent_capture_rms_ppm;
+}
+
+extern "C" uint32_t eidolon_livekit_board_recent_playback_rms_ppm(void)
+{
+    return s_recent_playback_rms_ppm;
+}
+
 extern "C" esp_err_t eidolon_livekit_board_set_capture_enabled(bool enabled)
 {
     if (!s_capturer) {
@@ -264,6 +304,9 @@ extern "C" esp_err_t eidolon_livekit_board_set_capture_enabled(bool enabled)
     }
     bool previous = s_gated_audio_source.enabled;
     s_gated_audio_source.enabled = enabled;
+    if (!enabled) {
+        s_recent_capture_rms_ppm = 0;
+    }
     if (previous != enabled) {
         ESP_LOGI(TAG, "LiveKit capture gate %s", enabled ? "open" : "muted");
     }
@@ -281,6 +324,7 @@ extern "C" esp_err_t eidolon_livekit_board_flush_playback(void)
         return ESP_FAIL;
     }
     s_last_playback_us = 0;
+    s_recent_playback_rms_ppm = 0;
     ESP_LOGI(TAG, "LiveKit playback flushed");
     return ESP_OK;
 }
@@ -304,4 +348,6 @@ extern "C" void eidolon_livekit_board_deinit(void)
     }
     s_gated_audio_source = {};
     s_last_playback_us = 0;
+    s_recent_capture_rms_ppm = 0;
+    s_recent_playback_rms_ppm = 0;
 }

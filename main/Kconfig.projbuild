@@ -1180,10 +1180,21 @@ menu "Eidolon Hub"
             (no VAD/EOT guessing). Disable for full-duplex (open mic + EOT +
             barge-in) on boards with good hardware AEC.
 
+    config EIDOLON_PTT_RELEASE_TAIL_MS
+        int "PTT release capture tail (ms)"
+        range 0 500
+        default 150
+        depends on EIDOLON_INTERACTION_MODE_PTT
+        help
+            Keep capture open briefly after touch release before publishing
+            ptt=false. This prevents clipping the final phoneme while preserving
+            the explicit PTT turn boundary; the device still does not decide
+            interruption or semantic turn ownership.
+
     config EIDOLON_LIVEKIT_SPEAKER_VOLUME
         int "LiveKit playback volume (0-100)"
         range 0 100
-        default 30
+        default 50
         depends on EIDOLON_HUB_MODE
 
     config EIDOLON_WAKE_WORD_ENABLE

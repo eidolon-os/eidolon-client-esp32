@@ -61,6 +61,7 @@ void EidolonUiPresenter::CommitTimeoutCb(void* arg)
     self->app_.Schedule([self]() {
         if (self->ptt_committing_) {
             self->ptt_committing_ = false;
+            ESP_LOGW(TAG, "PTT commit UI timeout; returning to ready state");
             self->Reapply();
         }
     });

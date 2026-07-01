@@ -47,10 +47,11 @@ const char* RingLabelText(const EidolonUiSnapshot& snapshot)
     switch (snapshot.turn) {
     case TurnPhase::Recording:
     case TurnPhase::UserSpeaking:
-        return "MIC";
+        return "REC";
     case TurnPhase::Committing:
+        return "SEND";
     case TurnPhase::AgentThinking:
-        return "...";
+        return "AI";
     case TurnPhase::AgentSpeaking:
         return "AI";
     case TurnPhase::Idle:

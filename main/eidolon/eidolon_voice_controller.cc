@@ -17,6 +17,10 @@
 #include <freertos/task.h>
 #include <stdio.h>
 
+#ifndef CONFIG_EIDOLON_PTT_RELEASE_TAIL_MS
+#define CONFIG_EIDOLON_PTT_RELEASE_TAIL_MS 0
+#endif
+
 #define TAG "EidolonVoice"
 
 namespace {
@@ -46,6 +50,11 @@ constexpr uint64_t kConnectWatchdogUs = 25ULL * 1000 * 1000;
 // agent output, so the server can release the agent session. Re-connecting is an
 // explicit tap. Tunable; 30-45s feels responsive without churning on short pauses.
 constexpr uint64_t kIdleAutoLeaveUs = 40ULL * 1000 * 1000;
+// PTT release tail: keep capture open briefly after touch release before
+// publishing ptt=false. This avoids clipping the final phoneme while preserving
+// an explicit, device-owned turn boundary.
+constexpr uint64_t kPttReleaseTailUs =
+    static_cast<uint64_t>(CONFIG_EIDOLON_PTT_RELEASE_TAIL_MS) * 1000ULL;
 // Single controller task: drains the event queue, serializing all state mutation.
 // Stack sized for the heaviest handler (rediscover = mDNS + HTTPS config fetch +
 // mbedtls signing + connect), which the old reconnect task ran on 8192.
@@ -125,7 +134,8 @@ EidolonVoiceController::~EidolonVoiceController()
 {
     // Best-effort teardown; in practice the controller lives for the app lifetime.
     for (esp_timer_handle_t* t :
-         {&audio_timer_, &reconnect_timer_, &connect_watchdog_, &idle_leave_timer_}) {
+         {&audio_timer_, &reconnect_timer_, &connect_watchdog_, &idle_leave_timer_,
+          &ptt_release_tail_timer_}) {
         if (*t != nullptr) {
             esp_timer_stop(*t);
             esp_timer_delete(*t);
@@ -203,6 +213,9 @@ void EidolonVoiceController::Dispatch(const Event& ev)
         break;
     case EventType::PttRelease:
         DoPttReleased();
+        break;
+    case EventType::PttReleaseTail:
+        DoPttReleaseTail();
         break;
     case EventType::LiveKitState:
         DoLiveKitState(ev.lk_state, ev.generation);
@@ -757,6 +770,14 @@ void EidolonVoiceController::IdleLeaveCb(void* arg)
     self->Enqueue(ev);
 }
 
+void EidolonVoiceController::PttReleaseTailCb(void* arg)
+{
+    auto* self = static_cast<EidolonVoiceController*>(arg);
+    Event ev;
+    ev.type = EventType::PttReleaseTail;
+    self->Enqueue(ev);
+}
+
 void EidolonVoiceController::DoIdleAutoLeave()
 {
     // Activity may have resumed between the timer firing and now.
@@ -1271,6 +1292,10 @@ void EidolonVoiceController::StopAudioStatePublisher()
     if (audio_timer_ != nullptr) {
         esp_timer_stop(audio_timer_);
     }
+    if (ptt_mode_) {
+        CancelPttReleaseTail();
+        ptt_active_ = false;
+    }
     // Emit a final closed-mic state (matches the old publisher's exit behavior).
     if (session_.IsConnected() && !control_room_) {
         PublishClientAudioState(false);
@@ -1295,7 +1320,7 @@ void EidolonVoiceController::DoAudioTick()
 
 void EidolonVoiceController::PublishClientAudioState(bool playback_active)
 {
-    char payload[280];
+    char payload[320];
     int64_t now_us = esp_timer_get_time();
     uint32_t client_ts_ms = static_cast<uint32_t>(now_us / 1000);
 
@@ -1303,9 +1328,9 @@ void EidolonVoiceController::PublishClientAudioState(bool playback_active)
     bool mic_muted;
     bool capture_on;
     if (ptt_mode_) {
-        // Push-to-talk (half-duplex): the mic is open ONLY while the button is
-        // held. Closed otherwise, so playback is never recorded and the turn
-        // boundary is explicit (the ptt false edge tells the server "I'm done").
+        // Push-to-talk (half-duplex): the mic is open while held and during the
+        // short release tail. Closed otherwise, so playback is not recorded and
+        // the ptt=false edge remains the explicit "I'm done" turn boundary.
         capture_on = mic_enabled_ && ptt_active_;
         mic_muted = !capture_on;
     } else {
@@ -1318,6 +1343,11 @@ void EidolonVoiceController::PublishClientAudioState(bool playback_active)
     // Physically gate the capture path to match so no unwanted audio reaches the
     // channel.
     eidolon_livekit_board_set_capture_enabled(capture_on);
+    uint32_t capture_rms_ppm = eidolon_livekit_board_recent_capture_rms_ppm();
+    if (mic_muted) {
+        capture_rms_ppm = 0;
+    }
+    uint32_t playback_rms_ppm = eidolon_livekit_board_recent_playback_rms_ppm();
 
     bool state_changed = !audio_state_sent_ ||
                          playback_active != last_audio_playback_active_ ||
@@ -1329,12 +1359,16 @@ void EidolonVoiceController::PublishClientAudioState(bool playback_active)
         return;
     }
     uint32_t seq = ++audio_state_seq_;
+    unsigned long capture_rms_whole =
+        static_cast<unsigned long>(capture_rms_ppm / 1000000UL);
+    unsigned long capture_rms_frac =
+        static_cast<unsigned long>(capture_rms_ppm % 1000000UL);
     int written = snprintf(
         payload,
         sizeof(payload),
         "{\"schema_v\":%d,\"type\":\"%s\",\"seq\":%lu,\"input_mode\":\"%s\","
         "\"playback_state\":\"%s\",\"mic_muted\":%s,"
-        "\"ptt\":%s,\"client_ts_ms\":%lu}",
+        "\"ptt\":%s,\"rms\":%lu.%06lu,\"client_ts_ms\":%lu}",
         kWireSchemaVersion,
         kClientAudioStateType,
         static_cast<unsigned long>(seq),
@@ -1342,6 +1376,8 @@ void EidolonVoiceController::PublishClientAudioState(bool playback_active)
         playback_active ? kPlaybackStateAgentSpeaking : kPlaybackStateIdle,
         mic_muted ? "true" : "false",
         ptt_held ? "true" : "false",
+        capture_rms_whole,
+        capture_rms_frac,
         static_cast<unsigned long>(client_ts_ms));
     if (written <= 0 || written >= static_cast<int>(sizeof(payload))) {
         return;
@@ -1350,6 +1386,20 @@ void EidolonVoiceController::PublishClientAudioState(bool playback_active)
     if (err != ESP_OK) {
         ESP_LOGD(TAG, "Publish client audio state skipped: %s", esp_err_to_name(err));
         return;
+    }
+    if (state_changed || ptt_held || playback_active) {
+        ESP_LOGI(TAG,
+                 "Audio state seq=%lu mode=%s playback=%s mic_muted=%d ptt=%d "
+                 "capture_rms=%lu.%03lu playback_rms=%lu.%03lu",
+                 static_cast<unsigned long>(seq),
+                 ptt_mode_ ? kInputModePtt : kInputModeAuto,
+                 playback_active ? kPlaybackStateAgentSpeaking : kPlaybackStateIdle,
+                 mic_muted ? 1 : 0,
+                 ptt_held ? 1 : 0,
+                 static_cast<unsigned long>(capture_rms_ppm / 1000000UL),
+                 static_cast<unsigned long>((capture_rms_ppm % 1000000UL) / 1000UL),
+                 static_cast<unsigned long>(playback_rms_ppm / 1000000UL),
+                 static_cast<unsigned long>((playback_rms_ppm % 1000000UL) / 1000UL));
     }
     audio_state_sent_ = true;
     last_audio_playback_active_ = playback_active;
@@ -1391,6 +1441,8 @@ void EidolonVoiceController::DoPttPressed()
     if (!ptt_mode_) {
         return;
     }
+    bool resumed_from_tail = ptt_release_tail_pending_;
+    CancelPttReleaseTail();
     ptt_active_ = true;
     UpdateIdleAutoLeave();  // active: cancel the idle countdown
     // Hold-to-talk only applies in-room. Entering the room is an explicit tap (the
@@ -1401,7 +1453,8 @@ void EidolonVoiceController::DoPttPressed()
         ESP_LOGI(TAG, "PTT press ignored: not in room (tap to connect first)");
         return;
     }
-    ESP_LOGI(TAG, "PTT press: mic open");
+    ESP_LOGI(TAG, "%s", resumed_from_tail ? "PTT press: release tail cancelled, mic open"
+                                          : "PTT press: mic open");
     PublishClientAudioState(AgentOutputActiveRecently());
 }
 
@@ -1410,13 +1463,69 @@ void EidolonVoiceController::DoPttReleased()
     if (!ptt_mode_) {
         return;
     }
+    if (!ptt_active_ && !ptt_release_tail_pending_) {
+        ESP_LOGI(TAG, "PTT release ignored: not active");
+        return;
+    }
+    if (!session_.IsConnected() || control_room_ || state_ != VoiceSessionState::InRoom) {
+        FinalizePttRelease("not_in_voice_room");
+        return;
+    }
+    if (kPttReleaseTailUs == 0) {
+        FinalizePttRelease("no_tail");
+        return;
+    }
+    if (ptt_release_tail_timer_ == nullptr) {
+        esp_timer_create_args_t args = {};
+        args.callback = &EidolonVoiceController::PttReleaseTailCb;
+        args.arg = this;
+        args.dispatch_method = ESP_TIMER_TASK;
+        args.name = "eidolon_ptt_tail";
+        if (esp_timer_create(&args, &ptt_release_tail_timer_) != ESP_OK) {
+            ptt_release_tail_timer_ = nullptr;
+            ESP_LOGW(TAG, "Failed to create PTT release tail timer");
+            FinalizePttRelease("tail_timer_create_failed");
+            return;
+        }
+    }
+    ptt_release_tail_pending_ = true;
+    esp_timer_stop(ptt_release_tail_timer_);
+    if (esp_timer_start_once(ptt_release_tail_timer_, kPttReleaseTailUs) != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to start PTT release tail timer");
+        FinalizePttRelease("tail_timer_start_failed");
+        return;
+    }
+    ESP_LOGI(TAG, "PTT release: keeping mic open for tail=%lums",
+             static_cast<unsigned long>(CONFIG_EIDOLON_PTT_RELEASE_TAIL_MS));
+}
+
+void EidolonVoiceController::DoPttReleaseTail()
+{
+    if (!ptt_mode_ || !ptt_release_tail_pending_) {
+        return;
+    }
+    FinalizePttRelease("tail_elapsed");
+}
+
+void EidolonVoiceController::CancelPttReleaseTail()
+{
+    if (ptt_release_tail_timer_ != nullptr) {
+        esp_timer_stop(ptt_release_tail_timer_);
+    }
+    ptt_release_tail_pending_ = false;
+}
+
+void EidolonVoiceController::FinalizePttRelease(const char* reason)
+{
+    CancelPttReleaseTail();
     ptt_active_ = false;
-    // The ptt=false edge tells the server the user's turn is complete and closes
-    // the capture gate.
     if (session_.IsConnected() && !control_room_) {
-        ESP_LOGI(TAG, "PTT release: mic closed, turn committed");
+        ESP_LOGI(TAG, "PTT release: mic closed, turn committed (%s)",
+                 reason ? reason : "unknown");
         PublishClientAudioState(AgentOutputActiveRecently());
     } else {
+        ESP_LOGI(TAG, "PTT release: mic closed without publish (%s)",
+                 reason ? reason : "not_connected");
         eidolon_livekit_board_set_capture_enabled(false);
     }
     UpdateIdleAutoLeave();  // turn done: start the idle countdown (if agent silent)
