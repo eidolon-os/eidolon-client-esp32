@@ -114,7 +114,9 @@ void LiveKitSession::OnTextStreamChunk(const livekit_data_stream_chunk_t* chunk,
     std::string payload(reinterpret_cast<const char*>(chunk->content), chunk->content_size);
     cJSON* root = cJSON_Parse(payload.c_str());
     if (!root) {
-        session->on_transcription_({TranscriptionSource::Unknown, payload, false});
+        // lk.transcription may deliver raw token/chunk text. Those chunks are
+        // transport data, not a stable device subtitle; only structured
+        // transcription payloads are surfaced to the UI.
         return;
     }
 

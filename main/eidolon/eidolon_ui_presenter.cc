@@ -12,12 +12,12 @@
 namespace eidolon {
 
 namespace {
-// How long to keep showing "processing" after release with no agent signal. The
-// observed STT-final + end-of-turn gap before the server reports thinking is a few
-// seconds; this is the safety net for the no-response case (e.g. empty STT) so the
-// UI doesn't hang on "processing" forever.
+// How long to keep showing "processing" after release/commit with no agent
+// signal. The observed STT-final + end-of-turn gap before the server reports
+// thinking is a few seconds; this is the safety net for the no-response case
+// (e.g. empty STT) so the UI doesn't hang on "processing" forever.
 #ifndef CONFIG_EIDOLON_PTT_COMMIT_UI_TIMEOUT_MS
-#define CONFIG_EIDOLON_PTT_COMMIT_UI_TIMEOUT_MS 3000
+#define CONFIG_EIDOLON_PTT_COMMIT_UI_TIMEOUT_MS 5000
 #endif
 
 constexpr uint64_t kCommitTimeoutUs =
@@ -166,8 +166,10 @@ void EidolonUiPresenter::OnPttTurnStatus(const std::string& outcome)
         return;
     }
     if (outcome == "committed") {
-        // Keep the optimistic processing bridge until the agent reports real
-        // progress or the fallback timer expires.
+        // The server has accepted the PTT turn; restart the bridge from this
+        // stronger signal instead of timing out from the original touch release.
+        BeginCommitting();
+        Reapply();
         return;
     }
     if (outcome.rfind("rejected:", 0) == 0 ||

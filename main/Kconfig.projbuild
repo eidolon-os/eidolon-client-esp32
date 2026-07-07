@@ -1194,12 +1194,12 @@ menu "Eidolon Hub"
     config EIDOLON_PTT_COMMIT_UI_TIMEOUT_MS
         int "PTT commit UI fallback timeout (ms)"
         range 500 10000
-        default 3000
+        default 5000
         depends on EIDOLON_INTERACTION_MODE_PTT
         help
-            Deadman UI timeout after release if the channel does not publish a
-            PTT turn status or agent progress. The channel remains the turn
-            owner; this only prevents the display from staying in processing.
+            Deadman UI timeout after release/commit if the channel does not
+            publish agent progress. The channel remains the turn owner; this
+            only prevents the display from staying in processing.
 
     config EIDOLON_LIVEKIT_SPEAKER_VOLUME
         int "LiveKit playback volume (0-100)"

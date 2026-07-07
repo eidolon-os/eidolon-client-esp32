@@ -197,6 +197,8 @@ private:
     void PublishClientAudioState(bool playback_active);
     bool PlaybackActiveRecently() const;
     bool AgentOutputActiveRecently() const;
+    void UpdateLocalPlaybackPhase(bool playback_active);
+    esp_err_t StopLocalPlayback(const char* reason);
 
     LiveKitSession session_;
     Esp32HubConfig config_;
@@ -238,6 +240,7 @@ private:
     uint32_t audio_state_seq_ = 0;
     bool audio_state_sent_ = false;
     bool last_audio_playback_active_ = false;
+    bool local_playback_ui_active_ = false;
     bool last_audio_mic_muted_ = false;
     bool last_audio_ptt_ = false;
     int64_t last_audio_publish_us_ = 0;

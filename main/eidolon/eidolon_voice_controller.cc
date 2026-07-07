@@ -24,7 +24,7 @@
 #define TAG "EidolonVoice"
 
 namespace {
-constexpr int64_t kPlaybackActiveWindowUs = 800 * 1000;
+constexpr int64_t kPlaybackActiveWindowUs = 1200 * 1000;
 // Poll the audio state fast so a barge-in (near-end speech) edge reaches the
 // channel within ~one poll, but only emit an unchanged heartbeat every
 // kAudioStateHeartbeatUs to avoid flooding lossy packets at the poll rate.
@@ -741,8 +741,10 @@ void EidolonVoiceController::UpdateIdleAutoLeave()
 {
     // Idle = in the voice room, PTT mode, nobody holding the button, and the agent
     // is not producing output. Any of those changing re-evaluates the timer.
+    bool agent_output_active = agent_phase_ != AgentPhase::Silent ||
+                               local_playback_ui_active_ || PlaybackActiveRecently();
     bool idle = ptt_mode_ && state_ == VoiceSessionState::InRoom && !control_room_ &&
-                !ptt_active_ && agent_phase_ == AgentPhase::Silent;
+                !ptt_active_ && !agent_output_active;
     if (idle) {
         if (idle_leave_timer_ == nullptr) {
             esp_timer_create_args_t args = {};
@@ -962,14 +964,13 @@ void EidolonVoiceController::HandlePlaybackStopCommand(const std::string& comman
     command.id = command_id;
     command.op = kControlOpPlaybackStop;
 
-    esp_err_t flush_err = eidolon_livekit_board_flush_playback();
+    esp_err_t flush_err = StopLocalPlayback("control_playback_stop");
     if (flush_err != ESP_OK) {
         ESP_LOGW(TAG, "Control-triggered playback stop failed: %s", esp_err_to_name(flush_err));
         AckCommand(command, "failed", "PLAYBACK_FLUSH_FAILED", esp_err_to_name(flush_err));
         return;
     }
 
-    DoAgentPhase(AgentPhase::Silent);
     PublishClientAudioState(false);
     AckCommand(command, "completed", "OK");
 }
@@ -1274,6 +1275,12 @@ esp_err_t EidolonVoiceController::ConnectControlRoom()
 
 esp_err_t EidolonVoiceController::DoLeaveRoom()
 {
+    if (!control_room_) {
+        esp_err_t stop_err = StopLocalPlayback("leave_room");
+        if (stop_err != ESP_OK && stop_err != ESP_ERR_INVALID_STATE) {
+            ESP_LOGD(TAG, "Leave-room playback stop skipped: %s", esp_err_to_name(stop_err));
+        }
+    }
     StopAudioStatePublisher();
     bool reconnect_control = HasControlConfig();
     esp_err_t err = session_.Disconnect(true);
@@ -1295,6 +1302,7 @@ void EidolonVoiceController::StartAudioStatePublisher()
     }
     audio_state_seq_ = 0;
     audio_state_sent_ = false;
+    local_playback_ui_active_ = false;
     audio_publisher_active_ = true;
     if (audio_timer_ == nullptr) {
         esp_timer_create_args_t args = {};
@@ -1382,6 +1390,7 @@ void EidolonVoiceController::PublishClientAudioState(bool playback_active)
                          playback_active != last_audio_playback_active_ ||
                          mic_muted != last_audio_mic_muted_ ||
                          ptt_held != last_audio_ptt_;
+    UpdateLocalPlaybackPhase(playback_active);
     // Fast poll, throttled heartbeat: nothing changed and the heartbeat isn't due
     // yet, so don't emit a packet (last_audio_* already equals the current state).
     if (!state_changed && (now_us - last_audio_publish_us_) < kAudioStateHeartbeatUs) {
@@ -1450,6 +1459,41 @@ bool EidolonVoiceController::AgentOutputActiveRecently() const
         return true;
     }
     return PlaybackActiveRecently();
+}
+
+void EidolonVoiceController::UpdateLocalPlaybackPhase(bool playback_active)
+{
+    if (!ptt_mode_ || control_room_ || state_ != VoiceSessionState::InRoom) {
+        return;
+    }
+    if (local_playback_ui_active_ == playback_active) {
+        return;
+    }
+    local_playback_ui_active_ = playback_active;
+
+    if (playback_active) {
+        if (on_agent_phase_) {
+            on_agent_phase_(AgentPhase::AgentSpeaking);
+        }
+    } else if (agent_phase_ != AgentPhase::AgentThinking &&
+               agent_phase_ != AgentPhase::AgentSpeaking) {
+        if (on_agent_phase_) {
+            on_agent_phase_(AgentPhase::Silent);
+        }
+    }
+    UpdateIdleAutoLeave();
+}
+
+esp_err_t EidolonVoiceController::StopLocalPlayback(const char* reason)
+{
+    esp_err_t flush_err = eidolon_livekit_board_flush_playback();
+    if (flush_err != ESP_OK) {
+        return flush_err;
+    }
+    ESP_LOGI(TAG, "Local playback stopped reason=%s", reason ? reason : "unspecified");
+    UpdateLocalPlaybackPhase(false);
+    DoAgentPhase(AgentPhase::Silent);
+    return ESP_OK;
 }
 
 // ============================ Mic / PTT / agent phase ============================

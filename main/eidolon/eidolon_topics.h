@@ -3,19 +3,19 @@
 
 namespace eidolon {
 
-// Single source of truth for the LiveKit data-channel topics shared between the
-// device and the channel agent. Previously these were defined ad-hoc in several
-// translation units (kControlTopic was even defined twice), which risked drift.
-// Keep in sync with eidolon_channel.
+// C++ mirror of the SDK wire-contract topics shared between device, hub, and
+// channel. Previously these were defined ad-hoc in several translation units
+// (kControlTopic was even defined twice), which risked drift. Keep in sync with
+// eidolon_sdk.biz.contracts.
 inline constexpr const char* kControlTopic = "eidolon.control";
 inline constexpr const char* kClientAudioStateTopic = "eidolon.audio_state";
 inline constexpr const char* kUiStateTopic = "eidolon.ui_state";
 inline constexpr const char* kSessionControlTopic = "eidolon.session_control";
-inline constexpr const char* kTranscriptionTopic = "transcription";
+inline constexpr const char* kTranscriptionTopic = "lk.transcription";
 
 // ---------------------------------------------------------------------------
 // The rest of the device⇄server wire vocabulary. SOURCE OF RECORD is the Python
-// module eidolon_sdk/eidolon_sdk/contracts; this header is the hand-kept C++
+// module eidolon_sdk/biz/contracts; this header is the hand-kept C++
 // mirror (Track A2). eidolon_sdk/tests/contracts/test_contracts.py pins the
 // Python values — change one there, change it here too. Keep byte-for-byte.
 // ---------------------------------------------------------------------------
