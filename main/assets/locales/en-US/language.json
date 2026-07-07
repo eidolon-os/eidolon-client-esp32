@@ -71,6 +71,7 @@
         "EIDOLON_CONNECT": "Connect",
         "ROOM_START": "Start conversation",
         "EIDOLON_PTT_HOLD": "Hold to talk",
+        "EIDOLON_PTT_RECORDING": "Recording...",
         "EIDOLON_PTT_RELEASE": "Release to send",
         "ROOM_CANCEL": "Cancel",
         "ROOM_END": "End conversation",

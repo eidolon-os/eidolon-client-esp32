@@ -822,6 +822,7 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload)
         {kControlOpConfigRefresh, &EidolonVoiceController::HandleConfigRefreshCommand},
         {kControlOpRoomJoin, &EidolonVoiceController::HandleRoomJoinCommand},
         {kControlOpPlaybackStop, &EidolonVoiceController::HandlePlaybackStopCommand},
+        {kControlOpPttTurnStatus, &EidolonVoiceController::HandlePttTurnStatusCommand},
         {kControlOpDeviceIdentify, &EidolonVoiceController::HandleDeviceIdentifyCommand},
     };
 
@@ -970,6 +971,34 @@ void EidolonVoiceController::HandlePlaybackStopCommand(const std::string& comman
 
     DoAgentPhase(AgentPhase::Silent);
     PublishClientAudioState(false);
+    AckCommand(command, "completed", "OK");
+}
+
+void EidolonVoiceController::HandlePttTurnStatusCommand(const std::string& command_id,
+                                                        const std::string& payload)
+{
+    std::string outcome;
+    if (!payload.empty()) {
+        cJSON* root = cJSON_Parse(payload.c_str());
+        if (root != nullptr) {
+            const cJSON* item = cJSON_GetObjectItem(root, "outcome");
+            if (cJSON_IsString(item) && item->valuestring != nullptr) {
+                outcome = item->valuestring;
+            }
+            cJSON_Delete(root);
+        }
+    }
+    if (outcome.empty()) {
+        outcome = "unknown";
+    }
+    ESP_LOGI(TAG, "PTT turn status outcome=%s", outcome.c_str());
+    if (on_ptt_turn_status_) {
+        on_ptt_turn_status_(outcome);
+    }
+
+    ControlCommand command;
+    command.id = command_id;
+    command.op = kControlOpPttTurnStatus;
     AckCommand(command, "completed", "OK");
 }
 

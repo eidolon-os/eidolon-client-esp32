@@ -106,7 +106,7 @@ void RenderConversation(EidolonUiSnapshot& snapshot)
         }
         switch (snapshot.turn) {
         case TurnPhase::Recording:
-            snapshot.status_text = Lang::Strings::LISTENING;
+            snapshot.status_text = Lang::Strings::EIDOLON_PTT_RECORDING;
             snapshot.emotion = "happy";
             break;
         case TurnPhase::Committing:

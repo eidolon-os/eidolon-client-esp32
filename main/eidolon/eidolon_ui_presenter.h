@@ -8,6 +8,8 @@
 
 #include <esp_timer.h>
 
+#include <string>
+
 class Application;
 
 namespace eidolon {
@@ -21,6 +23,7 @@ public:
                EndReason end_reason = EndReason::None);
     void OnTranscription(const TranscriptionEvent& event);
     void OnAgentPhase(AgentPhase phase);
+    void OnPttTurnStatus(const std::string& outcome);
     // Push-to-talk: the user is currently holding the talk button (mic recording).
     void SetPttRecording(bool recording);
 

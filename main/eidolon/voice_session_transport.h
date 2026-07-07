@@ -14,6 +14,7 @@ struct VoiceSessionCallbacks {
     std::function<void(VoiceSessionState)> on_session_state;
     std::function<void(const TranscriptionEvent&)> on_transcription;
     std::function<void(AgentPhase)> on_agent_phase;
+    std::function<void(const std::string& outcome)> on_ptt_turn_status;
     std::function<void(const std::string&)> on_error;
 };
 

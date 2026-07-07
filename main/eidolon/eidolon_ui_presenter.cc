@@ -16,7 +16,12 @@ namespace {
 // observed STT-final + end-of-turn gap before the server reports thinking is a few
 // seconds; this is the safety net for the no-response case (e.g. empty STT) so the
 // UI doesn't hang on "processing" forever.
-constexpr uint64_t kCommitTimeoutUs = 12ULL * 1000 * 1000;
+#ifndef CONFIG_EIDOLON_PTT_COMMIT_UI_TIMEOUT_MS
+#define CONFIG_EIDOLON_PTT_COMMIT_UI_TIMEOUT_MS 3000
+#endif
+
+constexpr uint64_t kCommitTimeoutUs =
+    static_cast<uint64_t>(CONFIG_EIDOLON_PTT_COMMIT_UI_TIMEOUT_MS) * 1000ULL;
 }
 
 EidolonUiPresenter::EidolonUiPresenter(Application& app) : app_(app)
@@ -151,6 +156,25 @@ void EidolonUiPresenter::OnAgentPhase(AgentPhase phase)
         ClearCommitting();
     }
     tracker_.OnAgentPhase(phase);
+    Reapply();
+}
+
+void EidolonUiPresenter::OnPttTurnStatus(const std::string& outcome)
+{
+    ESP_LOGI(TAG, "PTT turn status received outcome=%s", outcome.c_str());
+    if (outcome == "recording" || outcome == "finalizing") {
+        return;
+    }
+    if (outcome == "committed") {
+        // Keep the optimistic processing bridge until the agent reports real
+        // progress or the fallback timer expires.
+        return;
+    }
+    if (outcome.rfind("rejected:", 0) == 0 ||
+        outcome.rfind("cancelled:", 0) == 0) {
+        tracker_.OnAgentPhase(AgentPhase::Silent);
+    }
+    ClearCommitting();
     Reapply();
 }
 

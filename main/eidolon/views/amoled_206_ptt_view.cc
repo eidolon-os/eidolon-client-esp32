@@ -56,7 +56,7 @@ const char* RingLabelText(const EidolonUiSnapshot& snapshot)
         return "AI";
     case TurnPhase::Idle:
     default:
-        return "";
+        return snapshot.mode == InteractionMode::PushToTalk ? "TALK" : "";
     }
 }
 
@@ -160,7 +160,8 @@ const char* FooterText(const EidolonUiSnapshot& snapshot)
         return Lang::Strings::MIC_MUTED;
     }
     if (IsInterrupting(snapshot)) {
-        return Lang::Strings::LISTENING;
+        return snapshot.mode == InteractionMode::PushToTalk ? Lang::Strings::ROOM_INTERRUPT
+                                                            : Lang::Strings::LISTENING;
     }
     switch (snapshot.turn) {
     case TurnPhase::Recording:
@@ -171,7 +172,8 @@ const char* FooterText(const EidolonUiSnapshot& snapshot)
     case TurnPhase::AgentSpeaking:
         return Lang::Strings::SPEAKING;
     case TurnPhase::UserSpeaking:
-        return Lang::Strings::LISTENING;
+        return snapshot.mode == InteractionMode::PushToTalk ? Lang::Strings::EIDOLON_PTT_HOLD
+                                                            : Lang::Strings::LISTENING;
     case TurnPhase::Idle:
     default:
         return snapshot.mode == InteractionMode::PushToTalk ? Lang::Strings::EIDOLON_PTT_HOLD

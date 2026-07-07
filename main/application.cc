@@ -303,6 +303,13 @@ void Application::Initialize() {
             }
         });
     };
+    callbacks.on_ptt_turn_status = [this](const std::string& outcome) {
+        Schedule([this, outcome]() {
+            if (ui_presenter_) {
+                ui_presenter_->OnPttTurnStatus(outcome);
+            }
+        });
+    };
     voice_transport_ = eidolon::CreateLiveKitVoiceTransport(std::move(callbacks));
 #else
     // Setup the audio service

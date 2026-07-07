@@ -70,6 +70,10 @@ public:
     void SetOnStateChanged(StateCallback cb) { on_state_changed_ = std::move(cb); }
     void SetOnTranscription(std::function<void(const TranscriptionEvent&)> cb);
     void SetOnAgentPhase(std::function<void(AgentPhase)> cb);
+    void SetOnPttTurnStatus(std::function<void(const std::string&)> cb)
+    {
+        on_ptt_turn_status_ = std::move(cb);
+    }
 
 private:
     // ---- Event loop ----
@@ -162,6 +166,7 @@ private:
     void HandleConfigRefreshCommand(const std::string& command_id, const std::string& payload);
     void HandleRoomJoinCommand(const std::string& command_id, const std::string& payload);
     void HandlePlaybackStopCommand(const std::string& command_id, const std::string& payload);
+    void HandlePttTurnStatusCommand(const std::string& command_id, const std::string& payload);
     void HandleDeviceIdentifyCommand(const std::string& command_id, const std::string& payload);
     void HandleIdleTimeoutCommand();
     // Parse and act on a session_end{reason} packet from the channel: record the
@@ -248,6 +253,7 @@ private:
 
     StateCallback on_state_changed_;
     std::function<void(AgentPhase)> on_agent_phase_;
+    std::function<void(const std::string&)> on_ptt_turn_status_;
 };
 
 }  // namespace eidolon

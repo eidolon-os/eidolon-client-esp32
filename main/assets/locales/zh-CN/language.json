@@ -71,6 +71,7 @@
         "EIDOLON_CONNECT": "连接",
         "ROOM_START": "开始对话",
         "EIDOLON_PTT_HOLD": "按住说话",
+        "EIDOLON_PTT_RECORDING": "录音中...",
         "EIDOLON_PTT_RELEASE": "松开发送",
         "ROOM_CANCEL": "取消",
         "ROOM_END": "结束对话",
