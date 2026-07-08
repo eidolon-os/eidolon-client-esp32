@@ -443,6 +443,24 @@ set_sdkconfig_value() {
   mv "${tmp}" "${sdkconfig}"
 }
 
+clear_sr_wakenet_models() {
+  local sdkconfig="${PROJECT_ROOT}/sdkconfig"
+  [[ -f "${sdkconfig}" ]] || return 0
+
+  local -a keys=()
+  local key
+  while IFS= read -r key; do
+    [[ -n "${key}" ]] && keys+=("${key#CONFIG_}")
+  done < <(awk '
+    /^CONFIG_SR_WN_[A-Z0-9_]+=y$/ { sub("=y", ""); print }
+    /^# CONFIG_SR_WN_[A-Z0-9_]+ is not set$/ { print $2 }
+  ' "${sdkconfig}" | sort -u)
+
+  for key in "${keys[@]}"; do
+    set_sdkconfig_bool "${key}" n
+  done
+}
+
 ensure_eidolon_trim_sdkconfig() {
   # Keep provisioning available. The current hotspot/web flow is temporary, and
   # future builds still need the Blufi/BLE provisioning capability.
@@ -469,6 +487,14 @@ ensure_eidolon_trim_sdkconfig() {
   # idle power-off so the serial port stays enumerated.
   set_sdkconfig_bool EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN y
   set_sdkconfig_bool EIDOLON_INTERACTION_MODE_PTT y
+  # Touch-first PTT joins by tapping the ring, so this board does not need
+  # microWakeWord in the app partition.
+  set_sdkconfig_bool EIDOLON_WAKE_WORD_ENABLE n
+  set_sdkconfig_bool WAKE_WORD_DISABLED y
+  set_sdkconfig_bool USE_ESP_WAKE_WORD n
+  set_sdkconfig_bool USE_AFE_WAKE_WORD n
+  set_sdkconfig_bool USE_CUSTOM_WAKE_WORD n
+  clear_sr_wakenet_models
   set_sdkconfig_value EIDOLON_PTT_RELEASE_TAIL_MS 150
   set_sdkconfig_value EIDOLON_PTT_COMMIT_UI_TIMEOUT_MS 5000
   set_sdkconfig_value EIDOLON_LIVEKIT_SPEAKER_VOLUME 50
@@ -506,9 +532,12 @@ CONFIG_EIDOLON_PTT_RELEASE_TAIL_MS=150
 CONFIG_EIDOLON_PTT_COMMIT_UI_TIMEOUT_MS=5000
 CONFIG_EIDOLON_LIVEKIT_SPEAKER_VOLUME=50
 CONFIG_EIDOLON_DEVICE_AEC_AFE_MODE_HIGH_PERF=y
-CONFIG_EIDOLON_WAKE_WORD_ENABLE=y
+# CONFIG_EIDOLON_WAKE_WORD_ENABLE is not set
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/v2/16m_eidolon.csv"
 CONFIG_WAKE_WORD_DISABLED=y
+# CONFIG_USE_ESP_WAKE_WORD is not set
+# CONFIG_USE_AFE_WAKE_WORD is not set
+# CONFIG_USE_CUSTOM_WAKE_WORD is not set
 CONFIG_LWIP_DNS_SUPPORT_MDNS_QUERIES=y
 CONFIG_MDNS_MAX_SERVICES=10
 CONFIG_CODEC_I2C_BACKWARD_COMPATIBLE=n

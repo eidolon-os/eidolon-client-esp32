@@ -1087,12 +1087,13 @@ if(CONFIG_EIDOLON_HUB_MODE)
             ${EIDOLON_MWW_FRONTEND_SRCS}
         )
         list(APPEND INCLUDE_DIRS "eidolon/wake_word")
+        list(APPEND MAIN_PRIV_REQUIRES_EXTRA espressif__esp-tflite-micro)
     endif()
     list(APPEND INCLUDE_DIRS
         "eidolon"
         "${CMAKE_CURRENT_SOURCE_DIR}/boards/waveshare/esp32-s3-touch-amoled-2.06"
     )
-    list(APPEND MAIN_PRIV_REQUIRES_EXTRA espressif__mdns livekit espressif__esp-tflite-micro)
+    list(APPEND MAIN_PRIV_REQUIRES_EXTRA espressif__mdns livekit)
 endif()
 
 set(EIDOLON_EMBED_FILES ${LANG_SOUNDS} ${COMMON_SOUNDS})
