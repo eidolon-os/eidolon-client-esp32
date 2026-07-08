@@ -34,7 +34,7 @@ enum class VoiceSessionState {
 // mutated exclusively on the one controller task that drains the event queue, so
 // there are no data races and no scattered per-command/reconnect/audio tasks.
 // Mode-agnostic: half-duplex (PTT) and full-duplex (barge-in) share this loop and
-// differ only inside a few handlers (mic gating, PTT events, idle auto-leave).
+// differ only inside a few handlers (mic gating, PTT events, idle fallback).
 class EidolonVoiceController {
 public:
     using StateCallback = std::function<void(VoiceSessionState)>;
@@ -181,7 +181,7 @@ private:
     void AckCommand(const ControlCommand& command, const char* status, const char* code,
                     const char* detail = "", const char* result = "");
 
-    // Reconnect (timer-driven backoff) + connect watchdog + idle auto-leave. Each
+    // Reconnect (timer-driven backoff) + connect watchdog + idle fallbacks. Each
     // timer callback just posts an event; the work runs on the controller task.
     void ScheduleControlReconnect(const char* reason);
     void ArmConnectWatchdog();

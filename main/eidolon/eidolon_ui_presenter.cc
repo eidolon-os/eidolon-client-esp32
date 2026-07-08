@@ -112,13 +112,17 @@ void EidolonUiPresenter::CommitTimeoutCb(void* arg)
     });
 }
 
-DeviceState EidolonUiPresenter::MapToDeviceState(VoiceSessionState session_state) const
+DeviceState EidolonUiPresenter::MapToDeviceState(VoiceSessionState session_state,
+                                                 AgentPhase phase) const
 {
     switch (session_state) {
     case VoiceSessionState::Connecting:
     case VoiceSessionState::Reconnecting:
         return kDeviceStateConnecting;
     case VoiceSessionState::InRoom:
+        if (phase == AgentPhase::AgentSpeaking) {
+            return kDeviceStateSpeaking;
+        }
         return kDeviceStateListening;
     case VoiceSessionState::PendingApproval:
     case VoiceSessionState::WaitingBinding:
@@ -127,6 +131,14 @@ DeviceState EidolonUiPresenter::MapToDeviceState(VoiceSessionState session_state
     case VoiceSessionState::Error:
     default:
         return kDeviceStateIdle;
+    }
+}
+
+void EidolonUiPresenter::SyncDeviceState()
+{
+    auto device_state = MapToDeviceState(session_state_, tracker_.GetPhase());
+    if (app_.GetDeviceState() != device_state) {
+        app_.SetDeviceState(device_state);
     }
 }
 
@@ -153,11 +165,7 @@ void EidolonUiPresenter::Apply(VoiceSessionState session_state, bool mic_enabled
                                        tracker_.LastTranscriptionSource(), mic_enabled,
                                        ptt_recording_, ptt_committing_, {}, end_reason_);
     ApplySnapshot(snapshot);
-
-    auto device_state = MapToDeviceState(session_state);
-    if (app_.GetDeviceState() != device_state) {
-        app_.SetDeviceState(device_state);
-    }
+    SyncDeviceState();
 }
 
 void EidolonUiPresenter::OnTranscription(const TranscriptionEvent& event)
@@ -243,6 +251,7 @@ void EidolonUiPresenter::Reapply()
                                        tracker_.LastTranscriptionSource(), mic_enabled_,
                                        ptt_recording_, ptt_committing_, {}, end_reason_);
     ApplySnapshot(snapshot);
+    SyncDeviceState();
 }
 
 void EidolonUiPresenter::ApplySnapshot(const EidolonUiSnapshot& snapshot)

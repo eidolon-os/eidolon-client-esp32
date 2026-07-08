@@ -32,7 +32,8 @@ public:
 private:
     void Reapply();
     void ApplySnapshot(const EidolonUiSnapshot& snapshot);
-    DeviceState MapToDeviceState(VoiceSessionState session_state) const;
+    void SyncDeviceState();
+    DeviceState MapToDeviceState(VoiceSessionState session_state, AgentPhase phase) const;
     // Bridge the gap between PTT release and the agent's first thinking/speaking
     // signal: hold a "processing" state so the UI never flashes back to standby.
     void BeginCommitting();

@@ -160,6 +160,12 @@ void LiveKitSession::OnTextStreamChunk(const livekit_data_stream_chunk_t* chunk,
     cJSON_Delete(root);
 }
 
+void LiveKitSession::OnDrainStreamChunk(const livekit_data_stream_chunk_t* chunk, void* ctx)
+{
+    (void)chunk;
+    (void)ctx;
+}
+
 void LiveKitSession::OnDataReceived(const livekit_data_received_t* data, void* ctx)
 {
     auto* session = static_cast<LiveKitSession*>(ctx);
@@ -247,6 +253,36 @@ void LiveKitSession::RegisterTranscriptionHandler()
     transcription_registered_ = true;
 }
 
+void LiveKitSession::RegisterAgentSessionDrainHandler()
+{
+    if (!room_handle_) {
+        return;
+    }
+    livekit_data_stream_handler_t handler = {
+        .on_recv = OnDrainStreamChunk,
+        .ctx = this,
+    };
+    livekit_room_data_stream_topic_register(room_handle_, kAgentSessionTopic, &handler);
+    agent_session_registered_ = true;
+}
+
+void LiveKitSession::UnregisterStreamHandlers()
+{
+    if (!room_handle_) {
+        transcription_registered_ = false;
+        agent_session_registered_ = false;
+        return;
+    }
+    if (transcription_registered_) {
+        livekit_room_data_stream_topic_unregister(room_handle_, kTranscriptionTopic);
+        transcription_registered_ = false;
+    }
+    if (agent_session_registered_) {
+        livekit_room_data_stream_topic_unregister(room_handle_, kAgentSessionTopic);
+        agent_session_registered_ = false;
+    }
+}
+
 esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config)
 {
     if (room_handle_ != nullptr) {
@@ -293,10 +329,12 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config)
         ESP_LOGE(TAG, "livekit_room_create failed");
         room_handle_ = nullptr;
         transcription_registered_ = false;
+        agent_session_registered_ = false;
         return ESP_FAIL;
     }
 
     RegisterTranscriptionHandler();
+    RegisterAgentSessionDrainHandler();
     using_media_ = true;
 
     ESP_LOGI(TAG, "Connecting room=%s identity=%s server=%s", config.active.room_name.c_str(),
@@ -305,9 +343,9 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config)
     if (livekit_room_connect(room_handle_, config.active.server_url.c_str(),
                              config.active.token.c_str()) != LIVEKIT_ERR_NONE) {
         ESP_LOGE(TAG, "livekit_room_connect failed");
+        UnregisterStreamHandlers();
         livekit_room_destroy(room_handle_);
         room_handle_ = nullptr;
-        transcription_registered_ = false;
         return ESP_FAIL;
     }
 
@@ -337,10 +375,12 @@ esp_err_t LiveKitSession::ConnectDataOnly(const Esp32HubConfig& config)
         ESP_LOGE(TAG, "livekit_room_create data-only failed");
         room_handle_ = nullptr;
         transcription_registered_ = false;
+        agent_session_registered_ = false;
         return ESP_FAIL;
     }
     using_media_ = false;
     transcription_registered_ = false;
+    agent_session_registered_ = false;
 
     ESP_LOGI(TAG, "Connecting control room=%s identity=%s server=%s",
              config.active.room_name.c_str(), config.active.identity.c_str(),
@@ -352,6 +392,7 @@ esp_err_t LiveKitSession::ConnectDataOnly(const Esp32HubConfig& config)
         livekit_room_destroy(room_handle_);
         room_handle_ = nullptr;
         transcription_registered_ = false;
+        agent_session_registered_ = false;
         return ESP_FAIL;
     }
 
@@ -375,10 +416,7 @@ esp_err_t LiveKitSession::Disconnect(bool release_media)
     livekit_room_handle_t handle = room_handle_;
     ESP_LOGI(TAG, "Disconnecting room (release_media=%d)", release_media ? 1 : 0);
 
-    if (transcription_registered_) {
-        livekit_room_data_stream_topic_unregister(room_handle_, kTranscriptionTopic);
-        transcription_registered_ = false;
-    }
+    UnregisterStreamHandlers();
 
     if (livekit_room_close(handle) != LIVEKIT_ERR_NONE) {
         ESP_LOGW(TAG, "livekit_room_close failed");

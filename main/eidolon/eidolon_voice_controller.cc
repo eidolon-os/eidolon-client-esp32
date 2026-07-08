@@ -21,6 +21,10 @@
 #define CONFIG_EIDOLON_PTT_RELEASE_TAIL_MS 0
 #endif
 
+#ifndef CONFIG_EIDOLON_PTT_IDLE_FALLBACK_MS
+#define CONFIG_EIDOLON_PTT_IDLE_FALLBACK_MS 0
+#endif
+
 #ifndef CONFIG_EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS
 #define CONFIG_EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS 0
 #endif
@@ -50,10 +54,12 @@ constexpr int kReconnectUnreachableAfter = 2;
 // this long is treated as hung and force-recovered. Generous enough to cover a
 // slow mDNS + HTTPS + connect on a healthy-but-slow network.
 constexpr uint64_t kConnectWatchdogUs = 25ULL * 1000 * 1000;
-// PTT: leave the voice room after this long in-room with no PTT activity and no
-// agent output, so the server can release the agent session. Re-connecting is an
-// explicit tap. Tunable; 30-45s feels responsive without churning on short pauses.
-constexpr uint64_t kIdleAutoLeaveUs = 40ULL * 1000 * 1000;
+// PTT: Channel owns half-duplex idle teardown and sends session_end before
+// deleting the voice room. This client timer is a lifecycle fallback only, so a
+// missed data packet / room-close callback cannot leave the UI stuck in a voice
+// room. Default 0 disables it.
+constexpr uint64_t kPttIdleFallbackUs =
+    static_cast<uint64_t>(CONFIG_EIDOLON_PTT_IDLE_FALLBACK_MS) * 1000ULL;
 // PTT release tail: keep capture open briefly after touch release before
 // publishing ptt=false. This avoids clipping the final phoneme while preserving
 // an explicit, device-owned turn boundary.
@@ -783,12 +789,18 @@ void EidolonVoiceController::DoConnectTimeout()
 
 void EidolonVoiceController::UpdateIdleAutoLeave()
 {
+    if (!ptt_mode_ || kPttIdleFallbackUs == 0) {
+        if (idle_leave_timer_ != nullptr) {
+            esp_timer_stop(idle_leave_timer_);
+        }
+        return;
+    }
     // Idle = in the voice room, PTT mode, nobody holding the button, and the agent
     // is not producing output. Any of those changing re-evaluates the timer.
     bool agent_output_active = agent_phase_ != AgentPhase::Silent ||
                                local_playback_ui_active_ || PlaybackActiveRecently();
-    bool idle = ptt_mode_ && state_ == VoiceSessionState::InRoom && !control_room_ &&
-                !ptt_active_ && !agent_output_active;
+    bool idle = state_ == VoiceSessionState::InRoom && !control_room_ && !ptt_active_ &&
+                !agent_output_active;
     if (idle) {
         if (idle_leave_timer_ == nullptr) {
             esp_timer_create_args_t args = {};
@@ -802,7 +814,7 @@ void EidolonVoiceController::UpdateIdleAutoLeave()
             }
         }
         esp_timer_stop(idle_leave_timer_);
-        esp_timer_start_once(idle_leave_timer_, kIdleAutoLeaveUs);
+        esp_timer_start_once(idle_leave_timer_, kPttIdleFallbackUs);
     } else if (idle_leave_timer_ != nullptr) {
         esp_timer_stop(idle_leave_timer_);
     }
@@ -827,16 +839,18 @@ void EidolonVoiceController::PttReleaseTailCb(void* arg)
 void EidolonVoiceController::DoIdleAutoLeave()
 {
     // Activity may have resumed between the timer firing and now.
-    if (!(ptt_mode_ && state_ == VoiceSessionState::InRoom && !control_room_ &&
-          !ptt_active_ && agent_phase_ == AgentPhase::Silent)) {
+    bool agent_output_active = agent_phase_ != AgentPhase::Silent ||
+                               local_playback_ui_active_ || PlaybackActiveRecently();
+    if (!(ptt_mode_ && kPttIdleFallbackUs > 0 && state_ == VoiceSessionState::InRoom &&
+          !control_room_ && !ptt_active_ && !agent_output_active)) {
         return;
     }
     ESP_LOGI(TAG,
-             "[lifecycle] idle auto-leave: leaving voice room after %llus idle "
+             "[lifecycle] ptt idle fallback: leaving voice room after %llus idle "
              "room=%s gen=%lu",
-             kIdleAutoLeaveUs / 1000000ULL, config_.active.room_name.c_str(),
+             kPttIdleFallbackUs / 1000000ULL, config_.active.room_name.c_str(),
              static_cast<unsigned long>(session_generation_));
-    DoLeaveRoom();  // -> control room / ConfigReady; re-connect is an explicit tap
+    HandleSessionEnd(EndReason::IdleNormalEnd);  // -> control room; re-connect is an explicit tap
 }
 
 void EidolonVoiceController::ResetFullDuplexIdleFallback(const char* reason)

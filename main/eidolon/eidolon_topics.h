@@ -12,6 +12,7 @@ inline constexpr const char* kClientAudioStateTopic = "eidolon.audio_state";
 inline constexpr const char* kUiStateTopic = "eidolon.ui_state";
 inline constexpr const char* kSessionControlTopic = "eidolon.session_control";
 inline constexpr const char* kTranscriptionTopic = "lk.transcription";
+inline constexpr const char* kAgentSessionTopic = "lk.agent.session";
 
 // ---------------------------------------------------------------------------
 // The rest of the device⇄server wire vocabulary. SOURCE OF RECORD is the Python

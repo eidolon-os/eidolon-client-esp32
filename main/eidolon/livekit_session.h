@@ -46,17 +46,21 @@ public:
 private:
     static void OnRoomStateChanged(livekit_connection_state_t state, void* ctx);
     static void OnTextStreamChunk(const livekit_data_stream_chunk_t* chunk, void* ctx);
+    static void OnDrainStreamChunk(const livekit_data_stream_chunk_t* chunk, void* ctx);
     static void OnDataReceived(const livekit_data_received_t* data, void* ctx);
 
     void HandleStateChanged(livekit_connection_state_t state);
     void HandleUiStatePayload(const char* payload, size_t size);
     void RegisterTranscriptionHandler();
+    void RegisterAgentSessionDrainHandler();
+    void UnregisterStreamHandlers();
 
     livekit_room_handle_t room_handle_ = nullptr;
     std::string identity_;
     bool connected_ = false;
     bool using_media_ = false;
     bool transcription_registered_ = false;
+    bool agent_session_registered_ = false;
     livekit_failure_reason_t last_failure_reason_ = LIVEKIT_FAILURE_REASON_NONE;
     StateCallback on_state_changed_;
     TranscriptionCallback on_transcription_;
