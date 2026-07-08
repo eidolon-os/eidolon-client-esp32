@@ -414,14 +414,23 @@ bool Assets::EmoteStrategy::GetAssetData(Assets* assets, const std::string& name
 }
 
 bool Assets::EmoteStrategy::Apply(Assets* assets, bool refresh_display_theme) {
+#if CONFIG_USE_ESP_WAKE_WORD || CONFIG_USE_AFE_WAKE_WORD || CONFIG_USE_CUSTOM_WAKE_WORD
     Assets::LoadSrmodelsFromIndex(assets);
+#endif
 
     auto display = Board::GetInstance().GetDisplay();
     auto* emote_display = dynamic_cast<emote::EmoteDisplay*>(display);
 
     if (emote_display && emote_display->GetEmoteHandle() != nullptr) {
-        emote_load_assets(emote_display->GetEmoteHandle());
+        esp_err_t ret = emote_load_assets(emote_display->GetEmoteHandle());
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to load emote assets: %s", esp_err_to_name(ret));
+            return false;
+        }
+        emote_display->OnAssetsLoaded();
     }
+    (void)assets;
+    (void)refresh_display_theme;
     return true;
 }
 

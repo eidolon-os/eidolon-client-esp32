@@ -1,7 +1,9 @@
 #include "eidolon_ui_presenter.h"
 
 #include "application.h"
+#include "board.h"
 #include "device_state.h"
+#include "display.h"
 #include "eidolon_view.h"
 #include "ui_state_mapper.h"
 
@@ -209,6 +211,22 @@ void EidolonUiPresenter::ApplySnapshot(const EidolonUiSnapshot& snapshot)
 {
     if (auto* view = GetEidolonView()) {
         view->Render(snapshot);
+        return;
+    }
+
+    auto display = Board::GetInstance().GetDisplay();
+    if (!display) {
+        return;
+    }
+    if (snapshot.emotion && snapshot.emotion[0] != '\0') {
+        display->SetEmotion(snapshot.emotion);
+    }
+    if (snapshot.status_text && snapshot.status_text[0] != '\0') {
+        display->SetStatus(snapshot.status_text);
+    }
+    if (snapshot.subtitle && snapshot.subtitle[0] != '\0') {
+        display->SetChatMessage(snapshot.subtitle_role ? snapshot.subtitle_role : "system",
+                                snapshot.subtitle);
     }
 }
 

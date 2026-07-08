@@ -25,6 +25,7 @@ public:
 
     bool StopAnimDialog();
     bool InsertAnimDialog(const char* emoji_name, uint32_t duration_ms);
+    void OnAssetsLoaded();
 
     void RefreshAll();
 
@@ -36,6 +37,8 @@ private:
     virtual void Unlock() override;
 
     emote_handle_t emote_handle_ = nullptr;
+    bool assets_loaded_ = false;
+    std::string pending_emotion_ = "idle";
 
 };
 

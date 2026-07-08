@@ -7,6 +7,7 @@
 #include <tuple>
 #include <algorithm>
 #include <cinttypes>
+#include <string>
 
 // Standard C headers
 #include <sys/time.h>
@@ -65,6 +66,17 @@ static void OnFlushCallback(int x_start, int y_start, int x_end, int y_end, cons
     if (panel != nullptr) {
         esp_lcd_panel_draw_bitmap(panel, x_start, y_start, x_end, y_end, data);
     }
+}
+
+static const char* NormalizeEmotionName(const char* emotion)
+{
+    if (!emotion || std::strlen(emotion) == 0) {
+        return nullptr;
+    }
+    if (std::strcmp(emotion, "microchip_ai") == 0) {
+        return "idle";
+    }
+    return emotion;
 }
 
 // ============================================================================
@@ -136,9 +148,14 @@ EmoteDisplay::~EmoteDisplay()
 
 void EmoteDisplay::SetEmotion(const char* const emotion)
 {
-    ESP_LOGI(TAG, "SetEmotion: %s", emotion);
-    if (emote_handle_ && emotion && strlen(emotion) > 0) {
-        emote_set_anim_emoji(emote_handle_, emotion);
+    const char* normalized = NormalizeEmotionName(emotion);
+    ESP_LOGI(TAG, "SetEmotion: %s -> %s", emotion ? emotion : "(null)",
+             normalized ? normalized : "(ignored)");
+    if (emote_handle_ && normalized) {
+        pending_emotion_ = normalized;
+        if (assets_loaded_) {
+            emote_set_anim_emoji(emote_handle_, pending_emotion_.c_str());
+        }
     }
 }
 
@@ -233,10 +250,18 @@ bool EmoteDisplay::StopAnimDialog()
 bool EmoteDisplay::InsertAnimDialog(const char* emoji_name, uint32_t duration_ms)
 {
     ESP_LOGI(TAG, "InsertAnimDialog: %s, %" PRIu32, emoji_name, duration_ms);
-    if (emote_handle_ && emoji_name) {
+    if (emote_handle_ && assets_loaded_ && emoji_name) {
         return emote_insert_anim_dialog(emote_handle_, emoji_name, duration_ms);
     }
     return false;
+}
+
+void EmoteDisplay::OnAssetsLoaded()
+{
+    assets_loaded_ = true;
+    if (emote_handle_ && !pending_emotion_.empty()) {
+        emote_set_anim_emoji(emote_handle_, pending_emotion_.c_str());
+    }
 }
 
 void EmoteDisplay::RefreshAll()

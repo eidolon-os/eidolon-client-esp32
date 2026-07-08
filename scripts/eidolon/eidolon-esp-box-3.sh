@@ -144,6 +144,16 @@ CONFIG_EIDOLON_HUB_MODE=y
 CONFIG_EIDOLON_AUTO_JOIN_ON_ACTIVATION=n
 CONFIG_EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN=y
 # CONFIG_EIDOLON_INTERACTION_MODE_PTT is not set
+CONFIG_USE_EMOTE_MESSAGE_STYLE=y
+# CONFIG_USE_DEFAULT_MESSAGE_STYLE is not set
+# CONFIG_USE_WECHAT_MESSAGE_STYLE is not set
+# CONFIG_FLASH_DEFAULT_ASSETS is not set
+CONFIG_FLASH_EXPRESSION_ASSETS=y
+# CONFIG_EIDOLON_WAKE_WORD_ENABLE is not set
+CONFIG_WAKE_WORD_DISABLED=y
+# CONFIG_USE_ESP_WAKE_WORD is not set
+# CONFIG_USE_AFE_WAKE_WORD is not set
+# CONFIG_USE_CUSTOM_WAKE_WORD is not set
 CONFIG_EIDOLON_LIVEKIT_SPEAKER_VOLUME=50
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/v2/16m_eidolon_box3.csv"
 CONFIG_LWIP_DNS_SUPPORT_MDNS_QUERIES=y
@@ -153,6 +163,71 @@ CONFIG_ESP_WS_CLIENT_SEPARATE_TX_LOCK=y
 CONFIG_MBEDTLS_SSL_DTLS_SRTP=y
 CONFIG_MBEDTLS_SSL_PROTO_DTLS=y
 EOF
+}
+
+set_sdkconfig_bool() {
+  local key="$1"
+  local value="$2"
+  local sdkconfig="${PROJECT_ROOT}/${SDKCONFIG_FILE}"
+  local tmp="${sdkconfig}.tmp"
+
+  mkdir -p "$(dirname "${sdkconfig}")"
+  touch "${sdkconfig}"
+  awk -v key="${key}" '
+    $0 == "CONFIG_" key "=y" { next }
+    $0 == "CONFIG_" key "=n" { next }
+    $0 == "# CONFIG_" key " is not set" { next }
+    { print }
+  ' "${sdkconfig}" >"${tmp}"
+
+  if [[ "${value}" == "y" ]]; then
+    printf 'CONFIG_%s=y\n' "${key}" >>"${tmp}"
+  else
+    printf '# CONFIG_%s is not set\n' "${key}" >>"${tmp}"
+  fi
+  mv "${tmp}" "${sdkconfig}"
+}
+
+set_sdkconfig_value() {
+  local key="$1"
+  local value="$2"
+  local sdkconfig="${PROJECT_ROOT}/${SDKCONFIG_FILE}"
+  local tmp="${sdkconfig}.tmp"
+
+  mkdir -p "$(dirname "${sdkconfig}")"
+  touch "${sdkconfig}"
+  awk -v key="${key}" '
+    index($0, "CONFIG_" key "=") == 1 { next }
+    $0 == "# CONFIG_" key " is not set" { next }
+    { print }
+  ' "${sdkconfig}" >"${tmp}"
+  printf 'CONFIG_%s=%s\n' "${key}" "${value}" >>"${tmp}"
+  mv "${tmp}" "${sdkconfig}"
+}
+
+ensure_box3_sdkconfig() {
+  set_sdkconfig_bool BOARD_TYPE_ESP_BOX_3 y
+  set_sdkconfig_bool EIDOLON_HUB_MODE y
+  set_sdkconfig_bool EIDOLON_AUTO_JOIN_ON_ACTIVATION n
+  set_sdkconfig_bool EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN y
+  set_sdkconfig_bool EIDOLON_INTERACTION_MODE_PTT n
+
+  set_sdkconfig_bool USE_DEFAULT_MESSAGE_STYLE n
+  set_sdkconfig_bool USE_WECHAT_MESSAGE_STYLE n
+  set_sdkconfig_bool USE_EMOTE_MESSAGE_STYLE y
+  set_sdkconfig_bool FLASH_NONE_ASSETS n
+  set_sdkconfig_bool FLASH_DEFAULT_ASSETS n
+  set_sdkconfig_bool FLASH_CUSTOM_ASSETS n
+  set_sdkconfig_bool FLASH_EXPRESSION_ASSETS y
+
+  set_sdkconfig_bool EIDOLON_WAKE_WORD_ENABLE n
+  set_sdkconfig_bool WAKE_WORD_DISABLED y
+  set_sdkconfig_bool USE_ESP_WAKE_WORD n
+  set_sdkconfig_bool USE_AFE_WAKE_WORD n
+  set_sdkconfig_bool USE_CUSTOM_WAKE_WORD n
+
+  set_sdkconfig_value EIDOLON_LIVEKIT_SPEAKER_VOLUME 50
+  set_sdkconfig_value PARTITION_TABLE_CUSTOM_FILENAME '"partitions/v2/16m_eidolon_box3.csv"'
 }
 
 idf_args() {
@@ -181,6 +256,7 @@ idf_args() {
 run_idf() {
   require_idf
   write_overlay
+  ensure_box3_sdkconfig
   local -a base_args=()
   while IFS= read -r arg; do
     base_args+=("${arg}")

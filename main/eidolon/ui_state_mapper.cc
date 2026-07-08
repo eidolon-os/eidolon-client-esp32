@@ -136,12 +136,15 @@ void RenderConversation(EidolonUiSnapshot& snapshot)
         switch (snapshot.turn) {
         case TurnPhase::AgentThinking:
             snapshot.status_text = Lang::Strings::EIDOLON_THINKING;
+            snapshot.emotion = "thinking";
             break;
         case TurnPhase::AgentSpeaking:
             snapshot.status_text = Lang::Strings::SPEAKING;
+            snapshot.emotion = "happy";
             break;
         default:
             snapshot.status_text = Lang::Strings::LISTENING;
+            snapshot.emotion = "neutral";
             break;
         }
     } else {
