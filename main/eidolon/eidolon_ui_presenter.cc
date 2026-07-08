@@ -24,6 +24,44 @@ namespace {
 
 constexpr uint64_t kCommitTimeoutUs =
     static_cast<uint64_t>(CONFIG_EIDOLON_PTT_COMMIT_UI_TIMEOUT_MS) * 1000ULL;
+
+const char* CompactStateLabel(const EidolonUiSnapshot& snapshot)
+{
+    switch (snapshot.connection) {
+    case ConnectionPhase::Connecting:
+        return "JOINING";
+    case ConnectionPhase::Reconnecting:
+        return "REJOIN";
+    case ConnectionPhase::Unreachable:
+        return "OFFLINE";
+    case ConnectionPhase::Error:
+        return "ERROR";
+    case ConnectionPhase::InRoom:
+        switch (snapshot.turn) {
+        case TurnPhase::Recording:
+        case TurnPhase::UserSpeaking:
+            return "LISTEN";
+        case TurnPhase::Committing:
+        case TurnPhase::AgentThinking:
+            return "THINK";
+        case TurnPhase::AgentSpeaking:
+            return "SPEAK";
+        case TurnPhase::Idle:
+        default:
+            return "LISTEN";
+        }
+    case ConnectionPhase::Ready:
+        return "READY";
+    case ConnectionPhase::Offline:
+    default:
+        return "OFFLINE";
+    }
+}
+
+const char* CompactModeLabel(const EidolonUiSnapshot& snapshot)
+{
+    return snapshot.mode == InteractionMode::PushToTalk ? "PTT" : "FULL DUPLEX";
+}
 }
 
 EidolonUiPresenter::EidolonUiPresenter(Application& app) : app_(app)
@@ -218,6 +256,8 @@ void EidolonUiPresenter::ApplySnapshot(const EidolonUiSnapshot& snapshot)
     if (!display) {
         return;
     }
+    display->SetVoiceChrome(CompactModeLabel(snapshot), CompactStateLabel(snapshot), "EXIT",
+                            snapshot.connection == ConnectionPhase::InRoom);
     if (snapshot.emotion && snapshot.emotion[0] != '\0') {
         display->SetEmotion(snapshot.emotion);
     }

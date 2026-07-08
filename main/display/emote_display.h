@@ -17,6 +17,8 @@ public:
     virtual void SetEmotion(const char* emotion) override;
     virtual void SetStatus(const char* status) override;
     virtual void SetChatMessage(const char* role, const char* content) override;
+    virtual void SetVoiceChrome(const char* mode, const char* state, const char* action,
+                                bool action_visible) override;
     virtual void SetTheme(Theme* theme) override;
     virtual void ShowNotification(const char* notification, int duration_ms = 3000) override;
     virtual void UpdateStatusBar(bool update_all = false) override;
@@ -39,6 +41,14 @@ private:
     emote_handle_t emote_handle_ = nullptr;
     bool assets_loaded_ = false;
     std::string pending_emotion_ = "idle";
+    std::string chrome_mode_;
+    std::string chrome_state_;
+    std::string chrome_action_;
+    bool chrome_action_visible_ = false;
+
+    void ApplyVoiceChrome();
+    void SetOverlayLabel(const char* name, const char* text, bool visible,
+                         uint32_t color, uint32_t bg_color, bool bg_enabled);
 
 };
 

@@ -38,6 +38,18 @@ namespace emote {
 // ============================================================================
 
 static const char* TAG = "EmoteDisplay";
+static constexpr uint32_t kChromeSubtleText = 0xA7B2C3;
+static constexpr uint32_t kChromeStateText = 0xBFFFE1;
+static constexpr uint32_t kChromeStateBg = 0x102A24;
+static constexpr uint32_t kChromeExitText = 0xFF6B6B;
+static constexpr uint32_t kChromeExitBg = 0x2B0E14;
+static constexpr uint32_t kChromeCaptionText = 0xE5E7EB;
+static constexpr uint32_t kChromeCaptionBg = 0x111827;
+
+static const char* kModeLabel = "eidolon_mode_label";
+static const char* kStateLabel = "eidolon_state_label";
+static const char* kExitLabel = "eidolon_exit_label";
+static const char* kCaptionLabel = "eidolon_caption_label";
 
 // ============================================================================
 // Forward Declarations
@@ -187,18 +199,24 @@ void EmoteDisplay::SetEmotion(const char* const emotion)
 void EmoteDisplay::SetChatMessage(const char* const role, const char* const content)
 {
     ESP_LOGI(TAG, "SetChatMessage: %s, %s", role, content);
-    if (emote_handle_ && content && strlen(content) > 0) {
-        if ((std::strcmp(role, "system") == 0) && std::strstr(content, "xiaozhi.me")) {
-            size_t len = strlen(content);
-            char* new_content = new char[len + 1];
-            strcpy(new_content, content);
-            std::replace(new_content, new_content + len, static_cast<char>(0x0A), static_cast<char>(0x20));
-            emote_set_event_msg(emote_handle_, EMOTE_MGR_EVT_SYS, new_content);
-            delete[] new_content;
-        } else {
-            emote_set_event_msg(emote_handle_, EMOTE_MGR_EVT_SPEAK, content);
-        }
+    if (!emote_handle_ || !content) {
+        return;
     }
+    if (strlen(content) == 0) {
+        SetOverlayLabel(kCaptionLabel, "", false, kChromeCaptionText, kChromeCaptionBg, true);
+        return;
+    }
+    const char* safe_role = role ? role : "";
+    if ((std::strcmp(safe_role, "system") == 0) && std::strstr(content, "xiaozhi.me")) {
+        size_t len = strlen(content);
+        char* new_content = new char[len + 1];
+        strcpy(new_content, content);
+        std::replace(new_content, new_content + len, static_cast<char>(0x0A), static_cast<char>(0x20));
+        emote_set_event_msg(emote_handle_, EMOTE_MGR_EVT_SYS, new_content);
+        delete[] new_content;
+        return;
+    }
+    SetOverlayLabel(kCaptionLabel, content, true, kChromeCaptionText, kChromeCaptionBg, true);
 }
 
 void EmoteDisplay::SetStatus(const char* const status)
@@ -223,6 +241,16 @@ void EmoteDisplay::ShowNotification(const char* notification, int duration_ms)
     if (emote_handle_ && notification && strlen(notification) > 0) {
         emote_set_event_msg(emote_handle_, EMOTE_MGR_EVT_SYS, notification);
     }
+}
+
+void EmoteDisplay::SetVoiceChrome(const char* mode, const char* state, const char* action,
+                                  bool action_visible)
+{
+    chrome_mode_ = mode ? mode : "";
+    chrome_state_ = state ? state : "";
+    chrome_action_ = action ? action : "";
+    chrome_action_visible_ = action_visible && !chrome_action_.empty();
+    ApplyVoiceChrome();
 }
 
 void EmoteDisplay::UpdateStatusBar(bool update_all)
@@ -287,6 +315,7 @@ void EmoteDisplay::OnAssetsLoaded()
     if (emote_handle_ && !pending_emotion_.empty()) {
         emote_set_anim_emoji(emote_handle_, pending_emotion_.c_str());
     }
+    ApplyVoiceChrome();
 }
 
 void EmoteDisplay::RefreshAll()
@@ -295,6 +324,42 @@ void EmoteDisplay::RefreshAll()
         emote_notify_all_refresh(emote_handle_);
         return;
     }
+}
+
+void EmoteDisplay::ApplyVoiceChrome()
+{
+    if (!emote_handle_ || !assets_loaded_) {
+        return;
+    }
+    SetOverlayLabel(kModeLabel, chrome_mode_.c_str(), !chrome_mode_.empty(),
+                    kChromeSubtleText, 0, false);
+    SetOverlayLabel(kStateLabel, chrome_state_.c_str(), !chrome_state_.empty(),
+                    kChromeStateText, kChromeStateBg, true);
+    SetOverlayLabel(kExitLabel, chrome_action_.c_str(), chrome_action_visible_,
+                    kChromeExitText, kChromeExitBg, true);
+}
+
+void EmoteDisplay::SetOverlayLabel(const char* name, const char* text, bool visible,
+                                   uint32_t color, uint32_t bg_color, bool bg_enabled)
+{
+    if (!emote_handle_ || !assets_loaded_ || !name) {
+        return;
+    }
+    gfx_obj_t* obj = emote_get_obj_by_name(emote_handle_, name);
+    if (!obj) {
+        ESP_LOGD(TAG, "Overlay label not found: %s", name);
+        return;
+    }
+    emote_lock(emote_handle_);
+    gfx_label_set_text(obj, text ? text : "");
+    gfx_label_set_color(obj, GFX_COLOR_HEX(color));
+    gfx_label_set_bg_enable(obj, bg_enabled);
+    if (bg_enabled) {
+        gfx_label_set_bg_color(obj, GFX_COLOR_HEX(bg_color));
+        gfx_label_set_opa(obj, 220);
+    }
+    gfx_obj_set_visible(obj, visible);
+    emote_unlock(emote_handle_);
 }
 
 } // namespace emote

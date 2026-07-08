@@ -77,6 +77,11 @@ private:
                 EnterWifiConfigMode();
                 return;
             }
+            if (app.GetDeviceState() == kDeviceStateListening) {
+                ESP_LOGI(TAG, "[ui] BOOT click -> RequestVoiceLeave");
+                app.RequestVoiceLeave();
+                return;
+            }
             app.ToggleChatState();
         });
 

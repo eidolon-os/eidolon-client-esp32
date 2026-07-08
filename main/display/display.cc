@@ -45,6 +45,14 @@ void Display::SetChatMessage(const char* role, const char* content) {
     ESP_LOGW(TAG, "     %s", content);
 }
 
+void Display::SetVoiceChrome(const char* mode, const char* state, const char* action,
+                             bool action_visible) {
+    (void)mode;
+    (void)state;
+    (void)action;
+    (void)action_visible;
+}
+
 void Display::ClearChatMessages() {
     // Default empty implementation, override in subclasses if needed
 }
