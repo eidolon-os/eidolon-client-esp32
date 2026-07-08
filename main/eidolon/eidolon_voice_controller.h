@@ -92,10 +92,12 @@ private:
         ControlCommand,
         SessionControl,
         AgentPhaseChanged,
+        SessionActivity,
         AudioTick,
         ReconnectTick,
         ConnectTimeout,
         IdleLeave,
+        FullDuplexIdleFallback,
     };
     struct Event {
         EventType type;
@@ -129,10 +131,12 @@ private:
     void DoControlCommand(const std::string& payload);
     void DoSessionControl(const std::string& payload);
     void DoAgentPhase(AgentPhase phase);
+    void DoSessionActivity();
     void DoAudioTick();
     void DoReconnectTick();
     void DoConnectTimeout();
     void DoIdleAutoLeave();
+    void DoFullDuplexIdleFallback();
 
     // ---- Internal helpers (controller task only) ----
     esp_err_t LoadStoredConfig();
@@ -183,11 +187,14 @@ private:
     void ArmConnectWatchdog();
     void DisarmConnectWatchdog();
     void UpdateIdleAutoLeave();
+    void ResetFullDuplexIdleFallback(const char* reason);
+    void DisarmFullDuplexIdleFallback();
     void CancelPttReleaseTail();
     void FinalizePttRelease(const char* reason);
     static void ReconnectTimerCb(void* arg);
     static void ConnectWatchdogCb(void* arg);
     static void IdleLeaveCb(void* arg);
+    static void FullDuplexIdleFallbackCb(void* arg);
     static void PttReleaseTailCb(void* arg);
 
     // Audio-state publisher (timer-driven tick on the controller task).
@@ -252,9 +259,11 @@ private:
     esp_timer_handle_t reconnect_timer_ = nullptr;
     esp_timer_handle_t connect_watchdog_ = nullptr;
     esp_timer_handle_t idle_leave_timer_ = nullptr;
+    esp_timer_handle_t full_duplex_idle_timer_ = nullptr;
     esp_timer_handle_t ptt_release_tail_timer_ = nullptr;
 
     StateCallback on_state_changed_;
+    std::function<void(const TranscriptionEvent&)> on_transcription_;
     std::function<void(AgentPhase)> on_agent_phase_;
     std::function<void(const std::string&)> on_ptt_turn_status_;
 };

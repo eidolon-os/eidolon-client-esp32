@@ -77,12 +77,17 @@ TranscriptionSource SourceFromString(const char* value)
     return TranscriptionSource::Unknown;
 }
 
-AgentPhase PhaseFromString(const char* value)
+AgentPhase PhaseFromUiState(const char* value, const char* reason)
 {
     if (!value || strcmp(value, "idle") == 0) {
         return AgentPhase::Silent;
     }
-    if (strcmp(value, "listening") == 0 || strcmp(value, "user_speaking") == 0) {
+    if (strcmp(value, "listening") == 0) {
+        return (reason && strcmp(reason, "user_state:speaking") == 0)
+                   ? AgentPhase::UserSpeaking
+                   : AgentPhase::Silent;
+    }
+    if (strcmp(value, "user_speaking") == 0) {
         return AgentPhase::UserSpeaking;
     }
     if (strcmp(value, "thinking") == 0 || strcmp(value, "processing") == 0) {
@@ -170,6 +175,8 @@ void LiveKitSession::OnDataReceived(const livekit_data_received_t* data, void* c
     if (strcmp(topic, kSessionControlTopic) == 0 && session->on_session_control_) {
         std::string payload(reinterpret_cast<const char*>(data->payload.bytes),
                             data->payload.size);
+        ESP_LOGI(TAG, "[lifecycle] session_control received topic=%s bytes=%u",
+                 topic, static_cast<unsigned>(data->payload.size));
         session->on_session_control_(payload);
         return;
     }
@@ -222,7 +229,7 @@ void LiveKitSession::HandleUiStatePayload(const char* payload, size_t size)
         state = JsonString(root, "phase");
     }
     if (state) {
-        on_agent_phase_(PhaseFromString(state));
+        on_agent_phase_(PhaseFromUiState(state, JsonString(root, "reason")));
     }
     cJSON_Delete(root);
 }

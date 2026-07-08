@@ -21,6 +21,10 @@
 #define CONFIG_EIDOLON_PTT_RELEASE_TAIL_MS 0
 #endif
 
+#ifndef CONFIG_EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS
+#define CONFIG_EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS 0
+#endif
+
 #define TAG "EidolonVoice"
 
 namespace {
@@ -55,6 +59,11 @@ constexpr uint64_t kIdleAutoLeaveUs = 40ULL * 1000 * 1000;
 // an explicit, device-owned turn boundary.
 constexpr uint64_t kPttReleaseTailUs =
     static_cast<uint64_t>(CONFIG_EIDOLON_PTT_RELEASE_TAIL_MS) * 1000ULL;
+// Full-duplex: Channel owns idle teardown and sends session_end before deleting
+// the voice room. This client timer is a lifecycle fallback only, so a missed
+// data packet / room-close callback cannot leave the UI stuck in "listening".
+constexpr uint64_t kFullDuplexIdleFallbackUs =
+    static_cast<uint64_t>(CONFIG_EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS) * 1000ULL;
 // Single controller task: drains the event queue, serializing all state mutation.
 // Stack sized for the heaviest handler (rediscover = mDNS + HTTPS config fetch +
 // mbedtls signing + connect), which the old reconnect task ran on 8192.
@@ -135,7 +144,7 @@ EidolonVoiceController::~EidolonVoiceController()
     // Best-effort teardown; in practice the controller lives for the app lifetime.
     for (esp_timer_handle_t* t :
          {&audio_timer_, &reconnect_timer_, &connect_watchdog_, &idle_leave_timer_,
-          &ptt_release_tail_timer_}) {
+          &full_duplex_idle_timer_, &ptt_release_tail_timer_}) {
         if (*t != nullptr) {
             esp_timer_stop(*t);
             esp_timer_delete(*t);
@@ -233,6 +242,9 @@ void EidolonVoiceController::Dispatch(const Event& ev)
     case EventType::AgentPhaseChanged:
         DoAgentPhase(ev.phase);
         break;
+    case EventType::SessionActivity:
+        DoSessionActivity();
+        break;
     case EventType::AudioTick:
         DoAudioTick();
         break;
@@ -244,6 +256,9 @@ void EidolonVoiceController::Dispatch(const Event& ev)
         break;
     case EventType::IdleLeave:
         DoIdleAutoLeave();
+        break;
+    case EventType::FullDuplexIdleFallback:
+        DoFullDuplexIdleFallback();
         break;
     }
 }
@@ -335,9 +350,17 @@ void EidolonVoiceController::OnPttReleased()
 
 void EidolonVoiceController::SetOnTranscription(std::function<void(const TranscriptionEvent&)> cb)
 {
-    // Transcription goes straight to the UI (Application schedules it) and never
-    // touches controller state, so it does not need to go through the loop.
-    session_.SetOnTranscription(std::move(cb));
+    on_transcription_ = std::move(cb);
+    session_.SetOnTranscription([this](const TranscriptionEvent& event) {
+        if (!event.text.empty()) {
+            Event ev;
+            ev.type = EventType::SessionActivity;
+            Enqueue(ev);
+        }
+        if (on_transcription_) {
+            on_transcription_(event);
+        }
+    });
 }
 
 void EidolonVoiceController::SetOnAgentPhase(std::function<void(AgentPhase)> cb)
@@ -460,6 +483,7 @@ void EidolonVoiceController::SetState(VoiceSessionState state, const char* reaso
         DisarmConnectWatchdog();
     }
     UpdateIdleAutoLeave();  // arms in-room/idle, disarms on leaving the room
+    ResetFullDuplexIdleFallback("state_changed");
     if (on_state_changed_) {
         on_state_changed_(state);
     }
@@ -813,6 +837,69 @@ void EidolonVoiceController::DoIdleAutoLeave()
              kIdleAutoLeaveUs / 1000000ULL, config_.active.room_name.c_str(),
              static_cast<unsigned long>(session_generation_));
     DoLeaveRoom();  // -> control room / ConfigReady; re-connect is an explicit tap
+}
+
+void EidolonVoiceController::ResetFullDuplexIdleFallback(const char* reason)
+{
+    if (ptt_mode_ || kFullDuplexIdleFallbackUs == 0) {
+        DisarmFullDuplexIdleFallback();
+        return;
+    }
+    if (state_ != VoiceSessionState::InRoom || control_room_ || !session_.IsConnected()) {
+        DisarmFullDuplexIdleFallback();
+        return;
+    }
+    if (full_duplex_idle_timer_ == nullptr) {
+        esp_timer_create_args_t args = {};
+        args.callback = &EidolonVoiceController::FullDuplexIdleFallbackCb;
+        args.arg = this;
+        args.dispatch_method = ESP_TIMER_TASK;
+        args.name = "eidolon_fd_idle";
+        if (esp_timer_create(&args, &full_duplex_idle_timer_) != ESP_OK) {
+            full_duplex_idle_timer_ = nullptr;
+            ESP_LOGW(TAG, "Failed to create full-duplex idle fallback timer");
+            return;
+        }
+    }
+    esp_timer_stop(full_duplex_idle_timer_);
+    if (esp_timer_start_once(full_duplex_idle_timer_, kFullDuplexIdleFallbackUs) == ESP_OK) {
+        ESP_LOGD(TAG, "[lifecycle] full-duplex idle fallback armed reason=%s timeout=%lums",
+                 reason ? reason : "activity",
+                 static_cast<unsigned long>(CONFIG_EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS));
+    }
+}
+
+void EidolonVoiceController::DisarmFullDuplexIdleFallback()
+{
+    if (full_duplex_idle_timer_ != nullptr) {
+        esp_timer_stop(full_duplex_idle_timer_);
+    }
+}
+
+void EidolonVoiceController::FullDuplexIdleFallbackCb(void* arg)
+{
+    auto* self = static_cast<EidolonVoiceController*>(arg);
+    Event ev;
+    ev.type = EventType::FullDuplexIdleFallback;
+    self->Enqueue(ev);
+}
+
+void EidolonVoiceController::DoFullDuplexIdleFallback()
+{
+    if (ptt_mode_ || state_ != VoiceSessionState::InRoom || control_room_ ||
+        !session_.IsConnected()) {
+        return;
+    }
+    if (agent_phase_ != AgentPhase::Silent || AgentOutputActiveRecently()) {
+        ResetFullDuplexIdleFallback("activity_still_active");
+        return;
+    }
+    ESP_LOGW(TAG,
+             "[lifecycle] full-duplex idle fallback fired after %lums; "
+             "no session_end/room-close observed, returning to control room=%s",
+             static_cast<unsigned long>(CONFIG_EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS),
+             config_.active.room_name.c_str());
+    HandleSessionEnd(EndReason::IdleNormalEnd);
 }
 
 // ============================ Control commands ============================
@@ -1692,10 +1779,16 @@ void EidolonVoiceController::DoAgentPhase(AgentPhase phase)
             PublishClientAudioState(AgentOutputActiveRecently());
         }
         UpdateIdleAutoLeave();  // agent busy disarms; back to silent arms the timer
+        ResetFullDuplexIdleFallback("agent_phase");
     }
     if (on_agent_phase_) {
         on_agent_phase_(phase);
     }
+}
+
+void EidolonVoiceController::DoSessionActivity()
+{
+    ResetFullDuplexIdleFallback("transcription");
 }
 
 }  // namespace eidolon

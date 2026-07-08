@@ -76,7 +76,32 @@ static const char* NormalizeEmotionName(const char* emotion)
     if (std::strcmp(emotion, "microchip_ai") == 0) {
         return "idle";
     }
-    return emotion;
+    if (std::strcmp(emotion, "cloud_slash") == 0 ||
+        std::strcmp(emotion, "circle_xmark") == 0 ||
+        std::strcmp(emotion, "triangle_exclamation") == 0) {
+        return "sad";
+    }
+    if (std::strcmp(emotion, "cloud_arrow_down") == 0 ||
+        std::strcmp(emotion, "download") == 0) {
+        return "thinking";
+    }
+    if (std::strcmp(emotion, "gear") == 0 ||
+        std::strcmp(emotion, "link") == 0) {
+        return "neutral";
+    }
+    static constexpr const char* kKnownEmotes[] = {
+        "angry", "confident", "confused", "crying", "delicious",
+        "embarrassed", "funny", "happy", "idle", "laughing", "loving",
+        "neutral", "relaxed", "sad", "shocked", "silly", "sleepy",
+        "surprised", "thinking", "winking",
+    };
+    for (const char* known : kKnownEmotes) {
+        if (std::strcmp(emotion, known) == 0) {
+            return emotion;
+        }
+    }
+    ESP_LOGW(TAG, "Unsupported emote emotion '%s', using neutral", emotion);
+    return "neutral";
 }
 
 // ============================================================================
