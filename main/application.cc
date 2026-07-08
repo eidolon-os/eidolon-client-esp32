@@ -90,6 +90,12 @@ bool Application::IsMicrophoneEnabled() const
 
 void Application::RequestVoiceJoin()
 {
+    ESP_LOGI(TAG, "[voice_request] RequestVoiceJoin transport=%d state=%s",
+             voice_transport_ ? 1 : 0,
+             voice_transport_
+                 ? eidolon::EidolonVoiceController::VoiceStateName(
+                       voice_transport_->GetSessionState())
+                 : "none");
     if (voice_transport_) {
         voice_transport_->JoinSession();
     }
@@ -97,6 +103,12 @@ void Application::RequestVoiceJoin()
 
 void Application::RequestVoiceLeave()
 {
+    ESP_LOGI(TAG, "[voice_request] RequestVoiceLeave transport=%d state=%s",
+             voice_transport_ ? 1 : 0,
+             voice_transport_
+                 ? eidolon::EidolonVoiceController::VoiceStateName(
+                       voice_transport_->GetSessionState())
+                 : "none");
     if (voice_transport_) {
         voice_transport_->LeaveSession();
     }
@@ -105,6 +117,12 @@ void Application::RequestVoiceLeave()
 void Application::ToggleVoiceSession()
 {
     Schedule([this]() {
+        ESP_LOGI(TAG, "[voice_request] ToggleVoiceSession transport=%d state=%s",
+                 voice_transport_ ? 1 : 0,
+                 voice_transport_
+                     ? eidolon::EidolonVoiceController::VoiceStateName(
+                           voice_transport_->GetSessionState())
+                     : "none");
         if (voice_transport_) {
             voice_transport_->ToggleSession();
         }
@@ -135,14 +153,21 @@ void Application::PttPress()
 {
     Schedule([this]() {
         if (!voice_transport_) {
+            ESP_LOGW(TAG, "[voice_request] PttPress ignored transport=none");
             return;
         }
         // Hold-to-talk only applies once in the room. While not connected the talk
         // button acts as a "connect" button (tap) — ignore the hold so we don't
         // flash recording UI or drop a half-captured first utterance.
         if (!voice_transport_->IsInSession()) {
+            ESP_LOGI(TAG, "[voice_request] PttPress ignored state=%s in_session=0",
+                     eidolon::EidolonVoiceController::VoiceStateName(
+                         voice_transport_->GetSessionState()));
             return;
         }
+        ESP_LOGI(TAG, "[voice_request] PttPress accepted state=%s",
+                 eidolon::EidolonVoiceController::VoiceStateName(
+                     voice_transport_->GetSessionState()));
         voice_transport_->PttPress();
         if (ui_presenter_) {
             ui_presenter_->SetPttRecording(true);
@@ -154,11 +179,18 @@ void Application::PttRelease()
 {
     Schedule([this]() {
         if (!voice_transport_) {
+            ESP_LOGW(TAG, "[voice_request] PttRelease ignored transport=none");
             return;
         }
         if (!voice_transport_->IsInSession()) {
+            ESP_LOGI(TAG, "[voice_request] PttRelease ignored state=%s in_session=0",
+                     eidolon::EidolonVoiceController::VoiceStateName(
+                         voice_transport_->GetSessionState()));
             return;
         }
+        ESP_LOGI(TAG, "[voice_request] PttRelease accepted state=%s",
+                 eidolon::EidolonVoiceController::VoiceStateName(
+                     voice_transport_->GetSessionState()));
         voice_transport_->PttRelease();
         if (ui_presenter_) {
             ui_presenter_->SetPttRecording(false);

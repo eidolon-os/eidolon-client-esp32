@@ -50,27 +50,37 @@ void LiveKitVoiceTransport::OnNetworkRestored()
 
 void LiveKitVoiceTransport::JoinSession()
 {
+    ESP_LOGI(TAG, "[voice_request] JoinSession state=%s",
+             EidolonVoiceController::VoiceStateName(controller_->GetState()));
     controller_->JoinRoom();
 }
 
 void LiveKitVoiceTransport::LeaveSession()
 {
+    ESP_LOGI(TAG, "[voice_request] LeaveSession state=%s",
+             EidolonVoiceController::VoiceStateName(controller_->GetState()));
     controller_->LeaveRoom();
 }
 
 void LiveKitVoiceTransport::PttPress()
 {
+    ESP_LOGI(TAG, "[voice_request] PttPress state=%s",
+             EidolonVoiceController::VoiceStateName(controller_->GetState()));
     controller_->OnPttPressed();
 }
 
 void LiveKitVoiceTransport::PttRelease()
 {
+    ESP_LOGI(TAG, "[voice_request] PttRelease state=%s",
+             EidolonVoiceController::VoiceStateName(controller_->GetState()));
     controller_->OnPttReleased();
 }
 
 void LiveKitVoiceTransport::ToggleSession()
 {
     auto state = controller_->GetState();
+    ESP_LOGI(TAG, "[voice_request] ToggleSession state=%s",
+             EidolonVoiceController::VoiceStateName(state));
     switch (state) {
     case VoiceSessionState::PendingApproval:
     case VoiceSessionState::WaitingBinding:

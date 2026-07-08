@@ -62,6 +62,7 @@ public:
     // written only on the controller task; a cross-thread read is benign (returns a
     // recent value) and the authoritative decisions re-check state on the task.
     VoiceSessionState GetState() const { return state_; }
+    static const char* VoiceStateName(VoiceSessionState state);
     // Why the last voice session ended (None until the channel reports one via
     // session_end). Read by the UI to distinguish a normal end from a JOIN
     // failure. Word-sized enum written only on the controller task; a cross-thread
@@ -159,7 +160,6 @@ private:
     // Plane that the live session currently belongs to ("control"/"voice"/"none"),
     // for diagnostic log attribution.
     const char* CurrentRoomKind() const;
-    static const char* VoiceStateName(VoiceSessionState state);
     // Control-op handlers. Each receives the command id (for the ACK) and the
     // raw JSON ``payload`` string (op-specific args). room.join reads the
     // session_intent out of the payload; the others ignore it.

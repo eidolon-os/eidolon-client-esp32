@@ -4,9 +4,12 @@
 #include "assets/lang_config.h"
 #include "display.h"
 
+#include <esp_log.h>
+
 namespace eidolon {
 
 namespace {
+static constexpr const char* kTag = "Amoled206Ptt";
 
 // Mode badge text. ASCII on purpose: the 2.06 ships a subset CJK font (basic) that
 // lacks many glyphs, but full Latin renders. "PTT" / "LIVE" read unambiguously.
@@ -126,9 +129,58 @@ bool CanRequestJoin(ConnectionPhase connection)
            connection == ConnectionPhase::Error;
 }
 
+const char* InteractionModeName(InteractionMode mode)
+{
+    switch (mode) {
+    case InteractionMode::PushToTalk:
+        return "ptt";
+    case InteractionMode::Streaming:
+        return "streaming";
+    }
+    return "unknown";
+}
+
+const char* ConnectionPhaseName(ConnectionPhase connection)
+{
+    switch (connection) {
+    case ConnectionPhase::Offline:
+        return "Offline";
+    case ConnectionPhase::Ready:
+        return "Ready";
+    case ConnectionPhase::Connecting:
+        return "Connecting";
+    case ConnectionPhase::InRoom:
+        return "InRoom";
+    case ConnectionPhase::Reconnecting:
+        return "Reconnecting";
+    case ConnectionPhase::Unreachable:
+        return "Unreachable";
+    case ConnectionPhase::Error:
+        return "Error";
+    }
+    return "unknown";
+}
+
+const char* LvEventName(lv_event_code_t code)
+{
+    switch (code) {
+    case LV_EVENT_CLICKED:
+        return "clicked";
+    case LV_EVENT_PRESSED:
+        return "pressed";
+    case LV_EVENT_RELEASED:
+        return "released";
+    case LV_EVENT_PRESS_LOST:
+        return "press_lost";
+    default:
+        return "other";
+    }
+}
+
 void OnEndButtonEvent(lv_event_t* e)
 {
     if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        ESP_LOGI(kTag, "[ui] end button clicked -> RequestVoiceLeave");
         Application::GetInstance().Schedule([]() {
             Application::GetInstance().RequestVoiceLeave();
         });
@@ -389,13 +441,29 @@ void Amoled206PttView::HandleRingEvent(lv_event_t* e)
         if (last_connection_ != ConnectionPhase::InRoom) {
             if (code == LV_EVENT_CLICKED && CanRequestJoin(last_connection_) && !join_request_pending_) {
                 join_request_pending_ = true;
+                ESP_LOGI(kTag,
+                         "[ui] ring clicked -> RequestVoiceJoin mode=ptt connection=%s "
+                         "pending=%d",
+                         ConnectionPhaseName(last_connection_), join_request_pending_ ? 1 : 0);
                 Application::GetInstance().RequestVoiceJoin();
+            } else if (code == LV_EVENT_CLICKED || code == LV_EVENT_PRESSED ||
+                       code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
+                ESP_LOGI(kTag,
+                         "[ui] ring %s ignored mode=ptt connection=%s pending=%d "
+                         "can_join=%d",
+                         LvEventName(code), ConnectionPhaseName(last_connection_),
+                         join_request_pending_ ? 1 : 0,
+                         CanRequestJoin(last_connection_) ? 1 : 0);
             }
             return;
         }
         if (code == LV_EVENT_PRESSED) {
+            ESP_LOGI(kTag, "[ui] ring pressed -> PttPress mode=ptt connection=%s",
+                     ConnectionPhaseName(last_connection_));
             Application::GetInstance().PttPress();
         } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
+            ESP_LOGI(kTag, "[ui] ring %s -> PttRelease mode=ptt connection=%s",
+                     LvEventName(code), ConnectionPhaseName(last_connection_));
             Application::GetInstance().PttRelease();
         }
         return;
@@ -405,10 +473,20 @@ void Amoled206PttView::HandleRingEvent(lv_event_t* e)
         return;
     }
     if (last_connection_ == ConnectionPhase::InRoom) {
+        ESP_LOGI(kTag, "[ui] ring clicked -> ToggleMicrophone mode=%s connection=%s",
+                 InteractionModeName(last_mode_), ConnectionPhaseName(last_connection_));
         Application::GetInstance().ToggleMicrophone();
     } else if (CanRequestJoin(last_connection_) && !join_request_pending_) {
         join_request_pending_ = true;
+        ESP_LOGI(kTag, "[ui] ring clicked -> RequestVoiceJoin mode=%s connection=%s pending=%d",
+                 InteractionModeName(last_mode_), ConnectionPhaseName(last_connection_),
+                 join_request_pending_ ? 1 : 0);
         Application::GetInstance().RequestVoiceJoin();
+    } else {
+        ESP_LOGI(kTag,
+                 "[ui] ring clicked ignored mode=%s connection=%s pending=%d can_join=%d",
+                 InteractionModeName(last_mode_), ConnectionPhaseName(last_connection_),
+                 join_request_pending_ ? 1 : 0, CanRequestJoin(last_connection_) ? 1 : 0);
     }
 }
 

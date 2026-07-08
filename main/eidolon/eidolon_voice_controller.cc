@@ -262,6 +262,9 @@ void EidolonVoiceController::OnHubActivationSucceeded()
 
 void EidolonVoiceController::OnNetworkLost()
 {
+    ESP_LOGW(TAG, "[lifecycle] enqueue network_lost state=%s room_kind=%s gen=%lu",
+             VoiceStateName(state_), CurrentRoomKind(),
+             static_cast<unsigned long>(session_generation_));
     Event ev;
     ev.type = EventType::NetworkLost;
     Enqueue(ev);
@@ -269,6 +272,9 @@ void EidolonVoiceController::OnNetworkLost()
 
 void EidolonVoiceController::OnNetworkRestored()
 {
+    ESP_LOGI(TAG, "[lifecycle] enqueue network_restored state=%s room_kind=%s gen=%lu",
+             VoiceStateName(state_), CurrentRoomKind(),
+             static_cast<unsigned long>(session_generation_));
     Event ev;
     ev.type = EventType::NetworkRestored;
     Enqueue(ev);
@@ -276,6 +282,9 @@ void EidolonVoiceController::OnNetworkRestored()
 
 esp_err_t EidolonVoiceController::JoinRoom()
 {
+    ESP_LOGI(TAG, "[lifecycle] enqueue join state=%s room_kind=%s gen=%lu",
+             VoiceStateName(state_), CurrentRoomKind(),
+             static_cast<unsigned long>(session_generation_));
     Event ev;
     ev.type = EventType::Join;
     Enqueue(ev);
@@ -284,6 +293,9 @@ esp_err_t EidolonVoiceController::JoinRoom()
 
 esp_err_t EidolonVoiceController::LeaveRoom()
 {
+    ESP_LOGI(TAG, "[lifecycle] enqueue leave state=%s room_kind=%s gen=%lu",
+             VoiceStateName(state_), CurrentRoomKind(),
+             static_cast<unsigned long>(session_generation_));
     Event ev;
     ev.type = EventType::Leave;
     Enqueue(ev);
@@ -301,6 +313,10 @@ esp_err_t EidolonVoiceController::SetMicEnabled(bool enabled)
 
 void EidolonVoiceController::OnPttPressed()
 {
+    ESP_LOGI(TAG, "[ptt] enqueue press state=%s room_kind=%s gen=%lu ptt_active=%d tail=%d",
+             VoiceStateName(state_), CurrentRoomKind(),
+             static_cast<unsigned long>(session_generation_), ptt_active_ ? 1 : 0,
+             ptt_release_tail_pending_ ? 1 : 0);
     Event ev;
     ev.type = EventType::PttPress;
     Enqueue(ev);
@@ -308,6 +324,10 @@ void EidolonVoiceController::OnPttPressed()
 
 void EidolonVoiceController::OnPttReleased()
 {
+    ESP_LOGI(TAG, "[ptt] enqueue release state=%s room_kind=%s gen=%lu ptt_active=%d tail=%d",
+             VoiceStateName(state_), CurrentRoomKind(),
+             static_cast<unsigned long>(session_generation_), ptt_active_ ? 1 : 0,
+             ptt_release_tail_pending_ ? 1 : 0);
     Event ev;
     ev.type = EventType::PttRelease;
     Enqueue(ev);
@@ -787,8 +807,11 @@ void EidolonVoiceController::DoIdleAutoLeave()
           !ptt_active_ && agent_phase_ == AgentPhase::Silent)) {
         return;
     }
-    ESP_LOGI(TAG, "Idle auto-leave: leaving voice room after %llus idle",
-             kIdleAutoLeaveUs / 1000000ULL);
+    ESP_LOGI(TAG,
+             "[lifecycle] idle auto-leave: leaving voice room after %llus idle "
+             "room=%s gen=%lu",
+             kIdleAutoLeaveUs / 1000000ULL, config_.active.room_name.c_str(),
+             static_cast<unsigned long>(session_generation_));
     DoLeaveRoom();  // -> control room / ConfigReady; re-connect is an explicit tap
 }
 
@@ -1123,6 +1146,12 @@ void EidolonVoiceController::DoActivation()
 
 void EidolonVoiceController::DoNetworkLost()
 {
+    ESP_LOGW(TAG,
+             "[lifecycle] network_lost executing state=%s room_kind=%s gen=%lu "
+             "connected=%d voice_room=%s control_room=%s",
+             VoiceStateName(state_), CurrentRoomKind(),
+             static_cast<unsigned long>(session_generation_), session_.IsConnected() ? 1 : 0,
+             config_.active.room_name.c_str(), config_.control.room_name.c_str());
     StopAudioStatePublisher();
     control_room_ = false;
     reconnect_attempts_ = 0;  // distinct cause; reconnect starts fresh on restore
@@ -1171,11 +1200,23 @@ void EidolonVoiceController::DoNetworkRestored()
 
 esp_err_t EidolonVoiceController::DoJoinRoom()
 {
+    ESP_LOGI(TAG,
+             "[lifecycle] join executing state=%s room_kind=%s gen=%lu control_room=%d "
+             "connected=%d voice_room=%s control_room_name=%s intent=%s",
+             VoiceStateName(state_), CurrentRoomKind(),
+             static_cast<unsigned long>(session_generation_), control_room_ ? 1 : 0,
+             session_.IsConnected() ? 1 : 0, config_.active.room_name.c_str(),
+             config_.control.room_name.c_str(),
+             pending_session_intent_.empty() ? "user" : pending_session_intent_.c_str());
     if (state_ == VoiceSessionState::Connecting || state_ == VoiceSessionState::Reconnecting) {
-        ESP_LOGI(TAG, "Join ignored while session is already transitioning");
+        ESP_LOGI(TAG, "[lifecycle] join ignored while session is already transitioning state=%s",
+                 VoiceStateName(state_));
         return ESP_ERR_INVALID_STATE;
     }
     if (state_ == VoiceSessionState::InRoom) {
+        ESP_LOGI(TAG, "[lifecycle] join ignored: already in voice room=%s gen=%lu",
+                 config_.active.room_name.c_str(),
+                 static_cast<unsigned long>(session_generation_));
         return ESP_OK;
     }
 
@@ -1275,6 +1316,18 @@ esp_err_t EidolonVoiceController::ConnectControlRoom()
 
 esp_err_t EidolonVoiceController::DoLeaveRoom()
 {
+    bool playback_recent = PlaybackActiveRecently();
+    ESP_LOGI(TAG,
+             "[lifecycle] leave executing state=%s room_kind=%s gen=%lu connected=%d "
+             "control_room=%d voice_room=%s control_room_name=%s ptt_active=%d tail=%d "
+             "audio_pub=%d playback_recent=%d local_playback=%d agent=%s",
+             VoiceStateName(state_), CurrentRoomKind(),
+             static_cast<unsigned long>(session_generation_), session_.IsConnected() ? 1 : 0,
+             control_room_ ? 1 : 0, config_.active.room_name.c_str(),
+             config_.control.room_name.c_str(), ptt_active_ ? 1 : 0,
+             ptt_release_tail_pending_ ? 1 : 0, audio_publisher_active_ ? 1 : 0,
+             playback_recent ? 1 : 0, local_playback_ui_active_ ? 1 : 0,
+             AgentPhaseName(agent_phase_));
     if (!control_room_) {
         esp_err_t stop_err = StopLocalPlayback("leave_room");
         if (stop_err != ESP_OK && stop_err != ESP_ERR_INVALID_STATE) {
@@ -1290,6 +1343,11 @@ esp_err_t EidolonVoiceController::DoLeaveRoom()
     } else if (state_ != VoiceSessionState::Idle) {
         SetState(StateForConfig(config_), "leave_room");
     }
+    ESP_LOGI(TAG,
+             "[lifecycle] leave complete err=%s reconnect_control=%d state=%s room_kind=%s "
+             "gen=%lu",
+             esp_err_to_name(err), reconnect_control ? 1 : 0, VoiceStateName(state_),
+             CurrentRoomKind(), static_cast<unsigned long>(session_generation_));
     return err;
 }
 
@@ -1515,6 +1573,16 @@ void EidolonVoiceController::DoPttPressed()
         return;
     }
     bool resumed_from_tail = ptt_release_tail_pending_;
+    bool playback_recent = PlaybackActiveRecently();
+    ESP_LOGI(TAG,
+             "[ptt] press executing state=%s room_kind=%s gen=%lu connected=%d "
+             "control_room=%d ptt_active=%d tail=%d playback_recent=%d local_playback=%d "
+             "agent=%s",
+             VoiceStateName(state_), CurrentRoomKind(),
+             static_cast<unsigned long>(session_generation_), session_.IsConnected() ? 1 : 0,
+             control_room_ ? 1 : 0, ptt_active_ ? 1 : 0,
+             ptt_release_tail_pending_ ? 1 : 0, playback_recent ? 1 : 0,
+             local_playback_ui_active_ ? 1 : 0, AgentPhaseName(agent_phase_));
     CancelPttReleaseTail();
     ptt_active_ = true;
     UpdateIdleAutoLeave();  // active: cancel the idle countdown
@@ -1523,11 +1591,12 @@ void EidolonVoiceController::DoPttPressed()
     // in-room is ignored rather than silently joining and dropping the first words.
     if (state_ != VoiceSessionState::InRoom) {
         ptt_active_ = false;
-        ESP_LOGI(TAG, "PTT press ignored: not in room (tap to connect first)");
+        ESP_LOGI(TAG, "[ptt] press ignored: not in room (tap to connect first) state=%s",
+                 VoiceStateName(state_));
         return;
     }
-    ESP_LOGI(TAG, "%s", resumed_from_tail ? "PTT press: release tail cancelled, mic open"
-                                          : "PTT press: mic open");
+    ESP_LOGI(TAG, "%s", resumed_from_tail ? "[ptt] press: release tail cancelled, mic open"
+                                          : "[ptt] press: mic open");
     PublishClientAudioState(AgentOutputActiveRecently());
 }
 
@@ -1536,8 +1605,17 @@ void EidolonVoiceController::DoPttReleased()
     if (!ptt_mode_) {
         return;
     }
+    ESP_LOGI(TAG,
+             "[ptt] release executing state=%s room_kind=%s gen=%lu connected=%d "
+             "control_room=%d ptt_active=%d tail=%d playback_recent=%d local_playback=%d "
+             "agent=%s",
+             VoiceStateName(state_), CurrentRoomKind(),
+             static_cast<unsigned long>(session_generation_), session_.IsConnected() ? 1 : 0,
+             control_room_ ? 1 : 0, ptt_active_ ? 1 : 0,
+             ptt_release_tail_pending_ ? 1 : 0, PlaybackActiveRecently() ? 1 : 0,
+             local_playback_ui_active_ ? 1 : 0, AgentPhaseName(agent_phase_));
     if (!ptt_active_ && !ptt_release_tail_pending_) {
-        ESP_LOGI(TAG, "PTT release ignored: not active");
+        ESP_LOGI(TAG, "[ptt] release ignored: not active");
         return;
     }
     if (!session_.IsConnected() || control_room_ || state_ != VoiceSessionState::InRoom) {
@@ -1568,7 +1646,7 @@ void EidolonVoiceController::DoPttReleased()
         FinalizePttRelease("tail_timer_start_failed");
         return;
     }
-    ESP_LOGI(TAG, "PTT release: keeping mic open for tail=%lums",
+    ESP_LOGI(TAG, "[ptt] release: keeping mic open for tail=%lums",
              static_cast<unsigned long>(CONFIG_EIDOLON_PTT_RELEASE_TAIL_MS));
 }
 
@@ -1593,11 +1671,11 @@ void EidolonVoiceController::FinalizePttRelease(const char* reason)
     CancelPttReleaseTail();
     ptt_active_ = false;
     if (session_.IsConnected() && !control_room_) {
-        ESP_LOGI(TAG, "PTT release: mic closed, turn committed (%s)",
+        ESP_LOGI(TAG, "[ptt] release: mic closed, turn committed (%s)",
                  reason ? reason : "unknown");
         PublishClientAudioState(AgentOutputActiveRecently());
     } else {
-        ESP_LOGI(TAG, "PTT release: mic closed without publish (%s)",
+        ESP_LOGI(TAG, "[ptt] release: mic closed without publish (%s)",
                  reason ? reason : "not_connected");
         eidolon_livekit_board_set_capture_enabled(false);
     }
