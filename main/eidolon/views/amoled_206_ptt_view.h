@@ -59,7 +59,9 @@ private:
     lv_obj_t* ring_inner_ = nullptr;
     lv_obj_t* ring_label_ = nullptr;
     InteractionMode last_mode_ = InteractionMode::PushToTalk;
+    PairingStatus last_pairing_ = PairingStatus::Active;
     ConnectionPhase last_connection_ = ConnectionPhase::Offline;
+    VoiceSessionButtonState last_button_state_ = VoiceSessionButtonState::Start;
     bool join_request_pending_ = false;
 };
 

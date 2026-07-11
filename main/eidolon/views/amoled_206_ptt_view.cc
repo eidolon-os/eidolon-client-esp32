@@ -26,6 +26,9 @@ bool IsInterrupting(const EidolonUiSnapshot& snapshot)
 
 const char* RingLabelText(const EidolonUiSnapshot& snapshot)
 {
+    if (snapshot.pairing != PairingStatus::Active) {
+        return snapshot.pairing == PairingStatus::Unauthorized ? "AUTH" : "WAIT";
+    }
     switch (snapshot.connection) {
     case ConnectionPhase::Connecting:
     case ConnectionPhase::Reconnecting:
@@ -66,6 +69,10 @@ const char* RingLabelText(const EidolonUiSnapshot& snapshot)
 lv_color_t RingColor(const EidolonUiSnapshot& snapshot, lv_color_t accent_color, lv_color_t live_color,
                      lv_color_t idle_color, lv_color_t muted_color)
 {
+    if (snapshot.pairing != PairingStatus::Active) {
+        return snapshot.pairing == PairingStatus::Unauthorized ? lv_color_hex(0xFF5B63)
+                                                               : lv_color_hex(0xF5B84B);
+    }
     if (snapshot.show_mute_icon) {
         return muted_color;
     }
@@ -121,12 +128,14 @@ int RingBorderWidth(const EidolonUiSnapshot& snapshot)
     }
 }
 
-bool CanRequestJoin(ConnectionPhase connection)
+bool CanRequestJoin(PairingStatus pairing, ConnectionPhase connection,
+                    VoiceSessionButtonState button_state)
 {
-    return connection == ConnectionPhase::Offline ||
-           connection == ConnectionPhase::Ready ||
-           connection == ConnectionPhase::Unreachable ||
-           connection == ConnectionPhase::Error;
+    if (pairing != PairingStatus::Active || button_state != VoiceSessionButtonState::Start) {
+        return false;
+    }
+    return connection == ConnectionPhase::Offline || connection == ConnectionPhase::Ready ||
+           connection == ConnectionPhase::Unreachable || connection == ConnectionPhase::Error;
 }
 
 const char* InteractionModeName(InteractionMode mode)
@@ -191,6 +200,10 @@ const char* FooterText(const EidolonUiSnapshot& snapshot)
 {
     if (snapshot.subtitle != nullptr && snapshot.subtitle[0] != '\0') {
         return snapshot.subtitle;
+    }
+    if (snapshot.pairing != PairingStatus::Active &&
+        snapshot.status_text != nullptr && snapshot.status_text[0] != '\0') {
+        return snapshot.status_text;
     }
     switch (snapshot.connection) {
     case ConnectionPhase::Connecting:
@@ -327,7 +340,9 @@ void Amoled206PttView::Render(const EidolonUiSnapshot& snapshot)
 
     DisplayLockGuard lock(display_);
     last_mode_ = snapshot.mode;
+    last_pairing_ = snapshot.pairing;
     last_connection_ = snapshot.connection;
+    last_button_state_ = snapshot.button_state;
     if (snapshot.connection != ConnectionPhase::Connecting &&
         snapshot.connection != ConnectionPhase::Reconnecting) {
         join_request_pending_ = false;
@@ -437,9 +452,10 @@ void Amoled206PttView::OnRingEvent(lv_event_t* e)
 void Amoled206PttView::HandleRingEvent(lv_event_t* e)
 {
     lv_event_code_t code = lv_event_get_code(e);
+    bool can_join = CanRequestJoin(last_pairing_, last_connection_, last_button_state_);
     if (last_mode_ == InteractionMode::PushToTalk) {
         if (last_connection_ != ConnectionPhase::InRoom) {
-            if (code == LV_EVENT_CLICKED && CanRequestJoin(last_connection_) && !join_request_pending_) {
+            if (code == LV_EVENT_CLICKED && can_join && !join_request_pending_) {
                 join_request_pending_ = true;
                 ESP_LOGI(kTag,
                          "[ui] ring clicked -> RequestVoiceJoin mode=ptt connection=%s "
@@ -453,7 +469,7 @@ void Amoled206PttView::HandleRingEvent(lv_event_t* e)
                          "can_join=%d",
                          LvEventName(code), ConnectionPhaseName(last_connection_),
                          join_request_pending_ ? 1 : 0,
-                         CanRequestJoin(last_connection_) ? 1 : 0);
+                         can_join ? 1 : 0);
             }
             return;
         }
@@ -476,7 +492,7 @@ void Amoled206PttView::HandleRingEvent(lv_event_t* e)
         ESP_LOGI(kTag, "[ui] ring clicked -> ToggleMicrophone mode=%s connection=%s",
                  InteractionModeName(last_mode_), ConnectionPhaseName(last_connection_));
         Application::GetInstance().ToggleMicrophone();
-    } else if (CanRequestJoin(last_connection_) && !join_request_pending_) {
+    } else if (can_join && !join_request_pending_) {
         join_request_pending_ = true;
         ESP_LOGI(kTag, "[ui] ring clicked -> RequestVoiceJoin mode=%s connection=%s pending=%d",
                  InteractionModeName(last_mode_), ConnectionPhaseName(last_connection_),
@@ -486,7 +502,7 @@ void Amoled206PttView::HandleRingEvent(lv_event_t* e)
         ESP_LOGI(kTag,
                  "[ui] ring clicked ignored mode=%s connection=%s pending=%d can_join=%d",
                  InteractionModeName(last_mode_), ConnectionPhaseName(last_connection_),
-                 join_request_pending_ ? 1 : 0, CanRequestJoin(last_connection_) ? 1 : 0);
+                 join_request_pending_ ? 1 : 0, can_join ? 1 : 0);
     }
 }
 

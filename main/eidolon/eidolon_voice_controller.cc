@@ -631,6 +631,16 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         reconnect_attempts_ = 0;  // recovered: voice room is up
         SetState(VoiceSessionState::InRoom, "voice_connected");
         StartAudioStatePublisher();
+        if (pending_room_join_command_active_ &&
+            (pending_room_join_generation_ == 0 ||
+             pending_room_join_generation_ == event_generation)) {
+            char result[192];
+            snprintf(result, sizeof(result),
+                     "{\"status\":\"in_room\",\"room_name\":\"%s\",\"generation\":%lu}",
+                     config_.active.room_name.c_str(),
+                     static_cast<unsigned long>(event_generation));
+            CompletePendingRoomJoinCommand("completed", "OK", "", result);
+        }
         break;
     case LiveKitConnectionState::Reconnecting:
         SetState(VoiceSessionState::Reconnecting, "voice_reconnecting");
@@ -638,6 +648,9 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
     case LiveKitConnectionState::Failed:
         StopAudioStatePublisher();
         agent_phase_ = AgentPhase::Silent;
+        CompletePendingRoomJoinCommand(
+            "failed", "ROOM_JOIN_FAILED",
+            livekit_failure_reason_str(session_.LastFailureReason()));
         if (session_.LastFailureReason() == LIVEKIT_FAILURE_REASON_ROOM_DELETED ||
             session_.LastFailureReason() == LIVEKIT_FAILURE_REASON_ROOM_CLOSED) {
             // [lifecycle] Room Deleted/Closed: the server tore down the voice room.
@@ -662,6 +675,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         // reaching here under the current generation is a genuine voice-room drop.
         StopAudioStatePublisher();
         agent_phase_ = AgentPhase::Silent;
+        CompletePendingRoomJoinCommand("failed", "ROOM_JOIN_DISCONNECTED");
         if (state_ != VoiceSessionState::Idle && state_ != VoiceSessionState::ConfigReady &&
             state_ != VoiceSessionState::PendingApproval &&
             state_ != VoiceSessionState::WaitingBinding) {
@@ -773,6 +787,7 @@ void EidolonVoiceController::DoConnectTimeout()
     ESP_LOGW(TAG, "Connect watchdog fired (stuck in state %d); forcing reconnect",
              static_cast<int>(state_));
     StopAudioStatePublisher();
+    CompletePendingRoomJoinCommand("failed", "ROOM_JOIN_TIMEOUT");
     // Drop the in-flight guards so ScheduleControlReconnect isn't suppressed, then
     // tear down the hung session and fall back to a stable base state.
     switching_to_voice_ = false;
@@ -926,6 +941,36 @@ void EidolonVoiceController::AckCommand(const ControlCommand& command, const cha
         BuildControlAck(command, SystemInfo::GetMacAddress(), status, code, detail, result));
 }
 
+void EidolonVoiceController::CompletePendingRoomJoinCommand(const char* status,
+                                                            const char* code,
+                                                            const char* detail,
+                                                            const char* result)
+{
+    if (!pending_room_join_command_active_) {
+        return;
+    }
+    AckCommand(pending_room_join_command_, status, code, detail, result);
+    pending_room_join_command_active_ = false;
+    pending_room_join_generation_ = 0;
+    pending_room_join_command_ = ControlCommand{};
+}
+
+const char* EidolonVoiceController::JoinBlockedCode() const
+{
+    switch (config_.status) {
+    case HubConfigStatus::PendingApproval:
+        return "NEEDS_APPROVAL";
+    case HubConfigStatus::WaitingBinding:
+        return "NEEDS_BINDING";
+    case HubConfigStatus::Revoked:
+    case HubConfigStatus::Unregistered:
+        return "UNAUTHORIZED";
+    case HubConfigStatus::Active:
+        break;
+    }
+    return "ROOM_JOIN_FAILED";
+}
+
 void EidolonVoiceController::DoControlCommand(const std::string& payload)
 {
     ControlCommand command = ParseControlCommand(payload);
@@ -1067,16 +1112,26 @@ void EidolonVoiceController::HandleRoomJoinCommand(const std::string& command_id
     command.op = kControlOpRoomJoin;
     vTaskDelay(kRoomJoinSettleDelay);
 
+    pending_room_join_command_ = command;
+    pending_room_join_command_active_ = true;
+    pending_room_join_generation_ = 0;
     esp_err_t err = DoJoinRoom();
     // One-shot: clear after the JOIN (incl. DoJoinRoom's internal connect-retry,
     // which re-fetches) so the intent never leaks into a later reconnect/refresh.
     pending_session_intent_.clear();
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Control-triggered room join failed: %s", esp_err_to_name(err));
-        // Reply with a failed ACK so the caller isn't left waiting on the earlier
-        // "accepted". Success stays implicit: the connection completes async and
-        // surfaces as the InRoom state, not a synchronous "completed" here.
-        AckCommand(command, "failed", "ROOM_JOIN_FAILED", esp_err_to_name(err));
+        CompletePendingRoomJoinCommand("failed", JoinBlockedCode(), esp_err_to_name(err));
+        return;
+    }
+    pending_room_join_generation_ = session_generation_;
+    if (state_ == VoiceSessionState::InRoom) {
+        char result[192];
+        snprintf(result, sizeof(result),
+                 "{\"status\":\"in_room\",\"room_name\":\"%s\",\"generation\":%lu}",
+                 config_.active.room_name.c_str(),
+                 static_cast<unsigned long>(session_generation_));
+        CompletePendingRoomJoinCommand("completed", "OK", "", result);
     }
 }
 

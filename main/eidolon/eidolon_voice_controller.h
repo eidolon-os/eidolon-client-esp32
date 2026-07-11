@@ -9,12 +9,11 @@
 #include <functional>
 #include <string>
 
+#include "control_protocol.h"
 #include "hub_types.h"
 #include "livekit_session.h"
 
 namespace eidolon {
-
-struct ControlCommand;
 
 enum class VoiceSessionState {
     Idle,
@@ -180,6 +179,10 @@ private:
     static EndReason ParseEndReason(const std::string& payload);
     void AckCommand(const ControlCommand& command, const char* status, const char* code,
                     const char* detail = "", const char* result = "");
+    void CompletePendingRoomJoinCommand(const char* status, const char* code,
+                                        const char* detail = "",
+                                        const char* result = "");
+    const char* JoinBlockedCode() const;
 
     // Reconnect (timer-driven backoff) + connect watchdog + idle fallbacks. Each
     // timer callback just posts an event; the work runs on the controller task.
@@ -230,6 +233,9 @@ private:
     bool control_room_ = false;
     bool switching_to_voice_ = false;
     bool control_reconnect_pending_ = false;
+    bool pending_room_join_command_active_ = false;
+    uint32_t pending_room_join_generation_ = 0;
+    ControlCommand pending_room_join_command_;
     // Monotonic attempt id, bumped at the start of every voice/control connect.
     // The state-changed callback snapshots it into the event so a late teardown
     // from a superseded connection can be recognised (Phase 0 logs the mismatch;
