@@ -18,6 +18,7 @@
 #include "eidolon/hub_types.h"
 #include "eidolon/livekit_voice_transport.h"
 #include <esp_app_desc.h>
+#include <esp_ota_ops.h>
 #if CONFIG_EIDOLON_WAKE_WORD_ENABLE
 #include "eidolon/audio/eidolon_audio_input_service.h"
 #endif
@@ -631,6 +632,22 @@ void Application::HandleActivationDoneEvent() {
 
 void Application::ActivationTask() {
 #if CONFIG_EIDOLON_HUB_MODE
+    // HUB_MODE never runs the Xiaozhi version-check, so it never reaches the
+    // mark-valid path inside CheckNewVersion(). Commit the running firmware here so an
+    // anti-rollback reset (e.g. a user power-cycle) before hub activation completes
+    // cannot abort the app and leave the device unbootable. We are already past board
+    // bring-up and WiFi connect by the time activation runs.
+    {
+        const esp_partition_t* running = esp_ota_get_running_partition();
+        esp_ota_img_states_t ota_state;
+        if (running != nullptr &&
+            esp_ota_get_state_partition(running, &ota_state) == ESP_OK &&
+            ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
+            esp_ota_mark_app_valid_cancel_rollback();
+            ESP_LOGI(TAG, "Marked firmware valid (HUB_MODE boot commit)");
+        }
+    }
+
     CheckAssetsVersion();
 
     auto display = Board::GetInstance().GetDisplay();
