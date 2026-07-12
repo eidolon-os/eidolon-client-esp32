@@ -15,6 +15,13 @@
 #include <esp_timer.h>
 #include "esp_video.h"
 
+#if CONFIG_EIDOLON_HUB_MODE
+#include "display/lvgl_display/lvgl_theme.h"
+#include "eidolon/eidolon_view.h"
+#include "eidolon/views/stackchan_avatar_view.h"
+#include <lvgl.h>
+#endif
+
 #define TAG "M5StackCoreS3Board"
 
 class Pmic : public Axp2101 {
@@ -114,6 +121,37 @@ public:
 private:
     uint8_t* read_buffer_ = nullptr;
     TouchPoint_t tp_;
+};
+
+// CoreS3 display that mounts the StackChan expressive avatar as the eidolon view.
+// The presenter (eidolon_ui_presenter) renders session state to whatever view the
+// board registers via SetEidolonView(); here that is the ported StackChan face.
+class CustomLcdDisplay : public SpiLcdDisplay {
+public:
+    CustomLcdDisplay(esp_lcd_panel_io_handle_t io_handle, esp_lcd_panel_handle_t panel_handle,
+                     int width, int height, int offset_x, int offset_y,
+                     bool mirror_x, bool mirror_y, bool swap_xy)
+        : SpiLcdDisplay(io_handle, panel_handle, width, height, offset_x, offset_y,
+                        mirror_x, mirror_y, swap_xy) {}
+
+#if CONFIG_EIDOLON_HUB_MODE
+    void SetupUI() override {
+        // Base creates the standard LVGL objects first; the avatar panel is then
+        // added on top of the active screen (covers the full 320x240 face).
+        SpiLcdDisplay::SetupUI();
+        DisplayLockGuard lock(this);
+        eidolon::StackChanAvatarView::BuildContext ctx;
+        ctx.parent = lv_screen_active();
+        ctx.font = static_cast<LvglTheme*>(current_theme_)->text_font()->font();
+        ctx.display = this;
+        avatar_view_ = new eidolon::StackChanAvatarView();
+        avatar_view_->Build(ctx);
+        eidolon::SetEidolonView(avatar_view_);
+    }
+
+private:
+    eidolon::StackChanAvatarView* avatar_view_ = nullptr;
+#endif
 };
 
 class M5StackCoreS3Board : public WifiBoard {
@@ -285,7 +323,7 @@ private:
         esp_lcd_panel_swap_xy(panel, DISPLAY_SWAP_XY);
         esp_lcd_panel_mirror(panel, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y);
 
-        display_ = new SpiLcdDisplay(panel_io, panel,
+        display_ = new CustomLcdDisplay(panel_io, panel,
                                     DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
     }
 

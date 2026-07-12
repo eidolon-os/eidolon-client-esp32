@@ -1068,7 +1068,6 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/fonts/font_eidolon_ui_30.c"
         "eidolon/eidolon_ui_presenter.cc"
         "eidolon/eidolon_view.cc"
-        "eidolon/views/amoled_206_ptt_view.cc"
         "eidolon/hub_activator.cc"
         "eidolon/hub_config_client.cc"
         "eidolon/hub_config_store.cc"
@@ -1080,6 +1079,39 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/eidolon_voice_controller.cc"
         "eidolon/ui_state_mapper.cc"
     )
+
+    # Per-board eidolon view: the presenter renders to whatever the board registers
+    # via SetEidolonView(). CoreS3 (StackChan) uses the ported StackChan LVGL avatar
+    # (needs the smooth_ui_toolkit component); other HUB boards keep the AMOLED view.
+    if(CONFIG_BOARD_TYPE_M5STACK_CORE_S3)
+        file(GLOB_RECURSE EIDOLON_AVATAR_SRCS
+            "${CMAKE_CURRENT_SOURCE_DIR}/eidolon/avatar/*.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/eidolon/avatar/*.c"
+        )
+        # smooth_ui_toolkit backs the StackChan avatar. It is vendored under
+        # main/eidolon/third_party/ and compiled INTO main (not as a components/
+        # entry): this repo sets MINIMAL_BUILD=ON, under which ESP-IDF silently drops
+        # local components/ from the requirement graph, so a components/ registration
+        # never resolves and <smooth_ui_toolkit.hpp> is not found. (components/ is also
+        # gitignored.) src/ and src/lvgl/ are the include roots upstream exposes.
+        file(GLOB_RECURSE SMOOTH_UI_TOOLKIT_SRCS
+            "${CMAKE_CURRENT_SOURCE_DIR}/eidolon/third_party/smooth_ui_toolkit/src/*.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/eidolon/third_party/smooth_ui_toolkit/src/*.cc"
+            "${CMAKE_CURRENT_SOURCE_DIR}/eidolon/third_party/smooth_ui_toolkit/src/*.c"
+        )
+        list(APPEND SOURCES
+            "eidolon/views/stackchan_avatar_view.cc"
+            ${EIDOLON_AVATAR_SRCS}
+            ${SMOOTH_UI_TOOLKIT_SRCS}
+        )
+        list(APPEND INCLUDE_DIRS
+            "${CMAKE_CURRENT_SOURCE_DIR}/eidolon/third_party/smooth_ui_toolkit/src"
+            "${CMAKE_CURRENT_SOURCE_DIR}/eidolon/third_party/smooth_ui_toolkit/src/lvgl"
+        )
+    else()
+        list(APPEND SOURCES "eidolon/views/amoled_206_ptt_view.cc")
+    endif()
+
     if(CONFIG_EIDOLON_WAKE_WORD_ENABLE)
         set(EIDOLON_MWW_FRONTEND_SRCS
             "eidolon/wake_word/tensorflow/lite/experimental/microfrontend/lib/frontend.c"
