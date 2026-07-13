@@ -248,8 +248,9 @@ void TestPresenceAdapterEmitsOnlyTransitionFacts()
     assert(absent.has_value());
     assert(absent->find("\"type\":\"guard.presence.absent\"") != std::string::npos);
     assert(absent->find("\"absent_for_ms\":2300") != std::string::npos);
-    assert(absent->find("\"runtime_revision\":7") != std::string::npos);
-    assert(absent->find("\"motion_score\":0") != std::string::npos);
+    assert(absent->find("\"signals\"") == std::string::npos);
+    assert(absent->find("\"camera\"") == std::string::npos);
+    assert(absent->find("\"motion_score\"") == std::string::npos);
     assert(!adapter.Build(Observation(eidolon::GuardState::Absent, 4, 12, 3600, 1200, 0), 10'003));
 }
 

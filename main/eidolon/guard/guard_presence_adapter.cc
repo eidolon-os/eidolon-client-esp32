@@ -108,11 +108,7 @@ std::optional<std::string> GuardPresenceAdapter::Build(const GuardObservation& o
                                            : 0;
         return std::string("{\"type\":\"") + kGuardPresenceAbsentType + "\"," +
                prefix.substr(1) + ",\"reason\":\"timeout\",\"absent_for_ms\":" +
-               std::to_string(absent_for_ms) +
-               ",\"signals\":{\"observation_sequence\":" +
-               std::to_string(observation.sequence) + ",\"runtime_revision\":" +
-               std::to_string(runtime_.runtime_revision) + "},\"camera\":{\"motion_score\":" +
-               std::to_string(observation.motion_score) + "},\"raw_retention\":\"none\"}";
+               std::to_string(absent_for_ms) + ",\"raw_retention\":\"none\"}";
     }
 
     return std::nullopt;
