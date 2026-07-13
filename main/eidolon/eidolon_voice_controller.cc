@@ -1151,6 +1151,22 @@ void EidolonVoiceController::HandleGuardRuntimeSyncCommand(const std::string& co
     const uint32_t expected_revision = static_cast<uint32_t>(revision->valueint);
     cJSON_Delete(root);
 
+    if (expected_desired_state == "stopped") {
+        ClearGuardPresenceRuntime();
+        guard_service_->Stop("hub_runtime_stopped");
+        has_guard_control_config_ = false;
+        guard_control_config_ = RoomConfig{};
+        AckCommand(command, "completed", "OK", "",
+                   ("{\"binding_id\":\"" + expected_binding_id +
+                    "\",\"runtime_revision\":" + std::to_string(expected_revision) +
+                    ",\"desired_runtime_state\":\"stopped\",\"running\":false}").c_str());
+        vTaskDelay(kActiveAckSettleDelay);
+        if (RefreshHubConfig(/*persist=*/false) == ESP_OK) {
+            ConnectControlRoom();
+        }
+        return;
+    }
+
     uint32_t applied_revision = 0;
     if (SyncGuardRuntime("hub_runtime_sync", &expected_binding_id, expected_revision,
                          &expected_desired_state, &applied_revision) != ESP_OK) {
@@ -1163,12 +1179,6 @@ void EidolonVoiceController::HandleGuardRuntimeSyncCommand(const std::string& co
                 ",\"desired_runtime_state\":\"" + expected_desired_state + "\",\"running\":" +
                 (guard_service_->IsRunning() ? "true" : "false") + "}").c_str());
     vTaskDelay(kActiveAckSettleDelay);
-    if (expected_desired_state == "stopped") {
-        if (RefreshHubConfig(/*persist=*/false) == ESP_OK) {
-            ConnectControlRoom();
-        }
-        return;
-    }
     ConnectControlRoom();
 #endif
 }
