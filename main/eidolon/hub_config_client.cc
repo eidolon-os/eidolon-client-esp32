@@ -5,6 +5,8 @@
 #include "eidolon_topics.h"
 #include "system_info.h"
 
+#include "sdkconfig.h"
+
 #include <cJSON.h>
 #include <esp_log.h>
 
@@ -39,6 +41,7 @@ void ParseOptionalFirmware(cJSON* root, bool* has_pending, bool* force, std::str
     }
 }
 
+#if CONFIG_EIDOLON_GUARD_SERVICE
 std::string GuardRuntimeUrl(const std::string& config_url)
 {
     const std::string suffix = "/api/config";
@@ -92,6 +95,7 @@ bool ReadRoomConfig(const cJSON* root, RoomConfig* out)
     out->room_name = room_name->valuestring;
     return out->usable();
 }
+#endif
 
 esp_err_t ParseEsp32ConfigResponse(const std::string& body, Esp32HubConfig& out,
                                    bool* has_pending_firmware,
@@ -288,6 +292,7 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
     return ESP_OK;
 }
 
+#if CONFIG_EIDOLON_GUARD_SERVICE
 esp_err_t HubConfigClient::RegisterGuardDevice(const std::string& config_url,
                                                const std::string& register_url,
                                                const std::string& device_id,
@@ -465,5 +470,6 @@ esp_err_t HubConfigClient::FetchGuardRuntime(const std::string& config_url,
     cJSON_Delete(root);
     return valid ? ESP_OK : ESP_ERR_INVALID_RESPONSE;
 }
+#endif
 
 }  // namespace eidolon

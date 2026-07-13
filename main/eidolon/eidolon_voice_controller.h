@@ -10,8 +10,11 @@
 #include <functional>
 #include <string>
 
+#include "sdkconfig.h"
 #include "control_protocol.h"
+#if CONFIG_EIDOLON_GUARD_SERVICE
 #include "guard/guard_presence_adapter.h"
+#endif
 #include "hub_types.h"
 #include "livekit_session.h"
 
@@ -92,7 +95,9 @@ private:
         PttRelease,
         PttReleaseTail,
         LiveKitState,
+#if CONFIG_EIDOLON_GUARD_SERVICE
         GuardObservation,
+#endif
         ControlCommand,
         SessionControl,
         AgentPhaseChanged,
@@ -108,7 +113,9 @@ private:
         LiveKitConnectionState lk_state = LiveKitConnectionState::Disconnected;
         AgentPhase phase = AgentPhase::Silent;
         bool flag = false;
+#if CONFIG_EIDOLON_GUARD_SERVICE
         GuardObservation guard_observation;
+#endif
         // Snapshot of session_generation_ taken when the SDK callback fired (on the
         // SDK task), so DoLiveKitState can tell whether a LiveKit event belongs to
         // the connection attempt that is still current or to a superseded one whose
@@ -133,7 +140,9 @@ private:
     void DoPttReleased();
     void DoPttReleaseTail();
     void DoLiveKitState(LiveKitConnectionState lk_state, uint32_t event_generation);
+#if CONFIG_EIDOLON_GUARD_SERVICE
     void DoGuardObservation(const GuardObservation& observation, uint32_t runtime_generation);
+#endif
     void DoControlCommand(const std::string& payload);
     void DoSessionControl(const std::string& payload);
     void DoAgentPhase(AgentPhase phase);
@@ -178,7 +187,9 @@ private:
     void HandlePlaybackStopCommand(const std::string& command_id, const std::string& payload);
     void HandlePttTurnStatusCommand(const std::string& command_id, const std::string& payload);
     void HandleDeviceIdentifyCommand(const std::string& command_id, const std::string& payload);
+#if CONFIG_EIDOLON_GUARD_SERVICE
     void HandleGuardRuntimeSyncCommand(const std::string& command_id, const std::string& payload);
+#endif
 #if CONFIG_EIDOLON_GUARD_VISION_BENCHMARK
     void HandleGuardVisionBenchmarkCommand(const std::string& command_id, const std::string& payload);
 #endif
@@ -190,6 +201,7 @@ private:
     static EndReason ParseEndReason(const std::string& payload);
     esp_err_t AckCommand(const ControlCommand& command, const char* status, const char* code,
                          const char* detail = "", const char* result = "");
+#if CONFIG_EIDOLON_GUARD_SERVICE
     esp_err_t SyncGuardRuntime(const char* reason, const std::string* expected_binding_id = nullptr,
                                uint32_t expected_runtime_revision = 0,
                                const std::string* expected_desired_state = nullptr,
@@ -198,6 +210,7 @@ private:
     void ClearGuardPresenceRuntime();
     void FlushPendingGuardPresence();
     static uint64_t GuardEventTimestampMs(const GuardObservation& observation);
+#endif
     void CompletePendingRoomJoinCommand(const char* status, const char* code,
                                         const char* detail = "",
                                         const char* result = "");
@@ -251,11 +264,13 @@ private:
     std::string pending_session_intent_;
     bool control_room_ = false;
     GuardService* guard_service_ = nullptr;
+#if CONFIG_EIDOLON_GUARD_SERVICE
     RoomConfig guard_control_config_;
     bool has_guard_control_config_ = false;
     GuardPresenceAdapter guard_presence_adapter_;
     std::deque<std::string> pending_guard_presence_payloads_;
     uint32_t guard_runtime_generation_ = 0;
+#endif
     bool switching_to_voice_ = false;
     bool control_reconnect_pending_ = false;
     bool pending_room_join_command_active_ = false;

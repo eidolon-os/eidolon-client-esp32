@@ -1068,12 +1068,6 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/fonts/font_eidolon_ui_30.c"
         "eidolon/eidolon_ui_presenter.cc"
         "eidolon/eidolon_view.cc"
-        "eidolon/guard/guard_motion.cc"
-        "eidolon/guard/guard_display.cc"
-        "eidolon/guard/guard_presence_adapter.cc"
-        "eidolon/guard/guard_service.cc"
-        "eidolon/guard/guard_state_machine.cc"
-        "eidolon/guard/vision_benchmark.cc"
         "eidolon/hub_activator.cc"
         "eidolon/hub_config_client.cc"
         "eidolon/hub_config_store.cc"
@@ -1085,6 +1079,19 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/eidolon_voice_controller.cc"
         "eidolon/ui_state_mapper.cc"
     )
+
+    if(CONFIG_EIDOLON_GUARD_SERVICE)
+        list(APPEND SOURCES
+            "eidolon/guard/guard_motion.cc"
+            "eidolon/guard/guard_display.cc"
+            "eidolon/guard/guard_presence_adapter.cc"
+            "eidolon/guard/guard_service.cc"
+            "eidolon/guard/guard_state_machine.cc"
+        )
+        if(CONFIG_EIDOLON_GUARD_VISION_BENCHMARK)
+            list(APPEND SOURCES "eidolon/guard/vision_benchmark.cc")
+        endif()
+    endif()
 
     # Per-board eidolon view: the presenter renders to whatever the board registers
     # via SetEidolonView(). CoreS3 (StackChan) uses the ported StackChan LVGL avatar

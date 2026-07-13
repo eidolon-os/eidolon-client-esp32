@@ -386,7 +386,9 @@ void EspVideo::SetExplainUrl(const std::string& url, const std::string& token) {
 }
 
 bool EspVideo::Capture() {
+#if CONFIG_EIDOLON_GUARD_SERVICE
     std::lock_guard<std::mutex> lock(frame_mutex_);
+#endif
 
     if (encoder_thread_.joinable()) {
         encoder_thread_.join();
@@ -842,6 +844,7 @@ bool EspVideo::Capture() {
     return true;
 }
 
+#if CONFIG_EIDOLON_GUARD_SERVICE
 bool EspVideo::AnalyzeFrame(const CameraFrameAnalyzer& analyzer) {
     if (!analyzer || !streaming_on_ || video_fd_ < 0) {
         return false;
@@ -877,6 +880,7 @@ bool EspVideo::AnalyzeFrame(const CameraFrameAnalyzer& analyzer) {
     }
     return accepted;
 }
+#endif
 
 bool EspVideo::SetHMirror(bool enabled) {
     if (video_fd_ < 0)

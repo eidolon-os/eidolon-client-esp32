@@ -4,7 +4,9 @@
 #include <lvgl.h>
 #include <thread>
 #include <memory>
+#if CONFIG_EIDOLON_GUARD_SERVICE
 #include <mutex>
+#endif
 #include <vector>
 
 #include <freertos/FreeRTOS.h>
@@ -28,7 +30,9 @@ private:
     std::string explain_url_;
     std::string explain_token_;
     std::thread encoder_thread_;
+#if CONFIG_EIDOLON_GUARD_SERVICE
     std::mutex camera_mutex_;
+#endif
     camera_fb_t *current_fb_ = nullptr;
     uint8_t *encode_buf_ = nullptr;  // Buffer for JPEG encoding (with optional byte swap)
     size_t encode_buf_size_ = 0;
@@ -42,6 +46,8 @@ public:
     virtual bool SetHMirror(bool enabled) override;
     virtual bool SetVFlip(bool enabled) override;
     virtual bool SetSwapBytes(bool enabled) override;
+#if CONFIG_EIDOLON_GUARD_SERVICE
     virtual bool AnalyzeFrame(const CameraFrameAnalyzer& analyzer) override;
+#endif
     virtual std::string Explain(const std::string &question) override;
 };

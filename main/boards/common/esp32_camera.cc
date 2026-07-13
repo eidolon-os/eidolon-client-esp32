@@ -17,6 +17,7 @@
 
 #define TAG "Esp32Camera"
 
+#if CONFIG_EIDOLON_GUARD_SERVICE
 namespace {
 
 constexpr uint32_t Fourcc(char a, char b, char c, char d) {
@@ -44,6 +45,7 @@ uint32_t CameraFrameFormat(pixformat_t format) {
 }
 
 }  // namespace
+#endif
 
 Esp32Camera::Esp32Camera(const camera_config_t &config) {
     esp_err_t err = esp_camera_init(&config);
@@ -85,7 +87,9 @@ void Esp32Camera::SetExplainUrl(const std::string &url, const std::string &token
 }
 
 bool Esp32Camera::Capture() {
+#if CONFIG_EIDOLON_GUARD_SERVICE
     std::lock_guard<std::mutex> lock(camera_mutex_);
+#endif
 
     if (encoder_thread_.joinable()) {
         encoder_thread_.join();
@@ -159,6 +163,7 @@ bool Esp32Camera::Capture() {
     return true;
 }
 
+#if CONFIG_EIDOLON_GUARD_SERVICE
 bool Esp32Camera::AnalyzeFrame(const CameraFrameAnalyzer& analyzer) {
     if (!analyzer || !streaming_on_) {
         return false;
@@ -182,6 +187,7 @@ bool Esp32Camera::AnalyzeFrame(const CameraFrameAnalyzer& analyzer) {
     esp_camera_fb_return(frame_buffer);
     return accepted;
 }
+#endif
 
 bool Esp32Camera::SetHMirror(bool enabled) {
     sensor_t *s = esp_camera_sensor_get();

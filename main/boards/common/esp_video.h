@@ -4,7 +4,9 @@
 #include <lvgl.h>
 #include <thread>
 #include <memory>
+#if CONFIG_EIDOLON_GUARD_SERVICE
 #include <mutex>
+#endif
 #include <vector>
 
 #include <freertos/FreeRTOS.h>
@@ -40,7 +42,9 @@ private:
     std::string explain_url_;
     std::string explain_token_;
     std::thread encoder_thread_;
+#if CONFIG_EIDOLON_GUARD_SERVICE
     std::mutex frame_mutex_;
+#endif
 
 public:
     EspVideo(const esp_video_init_config_t& config);
@@ -48,7 +52,9 @@ public:
 
     virtual void SetExplainUrl(const std::string& url, const std::string& token);
     virtual bool Capture();
+#if CONFIG_EIDOLON_GUARD_SERVICE
     virtual bool AnalyzeFrame(const CameraFrameAnalyzer& analyzer) override;
+#endif
     // 翻转控制函数
     virtual bool SetHMirror(bool enabled) override;
     virtual bool SetVFlip(bool enabled) override;
