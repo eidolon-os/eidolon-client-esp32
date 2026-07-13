@@ -386,6 +386,8 @@ void EspVideo::SetExplainUrl(const std::string& url, const std::string& token) {
 }
 
 bool EspVideo::Capture() {
+    std::lock_guard<std::mutex> lock(frame_mutex_);
+
     if (encoder_thread_.joinable()) {
         encoder_thread_.join();
     }
@@ -838,6 +840,42 @@ bool EspVideo::Capture() {
         display->SetPreviewImage(std::move(image));
     }
     return true;
+}
+
+bool EspVideo::AnalyzeFrame(const CameraFrameAnalyzer& analyzer) {
+    if (!analyzer || !streaming_on_ || video_fd_ < 0) {
+        return false;
+    }
+
+    std::lock_guard<std::mutex> lock(frame_mutex_);
+    struct v4l2_buffer buf = {};
+    buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    buf.memory = V4L2_MEMORY_MMAP;
+    if (ioctl(video_fd_, VIDIOC_DQBUF, &buf) != 0) {
+        ESP_LOGE(TAG, "VIDIOC_DQBUF failed for analysis frame");
+        return false;
+    }
+
+    bool accepted = false;
+    if (buf.index < mmap_buffers_.size()) {
+        const auto& mapped = mmap_buffers_[buf.index];
+        CameraFrame frame = {
+            .data = static_cast<const uint8_t*>(mapped.start),
+            .len = MIN(static_cast<size_t>(buf.bytesused), mapped.length),
+            .width = frame_.width,
+            .height = frame_.height,
+            .pixel_format = static_cast<uint32_t>(sensor_format_),
+        };
+        accepted = frame.data != nullptr && frame.len > 0 && analyzer(frame);
+    } else {
+        ESP_LOGE(TAG, "analysis frame index out of range: %lu", static_cast<unsigned long>(buf.index));
+    }
+
+    if (ioctl(video_fd_, VIDIOC_QBUF, &buf) != 0) {
+        ESP_LOGE(TAG, "VIDIOC_QBUF failed for analysis frame");
+        return false;
+    }
+    return accepted;
 }
 
 bool EspVideo::SetHMirror(bool enabled) {

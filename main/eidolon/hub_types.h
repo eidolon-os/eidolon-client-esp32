@@ -1,6 +1,7 @@
 #ifndef EIDOLON_HUB_TYPES_H_
 #define EIDOLON_HUB_TYPES_H_
 
+#include <cstdint>
 #include <map>
 #include <string>
 
@@ -11,6 +12,7 @@ inline constexpr const char* kTxtVers = "txtvers";
 inline constexpr const char* kTxtApi = "api";
 inline constexpr const char* kTxtVersion = "version";
 inline constexpr const char* kTxtConfigUrl = "config_url";
+inline constexpr const char* kTxtRegisterUrl = "register_url";
 
 inline constexpr int kSupportedTxtVers = 1;
 inline constexpr int kSupportedMaxTxtVers = 1;
@@ -65,6 +67,7 @@ struct HubTxtRecord {
     std::map<std::string, std::string> entries;
     std::string api;
     std::string config_url;
+    std::string register_url;
     std::string hub_version;
 };
 
@@ -89,6 +92,24 @@ struct Esp32HubConfig {
     std::string device_fingerprint;
     int sample_rate = 16000;
     int channels = 1;
+};
+
+// Guard-local runtime configuration returned by GET /api/guard/runtime-config.
+// It is deliberately separate from Esp32HubConfig: a guard does not require a
+// persona, voice room, memory realm, or ordinary active configuration.
+struct GuardRuntimeHubConfig {
+    std::string binding_id;
+    std::string guard_companion_id;
+    std::string desired_runtime_state;
+    uint32_t runtime_revision = 0;
+    uint32_t sample_interval_ms = 500;
+    uint32_t preview_interval_ms = 1000;
+    uint32_t motion_threshold = 18;
+    uint32_t motion_clear_threshold = 9;
+    uint32_t candidate_debounce_ms = 1000;
+    uint32_t absence_timeout_ms = 180000;
+    uint32_t consecutive_capture_failures = 5;
+    RoomConfig control;
 };
 
 }  // namespace eidolon

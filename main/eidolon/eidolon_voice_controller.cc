@@ -4,6 +4,12 @@
 #include "control_protocol.h"
 #include "eidolon_topics.h"
 #include "eidolon_local_feedback.h"
+#if CONFIG_EIDOLON_GUARD_SERVICE
+#include "guard/guard_service.h"
+#endif
+#if CONFIG_EIDOLON_GUARD_VISION_BENCHMARK
+#include "guard/vision_benchmark.h"
+#endif
 #include "hub_config_client.h"
 #include "hub_config_store.h"
 #include "hub_discovery.h"
@@ -12,9 +18,11 @@
 
 #include <cJSON.h>
 #include <esp_log.h>
+#include <esp_random.h>
 #include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <ctime>
 #include <stdio.h>
 
 #ifndef CONFIG_EIDOLON_PTT_RELEASE_TAIL_MS
@@ -80,6 +88,7 @@ constexpr UBaseType_t kEventQueueLen = 24;
 constexpr TickType_t kRoomJoinSettleDelay = pdMS_TO_TICKS(500);
 // Let the "succeeded" ack flush before reconnecting the control room.
 constexpr TickType_t kActiveAckSettleDelay = pdMS_TO_TICKS(100);
+constexpr size_t kMaxPendingGuardPresenceEvents = 8;
 
 uint64_t ReconnectDelayUs(int attempt)
 {
@@ -130,7 +139,8 @@ namespace eidolon {
 
 // ============================ Event loop plumbing ============================
 
-EidolonVoiceController::EidolonVoiceController()
+EidolonVoiceController::EidolonVoiceController(GuardService* guard_service)
+    : guard_service_(guard_service)
 {
     event_queue_ = xQueueCreate(kEventQueueLen, sizeof(Event));
     if (event_queue_ == nullptr) {
@@ -234,6 +244,9 @@ void EidolonVoiceController::Dispatch(const Event& ev)
         break;
     case EventType::LiveKitState:
         DoLiveKitState(ev.lk_state, ev.generation);
+        break;
+    case EventType::GuardObservation:
+        DoGuardObservation(ev.guard_observation, ev.generation);
         break;
     case EventType::ControlCommand:
         if (ev.payload != nullptr) {
@@ -604,6 +617,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         switch (lk_state) {
         case LiveKitConnectionState::Connected:
             reconnect_attempts_ = 0;  // recovered: control room is back
+            FlushPendingGuardPresence();
             SetState(StateForConfig(config_), "control_connected");
             break;
         case LiveKitConnectionState::Failed:
@@ -933,12 +947,17 @@ void EidolonVoiceController::DoFullDuplexIdleFallback()
 
 // ============================ Control commands ============================
 
-void EidolonVoiceController::AckCommand(const ControlCommand& command, const char* status,
-                                        const char* code, const char* detail, const char* result)
+esp_err_t EidolonVoiceController::AckCommand(const ControlCommand& command, const char* status,
+                                             const char* code, const char* detail, const char* result)
 {
-    session_.PublishData(
+    const esp_err_t err = session_.PublishData(
         kControlTopic,
         BuildControlAck(command, SystemInfo::GetMacAddress(), status, code, detail, result));
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Control ACK publish failed op=%s id=%s status=%s code=%s err=%s",
+                 command.op.c_str(), command.id.c_str(), status, code, esp_err_to_name(err));
+    }
+    return err;
 }
 
 void EidolonVoiceController::CompletePendingRoomJoinCommand(const char* status,
@@ -995,6 +1014,12 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload)
         {kControlOpPlaybackStop, &EidolonVoiceController::HandlePlaybackStopCommand},
         {kControlOpPttTurnStatus, &EidolonVoiceController::HandlePttTurnStatusCommand},
         {kControlOpDeviceIdentify, &EidolonVoiceController::HandleDeviceIdentifyCommand},
+#if CONFIG_EIDOLON_GUARD_SERVICE
+        {kControlOpGuardRuntimeSync, &EidolonVoiceController::HandleGuardRuntimeSyncCommand},
+#endif
+#if CONFIG_EIDOLON_GUARD_VISION_BENCHMARK
+        {kControlOpGuardVisionBenchmark, &EidolonVoiceController::HandleGuardVisionBenchmarkCommand},
+#endif
     };
 
     for (const auto& entry : kControlOps) {
@@ -1080,6 +1105,72 @@ void EidolonVoiceController::HandleConfigRefreshCommand(const std::string& comma
 
     AckCommand(command, "succeeded", "OK");
     ConnectControlRoom();
+}
+
+void EidolonVoiceController::HandleGuardRuntimeSyncCommand(const std::string& command_id,
+                                                           const std::string& payload)
+{
+    ControlCommand command;
+    command.id = command_id;
+    command.op = kControlOpGuardRuntimeSync;
+#if !CONFIG_EIDOLON_GUARD_SERVICE
+    (void)payload;
+    AckCommand(command, "unsupported", "GUARD_RUNTIME_UNAVAILABLE");
+    return;
+#else
+    if (guard_service_ == nullptr) {
+        AckCommand(command, "failed", "GUARD_RUNTIME_UNAVAILABLE");
+        return;
+    }
+    cJSON* root = cJSON_Parse(payload.c_str());
+    const cJSON* binding_id = root ? cJSON_GetObjectItem(root, "binding_id") : nullptr;
+    const cJSON* revision = root ? cJSON_GetObjectItem(root, "runtime_revision") : nullptr;
+    const cJSON* desired = root ? cJSON_GetObjectItem(root, "desired_runtime_state") : nullptr;
+    bool only_known_fields = root != nullptr;
+    for (const cJSON* item = root ? root->child : nullptr; item != nullptr; item = item->next) {
+        if (strcmp(item->string ? item->string : "", "binding_id") != 0 &&
+            strcmp(item->string ? item->string : "", "runtime_revision") != 0 &&
+            strcmp(item->string ? item->string : "", "desired_runtime_state") != 0) {
+            only_known_fields = false;
+            break;
+        }
+    }
+    const bool valid = only_known_fields && cJSON_IsString(binding_id) && binding_id->valuestring &&
+                       cJSON_IsNumber(revision) && revision->valueint > 0 &&
+                       revision->valuedouble == static_cast<double>(revision->valueint) &&
+                       cJSON_IsString(desired) && desired->valuestring &&
+                       (strcmp(desired->valuestring, "running") == 0 ||
+                        strcmp(desired->valuestring, "stopped") == 0);
+    if (!valid) {
+        cJSON_Delete(root);
+        AckCommand(command, "failed", "INVALID_ARGUMENT");
+        return;
+    }
+    const std::string expected_binding_id = binding_id->valuestring;
+    const std::string expected_desired_state = desired->valuestring;
+    const uint32_t expected_revision = static_cast<uint32_t>(revision->valueint);
+    cJSON_Delete(root);
+
+    uint32_t applied_revision = 0;
+    if (SyncGuardRuntime("hub_runtime_sync", &expected_binding_id, expected_revision,
+                         &expected_desired_state, &applied_revision) != ESP_OK) {
+        AckCommand(command, "failed", "GUARD_RUNTIME_SYNC_FAILED");
+        return;
+    }
+    AckCommand(command, "completed", "OK", "",
+               ("{\"binding_id\":\"" + expected_binding_id +
+                "\",\"runtime_revision\":" + std::to_string(applied_revision) +
+                ",\"desired_runtime_state\":\"" + expected_desired_state + "\",\"running\":" +
+                (guard_service_->IsRunning() ? "true" : "false") + "}").c_str());
+    vTaskDelay(kActiveAckSettleDelay);
+    if (expected_desired_state == "stopped") {
+        if (RefreshHubConfig(/*persist=*/false) == ESP_OK) {
+            ConnectControlRoom();
+        }
+        return;
+    }
+    ConnectControlRoom();
+#endif
 }
 
 void EidolonVoiceController::HandleRoomJoinCommand(const std::string& command_id,
@@ -1206,6 +1297,61 @@ void EidolonVoiceController::HandleDeviceIdentifyCommand(const std::string& comm
     AckCommand(command, "completed", "OK");
 }
 
+#if CONFIG_EIDOLON_GUARD_VISION_BENCHMARK
+void EidolonVoiceController::HandleGuardVisionBenchmarkCommand(const std::string& command_id,
+                                                                const std::string& payload)
+{
+    ControlCommand command;
+    command.id = command_id;
+    command.op = kControlOpGuardVisionBenchmark;
+
+    if (!control_room_) {
+        AckCommand(command, "failed", "VISION_PROBE_REQUIRES_CONTROL_ROOM");
+        return;
+    }
+
+    int sample_count = 30;
+    int interval_ms = 300;
+    cJSON* root = payload.empty() ? nullptr : cJSON_Parse(payload.c_str());
+    if (!payload.empty() && root == nullptr) {
+        AckCommand(command, "failed", "INVALID_ARGUMENT", "invalid JSON payload");
+        return;
+    }
+    if (root != nullptr) {
+        const cJSON* samples = cJSON_GetObjectItem(root, "sample_count");
+        const cJSON* interval = cJSON_GetObjectItem(root, "interval_ms");
+        if ((samples != nullptr && !cJSON_IsNumber(samples)) ||
+            (interval != nullptr && !cJSON_IsNumber(interval))) {
+            cJSON_Delete(root);
+            AckCommand(command, "failed", "INVALID_ARGUMENT", "sample_count and interval_ms must be integers");
+            return;
+        }
+        if (samples != nullptr) {
+            sample_count = samples->valueint;
+        }
+        if (interval != nullptr) {
+            interval_ms = interval->valueint;
+        }
+        cJSON_Delete(root);
+    }
+    if (sample_count < 10 || sample_count > 120 || interval_ms < 100 || interval_ms > 2000) {
+        AckCommand(command, "failed", "INVALID_ARGUMENT", "sample_count=10..120, interval_ms=100..2000");
+        return;
+    }
+
+    Camera* camera = Board::GetInstance().GetCamera();
+    if (camera == nullptr) {
+        AckCommand(command, "failed", "CAMERA_UNAVAILABLE");
+        return;
+    }
+
+    ESP_LOGI(TAG, "Control command -> guard vision benchmark samples=%d interval_ms=%d",
+             sample_count, interval_ms);
+    const std::string result = GuardVisionBenchmark::Run(*camera, sample_count, interval_ms);
+    AckCommand(command, "completed", "OK", "", result.c_str());
+}
+#endif
+
 void EidolonVoiceController::HandleIdleTimeoutCommand()
 {
     // Retained for the legacy idle path; routed through the unified handler.
@@ -1284,6 +1430,14 @@ void EidolonVoiceController::DoActivation()
             ESP_LOGW(TAG, "Initial Hub config refresh failed: %s", esp_err_to_name(refresh_err));
         }
     }
+#if CONFIG_EIDOLON_GUARD_SERVICE
+    if (guard_service_ != nullptr) {
+        const esp_err_t guard_err = SyncGuardRuntime("activation");
+        if (guard_err != ESP_OK && guard_err != ESP_ERR_NOT_FOUND) {
+            ESP_LOGW(TAG, "Initial Guard runtime sync failed: %s", esp_err_to_name(guard_err));
+        }
+    }
+#endif
 
     // PTT (half-duplex): land in the ready state on the lightweight control room —
     // entering the voice room (which plays the welcome) is an explicit tap, so the
@@ -1309,6 +1463,14 @@ void EidolonVoiceController::DoNetworkLost()
              static_cast<unsigned long>(session_generation_), session_.IsConnected() ? 1 : 0,
              config_.active.room_name.c_str(), config_.control.room_name.c_str());
     StopAudioStatePublisher();
+#if CONFIG_EIDOLON_GUARD_SERVICE
+    if (guard_service_ != nullptr) {
+        // Presence facts are meaningful only while a signed Guard runtime is
+        // current. Do not retain local observations across a network boundary.
+        ClearGuardPresenceRuntime();
+        guard_service_->Stop("network_lost");
+    }
+#endif
     control_room_ = false;
     reconnect_attempts_ = 0;  // distinct cause; reconnect starts fresh on restore
     session_.Disconnect(true);
@@ -1342,6 +1504,15 @@ void EidolonVoiceController::DoNetworkRestored()
         ScheduleControlReconnect("network_restore_refresh_failed");
         return;
     }
+
+#if CONFIG_EIDOLON_GUARD_SERVICE
+    if (guard_service_ != nullptr) {
+        const esp_err_t guard_err = SyncGuardRuntime("network_restore");
+        if (guard_err != ESP_OK && guard_err != ESP_ERR_NOT_FOUND) {
+            ESP_LOGW(TAG, "Guard runtime sync after network restore failed: %s", esp_err_to_name(guard_err));
+        }
+    }
+#endif
 
     if (HasControlConfig()) {
         err = ConnectControlRoom();
@@ -1452,7 +1623,9 @@ esp_err_t EidolonVoiceController::ConnectControlRoom()
     // that is already the pending room; once active, point it at the control room
     // (falling back to the active identity when the control room omits one).
     Esp32HubConfig control_config = config_;
-    if (config_.status == HubConfigStatus::Active) {
+    if (has_guard_control_config_ && guard_control_config_.usable()) {
+        control_config.active = guard_control_config_;
+    } else if (config_.status == HubConfigStatus::Active) {
         control_config.active = config_.control;
         if (control_config.active.identity.empty()) {
             control_config.active.identity = config_.active.identity;
@@ -1468,6 +1641,154 @@ esp_err_t EidolonVoiceController::ConnectControlRoom()
     }
     SetState(StateForConfig(config_), "control_connect");
     return err;
+}
+
+esp_err_t EidolonVoiceController::SyncGuardRuntime(const char* reason,
+                                                    const std::string* expected_binding_id,
+                                                    uint32_t expected_runtime_revision,
+                                                    const std::string* expected_desired_state,
+                                                    uint32_t* applied_runtime_revision)
+{
+#if !CONFIG_EIDOLON_GUARD_SERVICE
+    (void)reason;
+    (void)expected_binding_id;
+    (void)expected_runtime_revision;
+    (void)expected_desired_state;
+    (void)applied_runtime_revision;
+    return ESP_ERR_NOT_SUPPORTED;
+#else
+    if (guard_service_ == nullptr || config_url_.empty()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    GuardRuntimeHubConfig runtime;
+    HubConfigClient client;
+    const esp_err_t err = client.FetchGuardRuntime(config_url_, SystemInfo::GetMacAddress(), runtime);
+    if (err == ESP_ERR_NOT_FOUND) {
+        ClearGuardPresenceRuntime();
+        guard_service_->Stop("guard_binding_missing");
+        has_guard_control_config_ = false;
+        return err;
+    }
+    if (err != ESP_OK) {
+        return err;
+    }
+    if ((expected_binding_id && runtime.binding_id != *expected_binding_id) ||
+        (expected_runtime_revision > runtime.runtime_revision) ||
+        (expected_desired_state && runtime.desired_runtime_state != *expected_desired_state)) {
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+    if (applied_runtime_revision != nullptr) {
+        *applied_runtime_revision = runtime.runtime_revision;
+    }
+    has_guard_control_config_ = true;
+    guard_control_config_ = runtime.control;
+    if (runtime.desired_runtime_state == "stopped") {
+        ClearGuardPresenceRuntime();
+        guard_service_->Stop(reason);
+        has_guard_control_config_ = false;
+        guard_control_config_ = RoomConfig{};
+        return ESP_OK;
+    }
+    GuardRuntimeConfig config;
+    config.sample_interval_ms = runtime.sample_interval_ms;
+    config.preview_interval_ms = runtime.preview_interval_ms;
+    config.motion_threshold = runtime.motion_threshold;
+    config.motion_clear_threshold = runtime.motion_clear_threshold;
+    config.candidate_debounce_ms = runtime.candidate_debounce_ms;
+    config.absence_timeout_ms = runtime.absence_timeout_ms;
+    config.consecutive_capture_failures = runtime.consecutive_capture_failures;
+    ConfigureGuardPresenceRuntime(runtime);
+    return guard_service_->Start(config, reason) ? ESP_OK : ESP_FAIL;
+#endif
+}
+
+void EidolonVoiceController::ConfigureGuardPresenceRuntime(const GuardRuntimeHubConfig& runtime)
+{
+#if CONFIG_EIDOLON_GUARD_SERVICE
+    if (guard_service_ == nullptr) {
+        return;
+    }
+    ++guard_runtime_generation_;
+    pending_guard_presence_payloads_.clear();
+    guard_presence_adapter_.Configure({
+        .guard_companion_id = runtime.guard_companion_id,
+        .device_id = SystemInfo::GetMacAddress(),
+        .runtime_revision = runtime.runtime_revision,
+        .candidate_debounce_ms = runtime.candidate_debounce_ms,
+        .boot_nonce = esp_random(),
+    });
+    const uint32_t generation = guard_runtime_generation_;
+    guard_service_->SetObservationCallback([this, generation](const GuardObservation& observation) {
+        Event ev;
+        ev.type = EventType::GuardObservation;
+        ev.generation = generation;
+        ev.guard_observation = observation;
+        Enqueue(ev);
+    });
+#else
+    (void)runtime;
+#endif
+}
+
+void EidolonVoiceController::ClearGuardPresenceRuntime()
+{
+    ++guard_runtime_generation_;
+    pending_guard_presence_payloads_.clear();
+    guard_presence_adapter_.Clear();
+#if CONFIG_EIDOLON_GUARD_SERVICE
+    if (guard_service_ != nullptr) {
+        guard_service_->SetObservationCallback({});
+    }
+#endif
+}
+
+void EidolonVoiceController::DoGuardObservation(const GuardObservation& observation,
+                                                 uint32_t runtime_generation)
+{
+    if (runtime_generation != guard_runtime_generation_) {
+        ESP_LOGD(TAG, "Dropped stale Guard observation epoch=%lu generation=%lu",
+                 static_cast<unsigned long>(observation.epoch),
+                 static_cast<unsigned long>(runtime_generation));
+        return;
+    }
+    auto payload = guard_presence_adapter_.Build(observation, GuardEventTimestampMs(observation));
+    if (!payload.has_value()) {
+        return;
+    }
+    if (pending_guard_presence_payloads_.size() >= kMaxPendingGuardPresenceEvents) {
+        ESP_LOGW(TAG, "Dropped Guard fact: volatile queue is full epoch=%lu state=%s",
+                 static_cast<unsigned long>(observation.epoch), GuardStateName(observation.state));
+        return;
+    }
+    pending_guard_presence_payloads_.push_back(std::move(*payload));
+    FlushPendingGuardPresence();
+}
+
+void EidolonVoiceController::FlushPendingGuardPresence()
+{
+    if (!has_guard_control_config_ || !control_room_ || !session_.IsConnected()) {
+        return;
+    }
+    while (!pending_guard_presence_payloads_.empty()) {
+        const esp_err_t err = session_.PublishData(kControlTopic,
+                                                   pending_guard_presence_payloads_.front());
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "Guard fact publish deferred: %s", esp_err_to_name(err));
+            return;
+        }
+        pending_guard_presence_payloads_.pop_front();
+    }
+}
+
+uint64_t EidolonVoiceController::GuardEventTimestampMs(const GuardObservation& observation)
+{
+    const std::time_t seconds = std::time(nullptr);
+    // The signed config route intentionally supports pre-SNTP devices. Preserve
+    // a useful ordering timestamp in that case, but never treat it as wall clock.
+    if (seconds >= 1'700'000'000) {
+        return static_cast<uint64_t>(seconds) * 1000ULL;
+    }
+    return observation.now_ms;
 }
 
 esp_err_t EidolonVoiceController::DoLeaveRoom()

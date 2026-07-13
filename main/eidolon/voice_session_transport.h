@@ -10,6 +10,8 @@
 
 namespace eidolon {
 
+class GuardService;
+
 struct VoiceSessionCallbacks {
     std::function<void(VoiceSessionState)> on_session_state;
     std::function<void(const TranscriptionEvent&)> on_transcription;
@@ -46,7 +48,8 @@ public:
     virtual EndReason LastEndReason() const = 0;
 };
 
-std::unique_ptr<IVoiceSessionTransport> CreateLiveKitVoiceTransport(VoiceSessionCallbacks cb);
+std::unique_ptr<IVoiceSessionTransport> CreateLiveKitVoiceTransport(
+    VoiceSessionCallbacks cb, GuardService* guard_service = nullptr);
 
 }  // namespace eidolon
 

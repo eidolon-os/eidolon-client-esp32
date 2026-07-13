@@ -9,6 +9,8 @@
 #include "ota.h"
 #include "system_info.h"
 
+#include "sdkconfig.h"
+
 #include <cJSON.h>
 
 #include <esp_log.h>
@@ -61,7 +63,11 @@ bool HubActivator::Run(Display* display) {
         esp_err_t err = discovery.Discover(txt);
         if (err == ESP_OK) {
             Esp32HubConfig config;
+#if CONFIG_EIDOLON_GUARD_SERVICE
+            err = client.RegisterGuardDevice(txt.config_url, txt.register_url, device_id, config);
+#else
             err = client.Fetch(txt.config_url, device_id, config);
+#endif
             if (err == ESP_OK) {
                 store.SaveTxtRecord(txt);
                 store.SaveHubConfig(config, txt.config_url);

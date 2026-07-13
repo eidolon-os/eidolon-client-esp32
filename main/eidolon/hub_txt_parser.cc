@@ -21,6 +21,7 @@ void HubTxtParser::ApplyKnownFields(HubTxtRecord& record) {
 
     record.api = get(kTxtApi);
     record.config_url = get(kTxtConfigUrl);
+    record.register_url = get(kTxtRegisterUrl);
     record.hub_version = get(kTxtVersion);
 
     auto tv = get(kTxtVers);
@@ -48,6 +49,10 @@ esp_err_t HubTxtParser::ValidateForTxtVers(const HubTxtRecord& record) {
     }
     if (record.config_url.empty() || !HasUrlScheme(record.config_url)) {
         ESP_LOGE(TAG, "Invalid or missing config_url");
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+    if (!record.register_url.empty() && !HasUrlScheme(record.register_url)) {
+        ESP_LOGE(TAG, "Invalid register_url");
         return ESP_ERR_INVALID_RESPONSE;
     }
     return ESP_OK;

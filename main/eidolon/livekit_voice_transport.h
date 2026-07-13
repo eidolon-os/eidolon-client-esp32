@@ -9,9 +9,11 @@
 
 namespace eidolon {
 
+class GuardService;
+
 class LiveKitVoiceTransport : public IVoiceSessionTransport {
 public:
-    explicit LiveKitVoiceTransport(VoiceSessionCallbacks cb);
+    explicit LiveKitVoiceTransport(VoiceSessionCallbacks cb, GuardService* guard_service = nullptr);
     ~LiveKitVoiceTransport() override;
 
     void OnActivationComplete() override;

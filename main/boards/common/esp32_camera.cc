@@ -17,6 +17,34 @@
 
 #define TAG "Esp32Camera"
 
+namespace {
+
+constexpr uint32_t Fourcc(char a, char b, char c, char d) {
+    return static_cast<uint32_t>(a) |
+           (static_cast<uint32_t>(b) << 8) |
+           (static_cast<uint32_t>(c) << 16) |
+           (static_cast<uint32_t>(d) << 24);
+}
+
+uint32_t CameraFrameFormat(pixformat_t format) {
+    switch (format) {
+        case PIXFORMAT_RGB565:
+            return Fourcc('R', 'G', 'B', 'P');
+        case PIXFORMAT_YUV422:
+            return Fourcc('Y', 'U', 'Y', 'V');
+        case PIXFORMAT_YUV420:
+            return Fourcc('Y', 'U', '1', '2');
+        case PIXFORMAT_GRAYSCALE:
+            return Fourcc('G', 'R', 'E', 'Y');
+        case PIXFORMAT_RGB888:
+            return Fourcc('R', 'G', 'B', '3');
+        default:
+            return 0;
+    }
+}
+
+}  // namespace
+
 Esp32Camera::Esp32Camera(const camera_config_t &config) {
     esp_err_t err = esp_camera_init(&config);
     if (err != ESP_OK) {
@@ -57,6 +85,8 @@ void Esp32Camera::SetExplainUrl(const std::string &url, const std::string &token
 }
 
 bool Esp32Camera::Capture() {
+    std::lock_guard<std::mutex> lock(camera_mutex_);
+
     if (encoder_thread_.joinable()) {
         encoder_thread_.join();
     }
@@ -127,6 +157,30 @@ bool Esp32Camera::Capture() {
              current_fb_->width, current_fb_->height, current_fb_->len, current_fb_->format);
 
     return true;
+}
+
+bool Esp32Camera::AnalyzeFrame(const CameraFrameAnalyzer& analyzer) {
+    if (!analyzer || !streaming_on_) {
+        return false;
+    }
+
+    std::lock_guard<std::mutex> lock(camera_mutex_);
+    camera_fb_t* frame_buffer = esp_camera_fb_get();
+    if (frame_buffer == nullptr) {
+        ESP_LOGE(TAG, "Camera analysis capture failed");
+        return false;
+    }
+
+    const CameraFrame frame = {
+        .data = frame_buffer->buf,
+        .len = frame_buffer->len,
+        .width = static_cast<uint16_t>(frame_buffer->width),
+        .height = static_cast<uint16_t>(frame_buffer->height),
+        .pixel_format = CameraFrameFormat(frame_buffer->format),
+    };
+    const bool accepted = frame.pixel_format != 0 && frame.data != nullptr && frame.len > 0 && analyzer(frame);
+    esp_camera_fb_return(frame_buffer);
+    return accepted;
 }
 
 bool Esp32Camera::SetHMirror(bool enabled) {

@@ -17,6 +17,12 @@
 #include "settings.h"
 #include "lvgl_theme.h"
 #include "lvgl_display.h"
+#if CONFIG_EIDOLON_GUARD_VISION_BENCHMARK
+#include "guard/vision_benchmark.h"
+#endif
+#if CONFIG_EIDOLON_GUARD_SERVICE
+#include "eidolon/guard/guard_service.h"
+#endif
 
 #define TAG "MCP"
 
@@ -134,6 +140,40 @@ void McpServer::AddUserOnlyTools() {
             auto& board = Board::GetInstance();
             return board.GetSystemInfoJson();
         });
+
+#if CONFIG_EIDOLON_GUARD_VISION_BENCHMARK
+    auto camera = Board::GetInstance().GetCamera();
+    if (camera != nullptr) {
+        AddUserOnlyTool("self.guard.run_vision_benchmark",
+            "Run the ATK guard vision capability probe. It samples camera frames locally, "
+            "reports capture latency, low-resolution motion scores, and memory usage. "
+            "No image or audio leaves the device.",
+            PropertyList({
+                Property("sample_count", kPropertyTypeInteger, 30, 10, 120),
+                Property("interval_ms", kPropertyTypeInteger, 300, 100, 2000),
+            }),
+            [camera](const PropertyList& properties) -> ReturnValue {
+                TaskPriorityReset priority_reset(1);
+                return GuardVisionBenchmark::Run(
+                    *camera,
+                    properties["sample_count"].value<int>(),
+                    properties["interval_ms"].value<int>());
+            });
+    }
+#endif
+
+#if CONFIG_EIDOLON_GUARD_SERVICE
+    auto guard_service = Application::GetInstance().GetGuardService();
+    if (guard_service != nullptr) {
+        AddUserOnlyTool("self.guard.get_runtime_status",
+            "Get the local ATK guard runtime state summary. It contains no raw image or audio.",
+            PropertyList(),
+            [guard_service](const PropertyList& properties) -> ReturnValue {
+                (void)properties;
+                return guard_service->StatusJson();
+            });
+    }
+#endif
 
     AddUserOnlyTool("self.reboot", "Reboot the system",
         PropertyList(),

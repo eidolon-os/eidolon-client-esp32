@@ -19,6 +19,9 @@ public:
     static DeviceIdentity& GetInstance();
 
     esp_err_t EnsureKeypair();
+    esp_err_t SignRequest(const std::string& method, const std::string& path_query,
+                          const std::string& device_id, const std::string& body,
+                          SignedRequestHeaders& out);
     esp_err_t SignGetRequest(const std::string& path_query, const std::string& device_id,
                              SignedRequestHeaders& out);
     const std::string& Fingerprint() const { return fingerprint_; }

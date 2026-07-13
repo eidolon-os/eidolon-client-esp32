@@ -14,6 +14,9 @@
 #include "eidolon/eidolon_audio_input.h"
 #include "eidolon/eidolon_device_store.h"
 #include "eidolon/eidolon_ui_presenter.h"
+#if CONFIG_EIDOLON_GUARD_SERVICE
+#include "eidolon/guard/guard_service.h"
+#endif
 #include "eidolon/hub_activator.h"
 #include "eidolon/hub_types.h"
 #include "eidolon/livekit_voice_transport.h"
@@ -69,6 +72,9 @@ Application::~Application() {
     }
 #endif
     voice_transport_.reset();
+#if CONFIG_EIDOLON_GUARD_SERVICE
+    guard_service_.reset();
+#endif
     ui_presenter_.reset();
 #endif
     if (clock_timer_handle_ != nullptr) {
@@ -87,6 +93,15 @@ bool Application::IsVoiceDetected() const
 bool Application::IsMicrophoneEnabled() const
 {
     return voice_transport_ && voice_transport_->IsMicrophoneEnabled();
+}
+
+eidolon::GuardService* Application::GetGuardService()
+{
+#if CONFIG_EIDOLON_GUARD_SERVICE
+    return guard_service_.get();
+#else
+    return nullptr;
+#endif
 }
 
 void Application::RequestVoiceJoin()
@@ -343,7 +358,12 @@ void Application::Initialize() {
             }
         });
     };
+#if CONFIG_EIDOLON_GUARD_SERVICE
+    guard_service_ = std::make_unique<eidolon::GuardService>(board.GetCamera());
+    voice_transport_ = eidolon::CreateLiveKitVoiceTransport(std::move(callbacks), guard_service_.get());
+#else
     voice_transport_ = eidolon::CreateLiveKitVoiceTransport(std::move(callbacks));
+#endif
 #else
     // Setup the audio service
     auto codec = board.GetAudioCodec();
@@ -574,6 +594,11 @@ void Application::HandleNetworkDisconnectedEvent() {
     if (voice_transport_) {
         voice_transport_->OnNetworkLost();
     }
+#if CONFIG_EIDOLON_GUARD_SERVICE
+    if (guard_service_) {
+        guard_service_->Stop("network_lost");
+    }
+#endif
 #else
     // Close current conversation when network disconnected
     auto state = GetDeviceState();

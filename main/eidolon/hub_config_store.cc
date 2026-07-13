@@ -29,11 +29,13 @@ static std::string EntriesToJson(const std::map<std::string, std::string>& entri
 esp_err_t HubConfigStore::SaveTxtRecord(const HubTxtRecord& txt) {
     Settings settings(kNvsNamespace, true);
     settings.SetString("config_url", txt.config_url);
+    settings.SetString("register_url", txt.register_url);
     settings.SetInt("txtvers", txt.txtvers);
     settings.SetString("hub_api", txt.api);
     settings.SetString("hub_version", txt.hub_version);
     settings.SetString("mdns_txt_json", EntriesToJson(txt.entries));
-    ESP_LOGI(TAG, "Saved mDNS TXT (txtvers=%d, config_url=%s)", txt.txtvers, txt.config_url.c_str());
+    ESP_LOGI(TAG, "Saved mDNS TXT (txtvers=%d, config_url=%s, register_url=%s)",
+             txt.txtvers, txt.config_url.c_str(), txt.register_url.c_str());
     return ESP_OK;
 }
 

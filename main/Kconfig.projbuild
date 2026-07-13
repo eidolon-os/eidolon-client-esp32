@@ -1248,6 +1248,70 @@ menu "Eidolon Hub"
             Independent microWakeWord path using TFLite (not Espressif WakeNet).
             Say "hey jarvis" to join a LiveKit room when ConfigReady.
 
+    config EIDOLON_GUARD_VISION_BENCHMARK
+        bool "Enable ATK guard vision benchmark MCP tool"
+        default y
+        depends on EIDOLON_HUB_MODE && BOARD_TYPE_ATK_DNESP32S3
+        help
+            Exposes a user-only, low-rate camera benchmark for EID-12. It measures
+            frame capture, luminance-grid motion, and heap/PSRAM usage. It does not
+            retain frames, start a voice session, or perform owner verification.
+
+    config EIDOLON_GUARD_SERVICE
+        bool "Enable protocol-neutral ATK guard runtime"
+        default y
+        depends on EIDOLON_HUB_MODE && BOARD_TYPE_ATK_DNESP32S3
+        help
+            Starts a dormant local guard service with a dedicated FreeRTOS task.
+            It remains disabled until a signed GuardBinding runtime config and
+            guard.runtime.sync control path explicitly start it.
+
+    config EIDOLON_GUARD_SAMPLE_INTERVAL_MS
+        int "ATK guard sample interval in milliseconds"
+        range 200 5000
+        default 500
+        depends on EIDOLON_GUARD_SERVICE
+
+    config EIDOLON_GUARD_PREVIEW_INTERVAL_MS
+        int "Reserved ATK guard preview refresh interval in milliseconds"
+        range 500 5000
+        default 1000
+        depends on EIDOLON_GUARD_SERVICE
+        help
+            Retained for the Guard runtime config contract. The current ATK
+            runtime has no camera preview output, so this does not affect
+            sampling or send any image data over the network.
+
+    config EIDOLON_GUARD_MOTION_THRESHOLD
+        int "ATK guard motion threshold"
+        range 1 255
+        default 18
+        depends on EIDOLON_GUARD_SERVICE
+
+    config EIDOLON_GUARD_MOTION_CLEAR_THRESHOLD
+        int "ATK guard motion clear threshold"
+        range 0 255
+        default 9
+        depends on EIDOLON_GUARD_SERVICE
+
+    config EIDOLON_GUARD_CANDIDATE_DEBOUNCE_MS
+        int "ATK guard candidate debounce in milliseconds"
+        range 200 10000
+        default 1000
+        depends on EIDOLON_GUARD_SERVICE
+
+    config EIDOLON_GUARD_ABSENCE_TIMEOUT_MS
+        int "ATK guard absence timeout in milliseconds"
+        range 1000 900000
+        default 180000
+        depends on EIDOLON_GUARD_SERVICE
+
+    config EIDOLON_GUARD_CAPTURE_FAILURE_LIMIT
+        int "ATK guard consecutive capture failure limit"
+        range 1 60
+        default 5
+        depends on EIDOLON_GUARD_SERVICE
+
     config EIDOLON_WAKE_WORD_THRESHOLD
         int "microWakeWord probability cutoff (0-255)"
         range 1 255

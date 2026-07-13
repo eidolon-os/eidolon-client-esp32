@@ -6,14 +6,18 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <freertos/task.h>
+#include <deque>
 #include <functional>
 #include <string>
 
 #include "control_protocol.h"
+#include "guard/guard_presence_adapter.h"
 #include "hub_types.h"
 #include "livekit_session.h"
 
 namespace eidolon {
+
+class GuardService;
 
 enum class VoiceSessionState {
     Idle,
@@ -38,7 +42,7 @@ class EidolonVoiceController {
 public:
     using StateCallback = std::function<void(VoiceSessionState)>;
 
-    EidolonVoiceController();
+    explicit EidolonVoiceController(GuardService* guard_service = nullptr);
     ~EidolonVoiceController();
 
     void OnHubActivationSucceeded();
@@ -88,6 +92,7 @@ private:
         PttRelease,
         PttReleaseTail,
         LiveKitState,
+        GuardObservation,
         ControlCommand,
         SessionControl,
         AgentPhaseChanged,
@@ -103,6 +108,7 @@ private:
         LiveKitConnectionState lk_state = LiveKitConnectionState::Disconnected;
         AgentPhase phase = AgentPhase::Silent;
         bool flag = false;
+        GuardObservation guard_observation;
         // Snapshot of session_generation_ taken when the SDK callback fired (on the
         // SDK task), so DoLiveKitState can tell whether a LiveKit event belongs to
         // the connection attempt that is still current or to a superseded one whose
@@ -127,6 +133,7 @@ private:
     void DoPttReleased();
     void DoPttReleaseTail();
     void DoLiveKitState(LiveKitConnectionState lk_state, uint32_t event_generation);
+    void DoGuardObservation(const GuardObservation& observation, uint32_t runtime_generation);
     void DoControlCommand(const std::string& payload);
     void DoSessionControl(const std::string& payload);
     void DoAgentPhase(AgentPhase phase);
@@ -171,14 +178,26 @@ private:
     void HandlePlaybackStopCommand(const std::string& command_id, const std::string& payload);
     void HandlePttTurnStatusCommand(const std::string& command_id, const std::string& payload);
     void HandleDeviceIdentifyCommand(const std::string& command_id, const std::string& payload);
+    void HandleGuardRuntimeSyncCommand(const std::string& command_id, const std::string& payload);
+#if CONFIG_EIDOLON_GUARD_VISION_BENCHMARK
+    void HandleGuardVisionBenchmarkCommand(const std::string& command_id, const std::string& payload);
+#endif
     void HandleIdleTimeoutCommand();
     // Parse and act on a session_end{reason} packet from the channel: record the
     // reason for the UI, tear the voice room down gracefully, and pick the
     // resulting state (Ready for a normal end, Error for a server error).
     void HandleSessionEnd(EndReason reason);
     static EndReason ParseEndReason(const std::string& payload);
-    void AckCommand(const ControlCommand& command, const char* status, const char* code,
-                    const char* detail = "", const char* result = "");
+    esp_err_t AckCommand(const ControlCommand& command, const char* status, const char* code,
+                         const char* detail = "", const char* result = "");
+    esp_err_t SyncGuardRuntime(const char* reason, const std::string* expected_binding_id = nullptr,
+                               uint32_t expected_runtime_revision = 0,
+                               const std::string* expected_desired_state = nullptr,
+                               uint32_t* applied_runtime_revision = nullptr);
+    void ConfigureGuardPresenceRuntime(const GuardRuntimeHubConfig& runtime);
+    void ClearGuardPresenceRuntime();
+    void FlushPendingGuardPresence();
+    static uint64_t GuardEventTimestampMs(const GuardObservation& observation);
     void CompletePendingRoomJoinCommand(const char* status, const char* code,
                                         const char* detail = "",
                                         const char* result = "");
@@ -231,6 +250,12 @@ private:
     // JOIN. Controller-task only.
     std::string pending_session_intent_;
     bool control_room_ = false;
+    GuardService* guard_service_ = nullptr;
+    RoomConfig guard_control_config_;
+    bool has_guard_control_config_ = false;
+    GuardPresenceAdapter guard_presence_adapter_;
+    std::deque<std::string> pending_guard_presence_payloads_;
+    uint32_t guard_runtime_generation_ = 0;
     bool switching_to_voice_ = false;
     bool control_reconnect_pending_ = false;
     bool pending_room_join_command_active_ = false;

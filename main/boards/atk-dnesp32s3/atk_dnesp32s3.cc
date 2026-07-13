@@ -6,14 +6,14 @@
 #include "config.h"
 #include "i2c_device.h"
 #include "led/single_led.h"
-#if !CONFIG_EIDOLON_HUB_MODE
-#include "esp_video.h"
-#endif
+#include "esp32_camera.h"
 
 #include <esp_log.h>
 #include <esp_lcd_panel_vendor.h>
 #include <driver/i2c_master.h>
 #include <driver/spi_common.h>
+
+#include <atomic>
 
 #define TAG "atk_dnesp32s3"
 
@@ -51,9 +51,44 @@ private:
     Button boot_button_;
     LcdDisplay* display_;
     XL9555* xl9555_;
-#if !CONFIG_EIDOLON_HUB_MODE
-    EspVideo* camera_;
-#endif
+    Esp32Camera* camera_ = nullptr;
+    TaskHandle_t preview_task_ = nullptr;
+    std::atomic<bool> preview_running_{false};
+
+    static void PreviewTask(void* arg) {
+        auto* self = static_cast<atk_dnesp32s3*>(arg);
+        while (self->preview_running_.load()) {
+            if (self->camera_ == nullptr || !self->camera_->Capture()) {
+                ESP_LOGW(TAG, "Camera preview frame unavailable");
+                vTaskDelay(pdMS_TO_TICKS(250));
+                continue;
+            }
+            vTaskDelay(pdMS_TO_TICKS(125));
+        }
+        self->display_->SetPreviewImage(nullptr);
+        self->preview_task_ = nullptr;
+        vTaskDelete(nullptr);
+    }
+
+    void TogglePreview() {
+        if (preview_running_.exchange(false)) {
+            ESP_LOGI(TAG, "Stopping camera preview");
+            return;
+        }
+        if (preview_task_ != nullptr) {
+            ESP_LOGW(TAG, "Camera preview is stopping");
+            return;
+        }
+        preview_running_.store(true);
+        if (camera_ == nullptr ||
+            xTaskCreatePinnedToCore(PreviewTask, "atk_preview", 4096, this, 2, &preview_task_, 0) != pdPASS) {
+            preview_running_.store(false);
+            preview_task_ = nullptr;
+            ESP_LOGE(TAG, "Failed to start camera preview task");
+            return;
+        }
+        ESP_LOGI(TAG, "Camera preview started");
+    }
 
     void InitializeI2c() {
         // Initialize I2C peripheral
@@ -96,6 +131,9 @@ private:
             }
             app.ToggleChatState();
         });
+        boot_button_.OnDoubleClick([this]() {
+            TogglePreview();
+        });
     }
 
     void InitializeSt7789Display() {
@@ -134,69 +172,53 @@ private:
                                     DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
     }
 
-    // 初始化摄像头：ov2640；
-    // 根据正点原子官方示例参数
-#if !CONFIG_EIDOLON_HUB_MODE
     void InitializeCamera() {
-        xl9555_->SetOutputState(OV_PWDN_IO, 0); // PWDN=低 (上电)
-        xl9555_->SetOutputState(OV_RESET_IO, 0); // 确保复位
-        vTaskDelay(pdMS_TO_TICKS(50));           // 延长复位保持时间
-        xl9555_->SetOutputState(OV_RESET_IO, 1); // 释放复位
-        vTaskDelay(pdMS_TO_TICKS(50));           // 延长 50ms
+        xl9555_->SetOutputState(OV_PWDN_IO, 0);
+        xl9555_->SetOutputState(OV_RESET_IO, 0);
+        vTaskDelay(pdMS_TO_TICKS(20));
+        xl9555_->SetOutputState(OV_RESET_IO, 1);
+        vTaskDelay(pdMS_TO_TICKS(20));
 
-        static esp_cam_ctlr_dvp_pin_config_t dvp_pin_config = {
-            .data_width = CAM_CTLR_DATA_WIDTH_8,
-            .data_io = {
-                [0] = CAM_PIN_D0,
-                [1] = CAM_PIN_D1,
-                [2] = CAM_PIN_D2,
-                [3] = CAM_PIN_D3,
-                [4] = CAM_PIN_D4,
-                [5] = CAM_PIN_D5,
-                [6] = CAM_PIN_D6,
-                [7] = CAM_PIN_D7,
-            },
-            .vsync_io = CAM_PIN_VSYNC,
-            .de_io = CAM_PIN_HREF,
-            .pclk_io = CAM_PIN_PCLK,
-            .xclk_io = CAM_PIN_XCLK,
+        camera_config_t camera_config = {
+            .pin_pwdn = CAM_PIN_PWDN,
+            .pin_reset = CAM_PIN_RESET,
+            .pin_xclk = CAM_PIN_XCLK,
+            .pin_sccb_sda = CAM_PIN_SIOD,
+            .pin_sccb_scl = CAM_PIN_SIOC,
+            .pin_d7 = CAM_PIN_D7,
+            .pin_d6 = CAM_PIN_D6,
+            .pin_d5 = CAM_PIN_D5,
+            .pin_d4 = CAM_PIN_D4,
+            .pin_d3 = CAM_PIN_D3,
+            .pin_d2 = CAM_PIN_D2,
+            .pin_d1 = CAM_PIN_D1,
+            .pin_d0 = CAM_PIN_D0,
+            .pin_vsync = CAM_PIN_VSYNC,
+            .pin_href = CAM_PIN_HREF,
+            .pin_pclk = CAM_PIN_PCLK,
+            // CAM_PIN_XCLK is GPIO_NUM_NC: no XCLK signal is driven to the
+            // module. esp32-camera still requires this timing value on S3.
+            .xclk_freq_hz = 24000000,
+            .ledc_timer = LEDC_TIMER_0,
+            .ledc_channel = LEDC_CHANNEL_0,
+            .pixel_format = PIXFORMAT_RGB565,
+            .frame_size = FRAMESIZE_QVGA,
+            .jpeg_quality = 12,
+            .fb_count = 2,
+            .fb_location = CAMERA_FB_IN_PSRAM,
+            .grab_mode = CAMERA_GRAB_WHEN_EMPTY,
         };
-
-        esp_video_init_sccb_config_t sccb_config = {
-            .init_sccb = true,
-            .i2c_config = {
-                .port = 1,
-                .scl_pin = CAM_PIN_SIOC,
-                .sda_pin = CAM_PIN_SIOD,
-            },
-            .freq = 100000,
-        };
-
-        esp_video_init_dvp_config_t dvp_config = {
-            .sccb_config = sccb_config,
-            .reset_pin = CAM_PIN_RESET,   // 实际由 XL9555 控制
-            .pwdn_pin = CAM_PIN_PWDN,     // 实际由 XL9555 控制
-            .dvp_pin = dvp_pin_config,
-            .xclk_freq = 20000000,
-        };
-
-        esp_video_init_config_t video_config = {
-            .dvp = &dvp_config,
-        };
-
-        camera_ = new EspVideo(video_config);
+        camera_ = new Esp32Camera(camera_config);
+        camera_->SetVFlip(true);
+        camera_->SetHMirror(true);
     }
-#endif
-
 public:
-    atk_dnesp32s3() : boot_button_(BOOT_BUTTON_GPIO) {
+    atk_dnesp32s3() : boot_button_(BOOT_BUTTON_GPIO, false, 2000) {
         InitializeI2c();
         InitializeSpi();
         InitializeSt7789Display();
         InitializeButtons();
-#if !CONFIG_EIDOLON_HUB_MODE
         InitializeCamera();
-#endif
     }
 
     virtual Led* GetLed() override {
@@ -225,11 +247,9 @@ public:
         return display_;
     }
 
-#if !CONFIG_EIDOLON_HUB_MODE
     virtual Camera* GetCamera() override {
         return camera_;
     }
-#endif
 };
 
 DECLARE_BOARD(atk_dnesp32s3);

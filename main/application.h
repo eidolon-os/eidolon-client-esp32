@@ -51,6 +51,7 @@ enum AecMode {
 
 namespace eidolon {
 class EidolonUiPresenter;
+class GuardService;
 class IVoiceSessionTransport;
 }
 
@@ -82,6 +83,7 @@ public:
     bool IsVoiceDetected() const;
 #if CONFIG_EIDOLON_HUB_MODE
     bool IsMicrophoneEnabled() const;
+    eidolon::GuardService* GetGuardService();
 #endif
     
     /**
@@ -176,6 +178,9 @@ private:
 #if CONFIG_EIDOLON_HUB_MODE
     std::unique_ptr<eidolon::IVoiceSessionTransport> voice_transport_;
     std::unique_ptr<eidolon::EidolonUiPresenter> ui_presenter_;
+#if CONFIG_EIDOLON_GUARD_SERVICE
+    std::unique_ptr<eidolon::GuardService> guard_service_;
+#endif
 #if CONFIG_EIDOLON_WAKE_WORD_ENABLE
     std::unique_ptr<EidolonAudioInputService> eidolon_audio_input_service_;
     void StartEidolonWakeWord();

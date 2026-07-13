@@ -17,6 +17,15 @@ public:
     // on a proactive wake). Empty = a normal JOIN (Hub defaults user_initiated).
     esp_err_t Fetch(const std::string& config_url, const std::string& device_id,
                     Esp32HubConfig& out, const std::string& session_intent = "");
+    // Signed self-registration for guard-capable devices. The response shape is
+    // the same runtime config returned by /api/config.
+    esp_err_t RegisterGuardDevice(const std::string& config_url,
+                                  const std::string& register_url,
+                                  const std::string& device_id, Esp32HubConfig& out);
+    // Fetch GuardBinding-local runtime config with the same signed device
+    // identity as /api/config. It never fetches persona or policy config.
+    esp_err_t FetchGuardRuntime(const std::string& config_url, const std::string& device_id,
+                                GuardRuntimeHubConfig& out);
 
     bool HasPendingFirmware() const { return has_pending_firmware_; }
     bool PendingFirmwareForce() const { return pending_firmware_force_; }

@@ -7,14 +7,14 @@
 
 namespace eidolon {
 
-LiveKitVoiceTransport::LiveKitVoiceTransport(VoiceSessionCallbacks cb)
+LiveKitVoiceTransport::LiveKitVoiceTransport(VoiceSessionCallbacks cb, GuardService* guard_service)
 {
     if (livekit_system_init() != LIVEKIT_ERR_NONE) {
         ESP_LOGE(TAG, "livekit_system_init failed");
     }
 
     mic_enabled_ = device_store_.LoadMicEnabled(true);
-    controller_ = std::make_unique<EidolonVoiceController>();
+    controller_ = std::make_unique<EidolonVoiceController>(guard_service);
 
     if (cb.on_session_state) {
         controller_->SetOnStateChanged(std::move(cb.on_session_state));
@@ -131,9 +131,10 @@ EndReason LiveKitVoiceTransport::LastEndReason() const
     return controller_->LastEndReason();
 }
 
-std::unique_ptr<IVoiceSessionTransport> CreateLiveKitVoiceTransport(VoiceSessionCallbacks cb)
+std::unique_ptr<IVoiceSessionTransport> CreateLiveKitVoiceTransport(
+    VoiceSessionCallbacks cb, GuardService* guard_service)
 {
-    return std::make_unique<LiveKitVoiceTransport>(std::move(cb));
+    return std::make_unique<LiveKitVoiceTransport>(std::move(cb), guard_service);
 }
 
 }  // namespace eidolon

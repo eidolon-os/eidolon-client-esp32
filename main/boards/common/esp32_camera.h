@@ -4,6 +4,7 @@
 #include <lvgl.h>
 #include <thread>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 #include <freertos/FreeRTOS.h>
@@ -27,6 +28,7 @@ private:
     std::string explain_url_;
     std::string explain_token_;
     std::thread encoder_thread_;
+    std::mutex camera_mutex_;
     camera_fb_t *current_fb_ = nullptr;
     uint8_t *encode_buf_ = nullptr;  // Buffer for JPEG encoding (with optional byte swap)
     size_t encode_buf_size_ = 0;
@@ -40,5 +42,6 @@ public:
     virtual bool SetHMirror(bool enabled) override;
     virtual bool SetVFlip(bool enabled) override;
     virtual bool SetSwapBytes(bool enabled) override;
+    virtual bool AnalyzeFrame(const CameraFrameAnalyzer& analyzer) override;
     virtual std::string Explain(const std::string &question) override;
 };

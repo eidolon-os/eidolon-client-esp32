@@ -139,6 +139,11 @@ CONFIG_EIDOLON_INTERACTION_MODE_PTT=y
 CONFIG_EIDOLON_PTT_RELEASE_TAIL_MS=150
 CONFIG_EIDOLON_LIVEKIT_SPEAKER_VOLUME=50
 # CONFIG_EIDOLON_WAKE_WORD_ENABLE is not set
+# CONFIG_CAMERA_OV2640 is not set
+CONFIG_CAMERA_OV5640=y
+CONFIG_CAMERA_OV5640_AUTO_DETECT_DVP_INTERFACE_SENSOR=y
+CONFIG_CAMERA_OV5640_DVP_YUV422_800X600_10FPS=y
+CONFIG_CAMERA_OV5640_DVP_IF_FORMAT_INDEX_DEFAULT=0
 CONFIG_USE_AUDIO_PROCESSOR=y
 # CONFIG_USE_DEVICE_AEC is not set
 # CONFIG_USE_SERVER_AEC is not set
@@ -166,12 +171,19 @@ set_sdkconfig_value() {
   local file="${PROJECT_ROOT}/${SDKCONFIG_FILE}"
   [[ -f "${file}" ]] || return 0
 
+  local rendered="${key}=${value}"
+  if [[ "${value}" == "n" ]]; then
+    rendered="# ${key} is not set"
+  fi
+
   local tmp="${file}.tmp.$$"
   if grep -q "^${key}=" "${file}"; then
-    sed "s|^${key}=.*|${key}=${value}|" "${file}" >"${tmp}"
+    sed "s|^${key}=.*|${rendered}|" "${file}" >"${tmp}"
+  elif grep -q "^# ${key} is not set$" "${file}"; then
+    sed "s|^# ${key} is not set$|${rendered}|" "${file}" >"${tmp}"
   else
     cp "${file}" "${tmp}"
-    printf '%s=%s\n' "${key}" "${value}" >>"${tmp}"
+    printf '%s\n' "${rendered}" >>"${tmp}"
   fi
   mv "${tmp}" "${file}"
 }
@@ -179,6 +191,11 @@ set_sdkconfig_value() {
 sync_existing_sdkconfig() {
   set_sdkconfig_value CONFIG_PARTITION_TABLE_CUSTOM_FILENAME '"partitions/v2/16m_eidolon_box3.csv"'
   set_sdkconfig_value CONFIG_PARTITION_TABLE_FILENAME '"partitions/v2/16m_eidolon_box3.csv"'
+  set_sdkconfig_value CONFIG_CAMERA_OV2640 n
+  set_sdkconfig_value CONFIG_CAMERA_OV5640 y
+  set_sdkconfig_value CONFIG_CAMERA_OV5640_AUTO_DETECT_DVP_INTERFACE_SENSOR y
+  set_sdkconfig_value CONFIG_CAMERA_OV5640_DVP_YUV422_800X600_10FPS y
+  set_sdkconfig_value CONFIG_CAMERA_OV5640_DVP_IF_FORMAT_INDEX_DEFAULT 0
 }
 
 idf_args() {

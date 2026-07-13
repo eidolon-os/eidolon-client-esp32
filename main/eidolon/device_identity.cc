@@ -68,6 +68,12 @@ std::string NewNonce() {
     return Base64Url(bytes, sizeof(bytes));
 }
 
+std::string Sha256Hex(const std::string& body) {
+    unsigned char hash[32];
+    mbedtls_sha256(reinterpret_cast<const unsigned char*>(body.data()), body.size(), hash, 0);
+    return Hex(hash, sizeof(hash));
+}
+
 std::string RequestTimestamp() {
     time_t now = time(nullptr);
     if (now > 0) {
@@ -232,8 +238,9 @@ esp_err_t DeviceIdentity::SignCanonical(const std::string& canonical, std::strin
     return signature.empty() ? ESP_FAIL : ESP_OK;
 }
 
-esp_err_t DeviceIdentity::SignGetRequest(const std::string& path_query, const std::string& device_id,
-                                         SignedRequestHeaders& out) {
+esp_err_t DeviceIdentity::SignRequest(const std::string& method, const std::string& path_query,
+                                      const std::string& device_id, const std::string& body,
+                                      SignedRequestHeaders& out) {
     esp_err_t err = EnsureKeypair();
     if (err != ESP_OK) {
         return err;
@@ -242,11 +249,14 @@ esp_err_t DeviceIdentity::SignGetRequest(const std::string& path_query, const st
     out.timestamp = RequestTimestamp();
     out.public_key = public_key_b64_;
 
-    const std::string empty_body_hash =
-        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-    std::string canonical = "GET\n" + path_query + "\n" + device_id + "\n" + out.nonce + "\n" +
-                            out.timestamp + "\n" + empty_body_hash;
+    std::string canonical = method + "\n" + path_query + "\n" + device_id + "\n" + out.nonce + "\n" +
+                            out.timestamp + "\n" + Sha256Hex(body);
     return SignCanonical(canonical, out.signature);
+}
+
+esp_err_t DeviceIdentity::SignGetRequest(const std::string& path_query, const std::string& device_id,
+                                         SignedRequestHeaders& out) {
+    return SignRequest("GET", path_query, device_id, "", out);
 }
 
 std::string EidolonSignedGetPathQuery(const std::string& url) {
