@@ -48,6 +48,8 @@ inline constexpr const char* kControlOpConfigRefresh = "config.refresh";
 inline constexpr const char* kControlOpDeviceIdentify = "device.identify";
 inline constexpr const char* kControlOpGuardVisionBenchmark = "guard.vision.benchmark";
 inline constexpr const char* kControlOpGuardRuntimeSync = "guard.runtime.sync";
+inline constexpr const char* kControlOpGuardOwnerFaceProfileSync =
+    "guard.owner_face_profile.sync";
 
 // Guard facts — source of record: eidolon_sdk.biz.guard.protocol.
 inline constexpr const char* kGuardPresenceCandidateType = "guard.presence.candidate";

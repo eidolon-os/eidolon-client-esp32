@@ -30,7 +30,10 @@ constexpr uint32_t Fourcc(char a, char b, char c, char d) {
 uint32_t CameraFrameFormat(pixformat_t format) {
     switch (format) {
         case PIXFORMAT_RGB565:
-            return Fourcc('R', 'G', 'B', 'P');
+            // esp32-camera exposes the sensor's RGB565 bytes in network/big-endian
+            // order. Advertise the matching V4L2 semantic instead of RGBP (LE),
+            // so every analyzer consumes the same proven byte order.
+            return Fourcc('R', 'G', 'B', 'R');
         case PIXFORMAT_YUV422:
             return Fourcc('Y', 'U', 'Y', 'V');
         case PIXFORMAT_YUV420:

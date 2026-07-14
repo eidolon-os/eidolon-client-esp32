@@ -11,6 +11,9 @@
 #include "boards/common/camera.h"
 #include "guard/guard_motion.h"
 #include "guard/guard_state_machine.h"
+#if CONFIG_EIDOLON_OWNER_FACE_PROFILE
+#include "guard/owner_face_engine.h"
+#endif
 
 namespace eidolon {
 
@@ -30,6 +33,9 @@ public:
     GuardObservation CurrentObservation() const;
     std::string StatusJson() const;
     bool IsRunning() const;
+#if CONFIG_EIDOLON_OWNER_FACE_PROFILE
+    OwnerFaceEngine* owner_face_engine() const { return owner_face_engine_.get(); }
+#endif
 
     static GuardRuntimeConfig DefaultConfig();
 
@@ -48,6 +54,10 @@ private:
     bool has_previous_grid_ = false;
     bool reset_grid_requested_ = false;
     std::unique_ptr<GuardDisplay> guard_display_;
+#if CONFIG_EIDOLON_OWNER_FACE_PROFILE
+    std::unique_ptr<OwnerFaceEngine> owner_face_engine_;
+    OwnerFaceLiveResult last_owner_face_result_;
+#endif
 
     static void TaskTrampoline(void* arg);
     void TaskLoop();

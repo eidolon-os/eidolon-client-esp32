@@ -9,6 +9,9 @@
 #include "board.h"
 #include "display.h"
 #include "guard/guard_display.h"
+#if CONFIG_EIDOLON_OWNER_FACE_PROFILE
+#include "guard/owner_face_engine.h"
+#endif
 
 namespace eidolon {
 namespace {
@@ -69,6 +72,9 @@ GuardService::GuardService(Camera* camera) : camera_(camera)
     state_machine_.ApplyConfig(DefaultConfig());
     last_observation_ = state_machine_.Current(NowMs());
     guard_display_ = std::make_unique<GuardDisplay>(Board::GetInstance().GetDisplay());
+#if CONFIG_EIDOLON_OWNER_FACE_PROFILE
+    owner_face_engine_ = std::make_unique<OwnerFaceEngine>();
+#endif
     if (xTaskCreate(&GuardService::TaskTrampoline, "guard_service", 4096, this, 3, &task_handle_) != pdPASS) {
         ESP_LOGE(kTag, "Failed to create guard service task");
         task_handle_ = nullptr;
@@ -237,16 +243,38 @@ GuardSample GuardService::CaptureSample(uint64_t now_ms)
 
     GuardLuminanceGrid current = {};
     bool grid_ready = false;
+#if CONFIG_EIDOLON_OWNER_FACE_PROFILE
+    OwnerFaceLiveResult owner_face;
+#endif
     sample.frame_ok = camera_->AnalyzeFrame([&](const CameraFrame& frame) {
         grid_ready = ReadGuardLuminanceGrid(frame, current);
+#if CONFIG_EIDOLON_OWNER_FACE_PROFILE
+        if (grid_ready && owner_face_engine_ != nullptr) {
+            owner_face = owner_face_engine_->AnalyzeLiveFrame(frame, now_ms);
+        }
+#endif
         return grid_ready;
     });
     if (!sample.frame_ok || !grid_ready) {
         return sample;
     }
+#if CONFIG_EIDOLON_OWNER_FACE_PROFILE
+    if (owner_face.evaluated) {
+        ESP_LOGI(kTag,
+                 "owner_face_fact revision=%lu faces=%d id=%d similarity=%.3f",
+                 static_cast<unsigned long>(owner_face.profile_revision),
+                 owner_face.faces, owner_face.id,
+                 static_cast<double>(owner_face.similarity));
+    }
+#endif
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
+#if CONFIG_EIDOLON_OWNER_FACE_PROFILE
+        if (owner_face.evaluated) {
+            last_owner_face_result_ = owner_face;
+        }
+#endif
         if (reset_grid_requested_) {
             has_previous_grid_ = false;
             reset_grid_requested_ = false;
@@ -291,8 +319,35 @@ void GuardService::PublishObservation(const GuardObservation& observation)
 
 void GuardService::ApplyDisplayState(const GuardObservation& observation)
 {
+    GuardOwnerFaceDisplay owner_face_display;
+#if CONFIG_EIDOLON_OWNER_FACE_PROFILE
+    if (owner_face_engine_ != nullptr) {
+        const OwnerFaceProfileStatus profile = owner_face_engine_->GetProfileStatus();
+        owner_face_display.profile_active = profile.active;
+        owner_face_display.profile_revision = profile.revision;
+        owner_face_display.template_count = profile.template_count;
+        if (profile.active) {
+            OwnerFaceLiveResult last_result;
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                last_result = last_owner_face_result_;
+            }
+            if (last_result.evaluated && last_result.profile_revision == profile.revision) {
+                const uint64_t now_ms = NowMs();
+                owner_face_display.has_result = true;
+                owner_face_display.result_age_ms =
+                    now_ms >= last_result.evaluated_at_ms
+                        ? now_ms - last_result.evaluated_at_ms
+                        : 0;
+                owner_face_display.faces = last_result.faces;
+                owner_face_display.id = last_result.id;
+                owner_face_display.similarity = last_result.similarity;
+            }
+        }
+    }
+#endif
     if (guard_display_ != nullptr) {
-        guard_display_->UpdateObservation(observation);
+        guard_display_->UpdateObservation(observation, owner_face_display);
     }
     auto display = Board::GetInstance().GetDisplay();
     if (display == nullptr) {

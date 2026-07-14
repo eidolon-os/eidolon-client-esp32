@@ -652,9 +652,12 @@ elseif(CONFIG_BOARD_TYPE_MOVECALL_CUICAN_ESP32S3)
     set(DEFAULT_EMOJI_COLLECTION twemoji_64)
 elseif(CONFIG_BOARD_TYPE_ATK_DNESP32S3)
     set(BOARD_TYPE "atk-dnesp32s3")
-    set(BUILTIN_TEXT_FONT font_noto_basic_20_4)
+    # Guard firmware reserves flash for dual OTA slots and ESP-WHO models.
+    # Keep a full Chinese 20 px font, but use the compact Puhui asset and
+    # static 64 px emoji set instead of the multi-megabyte animated bundle.
+    set(BUILTIN_TEXT_FONT font_puhui_basic_20_4)
     set(BUILTIN_ICON_FONT font_awesome_20_4)
-    set(DEFAULT_EMOJI_COLLECTION noto-emoji_128)
+    set(DEFAULT_EMOJI_COLLECTION twemoji_64)
 elseif(CONFIG_BOARD_TYPE_ATK_DNESP32S3_BOX)
     set(BOARD_TYPE "atk-dnesp32s3-box")
     set(BUILTIN_TEXT_FONT font_noto_basic_20_4)
@@ -1091,14 +1094,14 @@ if(CONFIG_EIDOLON_HUB_MODE)
         if(CONFIG_EIDOLON_GUARD_VISION_BENCHMARK)
             list(APPEND SOURCES "eidolon/guard/vision_benchmark.cc")
         endif()
-    endif()
-    if(CONFIG_EIDOLON_ATK_OWNER_FACE_TEST)
-        list(APPEND SOURCES "eidolon/guard/owner_face_probe.cc")
-        list(APPEND MAIN_PRIV_REQUIRES_EXTRA
-            espressif__human_face_detect
-            espressif__human_face_recognition
-            spiffs
-        )
+        if(CONFIG_EIDOLON_OWNER_FACE_PROFILE)
+            list(APPEND SOURCES "eidolon/guard/owner_face_engine.cc")
+            list(APPEND MAIN_PRIV_REQUIRES_EXTRA
+                espressif__human_face_detect
+                espressif__human_face_recognition
+                spiffs
+            )
+        endif()
     endif()
 
     # Per-board eidolon view: the presenter renders to whatever the board registers

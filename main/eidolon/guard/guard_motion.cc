@@ -21,7 +21,8 @@ constexpr uint32_t kPixFmtGrey = Fourcc('G', 'R', 'E', 'Y');
 enum class PixelFormat {
     Yuv422Planar,
     Yuyv,
-    Rgb565,
+    Rgb565LittleEndian,
+    Rgb565BigEndian,
     Rgb24,
     Grey,
 };
@@ -38,9 +39,12 @@ bool ResolvePixelFormat(uint32_t fourcc, size_t& bytes_per_pixel, PixelFormat& f
         format = PixelFormat::Yuyv;
         return true;
     case kPixFmtRgb565:
+        bytes_per_pixel = 2;
+        format = PixelFormat::Rgb565LittleEndian;
+        return true;
     case kPixFmtRgb565x:
         bytes_per_pixel = 2;
-        format = PixelFormat::Rgb565;
+        format = PixelFormat::Rgb565BigEndian;
         return true;
     case kPixFmtRgb24:
         bytes_per_pixel = 3;
@@ -96,10 +100,14 @@ bool ReadGuardLuminanceGrid(const CameraFrame& frame, GuardLuminanceGrid& output
                 luma = pixel[0];
                 break;
             }
-            case PixelFormat::Rgb565: {
+            case PixelFormat::Rgb565LittleEndian:
+            case PixelFormat::Rgb565BigEndian: {
                 const uint8_t* pixel = frame.data + clamped_y * stride + clamped_x * bytes_per_pixel;
-                const uint16_t rgb = static_cast<uint16_t>(pixel[0]) |
-                                     (static_cast<uint16_t>(pixel[1]) << 8);
+                const uint16_t rgb = format == PixelFormat::Rgb565BigEndian
+                                         ? (static_cast<uint16_t>(pixel[0]) << 8) |
+                                               static_cast<uint16_t>(pixel[1])
+                                         : static_cast<uint16_t>(pixel[0]) |
+                                               (static_cast<uint16_t>(pixel[1]) << 8);
                 const uint8_t red = static_cast<uint8_t>(((rgb >> 11) & 0x1f) * 255 / 31);
                 const uint8_t green = static_cast<uint8_t>(((rgb >> 5) & 0x3f) * 255 / 63);
                 const uint8_t blue = static_cast<uint8_t>((rgb & 0x1f) * 255 / 31);

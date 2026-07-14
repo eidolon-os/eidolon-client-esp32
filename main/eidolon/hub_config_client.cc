@@ -9,6 +9,10 @@
 
 #include <cJSON.h>
 #include <esp_log.h>
+#include <mbedtls/sha256.h>
+
+#include <cctype>
+#include <set>
 
 #define TAG "HubConfigClient"
 
@@ -50,6 +54,94 @@ std::string GuardRuntimeUrl(const std::string& config_url)
         return "";
     }
     return config_url.substr(0, pos) + "/api/guard/runtime-config";
+}
+
+std::string GuardOwnerFaceUrl(const std::string& config_url)
+{
+    const std::string suffix = "/api/config";
+    const size_t pos = config_url.find(suffix);
+    if (pos == std::string::npos) {
+        return "";
+    }
+    return config_url.substr(0, pos) + "/api/guard/owner-face-profile";
+}
+
+bool IsOpaqueReferenceId(const std::string& value)
+{
+    if (value.empty() || value.size() > 96) {
+        return false;
+    }
+    for (const unsigned char ch : value) {
+        if (!std::isalnum(ch) && ch != '_' && ch != '-') {
+            return false;
+        }
+    }
+    return true;
+}
+
+std::string GuardOwnerFaceReferenceUrl(const std::string& config_url,
+                                       const std::string& reference_id)
+{
+    std::string manifest = GuardOwnerFaceUrl(config_url);
+    if (manifest.empty() || !IsOpaqueReferenceId(reference_id)) {
+        return "";
+    }
+    const std::string suffix = "/owner-face-profile";
+    return manifest.substr(0, manifest.size() - suffix.size()) +
+           "/owner-face-references/" + reference_id;
+}
+
+bool IsLowerHexSha256(const std::string& value)
+{
+    if (value.size() != 64) {
+        return false;
+    }
+    for (const unsigned char ch : value) {
+        if (!std::isdigit(ch) && (ch < 'a' || ch > 'f')) {
+            return false;
+        }
+    }
+    return true;
+}
+
+std::string Sha256Hex(const std::string& value)
+{
+    unsigned char digest[32] = {};
+    mbedtls_sha256(reinterpret_cast<const unsigned char*>(value.data()), value.size(), digest, 0);
+    static constexpr char kHex[] = "0123456789abcdef";
+    std::string out(64, '0');
+    for (size_t i = 0; i < sizeof(digest); ++i) {
+        out[i * 2] = kHex[digest[i] >> 4];
+        out[i * 2 + 1] = kHex[digest[i] & 0x0f];
+    }
+    return out;
+}
+
+void SetSignedGetHeaders(Http* http, const std::string& device_id,
+                         const SignedRequestHeaders& signed_headers)
+{
+    http->SetHeader("X-Device-ID", device_id.c_str());
+    http->SetHeader("X-Device-Nonce", signed_headers.nonce.c_str());
+    http->SetHeader("X-Device-Timestamp", signed_headers.timestamp.c_str());
+    http->SetHeader("X-Device-Public-Key", signed_headers.public_key.c_str());
+    http->SetHeader("X-Device-Signature", signed_headers.signature.c_str());
+    http->SetHeader("Accept", "application/json");
+    http->SetHeader("User-Agent", SystemInfo::GetUserAgent().c_str());
+}
+
+bool HasExactFields(const cJSON* object, const std::set<std::string>& fields)
+{
+    if (!cJSON_IsObject(object)) {
+        return false;
+    }
+    std::set<std::string> seen;
+    for (const cJSON* item = object->child; item != nullptr; item = item->next) {
+        if (item->string == nullptr || fields.count(item->string) == 0 ||
+            !seen.insert(item->string).second) {
+            return false;
+        }
+    }
+    return seen == fields;
 }
 
 std::string RegisterUrl(const std::string& config_url, const std::string& register_url)
@@ -469,6 +561,184 @@ esp_err_t HubConfigClient::FetchGuardRuntime(const std::string& config_url,
     }
     cJSON_Delete(root);
     return valid ? ESP_OK : ESP_ERR_INVALID_RESPONSE;
+}
+
+esp_err_t HubConfigClient::FetchOwnerFaceProfile(const std::string& config_url,
+                                                 const std::string& device_id,
+                                                 OwnerFaceProfileHubConfig& out)
+{
+    out = OwnerFaceProfileHubConfig{};
+    const std::string request_url = GuardOwnerFaceUrl(config_url);
+    if (request_url.empty()) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    auto network = Board::GetInstance().GetNetwork();
+    auto http = network ? network->CreateHttp(CONFIG_EIDOLON_CONFIG_HTTP_TIMEOUT_MS) : nullptr;
+    if (!http) {
+        return network ? ESP_ERR_NO_MEM : ESP_ERR_INVALID_STATE;
+    }
+    SignedRequestHeaders signed_headers;
+    esp_err_t err = DeviceIdentity::GetInstance().SignGetRequest(
+        EidolonSignedGetPathQuery(request_url), device_id, signed_headers);
+    if (err != ESP_OK) {
+        return err;
+    }
+    SetSignedGetHeaders(http.get(), device_id, signed_headers);
+    if (!http->Open("GET", request_url)) {
+        return ESP_FAIL;
+    }
+    const int status = http->GetStatusCode();
+    const std::string body = http->ReadAll();
+    http->Close();
+    if (status == 404) {
+        return ESP_ERR_NOT_FOUND;
+    }
+    if (status == 401 || status == 403) {
+        return ESP_ERR_NOT_ALLOWED;
+    }
+    if (status != 200) {
+        ESP_LOGW(TAG, "Owner Face manifest HTTP status %d", status);
+        return status == 422 ? ESP_ERR_INVALID_ARG : ESP_FAIL;
+    }
+
+    cJSON* root = cJSON_ParseWithLength(body.data(), body.size());
+    if (!root) {
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+    static const std::set<std::string> kManifestFields = {
+        "schema_v", "binding_id", "profile_id", "profile_revision", "desired_state",
+        "model_id", "preprocessing_version", "references",
+    };
+    static const std::set<std::string> kReferenceFields = {
+        "reference_id", "pose", "sha256", "size_bytes", "content_type",
+    };
+    const cJSON* schema = cJSON_GetObjectItem(root, "schema_v");
+    const cJSON* binding = cJSON_GetObjectItem(root, "binding_id");
+    const cJSON* profile = cJSON_GetObjectItem(root, "profile_id");
+    const cJSON* desired = cJSON_GetObjectItem(root, "desired_state");
+    const cJSON* model = cJSON_GetObjectItem(root, "model_id");
+    const cJSON* preprocessing = cJSON_GetObjectItem(root, "preprocessing_version");
+    const cJSON* references = cJSON_GetObjectItem(root, "references");
+    bool valid = HasExactFields(root, kManifestFields) && cJSON_IsNumber(schema) &&
+                 schema->valueint == 1 && cJSON_IsString(binding) && binding->valuestring &&
+                 cJSON_IsString(profile) && profile->valuestring && cJSON_IsString(desired) &&
+                 desired->valuestring && cJSON_IsArray(references) &&
+                 ReadUnsigned(root, "profile_revision", &out.profile_revision);
+    if (valid) {
+        out.binding_id = binding->valuestring;
+        out.profile_id = profile->valuestring;
+        out.desired_state = desired->valuestring;
+        valid = !out.binding_id.empty() && !out.profile_id.empty() && out.profile_revision > 0 &&
+                (out.desired_state == "active" || out.desired_state == "cleared");
+    }
+    std::set<std::string> reference_ids;
+    std::set<std::string> poses;
+    if (valid && out.desired_state == "active") {
+        valid = cJSON_IsString(model) && model->valuestring &&
+                cJSON_IsString(preprocessing) && preprocessing->valuestring;
+        if (valid) {
+            out.model_id = model->valuestring;
+            out.preprocessing_version = preprocessing->valuestring;
+            const int count = cJSON_GetArraySize(references);
+            valid = !out.model_id.empty() && !out.preprocessing_version.empty() &&
+                    count >= 3 && count <= 5;
+            for (int i = 0; valid && i < count; ++i) {
+                const cJSON* item = cJSON_GetArrayItem(references, i);
+                const cJSON* reference_id = cJSON_GetObjectItem(item, "reference_id");
+                const cJSON* pose = cJSON_GetObjectItem(item, "pose");
+                const cJSON* sha256 = cJSON_GetObjectItem(item, "sha256");
+                const cJSON* content_type = cJSON_GetObjectItem(item, "content_type");
+                OwnerFaceReferenceHubConfig parsed;
+                valid = HasExactFields(item, kReferenceFields) &&
+                        cJSON_IsString(reference_id) && reference_id->valuestring &&
+                        cJSON_IsString(pose) && pose->valuestring &&
+                        cJSON_IsString(sha256) && sha256->valuestring &&
+                        cJSON_IsString(content_type) && content_type->valuestring &&
+                        ReadUnsigned(item, "size_bytes", &parsed.size_bytes);
+                if (!valid) {
+                    break;
+                }
+                parsed.reference_id = reference_id->valuestring;
+                parsed.pose = pose->valuestring;
+                parsed.sha256 = sha256->valuestring;
+                parsed.content_type = content_type->valuestring;
+                valid = IsOpaqueReferenceId(parsed.reference_id) &&
+                        (parsed.pose == "front" || parsed.pose == "left" ||
+                         parsed.pose == "right" || parsed.pose == "down" ||
+                         parsed.pose == "up") && IsLowerHexSha256(parsed.sha256) &&
+                        parsed.size_bytes > 0 && parsed.size_bytes <= 4 * 1024 * 1024 &&
+                        parsed.content_type == "image/jpeg" &&
+                        reference_ids.insert(parsed.reference_id).second &&
+                        poses.insert(parsed.pose).second;
+                if (valid) {
+                    out.references.push_back(std::move(parsed));
+                }
+            }
+            valid = valid && poses.count("front") && poses.count("left") && poses.count("right");
+        }
+    } else if (valid) {
+        valid = cJSON_IsNull(model) && cJSON_IsNull(preprocessing) &&
+                cJSON_GetArraySize(references) == 0;
+    }
+    cJSON_Delete(root);
+    return valid ? ESP_OK : ESP_ERR_INVALID_RESPONSE;
+}
+
+esp_err_t HubConfigClient::FetchOwnerFaceReference(
+    const std::string& config_url, const std::string& device_id,
+    const OwnerFaceReferenceHubConfig& reference, std::string& out)
+{
+    out.clear();
+    if (!IsOpaqueReferenceId(reference.reference_id) ||
+        !IsLowerHexSha256(reference.sha256) || reference.size_bytes == 0 ||
+        reference.size_bytes > 4 * 1024 * 1024 || reference.content_type != "image/jpeg") {
+        return ESP_ERR_INVALID_ARG;
+    }
+    const std::string request_url =
+        GuardOwnerFaceReferenceUrl(config_url, reference.reference_id);
+    if (request_url.empty()) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    auto network = Board::GetInstance().GetNetwork();
+    auto http = network ? network->CreateHttp(CONFIG_EIDOLON_CONFIG_HTTP_TIMEOUT_MS) : nullptr;
+    if (!http) {
+        return network ? ESP_ERR_NO_MEM : ESP_ERR_INVALID_STATE;
+    }
+    SignedRequestHeaders signed_headers;
+    esp_err_t err = DeviceIdentity::GetInstance().SignGetRequest(
+        EidolonSignedGetPathQuery(request_url), device_id, signed_headers);
+    if (err != ESP_OK) {
+        return err;
+    }
+    SetSignedGetHeaders(http.get(), device_id, signed_headers);
+    http->SetHeader("Accept", "image/jpeg");
+    if (!http->Open("GET", request_url)) {
+        return ESP_FAIL;
+    }
+    const int status = http->GetStatusCode();
+    if (status == 200 && http->GetBodyLength() > 4 * 1024 * 1024) {
+        http->Close();
+        return ESP_ERR_INVALID_SIZE;
+    }
+    out = http->ReadAll();
+    http->Close();
+    if (status == 404) {
+        out.clear();
+        return ESP_ERR_NOT_FOUND;
+    }
+    if (status == 401 || status == 403) {
+        out.clear();
+        return ESP_ERR_NOT_ALLOWED;
+    }
+    if (status != 200) {
+        out.clear();
+        return ESP_FAIL;
+    }
+    if (out.size() != reference.size_bytes || Sha256Hex(out) != reference.sha256) {
+        out.clear();
+        return ESP_ERR_INVALID_CRC;
+    }
+    return ESP_OK;
 }
 #endif
 

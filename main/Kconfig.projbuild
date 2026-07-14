@@ -1266,20 +1266,15 @@ menu "Eidolon Hub"
             It remains disabled until a signed GuardBinding runtime config and
             guard.runtime.sync control path explicitly start it.
 
-    config EIDOLON_ATK_OWNER_FACE_TEST
-        bool "Enable ATK owner face local test"
-        default n
+    config EIDOLON_OWNER_FACE_PROFILE
+        bool "Enable Admin-managed Owner Face Profile"
+        default y
         depends on EIDOLON_GUARD_SERVICE
         help
-            Experimental local owner-face probe for the atk_guard branch. It
-            consumes low-rate RGB565 camera frames on-device and logs face
-            detect/enroll/recognize facts without uploading images.
-
-    config EIDOLON_ATK_OWNER_FACE_SAMPLE_INTERVAL_MS
-        int "ATK owner face sample interval in milliseconds"
-        range 500 10000
-        default 1500
-        depends on EIDOLON_ATK_OWNER_FACE_TEST
+            Applies versioned owner reference photos from authenticated Hub pull
+            endpoints into an on-device ESP-WHO template database. Raw reference
+            images are discarded immediately after enrollment; only local facts
+            are produced during live Guard inference.
 
     config EIDOLON_GUARD_SAMPLE_INTERVAL_MS
         int "ATK guard sample interval in milliseconds"

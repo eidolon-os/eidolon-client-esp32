@@ -28,6 +28,13 @@ public:
     // identity as /api/config. It never fetches persona or policy config.
     esp_err_t FetchGuardRuntime(const std::string& config_url, const std::string& device_id,
                                 GuardRuntimeHubConfig& out);
+    esp_err_t FetchOwnerFaceProfile(const std::string& config_url,
+                                    const std::string& device_id,
+                                    OwnerFaceProfileHubConfig& out);
+    esp_err_t FetchOwnerFaceReference(const std::string& config_url,
+                                      const std::string& device_id,
+                                      const OwnerFaceReferenceHubConfig& reference,
+                                      std::string& out);
 #endif
 
     bool HasPendingFirmware() const { return has_pending_firmware_; }

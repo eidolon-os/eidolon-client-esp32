@@ -98,6 +98,9 @@ private:
 #if CONFIG_EIDOLON_GUARD_SERVICE
         GuardObservation,
 #endif
+#if CONFIG_EIDOLON_OWNER_FACE_PROFILE
+        OwnerFaceProfileCompleted,
+#endif
         ControlCommand,
         SessionControl,
         AgentPhaseChanged,
@@ -142,6 +145,9 @@ private:
     void DoLiveKitState(LiveKitConnectionState lk_state, uint32_t event_generation);
 #if CONFIG_EIDOLON_GUARD_SERVICE
     void DoGuardObservation(const GuardObservation& observation, uint32_t runtime_generation);
+#endif
+#if CONFIG_EIDOLON_OWNER_FACE_PROFILE
+    void DoOwnerFaceProfileCompleted(const std::string& payload);
 #endif
     void DoControlCommand(const std::string& payload);
     void DoSessionControl(const std::string& payload);
@@ -189,6 +195,10 @@ private:
     void HandleDeviceIdentifyCommand(const std::string& command_id, const std::string& payload);
 #if CONFIG_EIDOLON_GUARD_SERVICE
     void HandleGuardRuntimeSyncCommand(const std::string& command_id, const std::string& payload);
+#endif
+#if CONFIG_EIDOLON_OWNER_FACE_PROFILE
+    void HandleGuardOwnerFaceProfileSyncCommand(const std::string& command_id,
+                                                const std::string& payload);
 #endif
 #if CONFIG_EIDOLON_GUARD_VISION_BENCHMARK
     void HandleGuardVisionBenchmarkCommand(const std::string& command_id, const std::string& payload);

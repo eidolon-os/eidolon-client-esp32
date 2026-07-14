@@ -1,7 +1,12 @@
-# ESP-IDF Partition Table (ATK guard model test: single app, no OTA)
-# Name,   Type, SubType, Offset,  Size, Flags
-nvs,      data, nvs,     0x9000,    0x4000,
-phy_init, data, phy,     0xf000,    0x1000,
-factory,  app,  factory, 0x10000,   0x800000,
-face_db,  data, spiffs,  0x810000,  0x10000,
-assets,   data, spiffs,  0x820000,  0x7E0000,
+# ESP-IDF Partition Table (ATK Guard production layout, 16 MiB)
+# Name,          Type, SubType, Offset,    Size,       Flags
+nvs,             data, nvs,     0x9000,    0x5000,
+nvs_keys,        data, nvs_keys,0xe000,    0x1000,     encrypted
+phy_init,        data, phy,     0xf000,    0x1000,
+otadata,         data, ota,     0x10000,   0x2000,
+ota_0,           app,  ota_0,   0x20000,   0x520000,
+ota_1,           app,  ota_1,   0x540000,  0x520000,
+human_face_det,  data, 0x40,    0xa60000,  0x40000,    encrypted
+human_face_feat, data, 0x41,    0xaa0000,  0x150000,   encrypted
+face_db,         data, spiffs,  0xbf0000,  0x10000,    encrypted
+assets,          data, spiffs,  0xc00000,  0x400000,

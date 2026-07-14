@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include <vector>
 
 namespace eidolon {
 
@@ -110,6 +111,24 @@ struct GuardRuntimeHubConfig {
     uint32_t absence_timeout_ms = 180000;
     uint32_t consecutive_capture_failures = 5;
     RoomConfig control;
+};
+
+struct OwnerFaceReferenceHubConfig {
+    std::string reference_id;
+    std::string pose;
+    std::string sha256;
+    uint32_t size_bytes = 0;
+    std::string content_type;
+};
+
+struct OwnerFaceProfileHubConfig {
+    std::string binding_id;
+    std::string profile_id;
+    uint32_t profile_revision = 0;
+    std::string desired_state;
+    std::string model_id;
+    std::string preprocessing_version;
+    std::vector<OwnerFaceReferenceHubConfig> references;
 };
 
 }  // namespace eidolon

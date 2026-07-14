@@ -7,6 +7,9 @@
 #if CONFIG_EIDOLON_GUARD_SERVICE
 #include "guard/guard_service.h"
 #endif
+#if CONFIG_EIDOLON_OWNER_FACE_PROFILE
+#include "guard/owner_face_engine.h"
+#endif
 #if CONFIG_EIDOLON_GUARD_VISION_BENCHMARK
 #include "guard/vision_benchmark.h"
 #endif
@@ -22,7 +25,10 @@
 #include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <cmath>
+#include <cstring>
 #include <ctime>
+#include <new>
 #include <stdio.h>
 
 #ifndef CONFIG_EIDOLON_PTT_RELEASE_TAIL_MS
@@ -252,6 +258,13 @@ void EidolonVoiceController::Dispatch(const Event& ev)
         DoGuardObservation(ev.guard_observation, ev.generation);
         break;
 #endif
+#if CONFIG_EIDOLON_OWNER_FACE_PROFILE
+    case EventType::OwnerFaceProfileCompleted:
+        if (ev.payload != nullptr) {
+            DoOwnerFaceProfileCompleted(*ev.payload);
+        }
+        break;
+#endif
     case EventType::ControlCommand:
         if (ev.payload != nullptr) {
             DoControlCommand(*ev.payload);
@@ -417,7 +430,13 @@ VoiceSessionState EidolonVoiceController::StateForConfig(const Esp32HubConfig& c
 
 bool EidolonVoiceController::HasActiveConfig() const
 {
+#if CONFIG_EIDOLON_GUARD_SERVICE
+    // Guard registration receives a stable data-only control room in the
+    // legacy `active` slot.  It must never be treated as a normal voice room.
+    return false;
+#else
     return config_.status == HubConfigStatus::Active && config_.active.usable();
+#endif
 }
 
 bool EidolonVoiceController::HasControlConfig() const
@@ -1023,6 +1042,10 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload)
 #if CONFIG_EIDOLON_GUARD_SERVICE
         {kControlOpGuardRuntimeSync, &EidolonVoiceController::HandleGuardRuntimeSyncCommand},
 #endif
+#if CONFIG_EIDOLON_OWNER_FACE_PROFILE
+        {kControlOpGuardOwnerFaceProfileSync,
+         &EidolonVoiceController::HandleGuardOwnerFaceProfileSyncCommand},
+#endif
 #if CONFIG_EIDOLON_GUARD_VISION_BENCHMARK
         {kControlOpGuardVisionBenchmark, &EidolonVoiceController::HandleGuardVisionBenchmarkCommand},
 #endif
@@ -1182,6 +1205,172 @@ void EidolonVoiceController::HandleGuardRuntimeSyncCommand(const std::string& co
                 (guard_service_->IsRunning() ? "true" : "false") + "}").c_str());
     vTaskDelay(kActiveAckSettleDelay);
     ConnectControlRoom();
+}
+#endif
+
+#if CONFIG_EIDOLON_OWNER_FACE_PROFILE
+void EidolonVoiceController::HandleGuardOwnerFaceProfileSyncCommand(
+    const std::string& command_id, const std::string& payload)
+{
+    ControlCommand command;
+    command.id = command_id;
+    command.op = kControlOpGuardOwnerFaceProfileSync;
+    OwnerFaceEngine* engine =
+        guard_service_ != nullptr ? guard_service_->owner_face_engine() : nullptr;
+    if (engine == nullptr || config_url_.empty()) {
+        AckCommand(command, "failed", "OWNER_FACE_UNAVAILABLE");
+        return;
+    }
+
+    cJSON* root = cJSON_Parse(payload.c_str());
+    const cJSON* binding_id = root ? cJSON_GetObjectItem(root, "binding_id") : nullptr;
+    const cJSON* profile_id = root ? cJSON_GetObjectItem(root, "profile_id") : nullptr;
+    const cJSON* revision = root ? cJSON_GetObjectItem(root, "profile_revision") : nullptr;
+    const cJSON* desired = root ? cJSON_GetObjectItem(root, "desired_state") : nullptr;
+    int field_count = 0;
+    int binding_count = 0;
+    int profile_count = 0;
+    int revision_count = 0;
+    int desired_count = 0;
+    bool only_known_fields = root != nullptr && cJSON_IsObject(root);
+    for (const cJSON* item = root ? root->child : nullptr; item != nullptr; item = item->next) {
+        ++field_count;
+        const char* key = item->string ? item->string : "";
+        if (strcmp(key, "binding_id") == 0) {
+            ++binding_count;
+        } else if (strcmp(key, "profile_id") == 0) {
+            ++profile_count;
+        } else if (strcmp(key, "profile_revision") == 0) {
+            ++revision_count;
+        } else if (strcmp(key, "desired_state") == 0) {
+            ++desired_count;
+        } else {
+            only_known_fields = false;
+        }
+    }
+    const bool integer_revision = cJSON_IsNumber(revision) && revision->valuedouble >= 1 &&
+                                  revision->valuedouble <= UINT32_MAX &&
+                                  std::floor(revision->valuedouble) == revision->valuedouble;
+    const bool valid = only_known_fields && field_count == 4 && binding_count == 1 &&
+                       profile_count == 1 && revision_count == 1 && desired_count == 1 &&
+                       cJSON_IsString(binding_id) && binding_id->valuestring != nullptr &&
+                       binding_id->valuestring[0] != '\0' && strlen(binding_id->valuestring) <= 64 &&
+                       cJSON_IsString(profile_id) && profile_id->valuestring != nullptr &&
+                       profile_id->valuestring[0] != '\0' && strlen(profile_id->valuestring) <= 64 &&
+                       integer_revision && cJSON_IsString(desired) &&
+                       desired->valuestring != nullptr &&
+                       (strcmp(desired->valuestring, "active") == 0 ||
+                        strcmp(desired->valuestring, "cleared") == 0);
+    if (!valid) {
+        cJSON_Delete(root);
+        AckCommand(command, "failed", "INVALID_ARGUMENT");
+        return;
+    }
+    OwnerFaceSyncRequest request = {
+        .binding_id = binding_id->valuestring,
+        .profile_id = profile_id->valuestring,
+        .profile_revision = static_cast<uint32_t>(revision->valuedouble),
+        .desired_state = desired->valuestring,
+    };
+    cJSON_Delete(root);
+
+    const bool queued = engine->QueueSync(
+        request, config_url_, SystemInfo::GetMacAddress(),
+        [this, command_id](const OwnerFaceApplyResult& result) {
+            cJSON* completion = cJSON_CreateObject();
+            if (completion == nullptr) {
+                ESP_LOGE(TAG, "Owner Face completion allocation failed id=%s", command_id.c_str());
+                return;
+            }
+            cJSON_AddStringToObject(completion, "command_id", command_id.c_str());
+            cJSON_AddStringToObject(completion, "binding_id", result.request.binding_id.c_str());
+            cJSON_AddStringToObject(completion, "profile_id", result.request.profile_id.c_str());
+            cJSON_AddNumberToObject(completion, "profile_revision", result.request.profile_revision);
+            cJSON_AddStringToObject(completion, "desired_state", result.request.desired_state.c_str());
+            cJSON_AddBoolToObject(completion, "success", result.success);
+            cJSON_AddStringToObject(completion, "code", result.code.c_str());
+            cJSON_AddStringToObject(completion, "model_id", result.model_id.c_str());
+            cJSON_AddStringToObject(completion, "preprocessing_version",
+                                    result.preprocessing_version.c_str());
+            cJSON_AddNumberToObject(completion, "template_count", result.template_count);
+            char* encoded = cJSON_PrintUnformatted(completion);
+            cJSON_Delete(completion);
+            if (encoded == nullptr) {
+                ESP_LOGE(TAG, "Owner Face completion encoding failed id=%s", command_id.c_str());
+                return;
+            }
+            Event ev;
+            ev.type = EventType::OwnerFaceProfileCompleted;
+            ev.payload = new (std::nothrow) std::string(encoded);
+            cJSON_free(encoded);
+            if (ev.payload == nullptr) {
+                ESP_LOGE(TAG, "Owner Face completion queue allocation failed id=%s",
+                         command_id.c_str());
+                return;
+            }
+            Enqueue(ev);
+        });
+    if (!queued) {
+        AckCommand(command, "failed", "OWNER_FACE_BUSY");
+    }
+}
+
+void EidolonVoiceController::DoOwnerFaceProfileCompleted(const std::string& payload)
+{
+    cJSON* root = cJSON_Parse(payload.c_str());
+    const cJSON* command_id = root ? cJSON_GetObjectItem(root, "command_id") : nullptr;
+    const cJSON* binding_id = root ? cJSON_GetObjectItem(root, "binding_id") : nullptr;
+    const cJSON* profile_id = root ? cJSON_GetObjectItem(root, "profile_id") : nullptr;
+    const cJSON* revision = root ? cJSON_GetObjectItem(root, "profile_revision") : nullptr;
+    const cJSON* desired = root ? cJSON_GetObjectItem(root, "desired_state") : nullptr;
+    const cJSON* success = root ? cJSON_GetObjectItem(root, "success") : nullptr;
+    const cJSON* code = root ? cJSON_GetObjectItem(root, "code") : nullptr;
+    const cJSON* model = root ? cJSON_GetObjectItem(root, "model_id") : nullptr;
+    const cJSON* preprocessing =
+        root ? cJSON_GetObjectItem(root, "preprocessing_version") : nullptr;
+    const cJSON* templates = root ? cJSON_GetObjectItem(root, "template_count") : nullptr;
+    if (!cJSON_IsString(command_id) || !cJSON_IsString(binding_id) ||
+        !cJSON_IsString(profile_id) || !cJSON_IsNumber(revision) ||
+        !cJSON_IsString(desired) || !cJSON_IsBool(success) || !cJSON_IsString(code) ||
+        !cJSON_IsString(model) || !cJSON_IsString(preprocessing) ||
+        !cJSON_IsNumber(templates)) {
+        ESP_LOGE(TAG, "Ignoring malformed Owner Face completion");
+        cJSON_Delete(root);
+        return;
+    }
+    ControlCommand command;
+    command.id = command_id->valuestring;
+    command.op = kControlOpGuardOwnerFaceProfileSync;
+    if (!cJSON_IsTrue(success)) {
+        AckCommand(command, "failed", code->valuestring);
+        cJSON_Delete(root);
+        return;
+    }
+
+    cJSON* result = cJSON_CreateObject();
+    cJSON_AddStringToObject(result, "binding_id", binding_id->valuestring);
+    cJSON_AddStringToObject(result, "profile_id", profile_id->valuestring);
+    cJSON_AddNumberToObject(result, "profile_revision", revision->valuedouble);
+    cJSON_AddStringToObject(result, "applied_state", desired->valuestring);
+    if (strcmp(desired->valuestring, "cleared") == 0) {
+        cJSON_AddNullToObject(result, "model_id");
+        cJSON_AddNullToObject(result, "preprocessing_version");
+        cJSON_AddNumberToObject(result, "template_count", 0);
+    } else {
+        cJSON_AddStringToObject(result, "model_id", model->valuestring);
+        cJSON_AddStringToObject(result, "preprocessing_version", preprocessing->valuestring);
+        cJSON_AddNumberToObject(result, "template_count", templates->valueint);
+    }
+    char* encoded = cJSON_PrintUnformatted(result);
+    cJSON_Delete(result);
+    if (encoded == nullptr) {
+        AckCommand(command, "failed", "OWNER_FACE_RESULT_ENCODING_FAILED");
+        cJSON_Delete(root);
+        return;
+    }
+    AckCommand(command, "succeeded", "OK", "", encoded);
+    cJSON_free(encoded);
+    cJSON_Delete(root);
 }
 #endif
 
