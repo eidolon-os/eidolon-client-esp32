@@ -7,6 +7,9 @@
 #include "i2c_device.h"
 #include "led/single_led.h"
 #include "esp32_camera.h"
+#if CONFIG_EIDOLON_ATK_OWNER_FACE_TEST
+#include "guard/owner_face_probe.h"
+#endif
 
 #include <esp_log.h>
 #include <esp_lcd_panel_vendor.h>
@@ -52,6 +55,9 @@ private:
     LcdDisplay* display_;
     XL9555* xl9555_;
     Esp32Camera* camera_ = nullptr;
+#if CONFIG_EIDOLON_ATK_OWNER_FACE_TEST
+    OwnerFaceProbe owner_face_probe_;
+#endif
     TaskHandle_t preview_task_ = nullptr;
     std::atomic<bool> preview_running_{false};
 
@@ -134,6 +140,14 @@ private:
         boot_button_.OnDoubleClick([this]() {
             TogglePreview();
         });
+#if CONFIG_EIDOLON_ATK_OWNER_FACE_TEST
+        boot_button_.OnLongPress([this]() {
+            owner_face_probe_.RequestEnroll();
+        });
+        boot_button_.OnMultipleClick([this]() {
+            owner_face_probe_.RequestRecognize();
+        }, 3);
+#endif
     }
 
     void InitializeSt7789Display() {
@@ -211,6 +225,9 @@ private:
         camera_ = new Esp32Camera(camera_config);
         camera_->SetVFlip(true);
         camera_->SetHMirror(true);
+#if CONFIG_EIDOLON_ATK_OWNER_FACE_TEST
+        owner_face_probe_.Start(*camera_);
+#endif
     }
 public:
     atk_dnesp32s3() : boot_button_(BOOT_BUTTON_GPIO, false, 2000) {

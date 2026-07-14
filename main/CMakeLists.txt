@@ -1092,6 +1092,14 @@ if(CONFIG_EIDOLON_HUB_MODE)
             list(APPEND SOURCES "eidolon/guard/vision_benchmark.cc")
         endif()
     endif()
+    if(CONFIG_EIDOLON_ATK_OWNER_FACE_TEST)
+        list(APPEND SOURCES "eidolon/guard/owner_face_probe.cc")
+        list(APPEND MAIN_PRIV_REQUIRES_EXTRA
+            espressif__human_face_detect
+            espressif__human_face_recognition
+            spiffs
+        )
+    endif()
 
     # Per-board eidolon view: the presenter renders to whatever the board registers
     # via SetEidolonView(). CoreS3 (StackChan) uses the ported StackChan LVGL avatar
