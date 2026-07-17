@@ -6,6 +6,7 @@
 namespace eidolon {
 
 esp_err_t PlayIdentifyFeedback();
+esp_err_t PlayRollCallFeedback();
 
 }  // namespace eidolon
 

@@ -10,9 +10,9 @@ namespace eidolon {
 class HubConfigStore {
 public:
     esp_err_t SaveTxtRecord(const HubTxtRecord& txt);
-    esp_err_t SaveHubConfig(const Esp32HubConfig& config, const std::string& config_url);
+    esp_err_t SaveHubConfig(const Esp32HubConfig& config, const std::string& register_url);
     bool HasValidConfig() const;
-    bool Load(Esp32HubConfig& config, std::string* config_url = nullptr) const;
+    bool Load(Esp32HubConfig& config, std::string* register_url = nullptr) const;
 };
 
 }  // namespace eidolon

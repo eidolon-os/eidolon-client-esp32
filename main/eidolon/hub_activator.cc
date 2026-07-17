@@ -63,14 +63,10 @@ bool HubActivator::Run(Display* display) {
         esp_err_t err = discovery.Discover(txt);
         if (err == ESP_OK) {
             Esp32HubConfig config;
-#if CONFIG_EIDOLON_GUARD_SERVICE
-            err = client.RegisterGuardDevice(txt.config_url, txt.register_url, device_id, config);
-#else
-            err = client.Fetch(txt.config_url, device_id, config);
-#endif
+            err = client.RegisterDevice(txt.register_url, device_id, config);
             if (err == ESP_OK) {
                 store.SaveTxtRecord(txt);
-                store.SaveHubConfig(config, txt.config_url);
+                store.SaveHubConfig(config, txt.register_url);
 
                 if (client.HasPendingFirmware()) {
                     cJSON* firmware = cJSON_CreateObject();

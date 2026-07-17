@@ -91,4 +91,16 @@ esp_err_t PlayIdentifyFeedback()
     return PlayIdentifyFeedbackLocked(Board::GetInstance().GetAudioCodec());
 }
 
+esp_err_t PlayRollCallFeedback()
+{
+    // V1 uses the existing local two-tone cue as Guard's audible "I am here"
+    // response. The capability contract stays stable if a spoken asset replaces
+    // the cue later.
+    esp_err_t err = PlayIdentifyFeedback();
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "Roll-call feedback played locally");
+    }
+    return err;
+}
+
 }  // namespace eidolon

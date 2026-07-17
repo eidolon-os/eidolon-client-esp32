@@ -20,7 +20,6 @@ void HubTxtParser::ApplyKnownFields(HubTxtRecord& record) {
     };
 
     record.api = get(kTxtApi);
-    record.config_url = get(kTxtConfigUrl);
     record.register_url = get(kTxtRegisterUrl);
     record.hub_version = get(kTxtVersion);
 
@@ -47,12 +46,8 @@ esp_err_t HubTxtParser::ValidateForTxtVers(const HubTxtRecord& record) {
         ESP_LOGE(TAG, "Unsupported api=%s (expected %s)", record.api.c_str(), kExpectedApi);
         return ESP_ERR_NOT_SUPPORTED;
     }
-    if (record.config_url.empty() || !HasUrlScheme(record.config_url)) {
-        ESP_LOGE(TAG, "Invalid or missing config_url");
-        return ESP_ERR_INVALID_RESPONSE;
-    }
-    if (!record.register_url.empty() && !HasUrlScheme(record.register_url)) {
-        ESP_LOGE(TAG, "Invalid register_url");
+    if (record.register_url.empty() || !HasUrlScheme(record.register_url)) {
+        ESP_LOGE(TAG, "Invalid or missing register_url");
         return ESP_ERR_INVALID_RESPONSE;
     }
     return ESP_OK;

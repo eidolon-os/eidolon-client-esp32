@@ -194,6 +194,9 @@ private:
     void HandlePttTurnStatusCommand(const std::string& command_id, const std::string& payload);
     void HandleDeviceIdentifyCommand(const std::string& command_id, const std::string& payload);
 #if CONFIG_EIDOLON_GUARD_SERVICE
+    void HandleDeviceRollCallCommand(const std::string& command_id, const std::string& payload);
+#endif
+#if CONFIG_EIDOLON_GUARD_SERVICE
     void HandleGuardRuntimeSyncCommand(const std::string& command_id, const std::string& payload);
 #endif
 #if CONFIG_EIDOLON_OWNER_FACE_PROFILE
@@ -254,7 +257,7 @@ private:
 
     LiveKitSession session_;
     Esp32HubConfig config_;
-    std::string config_url_;
+    std::string register_url_;
     VoiceSessionState state_ = VoiceSessionState::Idle;
     bool mic_enabled_ = true;
     // Interaction mode: push-to-talk (half-duplex) vs auto open-mic (full-duplex).

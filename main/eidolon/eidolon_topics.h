@@ -46,6 +46,7 @@ inline constexpr const char* kControlOpPlaybackStop = "playback.stop";
 inline constexpr const char* kControlOpPttTurnStatus = "ptt.turn_status";
 inline constexpr const char* kControlOpConfigRefresh = "config.refresh";
 inline constexpr const char* kControlOpDeviceIdentify = "device.identify";
+inline constexpr const char* kControlOpDeviceRollCall = "device.roll_call";
 inline constexpr const char* kControlOpGuardVisionBenchmark = "guard.vision.benchmark";
 inline constexpr const char* kControlOpGuardRuntimeSync = "guard.runtime.sync";
 inline constexpr const char* kControlOpGuardOwnerFaceProfileSync =

@@ -46,24 +46,24 @@ void ParseOptionalFirmware(cJSON* root, bool* has_pending, bool* force, std::str
 }
 
 #if CONFIG_EIDOLON_GUARD_SERVICE
-std::string GuardRuntimeUrl(const std::string& config_url)
+std::string GuardRuntimeUrl(const std::string& register_url)
 {
-    const std::string suffix = "/api/config";
-    const size_t pos = config_url.find(suffix);
+    const std::string suffix = "/api/device/register";
+    const size_t pos = register_url.find(suffix);
     if (pos == std::string::npos) {
         return "";
     }
-    return config_url.substr(0, pos) + "/api/guard/runtime-config";
+    return register_url.substr(0, pos) + "/api/guard/runtime-config";
 }
 
-std::string GuardOwnerFaceUrl(const std::string& config_url)
+std::string GuardOwnerFaceUrl(const std::string& register_url)
 {
-    const std::string suffix = "/api/config";
-    const size_t pos = config_url.find(suffix);
+    const std::string suffix = "/api/device/register";
+    const size_t pos = register_url.find(suffix);
     if (pos == std::string::npos) {
         return "";
     }
-    return config_url.substr(0, pos) + "/api/guard/owner-face-profile";
+    return register_url.substr(0, pos) + "/api/guard/owner-face-profile";
 }
 
 bool IsOpaqueReferenceId(const std::string& value)
@@ -79,10 +79,10 @@ bool IsOpaqueReferenceId(const std::string& value)
     return true;
 }
 
-std::string GuardOwnerFaceReferenceUrl(const std::string& config_url,
+std::string GuardOwnerFaceReferenceUrl(const std::string& register_url,
                                        const std::string& reference_id)
 {
-    std::string manifest = GuardOwnerFaceUrl(config_url);
+    std::string manifest = GuardOwnerFaceUrl(register_url);
     if (manifest.empty() || !IsOpaqueReferenceId(reference_id)) {
         return "";
     }
@@ -142,19 +142,6 @@ bool HasExactFields(const cJSON* object, const std::set<std::string>& fields)
         }
     }
     return seen == fields;
-}
-
-std::string RegisterUrl(const std::string& config_url, const std::string& register_url)
-{
-    if (!register_url.empty()) {
-        return register_url;
-    }
-    const std::string suffix = "/api/config";
-    const size_t pos = config_url.find(suffix);
-    if (pos == std::string::npos) {
-        return "";
-    }
-    return config_url.substr(0, pos) + "/api/device/register";
 }
 
 bool ReadUnsigned(const cJSON* root, const char* key, uint32_t* out)
@@ -279,8 +266,10 @@ esp_err_t ParseEsp32ConfigResponse(const std::string& body, Esp32HubConfig& out,
 
 }  // namespace
 
-esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::string& device_id,
-                                 Esp32HubConfig& out, const std::string& session_intent) {
+esp_err_t HubConfigClient::RegisterDevice(const std::string& register_url,
+                                          const std::string& device_id,
+                                          Esp32HubConfig& out,
+                                          const std::string& session_intent) {
     out = Esp32HubConfig{};
     has_pending_firmware_ = false;
     pending_firmware_force_ = false;
@@ -297,7 +286,7 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
         return ESP_ERR_NO_MEM;
     }
 
-    std::string request_url = config_url;
+    std::string request_url = register_url;
     // LiveKit agent dispatch mode stays streaming for ESP32 voice sessions.
     // Duplex/PTT capability is declared separately below via
     // X-Device-Interaction-Mode; do not use agent_mode as the barge-in switch.
@@ -310,11 +299,28 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
         request_url += agent_param;
     }
 
+#if CONFIG_EIDOLON_GUARD_SERVICE
+    const std::string body =
+        "{\"capabilities\":[{\"name\":\"device.roll_call\","
+        "\"description\":\"Respond to Guard roll call with a local cue\","
+        "\"input_schema\":{\"type\":\"object\",\"properties\":{},"
+        "\"additionalProperties\":false},"
+        "\"result_schema\":{\"type\":\"object\",\"properties\":{"
+        "\"played\":{\"type\":\"boolean\"}},\"required\":[\"played\"]}}],"
+        "\"device\":{\"name\":\"ATK Guard\",\"kind\":\"atk-guard\"},"
+        "\"guard\":true,\"guard_protocol_versions\":[1]}";
+#else
+    const std::string body =
+        "{\"capabilities\":[{\"name\":\"device.identify\"}],"
+        "\"device\":{\"name\":\"ESP BOX-3\",\"kind\":\"esp-box-3\"},"
+        "\"guard\":false,\"guard_protocol_versions\":[]}";
+#endif
+
     SignedRequestHeaders signed_headers;
-    esp_err_t sign_err = DeviceIdentity::GetInstance().SignGetRequest(
-        EidolonSignedGetPathQuery(request_url), device_id, signed_headers);
+    esp_err_t sign_err = DeviceIdentity::GetInstance().SignRequest(
+        "POST", EidolonSignedGetPathQuery(request_url), device_id, body, signed_headers);
     if (sign_err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to sign Hub config request");
+        ESP_LOGE(TAG, "Failed to sign Hub device registration");
         return sign_err;
     }
 
@@ -326,6 +332,7 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
     http->SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
     http->SetHeader("Client-Id", Board::GetInstance().GetUuid().c_str());
     http->SetHeader("Accept", "application/json");
+    http->SetHeader("Content-Type", "application/json");
     http->SetHeader("User-Agent", SystemInfo::GetUserAgent().c_str());
     // Declare the board's interaction capability so the Hub can stamp the session
     // mode into the LiveKit token metadata (Phase 4) and channel can pick the turn
@@ -347,17 +354,18 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
         http->SetHeader("X-Device-Session-Intent", session_intent.c_str());
     }
 
-    if (!http->Open("GET", request_url)) {
+    http->SetContent(std::string(body));
+    if (!http->Open("POST", request_url)) {
         ESP_LOGE(TAG, "HTTP open failed for %s", request_url.c_str());
         return ESP_FAIL;
     }
 
     int status = http->GetStatusCode();
-    std::string body = http->ReadAll();
+    std::string response = http->ReadAll();
     http->Close();
 
     if (status != 200) {
-        ESP_LOGE(TAG, "HTTP status %d for %s", status, config_url.c_str());
+        ESP_LOGE(TAG, "HTTP status %d for %s", status, register_url.c_str());
         if (status == 422) {
             return ESP_ERR_INVALID_ARG;
         }
@@ -371,95 +379,6 @@ esp_err_t HubConfigClient::Fetch(const std::string& config_url, const std::strin
         return ESP_FAIL;
     }
 
-    esp_err_t parse_err = ParseEsp32ConfigResponse(body, out, &has_pending_firmware_,
-                                                   &pending_firmware_force_,
-                                                   &pending_firmware_version_,
-                                                   &pending_firmware_url_);
-    if (parse_err != ESP_OK) {
-        return parse_err;
-    }
-
-    ESP_LOGI(TAG, "Fetched Hub config for %s status=%s", out.active.identity.c_str(),
-             HubConfigStatusToString(out.status));
-    return ESP_OK;
-}
-
-#if CONFIG_EIDOLON_GUARD_SERVICE
-esp_err_t HubConfigClient::RegisterGuardDevice(const std::string& config_url,
-                                               const std::string& register_url,
-                                               const std::string& device_id,
-                                               Esp32HubConfig& out)
-{
-    out = Esp32HubConfig{};
-    has_pending_firmware_ = false;
-    pending_firmware_force_ = false;
-
-    const std::string request_url = RegisterUrl(config_url, register_url);
-    if (request_url.empty()) {
-        ESP_LOGE(TAG, "Cannot derive Guard register URL from %s", config_url.c_str());
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    auto network = Board::GetInstance().GetNetwork();
-    if (!network) {
-        ESP_LOGE(TAG, "Network interface not available");
-        return ESP_ERR_INVALID_STATE;
-    }
-    auto http = network->CreateHttp(CONFIG_EIDOLON_CONFIG_HTTP_TIMEOUT_MS);
-    if (!http) {
-        ESP_LOGE(TAG, "Failed to create HTTP client");
-        return ESP_ERR_NO_MEM;
-    }
-
-    const std::string body =
-        "{\"capabilities\":[{\"name\":\"guard.presence.candidate\"},"
-        "{\"name\":\"guard.presence.absent\"}],\"guard\":true,"
-        "\"guard_protocol_versions\":[1]}";
-
-    SignedRequestHeaders signed_headers;
-    esp_err_t sign_err = DeviceIdentity::GetInstance().SignRequest(
-        "POST", EidolonSignedGetPathQuery(request_url), device_id, body, signed_headers);
-    if (sign_err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to sign Guard device registration");
-        return sign_err;
-    }
-
-    http->SetHeader("X-Device-ID", device_id.c_str());
-    http->SetHeader("X-Device-Nonce", signed_headers.nonce.c_str());
-    http->SetHeader("X-Device-Timestamp", signed_headers.timestamp.c_str());
-    http->SetHeader("X-Device-Public-Key", signed_headers.public_key.c_str());
-    http->SetHeader("X-Device-Signature", signed_headers.signature.c_str());
-    http->SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
-    http->SetHeader("Client-Id", Board::GetInstance().GetUuid().c_str());
-    http->SetHeader("Accept", "application/json");
-    http->SetHeader("Content-Type", "application/json");
-    http->SetHeader("User-Agent", SystemInfo::GetUserAgent().c_str());
-#if CONFIG_EIDOLON_INTERACTION_MODE_PTT
-    http->SetHeader("X-Device-Interaction-Mode", kInteractionModeHalfDuplex);
-#else
-    http->SetHeader("X-Device-Interaction-Mode", kInteractionModeFullDuplex);
-#endif
-    http->SetContent(std::string(body));
-    if (!http->Open("POST", request_url)) {
-        ESP_LOGE(TAG, "HTTP open failed for %s", request_url.c_str());
-        return ESP_FAIL;
-    }
-
-    const int status = http->GetStatusCode();
-    const std::string response = http->ReadAll();
-    http->Close();
-
-    if (status != 200) {
-        ESP_LOGE(TAG, "HTTP status %d for Guard register %s", status, request_url.c_str());
-        if (status == 422) {
-            return ESP_ERR_INVALID_ARG;
-        }
-        if (status == 401 || status == 403) {
-            return ESP_ERR_NOT_ALLOWED;
-        }
-        return ESP_FAIL;
-    }
-
     esp_err_t parse_err = ParseEsp32ConfigResponse(response, out, &has_pending_firmware_,
                                                    &pending_firmware_force_,
                                                    &pending_firmware_version_,
@@ -467,19 +386,21 @@ esp_err_t HubConfigClient::RegisterGuardDevice(const std::string& config_url,
     if (parse_err != ESP_OK) {
         return parse_err;
     }
-    ESP_LOGI(TAG, "Registered Guard device %s status=%s", out.active.identity.c_str(),
+
+    ESP_LOGI(TAG, "Registered device %s status=%s", out.active.identity.c_str(),
              HubConfigStatusToString(out.status));
     return ESP_OK;
 }
 
-esp_err_t HubConfigClient::FetchGuardRuntime(const std::string& config_url,
+#if CONFIG_EIDOLON_GUARD_SERVICE
+esp_err_t HubConfigClient::FetchGuardRuntime(const std::string& register_url,
                                              const std::string& device_id,
                                              GuardRuntimeHubConfig& out)
 {
     out = GuardRuntimeHubConfig{};
-    const std::string request_url = GuardRuntimeUrl(config_url);
+    const std::string request_url = GuardRuntimeUrl(register_url);
     if (request_url.empty()) {
-        ESP_LOGE(TAG, "Cannot derive Guard runtime URL from %s", config_url.c_str());
+        ESP_LOGE(TAG, "Cannot derive Guard runtime URL from %s", register_url.c_str());
         return ESP_ERR_INVALID_ARG;
     }
     auto network = Board::GetInstance().GetNetwork();

@@ -28,14 +28,13 @@ static std::string EntriesToJson(const std::map<std::string, std::string>& entri
 
 esp_err_t HubConfigStore::SaveTxtRecord(const HubTxtRecord& txt) {
     Settings settings(kNvsNamespace, true);
-    settings.SetString("config_url", txt.config_url);
     settings.SetString("register_url", txt.register_url);
     settings.SetInt("txtvers", txt.txtvers);
     settings.SetString("hub_api", txt.api);
     settings.SetString("hub_version", txt.hub_version);
     settings.SetString("mdns_txt_json", EntriesToJson(txt.entries));
-    ESP_LOGI(TAG, "Saved mDNS TXT (txtvers=%d, config_url=%s, register_url=%s)",
-             txt.txtvers, txt.config_url.c_str(), txt.register_url.c_str());
+    ESP_LOGI(TAG, "Saved mDNS TXT (txtvers=%d, register_url=%s)",
+             txt.txtvers, txt.register_url.c_str());
     return ESP_OK;
 }
 
@@ -55,12 +54,13 @@ static int JsonIntField(cJSON* root, const char* key, int fallback) {
     return cJSON_IsNumber(item) ? item->valueint : fallback;
 }
 
-esp_err_t HubConfigStore::SaveHubConfig(const Esp32HubConfig& config, const std::string& config_url) {
+esp_err_t HubConfigStore::SaveHubConfig(const Esp32HubConfig& config,
+                                        const std::string& register_url) {
     cJSON* root = cJSON_CreateObject();
     if (!root) {
         return ESP_ERR_NO_MEM;
     }
-    cJSON_AddStringToObject(root, "config_url", config_url.c_str());
+    cJSON_AddStringToObject(root, "register_url", register_url.c_str());
     cJSON_AddStringToObject(root, "status", HubConfigStatusToString(config.status));
     cJSON_AddStringToObject(root, "server_url", config.active.server_url.c_str());
     cJSON_AddStringToObject(root, "token", config.active.token.c_str());
@@ -96,7 +96,7 @@ bool HubConfigStore::HasValidConfig() const {
     return Load(config, nullptr);
 }
 
-bool HubConfigStore::Load(Esp32HubConfig& config, std::string* config_url) const {
+bool HubConfigStore::Load(Esp32HubConfig& config, std::string* register_url) const {
     Settings settings(kNvsNamespace, false);
     std::string blob = settings.GetString(kConfigKey);
     if (blob.empty()) {
@@ -131,8 +131,8 @@ bool HubConfigStore::Load(Esp32HubConfig& config, std::string* config_url) const
     config.sample_rate = JsonIntField(root, "sample_rate", 16000);
     config.channels = JsonIntField(root, "channels", 1);
 
-    if (config_url) {
-        *config_url = JsonStringField(root, "config_url");
+    if (register_url) {
+        *register_url = JsonStringField(root, "register_url");
     }
     cJSON_Delete(root);
     return true;

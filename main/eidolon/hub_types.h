@@ -12,7 +12,6 @@ namespace eidolon {
 inline constexpr const char* kTxtVers = "txtvers";
 inline constexpr const char* kTxtApi = "api";
 inline constexpr const char* kTxtVersion = "version";
-inline constexpr const char* kTxtConfigUrl = "config_url";
 inline constexpr const char* kTxtRegisterUrl = "register_url";
 
 inline constexpr int kSupportedTxtVers = 1;
@@ -67,7 +66,6 @@ struct HubTxtRecord {
     int txtvers = 0;
     std::map<std::string, std::string> entries;
     std::string api;
-    std::string config_url;
     std::string register_url;
     std::string hub_version;
 };
