@@ -333,7 +333,25 @@ esp_err_t HubConfigClient::RegisterDevice(const std::string& register_url,
         "\"additionalProperties\":false},"
         "\"result_schema\":{\"type\":\"object\",\"properties\":{"
         "\"played\":{\"type\":\"boolean\"}},\"required\":[\"played\"],"
-        "\"additionalProperties\":false}}],"
+        "\"additionalProperties\":false}}"
+#if CONFIG_BOARD_TYPE_M5STACK_STACKCHAN
+        // StackChan servo body: discrete head gestures the brain/hub can drive.
+        ",{\"name\":\"head.look_at\",\"version\":1,"
+        "\"description\":\"Turn the head toward a normalized target (x,y in -1..1)\","
+        "\"input_schema\":{\"type\":\"object\",\"properties\":{"
+        "\"x\":{\"type\":\"number\",\"minimum\":-1,\"maximum\":1},"
+        "\"y\":{\"type\":\"number\",\"minimum\":-1,\"maximum\":1}},"
+        "\"required\":[\"x\",\"y\"],\"additionalProperties\":false},"
+        "\"result_schema\":{\"type\":\"object\",\"properties\":{},"
+        "\"additionalProperties\":false}},"
+        "{\"name\":\"head.home\",\"version\":1,"
+        "\"description\":\"Return the head to its rest position\","
+        "\"input_schema\":{\"type\":\"object\",\"properties\":{},"
+        "\"additionalProperties\":false},"
+        "\"result_schema\":{\"type\":\"object\",\"properties\":{},"
+        "\"additionalProperties\":false}}"
+#endif
+        "],"
         // Device identity is HARDWARE ONLY (board type/name); no logical role.
         "\"device\":{\"name\":\"" BOARD_NAME "\",\"kind\":\"" BOARD_TYPE "\"},"
         "\"guard\":false,\"guard_protocol_versions\":[]}";

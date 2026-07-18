@@ -87,6 +87,15 @@ public:
 
     /** Shared I2C bus for codecs (Eidolon LiveKit media). Default: none. */
     virtual i2c_master_bus_handle_t GetSharedI2cBus() { return nullptr; }
+
+    /**
+     * Head/body motion for boards with a servo body (e.g. StackChan). These are
+     * discrete, brain/hub-driven gestures; boards without a body use the no-op
+     * defaults. x,y are normalized [-1,1] (0,0 = centered/forward).
+     */
+    virtual bool HasHeadMotion() { return false; }
+    virtual void HeadLookAt(float x, float y) { (void)x; (void)y; }
+    virtual void HeadHome() {}
 };
 
 #define DECLARE_BOARD(BOARD_CLASS_NAME) \

@@ -1055,6 +1055,8 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload)
         {kControlOpPlaybackStop, 0, &EidolonVoiceController::HandlePlaybackStopCommand},
         {kControlOpPttTurnStatus, 0, &EidolonVoiceController::HandlePttTurnStatusCommand},
         {kControlOpDeviceIdentify, 1, &EidolonVoiceController::HandleDeviceIdentifyCommand},
+        {kControlOpHeadLookAt, 1, &EidolonVoiceController::HandleHeadLookAtCommand},
+        {kControlOpHeadHome, 1, &EidolonVoiceController::HandleHeadHomeCommand},
 #if CONFIG_EIDOLON_GUARD_SERVICE
         {kControlOpDeviceRollCall, 1, &EidolonVoiceController::HandleDeviceRollCallCommand},
         {kControlOpGuardRuntimeSync, 0, &EidolonVoiceController::HandleGuardRuntimeSyncCommand},
@@ -1522,6 +1524,54 @@ void EidolonVoiceController::HandleDeviceIdentifyCommand(const std::string& comm
         return;
     }
 
+    AckCommand(command, "completed", "OK");
+}
+
+void EidolonVoiceController::HandleHeadLookAtCommand(const std::string& command_id,
+                                                     const std::string& payload)
+{
+    ControlCommand command;
+    command.id = command_id;
+    command.op = kControlOpHeadLookAt;
+
+    auto& board = Board::GetInstance();
+    if (!board.HasHeadMotion()) {
+        AckCommand(command, "failed", "NO_HEAD_MOTION");
+        return;
+    }
+
+    float x = 0.0f, y = 0.0f;
+    cJSON* root = cJSON_Parse(payload.c_str());
+    if (root) {
+        const cJSON* jx = cJSON_GetObjectItem(root, "x");
+        const cJSON* jy = cJSON_GetObjectItem(root, "y");
+        if (cJSON_IsNumber(jx)) x = static_cast<float>(jx->valuedouble);
+        if (cJSON_IsNumber(jy)) y = static_cast<float>(jy->valuedouble);
+        cJSON_Delete(root);
+    }
+    // Normalized inputs; the motion layer maps to the mechanical range and clamps.
+    if (x < -1.0f) x = -1.0f; else if (x > 1.0f) x = 1.0f;
+    if (y < -1.0f) y = -1.0f; else if (y > 1.0f) y = 1.0f;
+
+    ESP_LOGI(TAG, "Control command -> head.look_at x=%.2f y=%.2f", x, y);
+    board.HeadLookAt(x, y);
+    AckCommand(command, "completed", "OK");
+}
+
+void EidolonVoiceController::HandleHeadHomeCommand(const std::string& command_id,
+                                                   const std::string& /*payload*/)
+{
+    ControlCommand command;
+    command.id = command_id;
+    command.op = kControlOpHeadHome;
+
+    auto& board = Board::GetInstance();
+    if (!board.HasHeadMotion()) {
+        AckCommand(command, "failed", "NO_HEAD_MOTION");
+        return;
+    }
+    ESP_LOGI(TAG, "Control command -> head.home");
+    board.HeadHome();
     AckCommand(command, "completed", "OK");
 }
 

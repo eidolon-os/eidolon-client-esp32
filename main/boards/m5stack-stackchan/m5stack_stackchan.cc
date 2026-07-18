@@ -452,6 +452,15 @@ public:
         static CustomBacklight backlight(pmic_);
         return &backlight;
     }
+
+    // Head/body motion: delegate to the servo body (no-op if the base is absent).
+    bool HasHeadMotion() override { return body_ != nullptr && body_->ready(); }
+    void HeadLookAt(float x, float y) override {
+        if (body_) body_->LookAtNormalized(x, y);
+    }
+    void HeadHome() override {
+        if (body_) body_->GoHome();
+    }
 };
 
 DECLARE_BOARD(M5StackChanBoard);

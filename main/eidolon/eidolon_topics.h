@@ -46,6 +46,10 @@ inline constexpr const char* kControlOpPlaybackStop = "playback.stop";
 inline constexpr const char* kControlOpPttTurnStatus = "ptt.turn_status";
 inline constexpr const char* kControlOpConfigRefresh = "config.refresh";
 inline constexpr const char* kControlOpDeviceIdentify = "device.identify";
+// Body/head motion (StackChan servo body). Discrete, brain/hub-driven gestures — NOT a
+// coordinate stream; continuous gaze tracking is a separate device-local reflex.
+inline constexpr const char* kControlOpHeadLookAt = "head.look_at";
+inline constexpr const char* kControlOpHeadHome = "head.home";
 inline constexpr const char* kControlOpDeviceRollCall = "device.roll_call";
 inline constexpr const char* kControlOpGuardVisionBenchmark = "guard.vision.benchmark";
 inline constexpr const char* kControlOpGuardRuntimeSync = "guard.runtime.sync";
