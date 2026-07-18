@@ -13,6 +13,7 @@ struct ControlCommand {
     bool valid = false;
     bool expired = false;
     bool is_v1 = false;
+    int capability_version = 0;
     std::string id;
     std::string op;
     std::string payload;

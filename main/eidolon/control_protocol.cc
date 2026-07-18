@@ -87,6 +87,10 @@ ControlCommand ParseControlCommand(const std::string& json)
         command.is_v1 = true;
         command.id = FirstString(root, "id", "command_id");
         command.op = FirstString(root, "op", "type", "command");
+        const cJSON* capability_version = cJSON_GetObjectItem(root, "capability_version");
+        if (cJSON_IsNumber(capability_version) && capability_version->valueint > 0) {
+            command.capability_version = capability_version->valueint;
+        }
         command.payload = PrintJson(cJSON_GetObjectItem(root, "payload"));
         command.expired = IsExpired(cJSON_GetObjectItem(root, "ts"), cJSON_GetObjectItem(root, "ttl_ms"));
     } else {
@@ -120,6 +124,9 @@ std::string BuildControlAck(const ControlCommand& command,
     AddString(root, "ref", command.id);
     AddString(root, "device_id", device_id);
     AddString(root, "op", command.op);
+    if (command.capability_version > 0) {
+        cJSON_AddNumberToObject(root, "capability_version", command.capability_version);
+    }
     cJSON_AddStringToObject(root, "status", status.c_str());
     cJSON_AddStringToObject(root, "code", code.c_str());
     AddString(root, "message", message);

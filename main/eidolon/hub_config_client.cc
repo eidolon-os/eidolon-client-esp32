@@ -302,11 +302,13 @@ esp_err_t HubConfigClient::RegisterDevice(const std::string& register_url,
 #if CONFIG_EIDOLON_GUARD_SERVICE
     const std::string body =
         "{\"capabilities\":[{\"name\":\"device.roll_call\","
-        "\"description\":\"Respond to Guard roll call with a local cue\","
+        "\"version\":1,"
+        "\"description\":\"Play this device's local roll-call response\","
         "\"input_schema\":{\"type\":\"object\",\"properties\":{},"
         "\"additionalProperties\":false},"
         "\"result_schema\":{\"type\":\"object\",\"properties\":{"
-        "\"played\":{\"type\":\"boolean\"}},\"required\":[\"played\"]}}],"
+        "\"played\":{\"type\":\"boolean\"}},\"required\":[\"played\"],"
+        "\"additionalProperties\":false}}],"
         // Device identity is HARDWARE ONLY (board type/name). The logical role
         // (guard) lives on the bound companion, not the device — so it is NOT
         // encoded in the device kind. `guard` below is a protocol capability
@@ -315,7 +317,14 @@ esp_err_t HubConfigClient::RegisterDevice(const std::string& register_url,
         "\"guard\":true,\"guard_protocol_versions\":[1]}";
 #else
     const std::string body =
-        "{\"capabilities\":[{\"name\":\"device.identify\"}],"
+        "{\"capabilities\":[{\"name\":\"device.identify\",\"version\":1,"
+        "\"description\":\"Play this device's local identification cue\","
+        "\"input_schema\":{\"type\":\"object\",\"properties\":{"
+        "\"reason\":{\"type\":\"string\",\"maxLength\":128}},"
+        "\"additionalProperties\":false},"
+        "\"result_schema\":{\"type\":\"object\",\"properties\":{"
+        "\"played\":{\"type\":\"boolean\"}},\"required\":[\"played\"],"
+        "\"additionalProperties\":false}}],"
         // Device identity is HARDWARE ONLY (board type/name); no logical role.
         "\"device\":{\"name\":\"" BOARD_NAME "\",\"kind\":\"" BOARD_TYPE "\"},"
         "\"guard\":false,\"guard_protocol_versions\":[]}";

@@ -1031,29 +1031,40 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload)
     // per-command worker task); blocking work just queues other events briefly.
     struct ControlOpHandler {
         const char* op;
+        int capability_version;
         void (EidolonVoiceController::*handler)(const std::string&, const std::string&);
     };
     static const ControlOpHandler kControlOps[] = {
-        {kControlOpConfigRefresh, &EidolonVoiceController::HandleConfigRefreshCommand},
-        {kControlOpRoomJoin, &EidolonVoiceController::HandleRoomJoinCommand},
-        {kControlOpPlaybackStop, &EidolonVoiceController::HandlePlaybackStopCommand},
-        {kControlOpPttTurnStatus, &EidolonVoiceController::HandlePttTurnStatusCommand},
-        {kControlOpDeviceIdentify, &EidolonVoiceController::HandleDeviceIdentifyCommand},
+        {kControlOpConfigRefresh, 0, &EidolonVoiceController::HandleConfigRefreshCommand},
+        {kControlOpRoomJoin, 0, &EidolonVoiceController::HandleRoomJoinCommand},
+        {kControlOpPlaybackStop, 0, &EidolonVoiceController::HandlePlaybackStopCommand},
+        {kControlOpPttTurnStatus, 0, &EidolonVoiceController::HandlePttTurnStatusCommand},
+        {kControlOpDeviceIdentify, 1, &EidolonVoiceController::HandleDeviceIdentifyCommand},
 #if CONFIG_EIDOLON_GUARD_SERVICE
-        {kControlOpDeviceRollCall, &EidolonVoiceController::HandleDeviceRollCallCommand},
-        {kControlOpGuardRuntimeSync, &EidolonVoiceController::HandleGuardRuntimeSyncCommand},
+        {kControlOpDeviceRollCall, 1, &EidolonVoiceController::HandleDeviceRollCallCommand},
+        {kControlOpGuardRuntimeSync, 0, &EidolonVoiceController::HandleGuardRuntimeSyncCommand},
 #endif
 #if CONFIG_EIDOLON_OWNER_FACE_PROFILE
-        {kControlOpGuardOwnerFaceProfileSync,
+        {kControlOpGuardOwnerFaceProfileSync, 0,
          &EidolonVoiceController::HandleGuardOwnerFaceProfileSyncCommand},
 #endif
 #if CONFIG_EIDOLON_GUARD_VISION_BENCHMARK
-        {kControlOpGuardVisionBenchmark, &EidolonVoiceController::HandleGuardVisionBenchmarkCommand},
+        {kControlOpGuardVisionBenchmark, 0,
+         &EidolonVoiceController::HandleGuardVisionBenchmarkCommand},
 #endif
     };
 
     for (const auto& entry : kControlOps) {
         if (command.op == entry.op) {
+            if (entry.capability_version > 0 && command.capability_version > 0 &&
+                command.capability_version != entry.capability_version) {
+                ESP_LOGW(TAG,
+                         "Unsupported capability version op=%s expected=%d got=%d",
+                         command.op.c_str(), entry.capability_version,
+                         command.capability_version);
+                AckCommand(command, "unsupported", "UNSUPPORTED_CAPABILITY_VERSION");
+                return;
+            }
             AckCommand(command, "accepted", "OK");
             (this->*entry.handler)(command.id, command.payload);
             return;
@@ -1848,17 +1859,22 @@ esp_err_t EidolonVoiceController::ConnectControlRoom()
     // that is already the pending room; once active, point it at the control room
     // (falling back to the active identity when the control room omits one).
     Esp32HubConfig control_config = config_;
-#if CONFIG_EIDOLON_GUARD_SERVICE
-    if (has_guard_control_config_ && guard_control_config_.usable()) {
-        control_config.active = guard_control_config_;
-    } else
-#endif
-    if (config_.status == HubConfigStatus::Active) {
+    if (config_.status == HubConfigStatus::Active && config_.control.usable()) {
+        // A successful /api/device/register refresh is the freshest source of
+        // control credentials. In particular, do not reconnect Guard with the
+        // older token cached by a previous runtime-config pull.
         control_config.active = config_.control;
         if (control_config.active.identity.empty()) {
             control_config.active.identity = config_.active.identity;
         }
     }
+#if CONFIG_EIDOLON_GUARD_SERVICE
+    else if (has_guard_control_config_ && guard_control_config_.usable()) {
+        // Guard runtime config remains a fallback while registration is not
+        // active, so an approved Guard can stay reachable while binding starts.
+        control_config.active = guard_control_config_;
+    }
+#endif
 
     control_room_ = true;
     BeginSessionGeneration("control");
