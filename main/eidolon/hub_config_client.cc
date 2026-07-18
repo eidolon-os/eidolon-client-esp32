@@ -307,12 +307,17 @@ esp_err_t HubConfigClient::RegisterDevice(const std::string& register_url,
         "\"additionalProperties\":false},"
         "\"result_schema\":{\"type\":\"object\",\"properties\":{"
         "\"played\":{\"type\":\"boolean\"}},\"required\":[\"played\"]}}],"
-        "\"device\":{\"name\":\"ATK Guard\",\"kind\":\"atk-guard\"},"
+        // Device identity is HARDWARE ONLY (board type/name). The logical role
+        // (guard) lives on the bound companion, not the device — so it is NOT
+        // encoded in the device kind. `guard` below is a protocol capability
+        // declaration, not a role.
+        "\"device\":{\"name\":\"" BOARD_NAME "\",\"kind\":\"" BOARD_TYPE "\"},"
         "\"guard\":true,\"guard_protocol_versions\":[1]}";
 #else
     const std::string body =
         "{\"capabilities\":[{\"name\":\"device.identify\"}],"
-        "\"device\":{\"name\":\"ESP BOX-3\",\"kind\":\"esp-box-3\"},"
+        // Device identity is HARDWARE ONLY (board type/name); no logical role.
+        "\"device\":{\"name\":\"" BOARD_NAME "\",\"kind\":\"" BOARD_TYPE "\"},"
         "\"guard\":false,\"guard_protocol_versions\":[]}";
 #endif
 
