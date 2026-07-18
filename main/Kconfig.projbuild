@@ -282,6 +282,9 @@ choice BOARD_TYPE
     config BOARD_TYPE_M5STACK_CORE_S3
         bool "M5Stack CoreS3"
         depends on IDF_TARGET_ESP32S3
+    config BOARD_TYPE_M5STACK_STACKCHAN
+        bool "M5Stack StackChan (CoreS3 + servo body)"
+        depends on IDF_TARGET_ESP32S3
     config BOARD_TYPE_M5STACK_STICK_S3
         bool "M5Stack StickS3"
         depends on IDF_TARGET_ESP32S3
@@ -1125,7 +1128,7 @@ menu "TAIJIPAI_S3_CONFIG"
 endmenu
 
 menu "Eidolon Hub"
-    depends on BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_2_06 || BOARD_TYPE_ESP_BOX_3 || BOARD_TYPE_ATK_DNESP32S3 || BOARD_TYPE_M5STACK_CORE_S3
+    depends on BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_2_06 || BOARD_TYPE_ESP_BOX_3 || BOARD_TYPE_ATK_DNESP32S3 || BOARD_TYPE_M5STACK_CORE_S3 || BOARD_TYPE_M5STACK_STACKCHAN
 
     config EIDOLON_HUB_MODE
         bool "Enable Eidolon Hub mDNS discovery and config"
