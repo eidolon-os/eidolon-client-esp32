@@ -234,6 +234,7 @@ private:
         static bool was_touched = false;
         static int64_t touch_start_time = 0;
         const int64_t TOUCH_THRESHOLD_MS = 500;  // 触摸时长阈值，超过500ms视为长按
+        const int64_t LONG_PRESS_WIFI_CONFIG_MS = 2000;  // 长按≥2s：任意状态进 WiFi 配网
         
         ft6336_->UpdateTouchPoint();
         auto& touch_point = ft6336_->GetTouchPoint();
@@ -248,7 +249,7 @@ private:
             was_touched = false;
             int64_t touch_duration = (esp_timer_get_time() / 1000) - touch_start_time;
             
-            // 只有短触才触发
+            // 短触：开机 starting 阶段进配网，否则切换对话
             if (touch_duration < TOUCH_THRESHOLD_MS) {
                 auto& app = Application::GetInstance();
                 if (app.GetDeviceState() == kDeviceStateStarting) {
@@ -256,6 +257,12 @@ private:
                     return;
                 }
                 app.ToggleChatState();
+            } else if (touch_duration >= LONG_PRESS_WIFI_CONFIG_MS) {
+                // 长按 >=2s：任意状态下进入 WiFi 配网。这是 CoreS3 的可靠配网入口，
+                // 不依赖开机那几秒的短触窗口（其他板子有 boot 按键，CoreS3 没有）。
+                ESP_LOGI(TAG, "Long-press detected: entering WiFi config mode");
+                StartWifiConfigMode();
+                return;
             }
         }
     }
