@@ -57,7 +57,8 @@ public:
                    const std::string& device_id,
                    OwnerFaceApplyCallback callback);
     OwnerFaceLiveResult AnalyzeLiveFrame(const CameraFrame& frame, uint64_t now_ms);
-    OwnerFaceProfileStatus GetProfileStatus();
+    void SetLiveIntervalMs(uint32_t interval_ms);
+    bool TryGetProfileStatus(OwnerFaceProfileStatus& out);
 
     OwnerFaceEngine(const OwnerFaceEngine&) = delete;
     OwnerFaceEngine& operator=(const OwnerFaceEngine&) = delete;

@@ -8,9 +8,13 @@
 #include "sdkconfig.h"
 
 #include <cJSON.h>
+#include <esp_heap_caps.h>
 #include <esp_log.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include <mbedtls/sha256.h>
 
+#include <algorithm>
 #include <cctype>
 #include <set>
 
@@ -205,6 +209,11 @@ esp_err_t ParseEsp32ConfigResponse(const std::string& body, Esp32HubConfig& out,
     cJSON* status_json = cJSON_GetObjectItem(root, "status");
     if (cJSON_IsString(status_json)) {
         out.status = ParseHubConfigStatus(status_json->valuestring);
+    }
+
+    cJSON* registration_id = cJSON_GetObjectItem(root, "registration_id");
+    if (cJSON_IsString(registration_id)) {
+        out.registration_id = registration_id->valuestring;
     }
 
     cJSON* server_url = cJSON_GetObjectItem(config, "server_url");
@@ -476,6 +485,11 @@ esp_err_t HubConfigClient::FetchGuardRuntime(const std::string& register_url,
                  ReadUnsigned(runtime, "candidate_debounce_ms", &out.candidate_debounce_ms) &&
                  ReadUnsigned(runtime, "absence_timeout_ms", &out.absence_timeout_ms) &&
                  ReadUnsigned(runtime, "consecutive_capture_failures", &out.consecutive_capture_failures) &&
+                 ReadUnsigned(runtime, "owner_face_interval_ms", &out.owner_face_interval_ms) &&
+                 ReadUnsigned(runtime, "owner_presence_enter_ms", &out.owner_presence_enter_ms) &&
+                 ReadUnsigned(runtime, "owner_presence_exit_ms", &out.owner_presence_exit_ms) &&
+                 ReadUnsigned(runtime, "owner_presence_heartbeat_ms", &out.owner_presence_heartbeat_ms) &&
+                 ReadUnsigned(runtime, "owner_presence_lease_ms", &out.owner_presence_lease_ms) &&
                  ReadRoomConfig(control, &out.control);
     if (valid) {
         const cJSON* runtime_schema = cJSON_GetObjectItem(runtime, "schema_v");
@@ -492,7 +506,10 @@ esp_err_t HubConfigClient::FetchGuardRuntime(const std::string& register_url,
                 out.preview_interval_ms >= out.sample_interval_ms &&
                 out.motion_clear_threshold <= out.motion_threshold &&
                 out.candidate_debounce_ms >= out.sample_interval_ms &&
-                out.absence_timeout_ms >= out.sample_interval_ms * 2U;
+                out.absence_timeout_ms >= out.sample_interval_ms * 2U &&
+                out.owner_presence_enter_ms >= out.owner_face_interval_ms &&
+                out.owner_presence_exit_ms >= out.owner_face_interval_ms * 2U &&
+                out.owner_presence_heartbeat_ms < out.owner_presence_lease_ms;
     }
     cJSON_Delete(root);
     return valid ? ESP_OK : ESP_ERR_INVALID_RESPONSE;
@@ -651,12 +668,58 @@ esp_err_t HubConfigClient::FetchOwnerFaceReference(
         return ESP_FAIL;
     }
     const int status = http->GetStatusCode();
-    if (status == 200 && http->GetBodyLength() > 4 * 1024 * 1024) {
+    const size_t content_length = http->GetBodyLength();
+    ESP_LOGI(
+        TAG,
+        "Owner Face reference HTTP status=%d content_length=%lu expected=%lu "
+        "internal=%lu largest_internal=%lu stack_free=%lu",
+        status, static_cast<unsigned long>(content_length),
+        static_cast<unsigned long>(reference.size_bytes),
+        static_cast<unsigned long>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
+        static_cast<unsigned long>(
+            heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)),
+        static_cast<unsigned long>(uxTaskGetStackHighWaterMark(nullptr)));
+    if (status == 200 &&
+        (content_length != reference.size_bytes ||
+         content_length > 4 * 1024 * 1024)) {
         http->Close();
         return ESP_ERR_INVALID_SIZE;
     }
-    out = http->ReadAll();
+    if (status == 200) {
+        out.reserve(reference.size_bytes);
+        char buffer[512];
+        while (out.size() < reference.size_bytes) {
+            const size_t remaining = reference.size_bytes - out.size();
+            const int received = http->Read(buffer, std::min(remaining, sizeof(buffer)));
+            if (received <= 0) {
+                ESP_LOGE(
+                    TAG,
+                    "Owner Face reference read failed received=%lu expected=%lu "
+                    "last_error=%d internal=%lu largest_internal=%lu stack_free=%lu",
+                    static_cast<unsigned long>(out.size()),
+                    static_cast<unsigned long>(reference.size_bytes),
+                    http->GetLastError(),
+                    static_cast<unsigned long>(
+                        heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
+                    static_cast<unsigned long>(
+                        heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)),
+                    static_cast<unsigned long>(uxTaskGetStackHighWaterMark(nullptr)));
+                break;
+            }
+            out.append(buffer, static_cast<size_t>(received));
+        }
+    }
     http->Close();
+    ESP_LOGI(
+        TAG,
+        "Owner Face reference body received=%lu expected=%lu internal=%lu "
+        "largest_internal=%lu stack_free=%lu",
+        static_cast<unsigned long>(out.size()),
+        static_cast<unsigned long>(reference.size_bytes),
+        static_cast<unsigned long>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
+        static_cast<unsigned long>(
+            heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)),
+        static_cast<unsigned long>(uxTaskGetStackHighWaterMark(nullptr)));
     if (status == 404) {
         out.clear();
         return ESP_ERR_NOT_FOUND;

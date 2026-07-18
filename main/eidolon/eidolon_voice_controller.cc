@@ -257,6 +257,9 @@ void EidolonVoiceController::Dispatch(const Event& ev)
     case EventType::GuardObservation:
         DoGuardObservation(ev.guard_observation, ev.generation);
         break;
+    case EventType::OwnerPresence:
+        DoOwnerPresence(ev.owner_presence_observation, ev.generation);
+        break;
 #endif
 #if CONFIG_EIDOLON_OWNER_FACE_PROFILE
     case EventType::OwnerFaceProfileCompleted:
@@ -1921,8 +1924,8 @@ esp_err_t EidolonVoiceController::SyncGuardRuntime(const char* reason,
     has_guard_control_config_ = true;
     guard_control_config_ = runtime.control;
     if (runtime.desired_runtime_state == "stopped") {
-        ClearGuardPresenceRuntime();
         guard_service_->Stop(reason);
+        ClearGuardPresenceRuntime();
         has_guard_control_config_ = false;
         guard_control_config_ = RoomConfig{};
         return ESP_OK;
@@ -1935,6 +1938,11 @@ esp_err_t EidolonVoiceController::SyncGuardRuntime(const char* reason,
     config.candidate_debounce_ms = runtime.candidate_debounce_ms;
     config.absence_timeout_ms = runtime.absence_timeout_ms;
     config.consecutive_capture_failures = runtime.consecutive_capture_failures;
+    config.owner_face_interval_ms = runtime.owner_face_interval_ms;
+    config.owner_presence_enter_ms = runtime.owner_presence_enter_ms;
+    config.owner_presence_exit_ms = runtime.owner_presence_exit_ms;
+    config.owner_presence_heartbeat_ms = runtime.owner_presence_heartbeat_ms;
+    config.owner_presence_lease_ms = runtime.owner_presence_lease_ms;
     ConfigureGuardPresenceRuntime(runtime);
     return guard_service_->Start(config, reason) ? ESP_OK : ESP_FAIL;
 }
@@ -1946,12 +1954,18 @@ void EidolonVoiceController::ConfigureGuardPresenceRuntime(const GuardRuntimeHub
     }
     ++guard_runtime_generation_;
     pending_guard_presence_payloads_.clear();
+    const uint32_t boot_nonce = esp_random();
     guard_presence_adapter_.Configure({
         .guard_companion_id = runtime.guard_companion_id,
         .device_id = SystemInfo::GetMacAddress(),
         .runtime_revision = runtime.runtime_revision,
         .candidate_debounce_ms = runtime.candidate_debounce_ms,
-        .boot_nonce = esp_random(),
+        .boot_nonce = boot_nonce,
+    });
+    owner_presence_adapter_.Configure({
+        .guard_companion_id = runtime.guard_companion_id,
+        .device_id = SystemInfo::GetMacAddress(),
+        .boot_nonce = boot_nonce,
     });
     const uint32_t generation = guard_runtime_generation_;
     guard_service_->SetObservationCallback([this, generation](const GuardObservation& observation) {
@@ -1961,6 +1975,14 @@ void EidolonVoiceController::ConfigureGuardPresenceRuntime(const GuardRuntimeHub
         ev.guard_observation = observation;
         Enqueue(ev);
     });
+    guard_service_->SetOwnerPresenceCallback(
+        [this, generation](const OwnerPresenceObservation& observation) {
+            Event ev;
+            ev.type = EventType::OwnerPresence;
+            ev.generation = generation;
+            ev.owner_presence_observation = observation;
+            Enqueue(ev);
+        });
 }
 
 void EidolonVoiceController::ClearGuardPresenceRuntime()
@@ -1968,9 +1990,11 @@ void EidolonVoiceController::ClearGuardPresenceRuntime()
     ++guard_runtime_generation_;
     pending_guard_presence_payloads_.clear();
     guard_presence_adapter_.Clear();
+    owner_presence_adapter_.Clear();
 #if CONFIG_EIDOLON_GUARD_SERVICE
     if (guard_service_ != nullptr) {
         guard_service_->SetObservationCallback({});
+        guard_service_->SetOwnerPresenceCallback({});
     }
 #endif
 }
@@ -1984,13 +2008,37 @@ void EidolonVoiceController::DoGuardObservation(const GuardObservation& observat
                  static_cast<unsigned long>(runtime_generation));
         return;
     }
-    auto payload = guard_presence_adapter_.Build(observation, GuardEventTimestampMs(observation));
+    auto payload = guard_presence_adapter_.Build(
+        observation, GuardEventTimestampMs(observation.now_ms));
     if (!payload.has_value()) {
         return;
     }
     if (pending_guard_presence_payloads_.size() >= kMaxPendingGuardPresenceEvents) {
         ESP_LOGW(TAG, "Dropped Guard fact: volatile queue is full epoch=%lu state=%s",
                  static_cast<unsigned long>(observation.epoch), GuardStateName(observation.state));
+        return;
+    }
+    pending_guard_presence_payloads_.push_back(std::move(*payload));
+    FlushPendingGuardPresence();
+}
+
+void EidolonVoiceController::DoOwnerPresence(
+    const OwnerPresenceObservation& observation, uint32_t runtime_generation)
+{
+    if (runtime_generation != guard_runtime_generation_) {
+        ESP_LOGD(TAG, "Dropped stale Owner Presence fact epoch=%lu generation=%lu",
+                 static_cast<unsigned long>(observation.epoch),
+                 static_cast<unsigned long>(runtime_generation));
+        return;
+    }
+    auto payload = owner_presence_adapter_.Build(
+        observation, GuardEventTimestampMs(observation.now_ms));
+    if (!payload.has_value()) {
+        return;
+    }
+    if (pending_guard_presence_payloads_.size() >= kMaxPendingGuardPresenceEvents) {
+        ESP_LOGW(TAG, "Dropped Owner Presence fact: volatile queue is full epoch=%lu",
+                 static_cast<unsigned long>(observation.epoch));
         return;
     }
     pending_guard_presence_payloads_.push_back(std::move(*payload));
@@ -2013,7 +2061,7 @@ void EidolonVoiceController::FlushPendingGuardPresence()
     }
 }
 
-uint64_t EidolonVoiceController::GuardEventTimestampMs(const GuardObservation& observation)
+uint64_t EidolonVoiceController::GuardEventTimestampMs(uint64_t monotonic_ms)
 {
     const std::time_t seconds = std::time(nullptr);
     // The signed config route intentionally supports pre-SNTP devices. Preserve
@@ -2021,7 +2069,7 @@ uint64_t EidolonVoiceController::GuardEventTimestampMs(const GuardObservation& o
     if (seconds >= 1'700'000'000) {
         return static_cast<uint64_t>(seconds) * 1000ULL;
     }
-    return observation.now_ms;
+    return monotonic_ms;
 }
 #endif
 

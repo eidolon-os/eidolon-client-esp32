@@ -55,6 +55,7 @@ inline constexpr const char* kControlOpGuardOwnerFaceProfileSync =
 // Guard facts — source of record: eidolon_sdk.biz.guard.protocol.
 inline constexpr const char* kGuardPresenceCandidateType = "guard.presence.candidate";
 inline constexpr const char* kGuardPresenceAbsentType = "guard.presence.absent";
+inline constexpr const char* kGuardOwnerPresenceType = "guard.owner_presence";
 
 // Session metadata enums — declared via X-Device-Interaction-Mode /
 // X-Device-Session-Intent headers; hub stamps them into the LiveKit token.

@@ -14,6 +14,7 @@
 #include "control_protocol.h"
 #if CONFIG_EIDOLON_GUARD_SERVICE
 #include "guard/guard_presence_adapter.h"
+#include "guard/owner_presence_adapter.h"
 #endif
 #include "hub_types.h"
 #include "livekit_session.h"
@@ -97,6 +98,7 @@ private:
         LiveKitState,
 #if CONFIG_EIDOLON_GUARD_SERVICE
         GuardObservation,
+        OwnerPresence,
 #endif
 #if CONFIG_EIDOLON_OWNER_FACE_PROFILE
         OwnerFaceProfileCompleted,
@@ -118,6 +120,7 @@ private:
         bool flag = false;
 #if CONFIG_EIDOLON_GUARD_SERVICE
         GuardObservation guard_observation;
+        OwnerPresenceObservation owner_presence_observation;
 #endif
         // Snapshot of session_generation_ taken when the SDK callback fired (on the
         // SDK task), so DoLiveKitState can tell whether a LiveKit event belongs to
@@ -145,6 +148,8 @@ private:
     void DoLiveKitState(LiveKitConnectionState lk_state, uint32_t event_generation);
 #if CONFIG_EIDOLON_GUARD_SERVICE
     void DoGuardObservation(const GuardObservation& observation, uint32_t runtime_generation);
+    void DoOwnerPresence(const OwnerPresenceObservation& observation,
+                         uint32_t runtime_generation);
 #endif
 #if CONFIG_EIDOLON_OWNER_FACE_PROFILE
     void DoOwnerFaceProfileCompleted(const std::string& payload);
@@ -222,7 +227,7 @@ private:
     void ConfigureGuardPresenceRuntime(const GuardRuntimeHubConfig& runtime);
     void ClearGuardPresenceRuntime();
     void FlushPendingGuardPresence();
-    static uint64_t GuardEventTimestampMs(const GuardObservation& observation);
+    static uint64_t GuardEventTimestampMs(uint64_t monotonic_ms);
 #endif
     void CompletePendingRoomJoinCommand(const char* status, const char* code,
                                         const char* detail = "",
@@ -281,6 +286,7 @@ private:
     RoomConfig guard_control_config_;
     bool has_guard_control_config_ = false;
     GuardPresenceAdapter guard_presence_adapter_;
+    OwnerPresenceAdapter owner_presence_adapter_;
     std::deque<std::string> pending_guard_presence_payloads_;
     uint32_t guard_runtime_generation_ = 0;
 #endif

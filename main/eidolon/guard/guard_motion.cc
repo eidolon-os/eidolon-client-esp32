@@ -61,9 +61,13 @@ bool ResolvePixelFormat(uint32_t fourcc, size_t& bytes_per_pixel, PixelFormat& f
 
 }  // namespace
 
-bool ReadGuardLuminanceGrid(const CameraFrame& frame, GuardLuminanceGrid& output)
+bool ReadGuardLuminanceImage(const CameraFrame& frame, uint8_t* output,
+                             size_t output_width, size_t output_height,
+                             bool center_crop_square)
 {
-    if (frame.data == nullptr || frame.width == 0 || frame.height == 0 || frame.len == 0) {
+    if (frame.data == nullptr || frame.width == 0 || frame.height == 0 ||
+        frame.len == 0 || output == nullptr || output_width == 0 ||
+        output_height == 0) {
         return false;
     }
 
@@ -82,11 +86,25 @@ bool ReadGuardLuminanceGrid(const CameraFrame& frame, GuardLuminanceGrid& output
         return false;
     }
 
-    for (size_t gy = 0; gy < kGuardMotionGridHeight; ++gy) {
-        const size_t y = (gy * frame.height + frame.height / 2) / kGuardMotionGridHeight;
+    size_t crop_x = 0;
+    size_t crop_y = 0;
+    size_t crop_width = frame.width;
+    size_t crop_height = frame.height;
+    if (center_crop_square) {
+        const size_t side = frame.width < frame.height ? frame.width : frame.height;
+        crop_x = (frame.width - side) / 2;
+        crop_y = (frame.height - side) / 2;
+        crop_width = side;
+        crop_height = side;
+    }
+
+    for (size_t gy = 0; gy < output_height; ++gy) {
+        const size_t y = crop_y +
+            (gy * crop_height + crop_height / 2) / output_height;
         const size_t clamped_y = y < frame.height ? y : frame.height - 1;
-        for (size_t gx = 0; gx < kGuardMotionGridWidth; ++gx) {
-            const size_t x = (gx * frame.width + frame.width / 2) / kGuardMotionGridWidth;
+        for (size_t gx = 0; gx < output_width; ++gx) {
+            const size_t x = crop_x +
+                (gx * crop_width + crop_width / 2) / output_width;
             const size_t clamped_x = x < frame.width ? x : frame.width - 1;
             uint8_t luma = 0;
             switch (format) {
@@ -120,10 +138,16 @@ bool ReadGuardLuminanceGrid(const CameraFrame& frame, GuardLuminanceGrid& output
                 break;
             }
             }
-            output[gy * kGuardMotionGridWidth + gx] = luma;
+            output[gy * output_width + gx] = luma;
         }
     }
     return true;
+}
+
+bool ReadGuardLuminanceGrid(const CameraFrame& frame, GuardLuminanceGrid& output)
+{
+    return ReadGuardLuminanceImage(frame, output.data(), kGuardMotionGridWidth,
+                                   kGuardMotionGridHeight, false);
 }
 
 uint32_t GuardMotionScore(const GuardLuminanceGrid& before, const GuardLuminanceGrid& after)

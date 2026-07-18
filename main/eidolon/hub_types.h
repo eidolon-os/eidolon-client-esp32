@@ -88,6 +88,10 @@ struct Esp32HubConfig {
     // once active. `control` is the per-device control room (only when active).
     RoomConfig active;
     RoomConfig control;
+    // Generation id assigned by Hub for the current signed capability manifest.
+    // It is also embedded in the control-room participant metadata so stale
+    // disconnects cannot retire a newer registration generation.
+    std::string registration_id;
     std::string device_fingerprint;
     int sample_rate = 16000;
     int channels = 1;
@@ -108,6 +112,11 @@ struct GuardRuntimeHubConfig {
     uint32_t candidate_debounce_ms = 1000;
     uint32_t absence_timeout_ms = 180000;
     uint32_t consecutive_capture_failures = 5;
+    uint32_t owner_face_interval_ms = 1500;
+    uint32_t owner_presence_enter_ms = 2500;
+    uint32_t owner_presence_exit_ms = 12000;
+    uint32_t owner_presence_heartbeat_ms = 10000;
+    uint32_t owner_presence_lease_ms = 30000;
     RoomConfig control;
 };
 

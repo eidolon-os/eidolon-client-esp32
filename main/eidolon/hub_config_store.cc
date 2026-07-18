@@ -70,6 +70,7 @@ esp_err_t HubConfigStore::SaveHubConfig(const Esp32HubConfig& config,
     cJSON_AddStringToObject(root, "ctrl_token", config.control.token.c_str());
     cJSON_AddStringToObject(root, "ctrl_id", config.control.identity.c_str());
     cJSON_AddStringToObject(root, "ctrl_room", config.control.room_name.c_str());
+    cJSON_AddStringToObject(root, "registration_id", config.registration_id.c_str());
     cJSON_AddStringToObject(root, "fingerprint", config.device_fingerprint.c_str());
     cJSON_AddNumberToObject(root, "sample_rate", config.sample_rate);
     cJSON_AddNumberToObject(root, "channels", config.channels);
@@ -127,6 +128,7 @@ bool HubConfigStore::Load(Esp32HubConfig& config, std::string* register_url) con
     config.control.token = JsonStringField(root, "ctrl_token");
     config.control.identity = JsonStringField(root, "ctrl_id");
     config.control.room_name = JsonStringField(root, "ctrl_room");
+    config.registration_id = JsonStringField(root, "registration_id");
     config.device_fingerprint = JsonStringField(root, "fingerprint");
     config.sample_rate = JsonIntField(root, "sample_rate", 16000);
     config.channels = JsonIntField(root, "channels", 1);

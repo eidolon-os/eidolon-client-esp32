@@ -1,3 +1,4 @@
+#include <array>
 #include <cassert>
 #include <cstdint>
 #include <vector>
@@ -5,6 +6,8 @@
 #include "eidolon/guard/guard_motion.h"
 #include "eidolon/guard/guard_presence_adapter.h"
 #include "eidolon/guard/guard_state_machine.h"
+#include "eidolon/guard/owner_presence_adapter.h"
+#include "eidolon/guard/owner_presence_state_machine.h"
 
 namespace {
 
@@ -270,6 +273,187 @@ void TestPresenceAdapterEscapesSignedRuntimeIdentity()
     assert(candidate->find("atk\\nunit") != std::string::npos);
 }
 
+eidolon::OwnerPresenceSample OwnerSample(uint64_t now_ms, bool match,
+                                         uint32_t revision = 5)
+{
+    return {
+        .now_ms = now_ms,
+        .profile_active = true,
+        .profile_revision = revision,
+        .face_evaluated = true,
+        .face_match = match,
+    };
+}
+
+eidolon::OwnerPresenceSample PersonSample(uint64_t now_ms, bool present,
+                                          uint32_t revision = 5)
+{
+    return {
+        .now_ms = now_ms,
+        .profile_active = true,
+        .profile_revision = revision,
+        .person_evaluated = true,
+        .person_present = present,
+    };
+}
+
+void TestOwnerPresenceHasSmoothEnterExitAndHeartbeat()
+{
+    eidolon::OwnerPresenceStateMachine machine;
+    machine.ApplyConfig({
+        .enter_ms = 2000,
+        .exit_ms = 6000,
+        .heartbeat_ms = 4000,
+        .lease_ms = 12000,
+    });
+
+    auto observation = machine.Process(OwnerSample(0, false));
+    assert(observation.state == eidolon::OwnerPresenceState::Watching);
+    observation = machine.Process(OwnerSample(1000, true));
+    assert(observation.state == eidolon::OwnerPresenceState::PresentPending);
+    assert(observation.fact == eidolon::OwnerPresenceFact::None);
+    observation = machine.Process(PersonSample(2500, true));
+    assert(observation.fact == eidolon::OwnerPresenceFact::None);
+    observation = machine.Process(PersonSample(3000, true));
+    assert(observation.state == eidolon::OwnerPresenceState::Present);
+    assert(observation.fact == eidolon::OwnerPresenceFact::Present);
+    const uint32_t epoch = observation.epoch;
+
+    observation = machine.Process(PersonSample(4500, true));
+    assert(observation.state == eidolon::OwnerPresenceState::Present);
+    assert(observation.fact == eidolon::OwnerPresenceFact::None);
+    observation = machine.Process(PersonSample(7000, true));
+    assert(observation.fact == eidolon::OwnerPresenceFact::Present);
+    assert(observation.epoch == epoch);
+
+    observation = machine.Process(PersonSample(8000, false));
+    assert(observation.state == eidolon::OwnerPresenceState::AbsentPending);
+    assert(observation.identity_session_active);
+
+    // An empty frame does not immediately declare the owner absent.
+    observation = machine.Process(PersonSample(12999, false));
+    assert(observation.fact == eidolon::OwnerPresenceFact::None);
+    assert(observation.state == eidolon::OwnerPresenceState::AbsentPending);
+    observation = machine.Process(PersonSample(13000, false));
+    assert(observation.state == eidolon::OwnerPresenceState::Watching);
+    assert(observation.fact == eidolon::OwnerPresenceFact::Absent);
+    assert(observation.epoch == epoch);
+
+    // Re-entry is face-gated and opens a new epoch.
+    observation = machine.Process(OwnerSample(14000, true));
+    assert(observation.state == eidolon::OwnerPresenceState::PresentPending);
+    observation = machine.Process(OwnerSample(16000, true));
+    assert(observation.state == eidolon::OwnerPresenceState::Present);
+    assert(observation.fact == eidolon::OwnerPresenceFact::Present);
+    assert(observation.epoch == epoch + 1);
+}
+
+void TestOwnerPresenceNonMatchDoesNotRevokeIdentitySession()
+{
+    eidolon::OwnerPresenceStateMachine machine;
+    machine.ApplyConfig({
+        .enter_ms = 1000,
+        .exit_ms = 4000,
+        .heartbeat_ms = 3000,
+        .lease_ms = 10000,
+    });
+
+    auto observation = machine.Process(OwnerSample(0, false));
+    assert(observation.state == eidolon::OwnerPresenceState::Watching);
+    observation = machine.Process(OwnerSample(1000, true));
+    observation = machine.Process(OwnerSample(2000, true));
+    assert(observation.state == eidolon::OwnerPresenceState::Present);
+    assert(observation.identity_session_active);
+    const uint32_t epoch = observation.epoch;
+
+    observation = machine.Process(OwnerSample(2500, false));
+    assert(observation.state == eidolon::OwnerPresenceState::Present);
+    assert(observation.identity_session_active);
+
+    // The enrolled database only proves owner matches. A below-threshold face
+    // result is not negative identity evidence, so person continuity may renew.
+    observation = machine.Process(PersonSample(5000, true));
+    assert(observation.state == eidolon::OwnerPresenceState::Present);
+    assert(observation.identity_session_active);
+    observation = machine.Process(PersonSample(6500, false));
+    assert(observation.state == eidolon::OwnerPresenceState::AbsentPending);
+    assert(observation.fact == eidolon::OwnerPresenceFact::None);
+    observation = machine.Process(PersonSample(9000, false));
+    assert(observation.state == eidolon::OwnerPresenceState::Watching);
+    assert(observation.fact == eidolon::OwnerPresenceFact::Absent);
+    assert(observation.epoch == epoch);
+}
+
+void TestOwnerPresenceRemainsPresentForStaticPerson()
+{
+    eidolon::OwnerPresenceStateMachine machine;
+    machine.ApplyConfig({
+        .enter_ms = 1000,
+        .exit_ms = 12000,
+        .heartbeat_ms = 10000,
+        .lease_ms = 30000,
+    });
+
+    machine.Process(OwnerSample(0, false));
+    auto observation = machine.Process(OwnerSample(500, true));
+    assert(observation.state == eidolon::OwnerPresenceState::PresentPending);
+    observation = machine.Process(PersonSample(1500, true));
+    assert(observation.fact == eidolon::OwnerPresenceFact::Present);
+    const uint32_t epoch = observation.epoch;
+
+    for (uint64_t now_ms = 2000; now_ms <= 62000; now_ms += 500) {
+        observation = machine.Process(PersonSample(now_ms, true));
+        assert(observation.state == eidolon::OwnerPresenceState::Present);
+        assert(observation.fact != eidolon::OwnerPresenceFact::Absent);
+        assert(observation.identity_session_active);
+        assert(observation.epoch == epoch);
+    }
+}
+
+void TestOwnerPresenceProfileChangeClosesOldEpoch()
+{
+    eidolon::OwnerPresenceStateMachine machine;
+    machine.ApplyConfig({.enter_ms = 500, .exit_ms = 2000, .heartbeat_ms = 1000,
+                         .lease_ms = 5000});
+    machine.Process(OwnerSample(0, false));
+    machine.Process(OwnerSample(100, true));
+    auto observation = machine.Process(OwnerSample(600, true));
+    assert(observation.fact == eidolon::OwnerPresenceFact::Present);
+
+    observation = machine.Process(OwnerSample(700, false, 6));
+    assert(observation.state == eidolon::OwnerPresenceState::Watching);
+    assert(observation.fact == eidolon::OwnerPresenceFact::Absent);
+    assert(observation.fact_profile_revision == 5);
+    assert(observation.profile_revision == 6);
+}
+
+void TestOwnerPresenceAdapterContainsOnlyMinimalFact()
+{
+    eidolon::OwnerPresenceStateMachine machine;
+    machine.ApplyConfig({.enter_ms = 500, .exit_ms = 2000, .heartbeat_ms = 1000,
+                         .lease_ms = 5000});
+    machine.Process(OwnerSample(0, false));
+    machine.Process(OwnerSample(100, true));
+    const auto observation = machine.Process(OwnerSample(600, true));
+
+    eidolon::OwnerPresenceAdapter adapter;
+    adapter.Configure({
+        .guard_companion_id = "guard-test",
+        .device_id = "atk-test",
+        .boot_nonce = 0x1234abcd,
+    });
+    const auto payload = adapter.Build(observation, 1'700'000'000'000ULL);
+    assert(payload.has_value());
+    assert(payload->find("\"type\":\"guard.owner_presence\"") != std::string::npos);
+    assert(payload->find("\"state\":\"present\"") != std::string::npos);
+    assert(payload->find("\"profile_revision\":5") != std::string::npos);
+    assert(payload->find("\"lease_ms\":5000") != std::string::npos);
+    assert(payload->find("op-1234abcd-r5-e1") != std::string::npos);
+    assert(payload->find("similarity") == std::string::npos);
+    assert(payload->find("faces") == std::string::npos);
+    assert(payload->find("owner_id") == std::string::npos);
+}
+
 }  // namespace
 
 int main()
@@ -283,5 +467,10 @@ int main()
     TestRgb565LuminanceGrid();
     TestPresenceAdapterEmitsOnlyTransitionFacts();
     TestPresenceAdapterEscapesSignedRuntimeIdentity();
+    TestOwnerPresenceHasSmoothEnterExitAndHeartbeat();
+    TestOwnerPresenceNonMatchDoesNotRevokeIdentitySession();
+    TestOwnerPresenceRemainsPresentForStaticPerson();
+    TestOwnerPresenceProfileChangeClosesOldEpoch();
+    TestOwnerPresenceAdapterContainsOnlyMinimalFact();
     return 0;
 }

@@ -1,5 +1,6 @@
 #include "guard/owner_face_engine.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <memory>
 #include <mutex>
@@ -14,8 +15,9 @@
 #include <freertos/task.h>
 #include <nvs.h>
 
-#include "display/lvgl_display/jpg/jpeg_to_image.h"
 #include "dl_image.hpp"
+#include "dl_image_color.hpp"
+#include "dl_image_jpeg.hpp"
 #include "human_face_detect.hpp"
 #include "human_face_recognition.hpp"
 #include "hub_config_client.h"
@@ -33,7 +35,13 @@ constexpr char kOwnerFaceNvsNamespace[] = "owner_face";
 constexpr uint8_t kStateCleared = 0;
 constexpr uint8_t kStateActive = 1;
 constexpr uint8_t kStateSchemaVersion = 1;
-constexpr uint64_t kLiveIntervalMs = 1500;
+constexpr uint32_t kOwnerFaceTaskStackBytes = 12 * 1024;
+constexpr size_t kOwnerFaceImageWidth = 320;
+constexpr size_t kOwnerFaceImageHeight = 240;
+constexpr size_t kOwnerFaceImageBytes =
+    kOwnerFaceImageWidth * kOwnerFaceImageHeight * 2;
+constexpr float kOwnerFaceQueryThreshold = -1.0f;
+constexpr float kOwnerFaceMatchThreshold = 0.5f;
 constexpr uint32_t kRgb565Fourcc = static_cast<uint32_t>('R') |
                                    (static_cast<uint32_t>('G') << 8) |
                                    (static_cast<uint32_t>('B') << 16) |
@@ -137,28 +145,78 @@ esp_err_t CommitClearedState(const OwnerFaceProfileHubConfig& profile)
     return err;
 }
 
-esp_err_t DecodeJpegRgb565BigEndian(const std::string& jpeg, uint8_t** pixels,
-                                    size_t* pixels_len, size_t* width, size_t* height)
+void LogApplyResources(const char* stage, uint32_t revision)
 {
-    size_t stride = 0;
-    esp_err_t err = jpeg_to_image(
-        reinterpret_cast<const uint8_t*>(jpeg.data()), jpeg.size(), pixels,
-        pixels_len, width, height, &stride);
-    if (err != ESP_OK) {
-        return err;
-    }
-    if (*pixels == nullptr || *width == 0 || *height == 0 ||
-        *width > UINT16_MAX || *height > UINT16_MAX ||
-        stride != *width * 2 || *pixels_len < *width * *height * 2) {
-        heap_caps_free(*pixels);
-        *pixels = nullptr;
+    ESP_LOGI(kTag,
+             "Owner Face apply stage=%s revision=%lu internal=%lu psram=%lu stack_free=%lu",
+             stage, static_cast<unsigned long>(revision),
+             static_cast<unsigned long>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
+             static_cast<unsigned long>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)),
+             static_cast<unsigned long>(uxTaskGetStackHighWaterMark(nullptr)));
+}
+
+esp_err_t DecodeJpegRgb565QvgaBigEndian(const std::string& jpeg, uint8_t** pixels,
+                                        size_t* pixels_len, size_t* width, size_t* height)
+{
+    const dl::image::jpeg_img_t jpeg_image = {
+        .data = const_cast<char*>(jpeg.data()),
+        .data_len = jpeg.size(),
+    };
+    dl::image::img_t decoded = dl::image::sw_decode_jpeg(
+        jpeg_image, dl::image::DL_IMAGE_PIX_TYPE_RGB888);
+    if (decoded.data == nullptr || decoded.width == 0 || decoded.height == 0 ||
+        decoded.pix_type != dl::image::DL_IMAGE_PIX_TYPE_RGB888) {
+        heap_caps_free(decoded.data);
         return ESP_ERR_INVALID_RESPONSE;
     }
-    for (size_t offset = 0; offset < *width * *height * 2; offset += 2) {
-        const uint8_t first = (*pixels)[offset];
-        (*pixels)[offset] = (*pixels)[offset + 1];
-        (*pixels)[offset + 1] = first;
+
+    uint8_t* normalized = static_cast<uint8_t*>(
+        heap_caps_malloc(kOwnerFaceImageBytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    if (normalized == nullptr) {
+        heap_caps_free(decoded.data);
+        return ESP_ERR_NO_MEM;
     }
+
+    // The live camera path is RGB565 big-endian QVGA. Normalize retained Admin
+    // references to the same geometry before feature extraction: center-crop to
+    // 4:3, resize to 320x240, and quantize the official ESP-DL RGB888 JPEG
+    // decode into the camera-compatible RGB565 byte order.
+    size_t crop_x = 0;
+    size_t crop_y = 0;
+    size_t crop_width = decoded.width;
+    size_t crop_height = decoded.height;
+    if (decoded.width * kOwnerFaceImageHeight >
+        decoded.height * kOwnerFaceImageWidth) {
+        crop_width = decoded.height * kOwnerFaceImageWidth / kOwnerFaceImageHeight;
+        crop_x = (decoded.width - crop_width) / 2;
+    } else if (decoded.width * kOwnerFaceImageHeight <
+               decoded.height * kOwnerFaceImageWidth) {
+        crop_height = decoded.width * kOwnerFaceImageHeight / kOwnerFaceImageWidth;
+        crop_y = (decoded.height - crop_height) / 2;
+    }
+    const uint8_t* decoded_pixels = static_cast<const uint8_t*>(decoded.data);
+    const size_t decoded_stride = static_cast<size_t>(decoded.width) * 3;
+    for (size_t y = 0; y < kOwnerFaceImageHeight; ++y) {
+        const size_t source_y = crop_y +
+            std::min(crop_height - 1, ((2 * y + 1) * crop_height) /
+                                          (2 * kOwnerFaceImageHeight));
+        for (size_t x = 0; x < kOwnerFaceImageWidth; ++x) {
+            const size_t source_x = crop_x +
+                std::min(crop_width - 1, ((2 * x + 1) * crop_width) /
+                                             (2 * kOwnerFaceImageWidth));
+            const size_t source_offset = source_y * decoded_stride + source_x * 3;
+            const size_t target_offset = (y * kOwnerFaceImageWidth + x) * 2;
+            dl::image::convert_pixel_from_rgb888_to_rgb565(
+                const_cast<uint8_t*>(decoded_pixels + source_offset),
+                reinterpret_cast<uint16_t*>(normalized + target_offset),
+                DL_IMAGE_CAP_RGB565_BIG_ENDIAN);
+        }
+    }
+    heap_caps_free(decoded.data);
+    *pixels = normalized;
+    *pixels_len = kOwnerFaceImageBytes;
+    *width = kOwnerFaceImageWidth;
+    *height = kOwnerFaceImageHeight;
     return ESP_OK;
 }
 
@@ -176,9 +234,14 @@ public:
     Impl()
     {
         queue_ = xQueueCreate(2, sizeof(Job*));
-        if (queue_ == nullptr ||
-            xTaskCreatePinnedToCore(TaskTrampoline, "owner_face", 16384, this, 2,
-                                    &task_, 1) != pdPASS) {
+        if (queue_ != nullptr) {
+            if (xTaskCreatePinnedToCore(TaskTrampoline, "owner_face",
+                                        kOwnerFaceTaskStackBytes, this, 2, &task_,
+                                        1) != pdPASS) {
+                task_ = nullptr;
+            }
+        }
+        if (queue_ == nullptr || task_ == nullptr) {
             ESP_LOGE(kTag, "Failed to create Owner Face worker");
             if (queue_ != nullptr) {
                 vQueueDelete(queue_);
@@ -226,7 +289,7 @@ public:
             now_ms < next_live_ms_) {
             return result;
         }
-        next_live_ms_ = now_ms + kLiveIntervalMs;
+        next_live_ms_ = now_ms + live_interval_ms_;
         std::unique_lock<std::mutex> lock(model_mutex_, std::try_to_lock);
         if (!lock.owns_lock() || !recognizer_ || !detector_ || !active_) {
             return result;
@@ -242,22 +305,38 @@ public:
         result.evaluated_at_ms = now_ms;
         result.profile_revision = active_revision_;
         result.faces = static_cast<int>(detected.size());
+        if (detected.empty()) {
+            return result;
+        }
         auto recognized = recognizer_->recognize(image, detected);
-        if (!recognized.empty()) {
-            result.id = recognized[0].id;
-            result.similarity = recognized[0].similarity;
+        for (const auto& candidate : recognized) {
+            if (candidate.similarity > result.similarity) {
+                result.similarity = candidate.similarity;
+                if (candidate.similarity > kOwnerFaceMatchThreshold) {
+                    result.id = candidate.id;
+                }
+            }
         }
         return result;
     }
 
-    OwnerFaceProfileStatus GetProfileStatus()
+    bool TryGetProfileStatus(OwnerFaceProfileStatus& out)
     {
-        std::lock_guard<std::mutex> lock(model_mutex_);
-        return {
+        std::unique_lock<std::mutex> lock(model_mutex_, std::try_to_lock);
+        if (!lock.owns_lock()) {
+            return false;
+        }
+        out = {
             .active = active_,
             .revision = active_revision_,
             .template_count = active_template_count_,
         };
+        return true;
+    }
+
+    void SetLiveIntervalMs(uint32_t interval_ms)
+    {
+        live_interval_ms_ = std::max<uint32_t>(interval_ms, 200);
     }
 
 private:
@@ -353,7 +432,10 @@ private:
             return;
         }
         std::string path = SlotPath(slot);
-        auto recognizer = std::make_unique<HumanFaceRecognizer>(path.data());
+        auto recognizer = std::make_unique<HumanFaceRecognizer>(
+            path.data(),
+            static_cast<HumanFaceFeat::model_type_t>(CONFIG_DEFAULT_HUMAN_FACE_FEAT_MODEL),
+            kOwnerFaceQueryThreshold, 1);
         if (recognizer->get_num_feats() != static_cast<int>(templates)) {
             remove(kFaceDbSlotA);
             remove(kFaceDbSlotB);
@@ -377,6 +459,7 @@ private:
     {
         OwnerFaceApplyResult result;
         result.request = job.request;
+        LogApplyResources("start", job.request.profile_revision);
         {
             std::lock_guard<std::mutex> lock(model_mutex_);
             if (active_revision_ == job.request.profile_revision &&
@@ -441,9 +524,18 @@ private:
         const uint8_t target_slot = active_ ? static_cast<uint8_t>(1 - active_slot_) : 0;
         std::string target_path = SlotPath(target_slot);
         remove(target_path.c_str());
-        auto staging = std::make_unique<HumanFaceRecognizer>(target_path.data());
+        LogApplyResources("model_load_begin", profile.profile_revision);
+        auto staging = std::make_unique<HumanFaceRecognizer>(
+            target_path.data(),
+            static_cast<HumanFaceFeat::model_type_t>(CONFIG_DEFAULT_HUMAN_FACE_FEAT_MODEL),
+            kOwnerFaceQueryThreshold, 1);
+        LogApplyResources("model_load_done", profile.profile_revision);
         std::unique_lock<std::mutex> model_lock(model_mutex_);
         for (const auto& reference : profile.references) {
+            ESP_LOGI(kTag, "Owner Face reference begin revision=%lu pose=%s bytes=%lu",
+                     static_cast<unsigned long>(profile.profile_revision),
+                     reference.pose.c_str(),
+                     static_cast<unsigned long>(reference.size_bytes));
             std::string jpeg;
             err = client.FetchOwnerFaceReference(
                 job.config_url, job.device_id, reference, jpeg);
@@ -458,7 +550,7 @@ private:
             size_t pixels_len = 0;
             size_t width = 0;
             size_t height = 0;
-            err = DecodeJpegRgb565BigEndian(
+            err = DecodeJpegRgb565QvgaBigEndian(
                 jpeg, &pixels, &pixels_len, &width, &height);
             jpeg.clear();
             jpeg.shrink_to_fit();
@@ -469,6 +561,7 @@ private:
                 result.code = "OWNER_FACE_REFERENCE_DECODE_FAILED";
                 return result;
             }
+            LogApplyResources("reference_decoded", profile.profile_revision);
             dl::image::img_t image = {
                 .data = pixels,
                 .width = static_cast<uint16_t>(width),
@@ -476,7 +569,38 @@ private:
                 .pix_type = dl::image::DL_IMAGE_PIX_TYPE_RGB565,
             };
             auto& detected = detector_->run(image);
-            if (detected.size() != 1 || staging->enroll(image, detected) != ESP_OK) {
+            ESP_LOGI(kTag,
+                     "Owner Face reference detected revision=%lu pose=%s faces=%lu "
+                     "internal=%lu largest_internal=%lu stack_free=%lu",
+                     static_cast<unsigned long>(profile.profile_revision),
+                     reference.pose.c_str(),
+                     static_cast<unsigned long>(detected.size()),
+                     static_cast<unsigned long>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
+                     static_cast<unsigned long>(
+                         heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)),
+                     static_cast<unsigned long>(uxTaskGetStackHighWaterMark(nullptr)));
+            if (detected.size() != 1) {
+                heap_caps_free(pixels);
+                staging.reset();
+                model_lock.unlock();
+                remove(target_path.c_str());
+                result.code = "OWNER_FACE_SINGLE_FACE_REQUIRED";
+                return result;
+            }
+            ESP_LOGI(kTag, "Owner Face reference enroll begin revision=%lu pose=%s",
+                     static_cast<unsigned long>(profile.profile_revision),
+                     reference.pose.c_str());
+            const esp_err_t enroll_err = staging->enroll(image, detected);
+            ESP_LOGI(kTag,
+                     "Owner Face reference enroll done revision=%lu pose=%s err=%s "
+                     "internal=%lu largest_internal=%lu stack_free=%lu",
+                     static_cast<unsigned long>(profile.profile_revision),
+                     reference.pose.c_str(), esp_err_to_name(enroll_err),
+                     static_cast<unsigned long>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
+                     static_cast<unsigned long>(
+                         heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)),
+                     static_cast<unsigned long>(uxTaskGetStackHighWaterMark(nullptr)));
+            if (enroll_err != ESP_OK) {
                 heap_caps_free(pixels);
                 staging.reset();
                 model_lock.unlock();
@@ -485,6 +609,8 @@ private:
                 return result;
             }
             heap_caps_free(pixels);
+            LogApplyResources("reference_enrolled", profile.profile_revision);
+            vTaskDelay(1);
         }
         if (staging->get_num_feats() != static_cast<int>(profile.references.size())) {
             staging.reset();
@@ -536,6 +662,7 @@ private:
     std::string current_profile_id_;
     std::string current_desired_state_;
     uint64_t next_live_ms_ = 0;
+    uint32_t live_interval_ms_ = 1500;
 };
 
 OwnerFaceEngine::OwnerFaceEngine() : impl_(std::make_unique<Impl>()) {}
@@ -555,9 +682,14 @@ OwnerFaceLiveResult OwnerFaceEngine::AnalyzeLiveFrame(const CameraFrame& frame,
     return impl_->AnalyzeLiveFrame(frame, now_ms);
 }
 
-OwnerFaceProfileStatus OwnerFaceEngine::GetProfileStatus()
+void OwnerFaceEngine::SetLiveIntervalMs(uint32_t interval_ms)
 {
-    return impl_->GetProfileStatus();
+    impl_->SetLiveIntervalMs(interval_ms);
+}
+
+bool OwnerFaceEngine::TryGetProfileStatus(OwnerFaceProfileStatus& out)
+{
+    return impl_->TryGetProfileStatus(out);
 }
 
 }  // namespace eidolon

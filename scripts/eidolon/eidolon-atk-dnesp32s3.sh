@@ -38,6 +38,10 @@ idf_ready() {
   command -v idf.py >/dev/null 2>&1
 }
 
+idf_tools_ready() {
+  idf_ready && command -v ninja >/dev/null 2>&1 && [[ -n "${IDF_PYTHON_ENV_PATH:-}" ]]
+}
+
 idf_export_candidates() {
   [[ -n "${EIDOLON_IDF_EXPORT:-}" ]] && echo "${EIDOLON_IDF_EXPORT}"
 
@@ -69,7 +73,7 @@ idf_export_candidates() {
 }
 
 ensure_idf_env() {
-  if idf_ready; then
+  if idf_tools_ready; then
     return 0
   fi
 
@@ -79,14 +83,14 @@ ensure_idf_env() {
     info "Loading ESP-IDF: ${export_sh}"
     # shellcheck source=/dev/null
     source "${export_sh}"
-    idf_ready && return 0
+    idf_tools_ready && return 0
   done < <(idf_export_candidates | awk '!seen[$0]++')
 
   return 1
 }
 
 require_idf() {
-  ensure_idf_env || die "ESP-IDF not found. Set EIDOLON_IDF_PATH or source export.sh first."
+  ensure_idf_env || die "ESP-IDF tools not ready. Set EIDOLON_IDF_PATH or source export.sh first."
 }
 
 list_ports() {
@@ -139,11 +143,18 @@ CONFIG_EIDOLON_INTERACTION_MODE_PTT=y
 CONFIG_EIDOLON_PTT_RELEASE_TAIL_MS=150
 CONFIG_EIDOLON_LIVEKIT_SPEAKER_VOLUME=50
 CONFIG_EIDOLON_OWNER_FACE_PROFILE=y
+CONFIG_EIDOLON_OWNER_PERSON_PRESENCE=y
 CONFIG_HUMAN_FACE_DETECT_MODEL_IN_FLASH_PARTITION=y
 # CONFIG_HUMAN_FACE_DETECT_MODEL_IN_FLASH_RODATA is not set
 CONFIG_HUMAN_FACE_FEAT_MODEL_IN_FLASH_PARTITION=y
 # CONFIG_HUMAN_FACE_FEAT_MODEL_IN_FLASH_RODATA is not set
 # CONFIG_EIDOLON_WAKE_WORD_ENABLE is not set
+CONFIG_WAKE_WORD_DISABLED=y
+# CONFIG_USE_ESP_WAKE_WORD is not set
+# CONFIG_USE_AFE_WAKE_WORD is not set
+# CONFIG_USE_CUSTOM_WAKE_WORD is not set
+# CONFIG_SEND_WAKE_WORD_DATA is not set
+# CONFIG_SR_WN_WN9_NIHAOXIAOZHI_TTS is not set
 # CONFIG_CAMERA_OV2640 is not set
 CONFIG_CAMERA_OV5640=y
 CONFIG_CAMERA_OV5640_AUTO_DETECT_DVP_INTERFACE_SENSOR=y
@@ -202,10 +213,17 @@ sync_existing_sdkconfig() {
   set_sdkconfig_value CONFIG_CAMERA_OV5640_DVP_YUV422_800X600_10FPS y
   set_sdkconfig_value CONFIG_CAMERA_OV5640_DVP_IF_FORMAT_INDEX_DEFAULT 0
   set_sdkconfig_value CONFIG_EIDOLON_OWNER_FACE_PROFILE y
+  set_sdkconfig_value CONFIG_EIDOLON_OWNER_PERSON_PRESENCE y
   set_sdkconfig_value CONFIG_HUMAN_FACE_DETECT_MODEL_IN_FLASH_PARTITION y
   set_sdkconfig_value CONFIG_HUMAN_FACE_DETECT_MODEL_IN_FLASH_RODATA n
   set_sdkconfig_value CONFIG_HUMAN_FACE_FEAT_MODEL_IN_FLASH_PARTITION y
   set_sdkconfig_value CONFIG_HUMAN_FACE_FEAT_MODEL_IN_FLASH_RODATA n
+  set_sdkconfig_value CONFIG_WAKE_WORD_DISABLED y
+  set_sdkconfig_value CONFIG_USE_ESP_WAKE_WORD n
+  set_sdkconfig_value CONFIG_USE_AFE_WAKE_WORD n
+  set_sdkconfig_value CONFIG_USE_CUSTOM_WAKE_WORD n
+  set_sdkconfig_value CONFIG_SEND_WAKE_WORD_DATA n
+  set_sdkconfig_value CONFIG_SR_WN_WN9_NIHAOXIAOZHI_TTS n
 }
 
 idf_args() {

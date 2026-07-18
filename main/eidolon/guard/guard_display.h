@@ -5,12 +5,18 @@
 #include <lvgl.h>
 
 #include "guard/guard_state_machine.h"
+#include "guard/owner_presence_state_machine.h"
 
 class Display;
 
 namespace eidolon {
 
 struct GuardOwnerFaceDisplay {
+    OwnerPresenceState presence_state = OwnerPresenceState::Unavailable;
+    bool identity_session_active = false;
+    bool person_evaluated = false;
+    bool person_present = false;
+    float person_score = 0.0f;
     bool profile_active = false;
     uint32_t profile_revision = 0;
     uint32_t template_count = 0;
@@ -36,11 +42,9 @@ private:
     Display* display_ = nullptr;
     lv_obj_t* panel_ = nullptr;
     lv_obj_t* state_label_ = nullptr;
-    lv_obj_t* detail_label_ = nullptr;
     lv_obj_t* owner_label_ = nullptr;
     lv_obj_t* owner_detail_label_ = nullptr;
     lv_obj_t* profile_label_ = nullptr;
-    lv_obj_t* epoch_label_ = nullptr;
     lv_obj_t* motion_bar_ = nullptr;
 
     bool EnsurePanel();

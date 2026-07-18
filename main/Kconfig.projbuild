@@ -1276,6 +1276,16 @@ menu "Eidolon Hub"
             images are discarded immediately after enrollment; only local facts
             are produced during live Guard inference.
 
+    config EIDOLON_OWNER_PERSON_PRESENCE
+        bool "Enable ATK owner environmental presence"
+        default y
+        depends on EIDOLON_OWNER_FACE_PROFILE && BOARD_TYPE_ATK_DNESP32S3
+        help
+            Uses Espressif's TFLite Micro person-detection reference after a
+            local owner face match. Person evidence may only renew an existing
+            identity session; it can never establish or transfer identity.
+            No image, embedding, or inference score leaves the device.
+
     config EIDOLON_GUARD_SAMPLE_INTERVAL_MS
         int "ATK guard sample interval in milliseconds"
         range 200 5000

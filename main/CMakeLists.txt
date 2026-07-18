@@ -1088,6 +1088,8 @@ if(CONFIG_EIDOLON_HUB_MODE)
             "eidolon/guard/guard_motion.cc"
             "eidolon/guard/guard_display.cc"
             "eidolon/guard/guard_presence_adapter.cc"
+            "eidolon/guard/owner_presence_adapter.cc"
+            "eidolon/guard/owner_presence_state_machine.cc"
             "eidolon/guard/guard_service.cc"
             "eidolon/guard/guard_state_machine.cc"
         )
@@ -1101,6 +1103,13 @@ if(CONFIG_EIDOLON_HUB_MODE)
                 espressif__human_face_recognition
                 spiffs
             )
+        endif()
+        if(CONFIG_EIDOLON_OWNER_PERSON_PRESENCE)
+            list(APPEND SOURCES
+                "eidolon/guard/person_presence_engine.cc"
+                "${PROJECT_DIR}/managed_components/espressif__esp-tflite-micro/examples/person_detection/main/person_detect_model_data.cc"
+            )
+            list(APPEND MAIN_PRIV_REQUIRES_EXTRA espressif__esp-tflite-micro)
         endif()
     endif()
 

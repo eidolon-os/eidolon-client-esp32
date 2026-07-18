@@ -13,6 +13,8 @@ output="${TMPDIR:-/tmp}/eidolon_guard_runtime_tests"
   main/eidolon/guard/guard_motion.cc \
   main/eidolon/guard/guard_presence_adapter.cc \
   main/eidolon/guard/guard_state_machine.cc \
+  main/eidolon/guard/owner_presence_adapter.cc \
+  main/eidolon/guard/owner_presence_state_machine.cc \
   -o "${output}"
 
 "${output}"
