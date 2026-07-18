@@ -12,6 +12,7 @@
 
 #include "sdkconfig.h"
 #include "control_protocol.h"
+#include "control_room_recovery.h"
 #if CONFIG_EIDOLON_GUARD_SERVICE
 #include "guard/guard_presence_adapter.h"
 #include "guard/owner_presence_adapter.h"
@@ -280,6 +281,9 @@ private:
     // token-fetch as the X-Device-Session-Intent header. Empty for a normal user
     // JOIN. Controller-task only.
     std::string pending_session_intent_;
+    // True means the current session generation targets the data-only control
+    // plane. It intentionally covers Connecting/Reconnecting/Connected; actual
+    // health is tracked by control_recovery_ / LiveKitSession::IsConnected().
     bool control_room_ = false;
     GuardService* guard_service_ = nullptr;
 #if CONFIG_EIDOLON_GUARD_SERVICE
@@ -291,7 +295,7 @@ private:
     uint32_t guard_runtime_generation_ = 0;
 #endif
     bool switching_to_voice_ = false;
-    bool control_reconnect_pending_ = false;
+    ControlRoomRecovery control_recovery_;
     bool pending_room_join_command_active_ = false;
     uint32_t pending_room_join_generation_ = 0;
     ControlCommand pending_room_join_command_;
@@ -305,9 +309,6 @@ private:
     // a new voice room is requested/connected so an old reason never bleeds into
     // a fresh session's chrome.
     EndReason last_end_reason_ = EndReason::None;
-    // Consecutive reconnect attempts since the last successful connect. Drives
-    // backoff, when to re-discover the Hub, and the ServerUnreachable UI.
-    int reconnect_attempts_ = 0;
     bool audio_publisher_active_ = false;
     uint32_t audio_state_seq_ = 0;
     bool audio_state_sent_ = false;

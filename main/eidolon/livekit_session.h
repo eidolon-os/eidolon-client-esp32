@@ -23,15 +23,16 @@ enum class LiveKitConnectionState {
 
 class LiveKitSession {
 public:
-    using StateCallback = std::function<void(LiveKitConnectionState)>;
+    using StateCallback = std::function<void(LiveKitConnectionState, uint32_t generation)>;
     using TranscriptionCallback = std::function<void(const TranscriptionEvent& event)>;
     using AgentPhaseCallback = std::function<void(AgentPhase phase)>;
     using ControlCommandCallback = std::function<void(const std::string& payload)>;
     using SessionControlCallback = std::function<void(const std::string& payload)>;
 
-    esp_err_t Connect(const Esp32HubConfig& config);
-    esp_err_t ConnectDataOnly(const Esp32HubConfig& config);
+    esp_err_t Connect(const Esp32HubConfig& config, uint32_t generation);
+    esp_err_t ConnectDataOnly(const Esp32HubConfig& config, uint32_t generation);
     esp_err_t Disconnect(bool release_media = true);
+    bool HasRoom() const { return room_handle_ != nullptr; }
     bool IsConnected() const;
     livekit_failure_reason_t LastFailureReason() const { return last_failure_reason_; }
     esp_err_t PublishData(const std::string& topic, const std::string& payload,
@@ -62,6 +63,7 @@ private:
     bool transcription_registered_ = false;
     bool agent_session_registered_ = false;
     livekit_failure_reason_t last_failure_reason_ = LIVEKIT_FAILURE_REASON_NONE;
+    uint32_t generation_ = 0;
     StateCallback on_state_changed_;
     TranscriptionCallback on_transcription_;
     AgentPhaseCallback on_agent_phase_;

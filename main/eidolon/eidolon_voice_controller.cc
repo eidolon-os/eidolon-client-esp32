@@ -52,18 +52,6 @@ constexpr int64_t kPlaybackActiveWindowUs = 1200 * 1000;
 // kAudioStateHeartbeatUs to avoid flooding lossy packets at the poll rate.
 constexpr uint64_t kAudioTickIntervalUs = 80 * 1000;
 constexpr int64_t kAudioStateHeartbeatUs = 500 * 1000;
-// Reconnect backoff: the Nth attempt waits min(1s << N, 30s) so transient
-// blips recover fast while a down/moved Hub is not hammered.
-constexpr uint32_t kReconnectBaseDelayMs = 1000;
-constexpr uint32_t kReconnectMaxDelayMs = 30000;
-// After this many consecutive failures, re-query mDNS before each reconnect —
-// the Hub IP may have changed (DHCP / network move), making the cached address
-// dead. The first attempt stays fast (cached address) for the common transient
-// case.
-constexpr int kReconnectRediscoverAfter = 1;
-// After this many consecutive failures, surface "cannot reach server" in the UI
-// (keep retrying in the background so it self-heals when the Hub returns).
-constexpr int kReconnectUnreachableAfter = 2;
 // A connect/reconnect attempt that never reaches a terminal LiveKit state within
 // this long is treated as hung and force-recovered. Generous enough to cover a
 // slow mDNS + HTTPS + connect on a healthy-but-slow network.
@@ -97,18 +85,6 @@ constexpr TickType_t kActiveAckSettleDelay = pdMS_TO_TICKS(100);
 #if CONFIG_EIDOLON_GUARD_SERVICE
 constexpr size_t kMaxPendingGuardPresenceEvents = 8;
 #endif
-
-uint64_t ReconnectDelayUs(int attempt)
-{
-    uint32_t ms = kReconnectBaseDelayMs;
-    for (int i = 0; i < attempt && ms < kReconnectMaxDelayMs; ++i) {
-        ms <<= 1;
-    }
-    if (ms > kReconnectMaxDelayMs) {
-        ms = kReconnectMaxDelayMs;
-    }
-    return static_cast<uint64_t>(ms) * 1000ULL;
-}
 
 const char* LiveKitConnectionStateName(eidolon::LiveKitConnectionState state)
 {
@@ -641,25 +617,38 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
     if (control_room_) {
         StopAudioStatePublisher();
         switch (lk_state) {
+        case LiveKitConnectionState::Connecting:
+            control_recovery_.OnConnecting();
+            ArmConnectWatchdog();
+            break;
         case LiveKitConnectionState::Connected:
-            reconnect_attempts_ = 0;  // recovered: control room is back
+            control_recovery_.OnConnected();
+            if (reconnect_timer_ != nullptr) {
+                esp_timer_stop(reconnect_timer_);
+            }
+            DisarmConnectWatchdog();
 #if CONFIG_EIDOLON_GUARD_SERVICE
             FlushPendingGuardPresence();
 #endif
             SetState(StateForConfig(config_), "control_connected");
             break;
         case LiveKitConnectionState::Failed:
+            control_recovery_.OnDisconnected();
+            DisarmConnectWatchdog();
             ESP_LOGW(TAG, "Control room connection failed");
             ScheduleControlReconnect("control_failed");
             break;
         case LiveKitConnectionState::Disconnected:
+            control_recovery_.OnDisconnected();
+            DisarmConnectWatchdog();
             ScheduleControlReconnect("control_disconnected");
             break;
-        case LiveKitConnectionState::Connecting:
         case LiveKitConnectionState::Reconnecting:
-            // Mid-attempt: keep the current status. Don't clobber a shown
-            // ServerUnreachable with a transient "ready"; Connected clears it,
-            // the reconnect path escalates it.
+            // Let the SDK repair a transient ICE/DTLS interruption, but bound the
+            // attempt: if it never reaches Connected/Failed/Disconnected, the
+            // same watchdog forces the ordinary recovery loop.
+            control_recovery_.OnReconnecting();
+            ArmConnectWatchdog();
             break;
         }
         return;
@@ -670,7 +659,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         SetState(VoiceSessionState::Connecting, "voice_connecting");
         break;
     case LiveKitConnectionState::Connected:
-        reconnect_attempts_ = 0;  // recovered: voice room is up
+        control_recovery_.OnVoiceConnected();
         SetState(VoiceSessionState::InRoom, "voice_connected");
         StartAudioStatePublisher();
         if (pending_room_join_command_active_ &&
@@ -732,12 +721,16 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
 
 void EidolonVoiceController::ScheduleControlReconnect(const char* reason)
 {
-    if (control_room_ || switching_to_voice_ || control_reconnect_pending_ || !HasControlConfig()) {
+    if (!control_recovery_.TrySchedule(switching_to_voice_, HasControlConfig())) {
         return;
     }
-    control_reconnect_pending_ = true;
-    ESP_LOGI(TAG, "Scheduling control room reconnect after %s (attempt %d)",
-             reason ? reason : "disconnect", reconnect_attempts_);
+    const int scheduled_attempt = control_recovery_.reconnect_attempts();
+    const uint32_t delay_ms = ControlReconnectDelayMs(scheduled_attempt);
+    ESP_LOGI(TAG,
+             "[lifecycle] control reconnect scheduled reason=%s attempt=%d delay_ms=%lu gen=%lu",
+             reason ? reason : "disconnect", scheduled_attempt,
+             static_cast<unsigned long>(delay_ms),
+             static_cast<unsigned long>(session_generation_));
 
     if (reconnect_timer_ == nullptr) {
         esp_timer_create_args_t args = {};
@@ -747,13 +740,17 @@ void EidolonVoiceController::ScheduleControlReconnect(const char* reason)
         args.name = "eidolon_reconnect";
         if (esp_timer_create(&args, &reconnect_timer_) != ESP_OK) {
             reconnect_timer_ = nullptr;
-            control_reconnect_pending_ = false;
+            control_recovery_.OnScheduleFailed();
             ESP_LOGW(TAG, "Failed to create reconnect timer");
             return;
         }
     }
     esp_timer_stop(reconnect_timer_);
-    esp_timer_start_once(reconnect_timer_, ReconnectDelayUs(reconnect_attempts_));
+    const uint64_t delay_us = static_cast<uint64_t>(delay_ms) * 1000ULL;
+    if (esp_timer_start_once(reconnect_timer_, delay_us) != ESP_OK) {
+        control_recovery_.OnScheduleFailed();
+        ESP_LOGW(TAG, "Failed to start reconnect timer");
+    }
 }
 
 void EidolonVoiceController::ReconnectTimerCb(void* arg)
@@ -766,23 +763,32 @@ void EidolonVoiceController::ReconnectTimerCb(void* arg)
 
 void EidolonVoiceController::DoReconnectTick()
 {
-    int attempt = reconnect_attempts_;
-    if (attempt >= kReconnectRediscoverAfter) {
-        // The Hub address may have changed; re-query mDNS and re-fetch config
-        // before reconnecting (best-effort, errors are logged).
-        RediscoverHub();
+    int attempt = 0;
+    if (!control_recovery_.BeginRetry(&attempt)) {
+        return;
     }
-    if (attempt >= kReconnectUnreachableAfter) {
+    ESP_LOGI(TAG, "[lifecycle] control reconnect tick attempt=%d gen=%lu",
+             attempt, static_cast<unsigned long>(session_generation_));
+    if (ShouldRediscoverControlConfig(attempt)) {
+        // The Hub address may have changed; re-query mDNS and re-fetch config
+        // before reconnecting. Authorization/config-status changes terminate
+        // this recovery owner instead of reviving stale cached credentials.
+        const esp_err_t refresh_err = RediscoverHub();
+        if (refresh_err == ESP_ERR_NOT_ALLOWED || !HasControlConfig()) {
+            ESP_LOGW(TAG, "Control recovery stopped after credential refresh: %s",
+                     esp_err_to_name(refresh_err));
+            control_recovery_.FinishRetry();
+            return;
+        }
+    }
+    if (ShouldSurfaceControlServerUnreachable(attempt)) {
         SetState(VoiceSessionState::ServerUnreachable, "reconnect_exhausted");
     }
-    reconnect_attempts_ = attempt + 1;
 
-    // Keep the guard up across ConnectControlRoom so its internal synchronous
-    // Disconnect can't trigger a spurious re-schedule; clear it afterward so the
-    // (async) Failed callback drives the next attempt, and if the connect failed
-    // synchronously, drive it ourselves.
+    // Keep the pending guard up across the synchronous connection call. A sync
+    // failure is rescheduled below; async terminal events arrive after it clears.
     esp_err_t err = ConnectControlRoom();
-    control_reconnect_pending_ = false;
+    control_recovery_.FinishRetry();
     if (err != ESP_OK) {
         ScheduleControlReconnect("control_retry");
     }
@@ -823,17 +829,23 @@ void EidolonVoiceController::ConnectWatchdogCb(void* arg)
 void EidolonVoiceController::DoConnectTimeout()
 {
     // The attempt may have completed between the timer firing and now.
-    if (state_ != VoiceSessionState::Connecting && state_ != VoiceSessionState::Reconnecting) {
+    const bool voice_connecting =
+        state_ == VoiceSessionState::Connecting || state_ == VoiceSessionState::Reconnecting;
+    const bool control_connecting = control_room_ && control_recovery_.connect_in_flight();
+    if (!voice_connecting && !control_connecting) {
         return;
     }
-    ESP_LOGW(TAG, "Connect watchdog fired (stuck in state %d); forcing reconnect",
-             static_cast<int>(state_));
+    ESP_LOGW(TAG,
+             "[lifecycle] connect watchdog fired state=%s room_kind=%s gen=%lu; forcing recovery",
+             VoiceStateName(state_), CurrentRoomKind(),
+             static_cast<unsigned long>(session_generation_));
     StopAudioStatePublisher();
     CompletePendingRoomJoinCommand("failed", "ROOM_JOIN_TIMEOUT");
     // Drop the in-flight guards so ScheduleControlReconnect isn't suppressed, then
     // tear down the hung session and fall back to a stable base state.
     switching_to_voice_ = false;
-    control_reconnect_pending_ = false;
+    control_recovery_.OnDisconnected();
+    control_recovery_.FinishRetry();
     session_.Disconnect(true);
     control_room_ = false;
     // Supersede the hung attempt so any of its late callbacks are dropped rather
@@ -1618,7 +1630,10 @@ void EidolonVoiceController::HandleSessionEnd(EndReason reason)
              config_.active.room_name.c_str());
 
     StopAudioStatePublisher();
-    control_reconnect_pending_ = true;
+    control_recovery_.OnIntentionalTeardown();
+    if (reconnect_timer_ != nullptr) {
+        esp_timer_stop(reconnect_timer_);
+    }
     session_.Disconnect(true);
     control_room_ = false;
     // Supersede the torn-down voice room so its trailing ROOM_DELETED/Disconnected
@@ -1626,7 +1641,6 @@ void EidolonVoiceController::HandleSessionEnd(EndReason reason)
     // generation gate instead of being read as a fresh voice-room drop.
     MarkSessionSuperseded("session_end");
     SetState(StateForConfig(config_), "session_end");
-    control_reconnect_pending_ = false;
     ConnectControlRoom();
 }
 
@@ -1634,16 +1648,16 @@ void EidolonVoiceController::HandleSessionEnd(EndReason reason)
 
 void EidolonVoiceController::DoActivation()
 {
+    control_recovery_.OnActivation();
     // Wire the SDK callbacks to post events so all state mutation stays on the loop.
-    session_.SetOnStateChanged([this](LiveKitConnectionState s) {
+    session_.SetOnStateChanged([this](LiveKitConnectionState s, uint32_t generation) {
         Event ev;
         ev.type = EventType::LiveKitState;
         ev.lk_state = s;
-        // Snapshot the generation here, on the SDK callback task, so a teardown
-        // event emitted by a superseded connection carries that connection's
-        // generation rather than whatever is current by the time the controller
-        // task dispatches it.
-        ev.generation = session_generation_;
+        // LiveKitSession binds this value when the room is created. Never read
+        // the controller's newer generation from the SDK callback task: a late
+        // teardown must retain ownership by the room that emitted it.
+        ev.generation = generation;
         Enqueue(ev);
     });
     session_.SetOnControlCommand([this](const std::string& payload) {
@@ -1702,6 +1716,10 @@ void EidolonVoiceController::DoNetworkLost()
              static_cast<unsigned long>(session_generation_), session_.IsConnected() ? 1 : 0,
              config_.active.room_name.c_str(), config_.control.room_name.c_str());
     StopAudioStatePublisher();
+    control_recovery_.OnNetworkLost();
+    if (reconnect_timer_ != nullptr) {
+        esp_timer_stop(reconnect_timer_);
+    }
 #if CONFIG_EIDOLON_GUARD_SERVICE
     if (guard_service_ != nullptr) {
         // Presence facts are meaningful only while a signed Guard runtime is
@@ -1711,7 +1729,6 @@ void EidolonVoiceController::DoNetworkLost()
     }
 #endif
     control_room_ = false;
-    reconnect_attempts_ = 0;  // distinct cause; reconnect starts fresh on restore
     session_.Disconnect(true);
     // Supersede so late callbacks from the dropped connection don't resurrect a
     // stale state once the network returns and we reconnect.
@@ -1722,8 +1739,7 @@ void EidolonVoiceController::DoNetworkLost()
 void EidolonVoiceController::DoNetworkRestored()
 {
     ESP_LOGI(TAG, "Network restored; refreshing Hub discovery/config");
-    control_reconnect_pending_ = false;
-    reconnect_attempts_ = 0;
+    control_recovery_.OnNetworkRestored();
     if (reconnect_timer_ != nullptr) {
         esp_timer_stop(reconnect_timer_);
     }
@@ -1734,9 +1750,17 @@ void EidolonVoiceController::DoNetworkRestored()
     }
 
     esp_err_t err = RediscoverHub();
+    if (err == ESP_ERR_NOT_ALLOWED) {
+        ESP_LOGW(TAG, "Network restore stopped: Hub rejected device identity");
+        return;
+    }
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Hub rediscovery after network restore failed: %s", esp_err_to_name(err));
         err = RefreshHubConfig();
+    }
+    if (err == ESP_ERR_NOT_ALLOWED) {
+        ESP_LOGW(TAG, "Network restore stopped: Hub rejected device identity");
+        return;
     }
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Hub config refresh after network restore failed: %s", esp_err_to_name(err));
@@ -1820,6 +1844,10 @@ esp_err_t EidolonVoiceController::DoJoinRoom()
     }
 
     switching_to_voice_ = true;
+    control_recovery_.OnIntentionalTeardown();
+    if (reconnect_timer_ != nullptr) {
+        esp_timer_stop(reconnect_timer_);
+    }
     // Fresh session: drop any end reason from the previous conversation so the
     // connecting/ready chrome doesn't show a stale "已结束".
     last_end_reason_ = EndReason::None;
@@ -1834,59 +1862,74 @@ esp_err_t EidolonVoiceController::DoJoinRoom()
         session_.Disconnect(true);
     }
     control_room_ = false;
-    BeginSessionGeneration("voice");
-    esp_err_t err = session_.Connect(config_);
+    uint32_t voice_generation = BeginSessionGeneration("voice");
+    esp_err_t err = session_.Connect(config_, voice_generation);
     switching_to_voice_ = false;
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Connect failed, refreshing Hub token");
         if (RefreshHubConfig(/*persist=*/false) == ESP_OK) {
             switching_to_voice_ = true;
-            BeginSessionGeneration("voice");
-            err = session_.Connect(config_);
+            voice_generation = BeginSessionGeneration("voice");
+            err = session_.Connect(config_, voice_generation);
             switching_to_voice_ = false;
         }
     }
     if (err != ESP_OK) {
+        // Connect() may have emitted Connecting before failing synchronously.
+        // Retire this generation so that queued tail event cannot re-arm the
+        // voice watchdog after we have already chosen the control fallback.
+        MarkSessionSuperseded("voice_connect_sync_failed");
         SetState(VoiceSessionState::Error, "join_connect_failed");
+        ScheduleControlReconnect("voice_connect_sync_failed");
     }
     return err;
 }
 
 esp_err_t EidolonVoiceController::ConnectControlRoom()
 {
-    if (!HasControlConfig()) {
+    if (!control_recovery_.network_available() || !HasControlConfig()) {
         return ESP_ERR_INVALID_STATE;
     }
 
     // ConnectDataOnly connects to control_config.active. While pending/waiting
     // that is already the pending room; once active, point it at the control room
     // (falling back to the active identity when the control room omits one).
-    Esp32HubConfig control_config = config_;
-    if (config_.status == HubConfigStatus::Active && config_.control.usable()) {
-        // A successful /api/device/register refresh is the freshest source of
-        // control credentials. In particular, do not reconnect Guard with the
-        // older token cached by a previous runtime-config pull.
-        control_config.active = config_.control;
-        if (control_config.active.identity.empty()) {
-            control_config.active.identity = config_.active.identity;
-        }
-    }
+    const RoomConfig* runtime_fallback = nullptr;
 #if CONFIG_EIDOLON_GUARD_SERVICE
-    else if (has_guard_control_config_ && guard_control_config_.usable()) {
-        // Guard runtime config remains a fallback while registration is not
-        // active, so an approved Guard can stay reachable while binding starts.
-        control_config.active = guard_control_config_;
+    if (has_guard_control_config_) {
+        runtime_fallback = &guard_control_config_;
     }
 #endif
+    Esp32HubConfig control_config = BuildControlConnectionConfig(config_, runtime_fallback);
 
+    // Retire any old room before assigning the next generation. Disconnect is
+    // synchronous in LiveKitSession; the explicit supersede generation also
+    // makes callbacks already in flight stale before the new attempt begins.
+    if (session_.HasRoom()) {
+        MarkSessionSuperseded("control_attempt_replace");
+        session_.Disconnect(true);
+    }
     control_room_ = true;
-    BeginSessionGeneration("control");
-    esp_err_t err = session_.ConnectDataOnly(control_config);
+    const uint32_t control_generation = BeginSessionGeneration("control");
+    control_recovery_.OnAttemptStarted();
+    esp_err_t err = session_.ConnectDataOnly(control_config, control_generation);
     if (err != ESP_OK) {
-        control_room_ = false;
+        // Keep control_room_ true: it denotes the plane owned by this generation,
+        // not connection health. Superseding drops any Connecting/Disconnected
+        // callback queued before the synchronous failure was returned.
+        control_recovery_.OnDisconnected();
+        MarkSessionSuperseded("control_connect_sync_failed");
         ESP_LOGW(TAG, "Connect control room failed: %s", esp_err_to_name(err));
     }
-    SetState(StateForConfig(config_), "control_connect");
+    // ServerUnreachable remains visible until LiveKit actually reports Connected.
+    if (state_ != VoiceSessionState::ServerUnreachable) {
+        SetState(StateForConfig(config_), "control_connect");
+    }
+    if (err == ESP_OK) {
+        ArmConnectWatchdog();
+    } else {
+        ScheduleControlReconnect("control_connect_sync_failed");
+    }
     return err;
 }
 

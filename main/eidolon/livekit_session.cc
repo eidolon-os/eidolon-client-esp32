@@ -203,11 +203,13 @@ void LiveKitSession::HandleStateChanged(livekit_connection_state_t state)
     // room_kind is inferred from whether this connection publishes/subscribes
     // media (voice) or is data-only (control), so the SDK-level transition lines
     // align with the controller's [lifecycle] logs by identity + room_kind.
-    ESP_LOGI(TAG, "[lifecycle] room state=%s room_kind=%s identity=%s",
+    ESP_LOGI(TAG, "[lifecycle] room state=%s room_kind=%s identity=%s gen=%lu",
              livekit_connection_state_str(state), using_media_ ? "voice" : "control",
-             identity_.c_str());
+             identity_.c_str(), static_cast<unsigned long>(generation_));
 
-    if (mapped == LiveKitConnectionState::Failed || mapped == LiveKitConnectionState::Reconnecting) {
+    if ((mapped == LiveKitConnectionState::Failed ||
+         mapped == LiveKitConnectionState::Reconnecting) &&
+        room_handle_ != nullptr) {
         livekit_failure_reason_t reason = livekit_room_get_failure_reason(room_handle_);
         last_failure_reason_ = reason;
         if (reason != LIVEKIT_FAILURE_REASON_NONE) {
@@ -216,7 +218,7 @@ void LiveKitSession::HandleStateChanged(livekit_connection_state_t state)
     }
 
     if (on_state_changed_) {
-        on_state_changed_(mapped);
+        on_state_changed_(mapped, generation_);
     }
 }
 
@@ -283,13 +285,14 @@ void LiveKitSession::UnregisterStreamHandlers()
     }
 }
 
-esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config)
+esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generation)
 {
     if (room_handle_ != nullptr) {
         Disconnect(true);
     }
 
     identity_ = config.active.identity;
+    generation_ = generation;
 
     esp_err_t media_err = eidolon_livekit_board_init();
     if (media_err != ESP_OK) {
@@ -352,13 +355,14 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config)
     return ESP_OK;
 }
 
-esp_err_t LiveKitSession::ConnectDataOnly(const Esp32HubConfig& config)
+esp_err_t LiveKitSession::ConnectDataOnly(const Esp32HubConfig& config, uint32_t generation)
 {
     if (room_handle_ != nullptr) {
         Disconnect(true);
     }
 
     identity_ = config.active.identity;
+    generation_ = generation;
 
     livekit_room_options_t room_options = {};
     room_options.publish = {
