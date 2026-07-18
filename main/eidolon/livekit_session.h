@@ -55,11 +55,14 @@ private:
     void RegisterTranscriptionHandler();
     void RegisterAgentSessionDrainHandler();
     void UnregisterStreamHandlers();
+    esp_err_t EnsureMediaBoard();
+    void ReleaseMediaBoard();
 
     livekit_room_handle_t room_handle_ = nullptr;
     std::string identity_;
     bool connected_ = false;
     bool using_media_ = false;
+    bool media_board_initialized_ = false;
     bool transcription_registered_ = false;
     bool agent_session_registered_ = false;
     livekit_failure_reason_t last_failure_reason_ = LIVEKIT_FAILURE_REASON_NONE;

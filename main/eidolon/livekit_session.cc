@@ -1,6 +1,7 @@
 #include "livekit_session.h"
 
 #include "eidolon_topics.h"
+#include "livekit_data_only_compat.h"
 #include "livekit_board.h"
 
 #include <cJSON.h>
@@ -285,6 +286,32 @@ void LiveKitSession::UnregisterStreamHandlers()
     }
 }
 
+esp_err_t LiveKitSession::EnsureMediaBoard()
+{
+    if (media_board_initialized_) {
+        return ESP_OK;
+    }
+    esp_err_t err = eidolon_livekit_board_init();
+    if (err == ESP_OK) {
+        media_board_initialized_ = true;
+    } else {
+        // board_init can fail after constructing only part of the provider.
+        // Always return it to a clean state so the next bounded retry starts
+        // from a complete capturer/renderer pair.
+        eidolon_livekit_board_deinit();
+    }
+    return err;
+}
+
+void LiveKitSession::ReleaseMediaBoard()
+{
+    if (!media_board_initialized_) {
+        return;
+    }
+    eidolon_livekit_board_deinit();
+    media_board_initialized_ = false;
+}
+
 esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generation)
 {
     if (room_handle_ != nullptr) {
@@ -294,7 +321,7 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
     identity_ = config.active.identity;
     generation_ = generation;
 
-    esp_err_t media_err = eidolon_livekit_board_init();
+    esp_err_t media_err = EnsureMediaBoard();
     if (media_err != ESP_OK) {
         return media_err;
     }
@@ -303,6 +330,7 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
     av_render_handle_t renderer = eidolon_livekit_board_get_renderer();
     if (!capturer || !renderer) {
         ESP_LOGE(TAG, "Media pipeline not ready");
+        ReleaseMediaBoard();
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -364,25 +392,38 @@ esp_err_t LiveKitSession::ConnectDataOnly(const Esp32HubConfig& config, uint32_t
     identity_ = config.active.identity;
     generation_ = generation;
 
+    esp_err_t media_err = EnsureMediaBoard();
+    if (media_err != ESP_OK) {
+        return media_err;
+    }
+
+    esp_capture_handle_t capturer = eidolon_livekit_board_get_capturer();
+    av_render_handle_t renderer = eidolon_livekit_board_get_renderer();
+
     livekit_room_options_t room_options = {};
-    room_options.publish = {
-        .kind = LIVEKIT_MEDIA_TYPE_NONE,
-    };
-    room_options.subscribe = {
-        .kind = LIVEKIT_MEDIA_TYPE_NONE,
-    };
+    if (!ConfigureDataOnlyMediaProvider(room_options, capturer, renderer)) {
+        ESP_LOGE(TAG, "Data-only compatibility media provider not ready");
+        ReleaseMediaBoard();
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (eidolon_livekit_board_set_capture_enabled(false) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to close capture gate for control room");
+        ReleaseMediaBoard();
+        return ESP_FAIL;
+    }
     room_options.on_state_changed = OnRoomStateChanged;
     room_options.on_data_received = OnDataReceived;
     room_options.ctx = this;
+    using_media_ = false;
 
     if (livekit_room_create(&room_handle_, &room_options) != LIVEKIT_ERR_NONE) {
         ESP_LOGE(TAG, "livekit_room_create data-only failed");
         room_handle_ = nullptr;
         transcription_registered_ = false;
         agent_session_registered_ = false;
+        ReleaseMediaBoard();
         return ESP_FAIL;
     }
-    using_media_ = false;
     transcription_registered_ = false;
     agent_session_registered_ = false;
 
@@ -397,6 +438,7 @@ esp_err_t LiveKitSession::ConnectDataOnly(const Esp32HubConfig& config, uint32_t
         room_handle_ = nullptr;
         transcription_registered_ = false;
         agent_session_registered_ = false;
+        ReleaseMediaBoard();
         return ESP_FAIL;
     }
 
@@ -409,9 +451,9 @@ esp_err_t LiveKitSession::Disconnect(bool release_media)
     if (room_handle_ == nullptr) {
         identity_.clear();
         last_failure_reason_ = LIVEKIT_FAILURE_REASON_NONE;
-        if (release_media && using_media_) {
+        if (release_media && media_board_initialized_) {
             ESP_LOGI(TAG, "Releasing LiveKit media board without active room");
-            eidolon_livekit_board_deinit();
+            ReleaseMediaBoard();
             using_media_ = false;
         }
         return ESP_OK;
@@ -445,8 +487,8 @@ esp_err_t LiveKitSession::Disconnect(bool release_media)
     room_handle_ = nullptr;
     identity_.clear();
     last_failure_reason_ = LIVEKIT_FAILURE_REASON_NONE;
-    if (release_media && using_media_) {
-        eidolon_livekit_board_deinit();
+    if (release_media && media_board_initialized_) {
+        ReleaseMediaBoard();
         ESP_LOGI(TAG, "LiveKit media board released");
         using_media_ = false;
     }
