@@ -55,7 +55,7 @@ private:
     void RegisterTranscriptionHandler();
     void RegisterAgentSessionDrainHandler();
     void UnregisterStreamHandlers();
-    esp_err_t EnsureMediaBoard();
+    esp_err_t EnsureMediaBoard(bool data_only);
     void ReleaseMediaBoard();
 
     livekit_room_handle_t room_handle_ = nullptr;

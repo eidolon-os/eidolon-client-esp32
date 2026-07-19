@@ -4,6 +4,7 @@
 
 #include "audio_codec.h"
 #include "audio/eidolon_afe_capture.h"
+#include "audio/pcm_push_capture_source.h"
 #include "eidolon_audio_input.h"
 
 #include <esp_audio_dec_default.h>
@@ -15,6 +16,8 @@
 #include <esp_log.h>
 #include <esp_timer.h>
 #include <av_render_default.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include <algorithm>
 #include <cmath>
 #include <string.h>
@@ -30,6 +33,12 @@ static av_render_handle_t s_av_renderer;
 static volatile int64_t s_last_playback_us;
 static volatile uint32_t s_recent_capture_rms_ppm;
 static volatile uint32_t s_recent_playback_rms_ppm;
+
+// Data-only control-room capture: a mic-free silent PCM source. Kept alive across
+// sessions (like s_afe_capture) so the feeder task never races a delete.
+static eidolon::PcmPushCaptureSource* s_silent_source;
+static TaskHandle_t s_silence_task;
+static volatile bool s_silence_feed;
 
 namespace {
 constexpr int kPlaybackPcmMinAvgAbs = 120;
@@ -190,6 +199,40 @@ static esp_err_t build_capturer(AudioCodec* codec)
     return esp_capture_open(&cfg, &s_capturer);
 }
 
+// Feeds real-time silence into the silent capture source. LiveKit 0.3.10 forces a
+// working capture path on every room; the control (data-only) room uses this instead
+// of the mic/AFE, so idle never engages the microphone.
+static void silence_feed_task(void*)
+{
+    constexpr int kFrameSamples = 16000 * 20 / 1000;  // 20 ms @ 16 kHz mono
+    static int16_t silence[kFrameSamples] = {0};
+    for (;;) {
+        if (s_silence_feed && s_silent_source != nullptr) {
+            s_silent_source->Push(silence, kFrameSamples);
+        }
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+}
+
+static esp_err_t build_silent_capturer(void)
+{
+    if (s_silent_source == nullptr) {
+        s_silent_source = new eidolon::PcmPushCaptureSource(16000);
+    }
+    if (s_silence_task == nullptr) {
+        xTaskCreate(silence_feed_task, "lk_silence", 2560, nullptr, 4, &s_silence_task);
+    }
+    esp_capture_cfg_t cfg = {
+        .sync_mode = ESP_CAPTURE_SYNC_MODE_AUDIO,
+        .audio_src = s_silent_source->Interface(),
+    };
+    esp_err_t err = esp_capture_open(&cfg, &s_capturer);
+    if (err == ESP_OK) {
+        s_silence_feed = true;
+    }
+    return err;
+}
+
 static esp_err_t build_renderer(esp_codec_dev_handle_t play_handle, uint32_t output_sample_rate)
 {
     i2s_render_cfg_t i2s_cfg = {
@@ -272,6 +315,24 @@ extern "C" esp_err_t eidolon_livekit_board_init(void)
     return ESP_OK;
 }
 
+extern "C" esp_err_t eidolon_livekit_board_init_data_only(void)
+{
+    if (s_capturer != nullptr) {
+        return ESP_OK;
+    }
+    // Control (data-only) room: no codec, no AFE/mic, no renderer — only a mic-free
+    // silent capturer to satisfy 0.3.10's mandatory capture sink. Register the audio
+    // encoder default so the sink's PCM->Opus path is available.
+    esp_audio_enc_register_default();
+    esp_err_t err = build_silent_capturer();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Silent capturer build failed: %s", esp_err_to_name(err));
+        return err;
+    }
+    ESP_LOGI(TAG, "LiveKit board data-only ready (mic-free silent capture)");
+    return ESP_OK;
+}
+
 extern "C" esp_capture_handle_t eidolon_livekit_board_get_capturer(void)
 {
     return s_capturer;
@@ -340,6 +401,9 @@ extern "C" void eidolon_livekit_board_deinit(void)
         esp_capture_close(s_capturer);
         s_capturer = nullptr;
     }
+    // Idle the silence feeder (the source + task are kept alive across sessions, like
+    // the AFE instance, so the feeder task can never race a delete).
+    s_silence_feed = false;
     // Keep the EidolonAfeCapture instance alive across sessions: its embedded
     // AfeAudioProcessor owns a long-lived AFE task that cannot be safely torn
     // down. Stop() idles it; build_capturer reuses the same instance next time.

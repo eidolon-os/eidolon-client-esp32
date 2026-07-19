@@ -286,12 +286,13 @@ void LiveKitSession::UnregisterStreamHandlers()
     }
 }
 
-esp_err_t LiveKitSession::EnsureMediaBoard()
+esp_err_t LiveKitSession::EnsureMediaBoard(bool data_only)
 {
     if (media_board_initialized_) {
         return ESP_OK;
     }
-    esp_err_t err = eidolon_livekit_board_init();
+    esp_err_t err = data_only ? eidolon_livekit_board_init_data_only()
+                              : eidolon_livekit_board_init();
     if (err == ESP_OK) {
         media_board_initialized_ = true;
     } else {
@@ -321,7 +322,7 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
     identity_ = config.active.identity;
     generation_ = generation;
 
-    esp_err_t media_err = EnsureMediaBoard();
+    esp_err_t media_err = EnsureMediaBoard(/*data_only=*/false);
     if (media_err != ESP_OK) {
         return media_err;
     }
@@ -392,25 +393,37 @@ esp_err_t LiveKitSession::ConnectDataOnly(const Esp32HubConfig& config, uint32_t
     identity_ = config.active.identity;
     generation_ = generation;
 
-    esp_err_t media_err = EnsureMediaBoard();
+    esp_err_t media_err = EnsureMediaBoard(/*data_only=*/true);
     if (media_err != ESP_OK) {
         return media_err;
     }
 
     esp_capture_handle_t capturer = eidolon_livekit_board_get_capturer();
-    av_render_handle_t renderer = eidolon_livekit_board_get_renderer();
-
-    livekit_room_options_t room_options = {};
-    if (!ConfigureDataOnlyMediaProvider(room_options, capturer, renderer)) {
-        ESP_LOGE(TAG, "Data-only compatibility media provider not ready");
+    if (!capturer) {
+        ESP_LOGE(TAG, "Control-room capturer not ready");
         ReleaseMediaBoard();
         return ESP_ERR_INVALID_STATE;
     }
-    if (eidolon_livekit_board_set_capture_enabled(false) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to close capture gate for control room");
-        ReleaseMediaBoard();
-        return ESP_FAIL;
-    }
+
+    // LiveKit 0.3.10 forces a working capture sink on every room, so the control room
+    // publishes a MIC-FREE silent Opus track (fed by the silent capturer). The
+    // data-only token (can_publish=false) denies the publish server-side, so the room
+    // stays effectively data-only and carries only data packets. subscribe=NONE:
+    // control needs no playback path.
+    livekit_room_options_t room_options = {};
+    room_options.publish = {
+        .kind = LIVEKIT_MEDIA_TYPE_AUDIO,
+        .audio_encode =
+            {
+                .codec = LIVEKIT_AUDIO_CODEC_OPUS,
+                .sample_rate = 16000,
+                .channel_count = 1,
+            },
+        .capturer = capturer,
+    };
+    room_options.subscribe = {
+        .kind = LIVEKIT_MEDIA_TYPE_NONE,
+    };
     room_options.on_state_changed = OnRoomStateChanged;
     room_options.on_data_received = OnDataReceived;
     room_options.ctx = this;
