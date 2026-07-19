@@ -220,7 +220,15 @@ static esp_err_t build_silent_capturer(void)
         s_silent_source = new eidolon::PcmPushCaptureSource(16000);
     }
     if (s_silence_task == nullptr) {
-        xTaskCreate(silence_feed_task, "lk_silence", 2560, nullptr, 4, &s_silence_task);
+        // Without this feeder the capturer below has no producer: 0.3.10 would
+        // read an empty ring and report a starved capture path as success. Fail
+        // the init instead of standing up a capturer that can never yield PCM.
+        if (xTaskCreate(silence_feed_task, "lk_silence", 2560, nullptr, 4,
+                        &s_silence_task) != pdPASS) {
+            s_silence_task = nullptr;
+            ESP_LOGE(TAG, "Silence feeder task create failed");
+            return ESP_ERR_NO_MEM;
+        }
     }
     esp_capture_cfg_t cfg = {
         .sync_mode = ESP_CAPTURE_SYNC_MODE_AUDIO,

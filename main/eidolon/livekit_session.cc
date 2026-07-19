@@ -405,11 +405,16 @@ esp_err_t LiveKitSession::ConnectDataOnly(const Esp32HubConfig& config, uint32_t
         return ESP_ERR_INVALID_STATE;
     }
 
-    // LiveKit 0.3.10 forces a working capture sink on every room, so the control room
-    // publishes a MIC-FREE silent Opus track (fed by the silent capturer). The
-    // data-only token (can_publish=false) denies the publish server-side, so the room
-    // stays effectively data-only and carries only data packets. subscribe=NONE:
-    // control needs no playback path.
+    // LiveKit 0.3.10 forces a working capture sink on every room, so the control
+    // room publishes a MIC-FREE silent Opus track. Two independent layers keep it
+    // effectively data-only, so privacy does not hinge on either one alone:
+    //   1) Source: the capturer is synthetic zero PCM (no codec/AFE); the mic is
+    //      never opened in the control room, so even a published track is silence.
+    //   2) Token: can_publish=false makes the server drop the track. Verified in
+    //      the LiveKit server log: onMediaTrack fires, then "webrtc track published
+    //      but can't find MediaTrack in pendingTracks" with isReceiverAdded:false,
+    //      i.e. no room MediaTrack is created and no participant can subscribe.
+    // subscribe=NONE: control needs no playback path.
     livekit_room_options_t room_options = {};
     room_options.publish = {
         .kind = LIVEKIT_MEDIA_TYPE_AUDIO,
