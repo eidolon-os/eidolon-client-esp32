@@ -75,6 +75,15 @@ void Motion::stop()
     _pitch_servo->move(_pitch_servo->getCurrentAngle());
 }
 
+void Motion::freeze()
+{
+    // Freeze the animation first (no pending snap), then cut torque, so the 50 Hz
+    // update tick has nothing to re-drive and the head stays limp until the next move.
+    _yaw_servo->halt();
+    _pitch_servo->halt();
+    setTorqueEnabled(false);
+}
+
 void Motion::lookAtNormalized(float x, float y, int speed)
 {
     auto angles = calculateNormalizedLookAngles(

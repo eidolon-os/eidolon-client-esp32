@@ -38,8 +38,12 @@ public:
     bool ready() const { return ready_; }
 
     void SetHeadAngles(float yaw_deg, float pitch_deg, int speed = 500);
-    void LookAtNormalized(float x, float y, int speed = 500);  // x,y in [-1,1]
+    // x,y in [-1,1]. ttl_ms > 0 arms a guardrail: the head returns home when the hold
+    // expires, so no caller can leave it turned off-center indefinitely.
+    void LookAtNormalized(float x, float y, int speed = 500, int ttl_ms = 0);
     void GoHome(int speed = 500);
+    // Emergency stop (safety.stop): preempt any running gesture and cut servo torque so
+    // the head goes limp. Highest motion priority. The next command re-engages torque.
     void Stop();
 
     // Discrete expressive gesture: name in {nod, shake, perk_up, droop, glance}.
@@ -55,6 +59,10 @@ private:
     void SelfTest();
     void RunGesture();
     void UpdateLoop();
+    // Delay one gesture step, then report whether the gesture may continue (false if a
+    // safety stop was requested or the body went unready). Keeps a running gesture from
+    // fighting a safety.stop.
+    bool GestureContinue(int delay_ms);
 
     i2c_master_bus_handle_t i2c_bus_;
     m5::PY32IOExpander_Class* ioe_ = nullptr;
@@ -66,6 +74,11 @@ private:
     // Pending gesture params, consumed by the one-shot gesture task. Guarded by
     // gesture_busy_ (only one gesture runs at a time).
     volatile bool gesture_busy_ = false;
+    // Set by Stop() to preempt the running gesture; cleared when a new gesture starts.
+    volatile bool gesture_abort_ = false;
+    // Absolute esp_timer deadline (us) for a look_at TTL hold; 0 = disarmed. Enforced on
+    // the 50 Hz update tick so the guardrail can't be bypassed by any caller.
+    volatile int64_t look_at_deadline_us_ = 0;
     struct {
         std::string name;
         int times;

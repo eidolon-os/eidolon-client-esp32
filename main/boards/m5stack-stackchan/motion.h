@@ -109,6 +109,13 @@ public:
     void stop();
 
     /**
+     * @brief Emergency freeze: halt both servos' animation at their current angle and
+     *        cut torque so the head goes limp immediately and stays put (does not snap
+     *        back on the next update tick). The next move re-engages torque via WritePos.
+     */
+    void freeze();
+
+    /**
      * @brief Moves the head using normalized coordinates ranging from -1.0 to 1.0.
      *
      * This method maps a proportional input to the full physical range of the servos.

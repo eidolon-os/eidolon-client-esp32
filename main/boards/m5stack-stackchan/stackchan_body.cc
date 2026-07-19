@@ -116,31 +116,49 @@ void StackChanBody::UpdateLoop() {
             MutexGuard lock(motion_mutex_);
             if (motion_) motion_->update();
         }
+        // Guardrail: a look_at with ttl_ms returns home when its hold expires. Enforced
+        // here (not in the caller) so no motion source can hold the head off-center past
+        // its TTL. GoHome takes the mutex itself, so call it outside the block above.
+        int64_t deadline = look_at_deadline_us_;
+        if (deadline != 0 && esp_timer_get_time() >= deadline) {
+            look_at_deadline_us_ = 0;
+            GoHome();
+        }
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
 
+bool StackChanBody::GestureContinue(int delay_ms) {
+    vTaskDelay(pdMS_TO_TICKS(delay_ms));
+    return ready_ && !gesture_abort_;
+}
+
 void StackChanBody::SetHeadAngles(float yaw_deg, float pitch_deg, int speed) {
     if (!ready_) return;
+    look_at_deadline_us_ = 0;  // any explicit angle move supersedes a look_at TTL hold
     MutexGuard lock(motion_mutex_);
     motion_->moveWithSpeed(static_cast<int>(std::lround(yaw_deg * 10.0f)),
                            static_cast<int>(std::lround(pitch_deg * 10.0f)), speed);
 }
 
-void StackChanBody::LookAtNormalized(float x, float y, int speed) {
+void StackChanBody::LookAtNormalized(float x, float y, int speed, int ttl_ms) {
     if (!ready_) return;
     MutexGuard lock(motion_mutex_);
     motion_->lookAtNormalized(x, y, speed);
+    // Arm the return-home guardrail; 0 = hold until the next command moves the head.
+    look_at_deadline_us_ = ttl_ms > 0 ? esp_timer_get_time() + static_cast<int64_t>(ttl_ms) * 1000 : 0;
 }
 
 void StackChanBody::GoHome(int speed) {
-    SetHeadAngles(kHomeYawDeg, kHomePitchDeg, speed);
+    SetHeadAngles(kHomeYawDeg, kHomePitchDeg, speed);  // clears the TTL hold via SetHeadAngles
 }
 
 void StackChanBody::Stop() {
     if (!ready_) return;
+    gesture_abort_ = true;  // set before the lock so a mid-step gesture bails out
     MutexGuard lock(motion_mutex_);
-    motion_->stop();
+    look_at_deadline_us_ = 0;
+    motion_->freeze();  // freeze animation + cut torque -> head limp (safety.stop = 断使能)
 }
 
 void StackChanBody::SelfTest() {
@@ -179,6 +197,7 @@ void StackChanBody::HeadGesture(const std::string& name, int times, float x, flo
     gesture_.y = y;
     gesture_.hold_ms = hold_ms;
     gesture_.return_ms = return_ms;
+    gesture_abort_ = false;  // fresh gesture clears any prior safety-stop request
     gesture_busy_ = true;
     xTaskCreate(
         [](void* arg) {
@@ -194,26 +213,28 @@ void StackChanBody::RunGesture() {
     const auto& g = gesture_;
     const int times = g.times > 0 ? g.times : 2;
     ESP_LOGI(TAG, "gesture: %s", g.name.c_str());
+    // Each step checks GestureContinue after moving; a safety.stop mid-gesture returns
+    // early WITHOUT homing, so the head stays limp instead of driving back to center.
     if (g.name == "nod") {  // pitch oscillation (yes)
         for (int i = 0; i < times; ++i) {
-            SetHeadAngles(0.0f, kHomePitchDeg - 12.0f); vTaskDelay(pdMS_TO_TICKS(280));
-            SetHeadAngles(0.0f, kHomePitchDeg + 10.0f); vTaskDelay(pdMS_TO_TICKS(280));
+            SetHeadAngles(0.0f, kHomePitchDeg - 12.0f); if (!GestureContinue(280)) return;
+            SetHeadAngles(0.0f, kHomePitchDeg + 10.0f); if (!GestureContinue(280)) return;
         }
         GoHome();
     } else if (g.name == "shake") {  // yaw oscillation (no)
         for (int i = 0; i < times; ++i) {
-            SetHeadAngles(-22.0f, kHomePitchDeg); vTaskDelay(pdMS_TO_TICKS(260));
-            SetHeadAngles(22.0f, kHomePitchDeg);  vTaskDelay(pdMS_TO_TICKS(260));
+            SetHeadAngles(-22.0f, kHomePitchDeg); if (!GestureContinue(260)) return;
+            SetHeadAngles(22.0f, kHomePitchDeg);  if (!GestureContinue(260)) return;
         }
         GoHome();
     } else if (g.name == "perk_up") {  // wake: look up, then settle
-        SetHeadAngles(0.0f, 72.0f); vTaskDelay(pdMS_TO_TICKS(g.hold_ms > 0 ? g.hold_ms : 800));
+        SetHeadAngles(0.0f, 72.0f); if (!GestureContinue(g.hold_ms > 0 ? g.hold_ms : 800)) return;
         GoHome();
     } else if (g.name == "droop") {  // fatigue mirror: droop low, hold, recover
-        SetHeadAngles(0.0f, 8.0f); vTaskDelay(pdMS_TO_TICKS(g.hold_ms > 0 ? g.hold_ms : 1200));
+        SetHeadAngles(0.0f, 8.0f); if (!GestureContinue(g.hold_ms > 0 ? g.hold_ms : 1200)) return;
         GoHome();
     } else if (g.name == "glance") {  // look toward target, then return
-        LookAtNormalized(g.x, g.y); vTaskDelay(pdMS_TO_TICKS(g.return_ms > 0 ? g.return_ms : 800));
+        LookAtNormalized(g.x, g.y); if (!GestureContinue(g.return_ms > 0 ? g.return_ms : 800)) return;
         GoHome();
     } else {
         ESP_LOGW(TAG, "unknown gesture: %s", g.name.c_str());

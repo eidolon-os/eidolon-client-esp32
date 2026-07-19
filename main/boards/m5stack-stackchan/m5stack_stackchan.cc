@@ -455,8 +455,8 @@ public:
 
     // Head/body motion: delegate to the servo body (no-op if the base is absent).
     bool HasHeadMotion() override { return body_ != nullptr && body_->ready(); }
-    void HeadLookAt(float x, float y) override {
-        if (body_) body_->LookAtNormalized(x, y);
+    void HeadLookAt(float x, float y, int speed, int ttl_ms) override {
+        if (body_) body_->LookAtNormalized(x, y, speed, ttl_ms);
     }
     void HeadHome() override {
         if (body_) body_->GoHome();
@@ -464,6 +464,9 @@ public:
     void HeadGesture(const std::string& name, int times, float x, float y,
                      int hold_ms, int return_ms) override {
         if (body_) body_->HeadGesture(name, times, x, y, hold_ms, return_ms);
+    }
+    void HeadStop() override {
+        if (body_) body_->Stop();
     }
 };
 

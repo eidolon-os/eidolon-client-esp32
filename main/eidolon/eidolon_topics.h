@@ -51,6 +51,9 @@ inline constexpr const char* kControlOpDeviceIdentify = "device.identify";
 inline constexpr const char* kControlOpHeadLookAt = "head.look_at";
 inline constexpr const char* kControlOpHeadHome = "head.home";
 inline constexpr const char* kControlOpHeadGesture = "head.gesture";
+// Emergency stop: cut servo torque immediately (head goes limp) and preempt any running
+// gesture. Highest motion priority; safe-risk op any caller may issue.
+inline constexpr const char* kControlOpSafetyStop = "safety.stop";
 inline constexpr const char* kControlOpDeviceRollCall = "device.roll_call";
 inline constexpr const char* kControlOpGuardVisionBenchmark = "guard.vision.benchmark";
 inline constexpr const char* kControlOpGuardRuntimeSync = "guard.runtime.sync";

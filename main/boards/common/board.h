@@ -94,13 +94,18 @@ public:
      * defaults. x,y are normalized [-1,1] (0,0 = centered/forward).
      */
     virtual bool HasHeadMotion() { return false; }
-    virtual void HeadLookAt(float x, float y) { (void)x; (void)y; }
+    // ttl_ms > 0 returns the head home when the hold expires (device guardrail).
+    virtual void HeadLookAt(float x, float y, int speed, int ttl_ms) {
+        (void)x; (void)y; (void)speed; (void)ttl_ms;
+    }
     virtual void HeadHome() {}
     // Discrete expressive gesture: name in {nod, shake, perk_up, droop, glance}.
     virtual void HeadGesture(const std::string& name, int times, float x, float y,
                              int hold_ms, int return_ms) {
         (void)name; (void)times; (void)x; (void)y; (void)hold_ms; (void)return_ms;
     }
+    // Emergency stop: cut head-servo torque and preempt any running gesture.
+    virtual void HeadStop() {}
 };
 
 #define DECLARE_BOARD(BOARD_CLASS_NAME) \

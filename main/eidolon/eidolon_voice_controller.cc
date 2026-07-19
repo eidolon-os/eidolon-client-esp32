@@ -1058,6 +1058,7 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload)
         {kControlOpHeadLookAt, 1, &EidolonVoiceController::HandleHeadLookAtCommand},
         {kControlOpHeadHome, 1, &EidolonVoiceController::HandleHeadHomeCommand},
         {kControlOpHeadGesture, 1, &EidolonVoiceController::HandleHeadGestureCommand},
+        {kControlOpSafetyStop, 1, &EidolonVoiceController::HandleSafetyStopCommand},
 #if CONFIG_EIDOLON_GUARD_SERVICE
         {kControlOpDeviceRollCall, 1, &EidolonVoiceController::HandleDeviceRollCallCommand},
         {kControlOpGuardRuntimeSync, 0, &EidolonVoiceController::HandleGuardRuntimeSyncCommand},
@@ -1542,20 +1543,28 @@ void EidolonVoiceController::HandleHeadLookAtCommand(const std::string& command_
     }
 
     float x = 0.0f, y = 0.0f;
+    int speed = 500;    // 0..1000; motion layer default
+    int ttl_ms = 0;     // 0 = hold until the next command; >0 arms return-home guardrail
     cJSON* root = cJSON_Parse(payload.c_str());
     if (root) {
         const cJSON* jx = cJSON_GetObjectItem(root, "x");
         const cJSON* jy = cJSON_GetObjectItem(root, "y");
+        const cJSON* jspeed = cJSON_GetObjectItem(root, "speed");
+        const cJSON* jttl = cJSON_GetObjectItem(root, "ttl_ms");
         if (cJSON_IsNumber(jx)) x = static_cast<float>(jx->valuedouble);
         if (cJSON_IsNumber(jy)) y = static_cast<float>(jy->valuedouble);
+        if (cJSON_IsNumber(jspeed)) speed = jspeed->valueint;
+        if (cJSON_IsNumber(jttl)) ttl_ms = jttl->valueint;
         cJSON_Delete(root);
     }
     // Normalized inputs; the motion layer maps to the mechanical range and clamps.
     if (x < -1.0f) x = -1.0f; else if (x > 1.0f) x = 1.0f;
     if (y < -1.0f) y = -1.0f; else if (y > 1.0f) y = 1.0f;
+    if (speed < 0) speed = 0; else if (speed > 1000) speed = 1000;
+    if (ttl_ms < 0) ttl_ms = 0;
 
-    ESP_LOGI(TAG, "Control command -> head.look_at x=%.2f y=%.2f", x, y);
-    board.HeadLookAt(x, y);
+    ESP_LOGI(TAG, "Control command -> head.look_at x=%.2f y=%.2f speed=%d ttl_ms=%d", x, y, speed, ttl_ms);
+    board.HeadLookAt(x, y, speed, ttl_ms);
     AckCommand(command, "completed", "OK");
 }
 
@@ -1617,6 +1626,23 @@ void EidolonVoiceController::HandleHeadGestureCommand(const std::string& command
 
     ESP_LOGI(TAG, "Control command -> head.gesture %s", name.c_str());
     board.HeadGesture(name, times, x, y, hold_ms, return_ms);
+    AckCommand(command, "completed", "OK");
+}
+
+void EidolonVoiceController::HandleSafetyStopCommand(const std::string& command_id,
+                                                     const std::string& /*payload*/)
+{
+    ControlCommand command;
+    command.id = command_id;
+    command.op = kControlOpSafetyStop;
+
+    auto& board = Board::GetInstance();
+    if (!board.HasHeadMotion()) {
+        AckCommand(command, "failed", "NO_HEAD_MOTION");
+        return;
+    }
+    ESP_LOGW(TAG, "Control command -> safety.stop (cut head torque)");
+    board.HeadStop();
     AckCommand(command, "completed", "OK");
 }
 

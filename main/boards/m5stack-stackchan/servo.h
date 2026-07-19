@@ -64,6 +64,17 @@ public:
     }
 
     /**
+     * @brief Freeze the spring animation at the current angle without re-issuing a
+     *        position write, so update() stops driving the servo. Used by the safety
+     *        stop before torque is cut, so the head stays put instead of snapping to a
+     *        stale target on the next tick.
+     */
+    void halt()
+    {
+        stop_motion_at_angle(getCurrentAngle());
+    }
+
+    /**
      * @brief Get servo current angle
      *
      * @return int
