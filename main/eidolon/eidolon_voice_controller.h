@@ -201,6 +201,7 @@ private:
     void HandleDeviceIdentifyCommand(const std::string& command_id, const std::string& payload);
     void HandleHeadLookAtCommand(const std::string& command_id, const std::string& payload);
     void HandleHeadHomeCommand(const std::string& command_id, const std::string& payload);
+    void HandleHeadGestureCommand(const std::string& command_id, const std::string& payload);
 #if CONFIG_EIDOLON_GUARD_SERVICE
     void HandleDeviceRollCallCommand(const std::string& command_id, const std::string& payload);
 #endif

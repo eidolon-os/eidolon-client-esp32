@@ -96,6 +96,11 @@ public:
     virtual bool HasHeadMotion() { return false; }
     virtual void HeadLookAt(float x, float y) { (void)x; (void)y; }
     virtual void HeadHome() {}
+    // Discrete expressive gesture: name in {nod, shake, perk_up, droop, glance}.
+    virtual void HeadGesture(const std::string& name, int times, float x, float y,
+                             int hold_ms, int return_ms) {
+        (void)name; (void)times; (void)x; (void)y; (void)hold_ms; (void)return_ms;
+    }
 };
 
 #define DECLARE_BOARD(BOARD_CLASS_NAME) \

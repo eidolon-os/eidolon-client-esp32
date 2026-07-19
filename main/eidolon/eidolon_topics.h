@@ -50,6 +50,7 @@ inline constexpr const char* kControlOpDeviceIdentify = "device.identify";
 // coordinate stream; continuous gaze tracking is a separate device-local reflex.
 inline constexpr const char* kControlOpHeadLookAt = "head.look_at";
 inline constexpr const char* kControlOpHeadHome = "head.home";
+inline constexpr const char* kControlOpHeadGesture = "head.gesture";
 inline constexpr const char* kControlOpDeviceRollCall = "device.roll_call";
 inline constexpr const char* kControlOpGuardVisionBenchmark = "guard.vision.benchmark";
 inline constexpr const char* kControlOpGuardRuntimeSync = "guard.runtime.sync";

@@ -5,6 +5,7 @@
 #include <freertos/semphr.h>
 
 #include <memory>
+#include <string>
 
 #include "SCSCL.h"
 
@@ -41,11 +42,18 @@ public:
     void GoHome(int speed = 500);
     void Stop();
 
+    // Discrete expressive gesture: name in {nod, shake, perk_up, droop, glance}.
+    // Runs a short motion sequence in a one-shot task; a new gesture is dropped while
+    // one is running. Unused params per gesture are ignored.
+    void HeadGesture(const std::string& name, int times, float x, float y,
+                     int hold_ms, int return_ms);
+
     // Boot bring-up sweep in its own task (does not block board construction).
     void StartSelfTest();
 
 private:
     void SelfTest();
+    void RunGesture();
     void UpdateLoop();
 
     i2c_master_bus_handle_t i2c_bus_;
@@ -54,4 +62,14 @@ private:
     std::unique_ptr<stackchan::motion::Motion> motion_;
     SemaphoreHandle_t motion_mutex_ = nullptr;
     bool ready_ = false;
+
+    // Pending gesture params, consumed by the one-shot gesture task. Guarded by
+    // gesture_busy_ (only one gesture runs at a time).
+    volatile bool gesture_busy_ = false;
+    struct {
+        std::string name;
+        int times;
+        float x, y;
+        int hold_ms, return_ms;
+    } gesture_{};
 };

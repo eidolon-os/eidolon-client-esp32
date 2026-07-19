@@ -1057,6 +1057,7 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload)
         {kControlOpDeviceIdentify, 1, &EidolonVoiceController::HandleDeviceIdentifyCommand},
         {kControlOpHeadLookAt, 1, &EidolonVoiceController::HandleHeadLookAtCommand},
         {kControlOpHeadHome, 1, &EidolonVoiceController::HandleHeadHomeCommand},
+        {kControlOpHeadGesture, 1, &EidolonVoiceController::HandleHeadGestureCommand},
 #if CONFIG_EIDOLON_GUARD_SERVICE
         {kControlOpDeviceRollCall, 1, &EidolonVoiceController::HandleDeviceRollCallCommand},
         {kControlOpGuardRuntimeSync, 0, &EidolonVoiceController::HandleGuardRuntimeSyncCommand},
@@ -1572,6 +1573,50 @@ void EidolonVoiceController::HandleHeadHomeCommand(const std::string& command_id
     }
     ESP_LOGI(TAG, "Control command -> head.home");
     board.HeadHome();
+    AckCommand(command, "completed", "OK");
+}
+
+void EidolonVoiceController::HandleHeadGestureCommand(const std::string& command_id,
+                                                      const std::string& payload)
+{
+    ControlCommand command;
+    command.id = command_id;
+    command.op = kControlOpHeadGesture;
+
+    auto& board = Board::GetInstance();
+    if (!board.HasHeadMotion()) {
+        AckCommand(command, "failed", "NO_HEAD_MOTION");
+        return;
+    }
+
+    std::string name;
+    int times = 0, hold_ms = 0, return_ms = 0;
+    float x = 0.0f, y = 0.0f;
+    cJSON* root = cJSON_Parse(payload.c_str());
+    if (root) {
+        const cJSON* jn = cJSON_GetObjectItem(root, "name");
+        if (cJSON_IsString(jn) && jn->valuestring) name = jn->valuestring;
+        const cJSON* jt = cJSON_GetObjectItem(root, "times");
+        if (cJSON_IsNumber(jt)) times = jt->valueint;
+        const cJSON* jh = cJSON_GetObjectItem(root, "hold_ms");
+        if (cJSON_IsNumber(jh)) hold_ms = jh->valueint;
+        const cJSON* jr = cJSON_GetObjectItem(root, "return_ms");
+        if (cJSON_IsNumber(jr)) return_ms = jr->valueint;
+        const cJSON* jx = cJSON_GetObjectItem(root, "x");
+        if (cJSON_IsNumber(jx)) x = static_cast<float>(jx->valuedouble);
+        const cJSON* jy = cJSON_GetObjectItem(root, "y");
+        if (cJSON_IsNumber(jy)) y = static_cast<float>(jy->valuedouble);
+        cJSON_Delete(root);
+    }
+    if (name.empty()) {
+        AckCommand(command, "failed", "MISSING_GESTURE_NAME");
+        return;
+    }
+    if (x < -1.0f) x = -1.0f; else if (x > 1.0f) x = 1.0f;
+    if (y < -1.0f) y = -1.0f; else if (y > 1.0f) y = 1.0f;
+
+    ESP_LOGI(TAG, "Control command -> head.gesture %s", name.c_str());
+    board.HeadGesture(name, times, x, y, hold_ms, return_ms);
     AckCommand(command, "completed", "OK");
 }
 

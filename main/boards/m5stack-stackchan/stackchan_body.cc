@@ -152,7 +152,11 @@ void StackChanBody::SelfTest() {
     SetHeadAngles(kHomeYawDeg, kHomePitchDeg); vTaskDelay(pdMS_TO_TICKS(kSettleMs)); // center
     SetHeadAngles(kHomeYawDeg, 60.0f);        vTaskDelay(pdMS_TO_TICKS(kSettleMs));  // up
     SetHeadAngles(kHomeYawDeg, 30.0f);        vTaskDelay(pdMS_TO_TICKS(kSettleMs));  // down
-    GoHome();
+    GoHome();                                 vTaskDelay(pdMS_TO_TICKS(kSettleMs));
+    // Gesture demo — verifies the gesture sequences on boot (reuses RunGesture; safe
+    // here because no async gesture runs during the boot self-test).
+    gesture_.name = "nod";   gesture_.times = 2; RunGesture();
+    gesture_.name = "shake"; gesture_.times = 2; RunGesture();
     ESP_LOGI(TAG, "self-test sweep done");
 }
 
@@ -164,4 +168,54 @@ void StackChanBody::StartSelfTest() {
             vTaskDelete(nullptr);
         },
         "stackchan_selftest", 4096, this, 3, nullptr);
+}
+
+void StackChanBody::HeadGesture(const std::string& name, int times, float x, float y,
+                                int hold_ms, int return_ms) {
+    if (!ready_ || gesture_busy_) return;  // drop if a gesture is already running
+    gesture_.name = name;
+    gesture_.times = times;
+    gesture_.x = x;
+    gesture_.y = y;
+    gesture_.hold_ms = hold_ms;
+    gesture_.return_ms = return_ms;
+    gesture_busy_ = true;
+    xTaskCreate(
+        [](void* arg) {
+            auto* b = static_cast<StackChanBody*>(arg);
+            b->RunGesture();
+            b->gesture_busy_ = false;
+            vTaskDelete(nullptr);
+        },
+        "stackchan_gesture", 4096, this, 3, nullptr);
+}
+
+void StackChanBody::RunGesture() {
+    const auto& g = gesture_;
+    const int times = g.times > 0 ? g.times : 2;
+    ESP_LOGI(TAG, "gesture: %s", g.name.c_str());
+    if (g.name == "nod") {  // pitch oscillation (yes)
+        for (int i = 0; i < times; ++i) {
+            SetHeadAngles(0.0f, kHomePitchDeg - 12.0f); vTaskDelay(pdMS_TO_TICKS(280));
+            SetHeadAngles(0.0f, kHomePitchDeg + 10.0f); vTaskDelay(pdMS_TO_TICKS(280));
+        }
+        GoHome();
+    } else if (g.name == "shake") {  // yaw oscillation (no)
+        for (int i = 0; i < times; ++i) {
+            SetHeadAngles(-22.0f, kHomePitchDeg); vTaskDelay(pdMS_TO_TICKS(260));
+            SetHeadAngles(22.0f, kHomePitchDeg);  vTaskDelay(pdMS_TO_TICKS(260));
+        }
+        GoHome();
+    } else if (g.name == "perk_up") {  // wake: look up, then settle
+        SetHeadAngles(0.0f, 72.0f); vTaskDelay(pdMS_TO_TICKS(g.hold_ms > 0 ? g.hold_ms : 800));
+        GoHome();
+    } else if (g.name == "droop") {  // fatigue mirror: droop low, hold, recover
+        SetHeadAngles(0.0f, 8.0f); vTaskDelay(pdMS_TO_TICKS(g.hold_ms > 0 ? g.hold_ms : 1200));
+        GoHome();
+    } else if (g.name == "glance") {  // look toward target, then return
+        LookAtNormalized(g.x, g.y); vTaskDelay(pdMS_TO_TICKS(g.return_ms > 0 ? g.return_ms : 800));
+        GoHome();
+    } else {
+        ESP_LOGW(TAG, "unknown gesture: %s", g.name.c_str());
+    }
 }

@@ -461,6 +461,10 @@ public:
     void HeadHome() override {
         if (body_) body_->GoHome();
     }
+    void HeadGesture(const std::string& name, int times, float x, float y,
+                     int hold_ms, int return_ms) override {
+        if (body_) body_->HeadGesture(name, times, x, y, hold_ms, return_ms);
+    }
 };
 
 DECLARE_BOARD(M5StackChanBoard);
