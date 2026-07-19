@@ -15,8 +15,6 @@ private:
     const audio_codec_if_t* in_codec_if_ = nullptr;
     const audio_codec_gpio_if_t* gpio_if_ = nullptr;
 
-    esp_codec_dev_handle_t output_dev_ = nullptr;
-    esp_codec_dev_handle_t input_dev_ = nullptr;
     // ref buffer used for aec
     std::vector<int16_t> ref_buffer_;
     int read_pos_ = 0;

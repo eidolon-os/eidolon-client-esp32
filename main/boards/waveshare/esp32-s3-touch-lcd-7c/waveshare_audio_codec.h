@@ -18,8 +18,6 @@ private:
 
     std::vector<int16_t> stereo_buffer_;
 
-    esp_codec_dev_handle_t output_dev_ = nullptr;
-    esp_codec_dev_handle_t input_dev_ = nullptr;
     gpio_num_t pa_pin_ = GPIO_NUM_NC;
     std::mutex data_if_mutex_;
 

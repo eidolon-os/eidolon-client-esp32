@@ -2,8 +2,6 @@
 
 #include "audio_codec.h"
 #include "board.h"
-#include "codecs/box_audio_codec.h"
-#include "codecs/es8388_audio_codec.h"
 
 #include <esp_ae_rate_cvt.h>
 #include <esp_audio_types.h>
@@ -21,22 +19,14 @@ EidolonAudioInput& EidolonAudioInput::Instance()
 
 esp_codec_dev_handle_t EidolonAudioInput::RecordHandle() const
 {
-    auto* box = dynamic_cast<BoxAudioCodec*>(codec_);
-    if (box) {
-        return box->GetInputDeviceHandle();
-    }
-    auto* es8388 = dynamic_cast<Es8388AudioCodec*>(codec_);
-    return es8388 ? es8388->GetInputDeviceHandle() : nullptr;
+    // Polymorphic: any AudioCodec exposes its input device handle. No concrete-codec
+    // knowledge here, so a new board/codec needs zero change to this layer.
+    return codec_ ? codec_->GetInputDeviceHandle() : nullptr;
 }
 
 esp_codec_dev_handle_t EidolonAudioInput::PlaybackHandle() const
 {
-    auto* box = dynamic_cast<BoxAudioCodec*>(codec_);
-    if (box) {
-        return box->GetOutputDeviceHandle();
-    }
-    auto* es8388 = dynamic_cast<Es8388AudioCodec*>(codec_);
-    return es8388 ? es8388->GetOutputDeviceHandle() : nullptr;
+    return codec_ ? codec_->GetOutputDeviceHandle() : nullptr;
 }
 
 esp_err_t EidolonAudioInput::Init()

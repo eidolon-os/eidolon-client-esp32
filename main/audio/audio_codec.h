@@ -4,6 +4,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
 #include <driver/i2s_std.h>
+#include <esp_codec_dev.h>
 
 #include <vector>
 #include <string>
@@ -39,9 +40,22 @@ public:
     inline bool input_enabled() const { return input_enabled_; }
     inline bool output_enabled() const { return output_enabled_; }
 
+    // Raw esp_codec_dev device handles. Every esp_codec_dev-based codec has these, so
+    // they live here as part of the AudioCodec contract rather than being duplicated in
+    // each subclass. Consumers that drive the devices directly (the Eidolon LiveKit
+    // media path renders through the output handle, bypassing OutputData) read them
+    // polymorphically — no per-codec type switch, no per-board change. Virtual so an
+    // exotic codec could still override, but the default returns the owned handle, so a
+    // subclass only has to assign output_dev_/input_dev_ during its init (as they all
+    // already do).
+    virtual esp_codec_dev_handle_t GetOutputDeviceHandle() const { return output_dev_; }
+    virtual esp_codec_dev_handle_t GetInputDeviceHandle() const { return input_dev_; }
+
 protected:
     i2s_chan_handle_t tx_handle_ = nullptr;
     i2s_chan_handle_t rx_handle_ = nullptr;
+    esp_codec_dev_handle_t output_dev_ = nullptr;
+    esp_codec_dev_handle_t input_dev_ = nullptr;
 
     bool duplex_ = false;
     bool input_reference_ = false;

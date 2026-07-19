@@ -16,8 +16,6 @@ private:
     const audio_codec_if_t* codec_if_ = nullptr;
     const audio_codec_gpio_if_t* gpio_if_ = nullptr;
 
-    esp_codec_dev_handle_t output_dev_ = nullptr;
-    esp_codec_dev_handle_t input_dev_ = nullptr;
     gpio_num_t pa_pin_ = GPIO_NUM_NC;
     std::mutex data_if_mutex_;
 

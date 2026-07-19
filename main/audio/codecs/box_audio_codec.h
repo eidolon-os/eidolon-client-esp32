@@ -17,8 +17,6 @@ private:
     const audio_codec_if_t* in_codec_if_ = nullptr;
     const audio_codec_gpio_if_t* gpio_if_ = nullptr;
 
-    esp_codec_dev_handle_t output_dev_ = nullptr;
-    esp_codec_dev_handle_t input_dev_ = nullptr;
     std::mutex data_if_mutex_;
 
     void CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din);
@@ -37,8 +35,6 @@ public:
     virtual void EnableOutput(bool enable) override;
 
 #if CONFIG_EIDOLON_HUB_MODE
-    esp_codec_dev_handle_t GetInputDeviceHandle() const { return input_dev_; }
-    esp_codec_dev_handle_t GetOutputDeviceHandle() const { return output_dev_; }
     std::mutex& GetDataIfMutex() { return data_if_mutex_; }
 #endif
 };

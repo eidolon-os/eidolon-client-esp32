@@ -9,8 +9,6 @@
 
 class AdcPdmAudioCodec : public AudioCodec {
 private:
-    esp_codec_dev_handle_t output_dev_ = nullptr;
-    esp_codec_dev_handle_t input_dev_ = nullptr;
     gpio_num_t pa_ctrl_pin_ = GPIO_NUM_NC;
 
     // 定时器相关成员变量
