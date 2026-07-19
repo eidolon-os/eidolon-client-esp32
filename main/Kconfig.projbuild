@@ -937,7 +937,7 @@ config USE_DEVICE_AEC
         || BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_3_4C || BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_4C || BOARD_TYPE_ESP_S3_LCD_EV_Board_2 || BOARD_TYPE_YUNLIAO_S3 \
         || BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_7 || BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_8 || BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_10_1 \
         || BOARD_TYPE_ESP_VOCAT || BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_LCD_3_49 || BOARD_TYPE_WAVESHARE_ESP32_S3_RLCD_4_2 || BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_LCD_1_85B || BOARD_TYPE_ZHENGCHEN_CAM || BOARD_TYPE_ZHENGCHEN_CAM_ML307 \
-        || BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_LCD_4_3C || BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_LCD_1_54 || BOARD_TYPE_WAVESHARE_ESP32_S3_LCD_0_85 || BOARD_TYPE_AI_VOX3 || BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_43C || BOARD_TYPE_ATK_DNESP32S3_BOX3)
+        || BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_LCD_4_3C || BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_LCD_1_54 || BOARD_TYPE_WAVESHARE_ESP32_S3_LCD_0_85 || BOARD_TYPE_AI_VOX3 || BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_43C || BOARD_TYPE_ATK_DNESP32S3_BOX3 || BOARD_TYPE_M5STACK_STACKCHAN)
     help
         To work properly, device-side AEC requires a clean output reference path from the speaker signal and physical acoustic isolation between the microphone and speaker.
 
@@ -982,6 +982,16 @@ config EIDOLON_AEC_QUALIFICATION
         it plays deterministic test audio, captures raw/reference/AEC PCM, and
         emits framed test events for the host-side qualification script.
 
+config EIDOLON_AEC_QUALIFICATION_PLAYBACK_VOLUME
+    int "AEC qualification playback volume"
+    default 75
+    range 0 100
+    depends on EIDOLON_AEC_QUALIFICATION
+    help
+        Output volume used by the standalone AEC qualification runner. This is
+        intentionally test-only so qualification can validate real acoustic
+        playback without changing the normal application volume.
+
 config EIDOLON_AEC_QUALIFICATION_BOX_REF_CHANNEL
     int "ESP-BOX style ES7210 reference channel for AEC qualification"
     default 1
@@ -992,6 +1002,17 @@ config EIDOLON_AEC_QUALIFICATION_BOX_REF_CHANNEL
         AEC qualification on ESP-BOX style boards. Channel 1 is the validated
         ESP-BOX-3 playback reference with the current codec channel ordering.
         Channels 2 and 3 are exposed only for qualification comparison.
+
+config EIDOLON_AEC_QUALIFICATION_STACKCHAN_REF_CHANNEL
+    int "StackChan ES7210 reference channel for AEC qualification"
+    default 1
+    range 1 3
+    depends on EIDOLON_AEC_QUALIFICATION && BOARD_TYPE_M5STACK_STACKCHAN
+    help
+        Select the ES7210 channel used as the candidate playback reference
+        during standalone AEC qualification on M5Stack StackChan. This is for
+        reference-channel verification only; the normal firmware must not treat
+        StackChan as barge-in capable until a clean reference path is validated.
 
 menu "WiFi Configuration Method"
     help

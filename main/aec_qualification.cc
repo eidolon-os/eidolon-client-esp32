@@ -34,6 +34,10 @@
 #define AECQ_FAR_AUDIO_SAMPLE_COUNT 0
 #endif
 
+#ifndef AECQ_FAR_AUDIO_SAMPLE_RATE
+#define AECQ_FAR_AUDIO_SAMPLE_RATE 16000
+#endif
+
 #ifndef AECQ_FAR_AUDIO_NAME
 #define AECQ_FAR_AUDIO_NAME "synthetic_multitone"
 #endif
@@ -45,12 +49,13 @@ constexpr int kSampleRate = 16000;
 constexpr int kFrameMs = 20;
 constexpr int kFrameSamples = kSampleRate * kFrameMs / 1000;
 constexpr int kSilenceMs = 1600;
+constexpr int kSpeakerSanityMs = 2600;
 constexpr int kPlaybackMs = 4200;
 constexpr int kBargeInMs = 6200;
 constexpr int kManualPromptMs = 5000;
 constexpr int kWarmupFrames = 10;
 constexpr int kPcmPreviewFrames = 48;
-constexpr int kPlaybackVolume = 75;
+constexpr int kPlaybackVolume = CONFIG_EIDOLON_AEC_QUALIFICATION_PLAYBACK_VOLUME;
 constexpr float kPi = 3.14159265358979323846f;
 
 struct CaptureStats {
@@ -149,14 +154,15 @@ bool HasEmbeddedFarAudio()
 #endif
 }
 
-void BuildSyntheticPlaybackFrame(std::vector<int16_t>& frame, int frame_index)
+void BuildSyntheticPlaybackFrame(std::vector<int16_t>& frame, int frame_index, int sample_rate)
 {
-    frame.resize(kFrameSamples);
+    const int frame_samples = sample_rate * kFrameMs / 1000;
+    frame.resize(frame_samples);
 
     // Deterministic far-end signal: a speech-like multi-tone with soft envelope.
-    const int sample_offset = frame_index * kFrameSamples;
-    for (int i = 0; i < kFrameSamples; ++i) {
-        float t = static_cast<float>(sample_offset + i) / static_cast<float>(kSampleRate);
+    const int sample_offset = frame_index * frame_samples;
+    for (int i = 0; i < frame_samples; ++i) {
+        float t = static_cast<float>(sample_offset + i) / static_cast<float>(sample_rate);
         float tone = 0.48f * std::sin(2.0f * kPi * 420.0f * t) +
                      0.32f * std::sin(2.0f * kPi * 870.0f * t) +
                      0.20f * std::sin(2.0f * kPi * 1410.0f * t);
@@ -165,9 +171,26 @@ void BuildSyntheticPlaybackFrame(std::vector<int16_t>& frame, int frame_index)
     }
 }
 
-void BuildPlaybackFrame(std::vector<int16_t>& frame, int frame_index, bool enabled)
+int16_t InterpolateSample(const int16_t* samples, size_t count, float index)
 {
-    frame.resize(kFrameSamples);
+    if (count == 0) {
+        return 0;
+    }
+    while (index >= static_cast<float>(count)) {
+        index -= static_cast<float>(count);
+    }
+    int left = static_cast<int>(std::floor(index));
+    int right = (left + 1) % static_cast<int>(count);
+    float frac = index - static_cast<float>(left);
+    float value = static_cast<float>(samples[left]) * (1.0f - frac) +
+                  static_cast<float>(samples[right]) * frac;
+    return ClampToI16(value);
+}
+
+void BuildPlaybackFrame(std::vector<int16_t>& frame, int frame_index, bool enabled, int output_sample_rate)
+{
+    const int frame_samples = output_sample_rate * kFrameMs / 1000;
+    frame.resize(frame_samples);
     if (!enabled) {
         std::fill(frame.begin(), frame.end(), 0);
         return;
@@ -175,16 +198,47 @@ void BuildPlaybackFrame(std::vector<int16_t>& frame, int frame_index, bool enabl
 
 #if AECQ_FAR_AUDIO_ENABLED
     if (AECQ_FAR_AUDIO_SAMPLE_COUNT > 0) {
-        size_t sample_offset = static_cast<size_t>(frame_index) * kFrameSamples;
-        for (int i = 0; i < kFrameSamples; ++i) {
-            frame[i] = AECQ_FAR_AUDIO_SAMPLES[(sample_offset + static_cast<size_t>(i)) %
-                                              AECQ_FAR_AUDIO_SAMPLE_COUNT];
+        const size_t sample_offset = static_cast<size_t>(frame_index) * frame_samples;
+        for (int i = 0; i < frame_samples; ++i) {
+            float src_index = static_cast<float>(sample_offset + static_cast<size_t>(i)) *
+                              static_cast<float>(AECQ_FAR_AUDIO_SAMPLE_RATE) /
+                              static_cast<float>(output_sample_rate);
+            frame[i] = InterpolateSample(AECQ_FAR_AUDIO_SAMPLES, AECQ_FAR_AUDIO_SAMPLE_COUNT, src_index);
         }
         return;
     }
 #endif
 
-    BuildSyntheticPlaybackFrame(frame, frame_index);
+    BuildSyntheticPlaybackFrame(frame, frame_index, output_sample_rate);
+}
+
+void ResampleInterleavedPcm16(const std::vector<int16_t>& input, int input_sample_rate, int channels,
+                              std::vector<int16_t>& output)
+{
+    if (input_sample_rate == kSampleRate) {
+        output = input;
+        return;
+    }
+
+    const int in_frames = input.size() / channels;
+    if (in_frames <= 0 || channels <= 0) {
+        output.clear();
+        return;
+    }
+    const int out_frames = kFrameSamples;
+    output.resize(static_cast<size_t>(out_frames) * channels);
+    for (int frame = 0; frame < out_frames; ++frame) {
+        float pos = static_cast<float>(frame) * static_cast<float>(input_sample_rate) /
+                    static_cast<float>(kSampleRate);
+        int left = std::min(static_cast<int>(std::floor(pos)), in_frames - 1);
+        int right = std::min(left + 1, in_frames - 1);
+        float frac = pos - static_cast<float>(left);
+        for (int ch = 0; ch < channels; ++ch) {
+            float a = static_cast<float>(input[static_cast<size_t>(left) * channels + ch]);
+            float b = static_cast<float>(input[static_cast<size_t>(right) * channels + ch]);
+            output[static_cast<size_t>(frame) * channels + ch] = ClampToI16(a * (1.0f - frac) + b * frac);
+        }
+    }
 }
 
 uint64_t Energy(const int16_t* samples, size_t count)
@@ -278,6 +332,7 @@ public:
                   ",\"free_internal_heap\":" + std::to_string(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)));
 
         RunCase("silence", kSilenceMs, false, false);
+        RunCase("speaker_sanity", kSpeakerSanityMs, true, false);
         RunCase("far_playback", kPlaybackMs, true, false);
         EmitEvent("manual_prompt", "\"message\":\"place_near_speech_source_and_start_playback\","
                   "\"countdown_ms\":" + std::to_string(kManualPromptMs));
@@ -311,11 +366,15 @@ private:
 
         int frames = duration_ms / kFrameMs;
         int channels = codec_->input_channels();
+        int input_sample_rate = codec_->input_sample_rate() > 0 ? codec_->input_sample_rate() : kSampleRate;
+        int output_sample_rate = codec_->output_sample_rate() > 0 ? codec_->output_sample_rate() : kSampleRate;
+        int input_frame_samples = input_sample_rate * kFrameMs / 1000;
         std::vector<int16_t> playback_frame;
-        std::vector<int16_t> input(static_cast<size_t>(kFrameSamples) * channels);
+        std::vector<int16_t> input(static_cast<size_t>(input_frame_samples) * channels);
+        std::vector<int16_t> input_16k;
 
         for (int frame = 0; frame < frames; ++frame) {
-            BuildPlaybackFrame(playback_frame, frame, playback);
+            BuildPlaybackFrame(playback_frame, frame, playback, output_sample_rate);
             if (playback) {
                 codec_->OutputData(playback_frame);
                 stats.playback_energy += Energy(playback_frame.data(), playback_frame.size());
@@ -332,8 +391,14 @@ private:
                 continue;
             }
 
-            auto mic = ExtractChannel(input, channels, 0);
-            auto ref = ExtractChannel(input, channels, channels > 1 ? channels - 1 : 0);
+            ResampleInterleavedPcm16(input, input_sample_rate, channels, input_16k);
+            if (input_16k.empty()) {
+                stats.dropout_frames++;
+                continue;
+            }
+
+            auto mic = ExtractChannel(input_16k, channels, 0);
+            auto ref = ExtractChannel(input_16k, channels, channels > 1 ? channels - 1 : 0);
             stats.raw_energy += Energy(mic.data(), mic.size());
             stats.ref_energy += Energy(ref.data(), ref.size());
             stats.clipped_samples += CountClipped(mic.data(), mic.size());
@@ -347,13 +412,13 @@ private:
             }
 
             int64_t start = esp_timer_get_time();
-            afe_.Feed(std::move(input));
+            afe_.Feed(std::move(input_16k));
             int64_t elapsed = esp_timer_get_time() - start;
             stats.feed_us += elapsed;
             if (elapsed > stats.max_feed_us) {
                 stats.max_feed_us = elapsed;
             }
-            input.resize(static_cast<size_t>(kFrameSamples) * channels);
+            input.resize(static_cast<size_t>(input_frame_samples) * channels);
         }
 
         vTaskDelay(pdMS_TO_TICKS(160));

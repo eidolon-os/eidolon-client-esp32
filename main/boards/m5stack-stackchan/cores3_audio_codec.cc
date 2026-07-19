@@ -194,13 +194,21 @@ void CoreS3AudioCodec::EnableInput(bool enable) {
     if (enable) {
         esp_codec_dev_sample_info_t fs = {
             .bits_per_sample = 16,
+#if CONFIG_EIDOLON_AEC_QUALIFICATION && CONFIG_BOARD_TYPE_M5STACK_STACKCHAN
+            .channel = 4,
+#else
             .channel = 2,
+#endif
             .channel_mask = ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0),
             .sample_rate = (uint32_t)output_sample_rate_,
             .mclk_multiple = 0,
         };
         if (input_reference_) {
+#if CONFIG_EIDOLON_AEC_QUALIFICATION && CONFIG_BOARD_TYPE_M5STACK_STACKCHAN
+            fs.channel_mask |= ESP_CODEC_DEV_MAKE_CHANNEL_MASK(CONFIG_EIDOLON_AEC_QUALIFICATION_STACKCHAN_REF_CHANNEL);
+#else
             fs.channel_mask |= ESP_CODEC_DEV_MAKE_CHANNEL_MASK(1);
+#endif
         }
         ESP_ERROR_CHECK(esp_codec_dev_open(input_dev_, &fs));
         ESP_ERROR_CHECK(esp_codec_dev_set_in_channel_gain(input_dev_, ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0), input_gain_));

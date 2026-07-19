@@ -56,6 +56,8 @@ AEC_THRESHOLDS = {
     "barge_in_residual_dbfs": -45.0,
     "ptt_erle_db": 10.0,
     "max_clip_ratio": 0.001,
+    "speaker_sanity_raw_lift_db": 8.0,
+    "speaker_sanity_min_raw_dbfs": -45.0,
 }
 
 THRESHOLD_PROFILE = {
@@ -363,6 +365,8 @@ def write_overlay(
     board: BoardVariant,
     out_dir: Path,
     box_ref_channel: int | None = None,
+    stackchan_ref_channel: int | None = None,
+    playback_volume: int = 75,
     aec_afe_mode: str = "board",
 ) -> Path:
     overlay = out_dir / f"sdkconfig.aecq.{board.name}"
@@ -372,6 +376,7 @@ def write_overlay(
         "CONFIG_USE_AUDIO_PROCESSOR=y",
         "CONFIG_USE_DEVICE_AEC=y",
         "CONFIG_EIDOLON_AEC_QUALIFICATION=y",
+        f"CONFIG_EIDOLON_AEC_QUALIFICATION_PLAYBACK_VOLUME={playback_volume}",
         "CONFIG_EIDOLON_HUB_MODE=y",
         "CONFIG_USE_SERVER_AEC=n",
         "CONFIG_USE_AUDIO_DEBUGGER=n",
@@ -381,6 +386,8 @@ def write_overlay(
     ]
     if box_ref_channel is not None:
         lines.append(f"CONFIG_EIDOLON_AEC_QUALIFICATION_BOX_REF_CHANNEL={box_ref_channel}")
+    if stackchan_ref_channel is not None:
+        lines.append(f"CONFIG_EIDOLON_AEC_QUALIFICATION_STACKCHAN_REF_CHANNEL={stackchan_ref_channel}")
     for item in board.sdkconfig_append:
         key = item.split("=", 1)[0]
         if key.startswith("CONFIG_BOARD_TYPE_"):
@@ -420,11 +427,13 @@ def build_firmware(
     build_dir: Path,
     out_dir: Path,
     box_ref_channel: int | None = None,
+    stackchan_ref_channel: int | None = None,
+    playback_volume: int = 75,
     aec_afe_mode: str = "board",
 ) -> None:
     build_dir.mkdir(parents=True, exist_ok=True)
     out_dir.mkdir(parents=True, exist_ok=True)
-    overlay = write_overlay(board, out_dir, box_ref_channel, aec_afe_mode)
+    overlay = write_overlay(board, out_dir, box_ref_channel, stackchan_ref_channel, playback_volume, aec_afe_mode)
     sdkconfig = out_dir / f"sdkconfig.{board.name}"
     defaults = [
         PROJECT_ROOT / "sdkconfig.defaults",
@@ -607,6 +616,46 @@ def rms_from_pcm16(payloads: list[bytes]) -> float:
     if count == 0:
         return 0.0
     return math.sqrt(total_sq / count)
+
+
+def frame_rms_sequence(payloads: list[bytes]) -> list[float]:
+    return [rms_from_pcm16([payload]) for payload in payloads if payload]
+
+
+def pearson_correlation(xs: list[float], ys: list[float]) -> float:
+    count = min(len(xs), len(ys))
+    if count < 3:
+        return 0.0
+    xs = xs[:count]
+    ys = ys[:count]
+    mean_x = statistics.fmean(xs)
+    mean_y = statistics.fmean(ys)
+    num = 0.0
+    den_x = 0.0
+    den_y = 0.0
+    for x, y in zip(xs, ys, strict=False):
+        dx = x - mean_x
+        dy = y - mean_y
+        num += dx * dy
+        den_x += dx * dx
+        den_y += dy * dy
+    if den_x <= 0.0 or den_y <= 0.0:
+        return 0.0
+    return num / math.sqrt(den_x * den_y)
+
+
+def max_lag_correlation(xs: list[float], ys: list[float], max_lag: int = 16) -> float:
+    best = 0.0
+    for lag in range(-max_lag, max_lag + 1):
+        if lag < 0:
+            corr = pearson_correlation(xs[-lag:], ys[: len(ys) + lag])
+        elif lag > 0:
+            corr = pearson_correlation(xs[: len(xs) - lag], ys[lag:])
+        else:
+            corr = pearson_correlation(xs, ys)
+        if abs(corr) > abs(best):
+            best = corr
+    return best
 
 
 def dbfs(rms: float) -> float:
@@ -801,7 +850,15 @@ def write_far_audio_header(samples: list[int] | None, name: str = "synthetic_mul
     FAR_AUDIO_HEADER.write_text("\n".join(lines), encoding="utf-8")
 
 
-def prepare_far_audio(source: str | None, out_dir: Path) -> dict[str, Any]:
+def apply_gain_db(samples: list[int], gain_db: float) -> tuple[list[int], float]:
+    if abs(gain_db) < 0.001:
+        return samples, 1.0
+    gain = 10.0 ** (gain_db / 20.0)
+    adjusted = [max(-32768, min(32767, int(round(s * gain)))) for s in samples]
+    return adjusted, gain
+
+
+def prepare_far_audio(source: str | None, out_dir: Path, gain_db: float = 0.0) -> dict[str, Any]:
     if not source:
         write_far_audio_header(None)
         return {
@@ -819,7 +876,8 @@ def prepare_far_audio(source: str | None, out_dir: Path) -> dict[str, Any]:
     max_samples = int(MAX_EMBEDDED_FAR_AUDIO_SECONDS * 16000)
     if len(samples) > max_samples:
         samples = samples[:max_samples]
-    samples, gain = normalize_pcm16(samples)
+    samples, normalization_gain = normalize_pcm16(samples)
+    samples, far_gain_linear = apply_gain_db(samples, gain_db)
     if not samples:
         raise SystemExit(f"Far-end audio is empty after conversion: {src}")
 
@@ -839,7 +897,9 @@ def prepare_far_audio(source: str | None, out_dir: Path) -> dict[str, Any]:
         "sample_rate": 16000,
         "sample_count": len(samples),
         "duration_s": len(samples) / 16000.0,
-        "normalization_gain": gain,
+        "normalization_gain": normalization_gain,
+        "far_gain_db": gain_db,
+        "far_gain_linear": far_gain_linear,
         "max_embedded_duration_s": MAX_EMBEDDED_FAR_AUDIO_SECONDS,
     }
 
@@ -975,6 +1035,8 @@ def analyze(
     out_dir: Path,
     far_audio_info: dict[str, Any],
     box_ref_channel: int | None = None,
+    stackchan_ref_channel: int | None = None,
+    playback_volume: int = 75,
 ) -> dict[str, Any]:
     audio: dict[str, dict[str, list[bytes]]] = capture_data["audio"]
     events: list[dict[str, Any]] = capture_data["events"]
@@ -997,6 +1059,9 @@ def analyze(
     metrics: dict[str, Any] = {}
     for case_id, streams in audio.items():
         stats = case_end.get(case_id, {})
+        playback_rms_frames = frame_rms_sequence(streams.get("playback_marker", []))
+        raw_rms_frames = frame_rms_sequence(streams.get("raw_mic", []))
+        ref_rms_frames = frame_rms_sequence(streams.get("reference", []))
         preview_raw_rms = rms_from_pcm16(streams.get("raw_mic", []))
         preview_aec_rms = rms_from_pcm16(streams.get("aec_out", []))
         preview_ref_rms = rms_from_pcm16(streams.get("reference", []))
@@ -1028,9 +1093,13 @@ def analyze(
             "preview_reference_dbfs": dbfs(preview_ref_rms),
             "preview_aec_rms": preview_aec_rms,
             "preview_aec_dbfs": dbfs(preview_aec_rms),
+            "preview_playback_raw_correlation": max_lag_correlation(playback_rms_frames, raw_rms_frames),
+            "preview_playback_reference_correlation": max_lag_correlation(playback_rms_frames, ref_rms_frames),
             "device_stats": stats,
         }
 
+    silence = metrics.get("silence", {})
+    speaker = metrics.get("speaker_sanity", {})
     far = metrics.get("far_playback", {})
     barge = metrics.get("barge_in", {})
     clipped_samples = sum(
@@ -1047,10 +1116,24 @@ def analyze(
     far_erle = float(far.get("erle_db", 0.0))
     far_residual = float(far.get("aec_dbfs", 0.0))
     barge_erle = float(barge.get("erle_db", 0.0))
+    silence_raw_dbfs = float(silence.get("raw_dbfs", -120.0))
+    speaker_raw_dbfs = float(speaker.get("raw_dbfs", -120.0))
+    speaker_raw_lift_db = speaker_raw_dbfs - silence_raw_dbfs
+    speaker_marker_raw_corr = float(speaker.get("preview_playback_raw_correlation", 0.0))
+    speaker_marker_ref_corr = float(speaker.get("preview_playback_reference_correlation", 0.0))
+    speaker_sanity_pass = (
+        run_status == "complete"
+        and bool(speaker)
+        and speaker_raw_lift_db >= AEC_THRESHOLDS["speaker_sanity_raw_lift_db"]
+        and speaker_raw_dbfs >= AEC_THRESHOLDS["speaker_sanity_min_raw_dbfs"]
+    )
     far_erle_pass = far_erle >= AEC_THRESHOLDS["barge_in_erle_db"]
     far_residual_pass = far_residual <= AEC_THRESHOLDS["barge_in_residual_dbfs"]
     ptt_erle_pass = far_erle >= AEC_THRESHOLDS["ptt_erle_db"]
     clipping_pass = clip_ratio <= AEC_THRESHOLDS["max_clip_ratio"]
+
+    if run_status == "complete" and not speaker_sanity_pass:
+        run_status = "no_audible_playback"
 
     if run_status != "complete":
         decision = "fail"
@@ -1072,6 +1155,12 @@ def analyze(
         far_residual_pass,
         ptt_erle_pass,
         clipping_pass,
+        speaker_sanity_pass,
+        silence_raw_dbfs,
+        speaker_raw_dbfs,
+        speaker_raw_lift_db,
+        speaker_marker_raw_corr,
+        speaker_marker_ref_corr,
     )
 
     return {
@@ -1094,6 +1183,8 @@ def analyze(
         },
         "qualification_config": {
             "box_ref_channel": box_ref_channel,
+            "stackchan_ref_channel": stackchan_ref_channel,
+            "playback_volume": playback_volume,
             "metric_source": "device_full_case_energy",
             "device_far_audio": ready_event.get("far_audio") if isinstance(ready_event, dict) else None,
             "device_far_audio_embedded": ready_event.get("far_audio_embedded")
@@ -1106,6 +1197,12 @@ def analyze(
             "far_playback_residual_dbfs": far_residual,
             "barge_in_erle_db": barge_erle,
             "clip_ratio": clip_ratio,
+            "speaker_sanity_pass": speaker_sanity_pass,
+            "speaker_sanity_raw_lift_db": speaker_raw_lift_db,
+            "speaker_sanity_raw_dbfs": speaker_raw_dbfs,
+            "silence_raw_dbfs": silence_raw_dbfs,
+            "speaker_sanity_playback_raw_correlation": speaker_marker_raw_corr,
+            "speaker_sanity_playback_reference_correlation": speaker_marker_ref_corr,
         },
         "decision": decision,
         "decision_reasons": decision_reasons,
@@ -1124,7 +1221,32 @@ def build_decision_reasons(
     far_residual_pass: bool,
     ptt_erle_pass: bool,
     clipping_pass: bool,
+    speaker_sanity_pass: bool,
+    silence_raw_dbfs: float,
+    speaker_raw_dbfs: float,
+    speaker_raw_lift_db: float,
+    speaker_marker_raw_corr: float,
+    speaker_marker_ref_corr: float,
 ) -> list[str]:
+    if run_status == "no_audible_playback":
+        return [
+            "未确认板载扬声器真实外放；本次不能作为 AEC 能力准入结果。",
+            (
+                f"speaker_sanity raw mic {speaker_raw_dbfs:.2f} dBFS，"
+                f"silence raw mic {silence_raw_dbfs:.2f} dBFS，"
+                f"提升 {speaker_raw_lift_db:.2f} dB，"
+                f"门槛 >= {AEC_THRESHOLDS['speaker_sanity_raw_lift_db']:.2f} dB。"
+            ),
+            (
+                f"speaker_sanity raw mic 最低门槛 {AEC_THRESHOLDS['speaker_sanity_min_raw_dbfs']:.2f} dBFS："
+                f"{'通过' if speaker_raw_dbfs >= AEC_THRESHOLDS['speaker_sanity_min_raw_dbfs'] else '未通过'}。"
+            ),
+            (
+                "playback marker 相关性仅作排查参考："
+                f"raw_mic={speaker_marker_raw_corr:.3f}，reference={speaker_marker_ref_corr:.3f}。"
+            ),
+        ]
+
     if run_status != "complete":
         return [
             f"测试未完整完成，run_status={run_status}；本次结论不能作为 AEC 能力准入结果。",
@@ -1133,14 +1255,24 @@ def build_decision_reasons(
     reasons: list[str] = []
     if decision == "barge-in":
         reasons.append(
-            "远端播放 ERLE、残余回声和 clipping 均达到 barge-in 门槛，可按 barge-in 模式接入。"
+            "speaker_sanity 已确认板载外放触达麦克风，远端播放 ERLE、残余回声和 clipping 均达到 barge-in 门槛。"
         )
     elif decision == "PTT":
         reasons.append(
-            "AEC 有明显效果，达到 PTT 门槛，但未同时达到 barge-in 的远端播放 ERLE/残余回声门槛。"
+            "speaker_sanity 已确认板载外放触达麦克风；AEC 达到 PTT 门槛，但未同时达到 barge-in 的远端播放 ERLE/残余回声门槛。"
         )
     else:
-        reasons.append("AEC 未达到 PTT 的最低门槛，或存在 clipping/dropout 等基础风险。")
+        reasons.append("speaker_sanity 已确认板载外放触达麦克风；AEC 未达到 PTT 的最低门槛，或存在 clipping/dropout 等基础风险。")
+
+    reasons.append(
+        f"speaker_sanity：raw mic 从 {silence_raw_dbfs:.2f} dBFS 提升到 "
+        f"{speaker_raw_dbfs:.2f} dBFS，提升 {speaker_raw_lift_db:.2f} dB；"
+        f"{'通过' if speaker_sanity_pass else '未通过'}。"
+    )
+    reasons.append(
+        "speaker_sanity playback marker 相关性："
+        f"raw_mic={speaker_marker_raw_corr:.3f}，reference={speaker_marker_ref_corr:.3f}。"
+    )
 
     erle_threshold = AEC_THRESHOLDS["barge_in_erle_db"]
     residual_threshold = AEC_THRESHOLDS["barge_in_residual_dbfs"]
@@ -1180,12 +1312,20 @@ def write_summary(report: dict[str, Any], out_dir: Path) -> None:
         f"- Board: {report['board']['full_name']}",
         f"- Port: {report['port']}",
         f"- BOX reference channel: {report.get('qualification_config', {}).get('box_ref_channel')}",
+        f"- StackChan reference channel: {report.get('qualification_config', {}).get('stackchan_ref_channel')}",
+        f"- Playback volume: {report.get('qualification_config', {}).get('playback_volume')}",
         f"- Metric source: {report.get('qualification_config', {}).get('metric_source', 'unknown')}",
         f"- Far audio: {report.get('qualification_config', {}).get('device_far_audio', 'unknown')}",
         f"- Run status: {report.get('run_status', 'unknown')}",
         f"- Decision: {report['decision']}",
         f"- Threshold profile: {report.get('threshold_profile', {}).get('name', 'unknown')} "
         "(engineering default, not an official certification benchmark)",
+        f"- Speaker sanity: {'pass' if derived.get('speaker_sanity_pass') else 'fail'}",
+        f"- Speaker sanity raw lift: {derived.get('speaker_sanity_raw_lift_db', 0.0):.2f} dB",
+        f"- Speaker sanity raw/playback correlation: "
+        f"{derived.get('speaker_sanity_playback_raw_correlation', 0.0):.3f}",
+        f"- Speaker sanity reference/playback correlation: "
+        f"{derived.get('speaker_sanity_playback_reference_correlation', 0.0):.3f}",
         f"- Far playback ERLE: {derived['far_playback_erle_db']:.2f} dB",
         f"- Far playback residual: {derived['far_playback_residual_dbfs']:.2f} dBFS",
         f"- Barge-in ERLE: {derived['barge_in_erle_db']:.2f} dB",
@@ -1226,6 +1366,12 @@ def main() -> int:
         help="ESP-BOX-3 qualification-only ES7210 playback reference channel to test",
     )
     parser.add_argument(
+        "--stackchan-ref-channel",
+        type=int,
+        choices=(1, 2, 3),
+        help="M5Stack StackChan qualification-only ES7210 candidate reference channel to test",
+    )
+    parser.add_argument(
         "--aec-afe-mode",
         choices=("board", "low_cost", "high_perf"),
         default="board",
@@ -1240,6 +1386,20 @@ def main() -> int:
             "Far-end 16-bit PCM WAV to embed into the qualification firmware for board-speaker playback; "
             "defaults to the legacy synthetic multitone"
         ),
+    )
+    parser.add_argument(
+        "--far-gain-db",
+        type=float,
+        default=0.0,
+        help="Apply this gain in dB to embedded far-end audio after normalization; negative values reduce board playback level",
+    )
+    parser.add_argument(
+        "--playback-volume",
+        type=int,
+        default=75,
+        choices=range(0, 101),
+        metavar="0-100",
+        help="Device speaker output volume used by the AEC qualification firmware",
     )
     parser.add_argument("--near-audio", help="Near-end WAV file to play during barge-in; defaults to generated test audio")
     parser.add_argument("--no-near-playback", action="store_true", help="Disable host playback and use manual near-end audio")
@@ -1276,22 +1436,36 @@ def main() -> int:
     board = find_board(args.board)
     if args.box_ref_channel is not None and board.board_path != "esp-box-3":
         parser.error("--box-ref-channel is currently supported only for --board esp-box-3")
+    if args.stackchan_ref_channel is not None and board.board_path != "m5stack-stackchan":
+        parser.error("--stackchan-ref-channel is currently supported only for --board m5stack-stackchan")
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", board.full_name)
     if args.box_ref_channel is not None:
         safe_name = f"{safe_name}-refch{args.box_ref_channel}"
+    if args.stackchan_ref_channel is not None:
+        safe_name = f"{safe_name}-refch{args.stackchan_ref_channel}"
+    if args.playback_volume != 75:
+        safe_name = f"{safe_name}-vol{args.playback_volume}"
     out_dir = (PROJECT_ROOT / args.out_dir / f"{timestamp}-{safe_name}").resolve()
     build_suffix = safe_name if args.aec_afe_mode == "board" else f"{safe_name}-{args.aec_afe_mode}"
     if args.far_audio:
         build_suffix = f"{build_suffix}-farwav"
     build_dir = (PROJECT_ROOT / args.build_dir / build_suffix).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
-    far_audio_info = prepare_far_audio(args.far_audio, out_dir)
+    far_audio_info = prepare_far_audio(args.far_audio, out_dir, args.far_gain_db)
     if args.skip_build and far_audio_info.get("enabled"):
         print("Warning: --far-audio only changes firmware after a build; --skip-build will use the existing binary.")
 
     if not args.skip_build:
-        build_firmware(board, build_dir, out_dir, args.box_ref_channel, args.aec_afe_mode)
+        build_firmware(
+            board,
+            build_dir,
+            out_dir,
+            args.box_ref_channel,
+            args.stackchan_ref_channel,
+            args.playback_volume,
+            args.aec_afe_mode,
+        )
     if args.build_only:
         print(f"Build directory: {build_dir}")
         print(f"Generated config/report directory: {out_dir}")
@@ -1311,7 +1485,16 @@ def main() -> int:
         not args.no_capture_reset,
         args.capture_boot_wait,
     )
-    report = analyze(board, port, capture_data, out_dir, far_audio_info, args.box_ref_channel)
+    report = analyze(
+        board,
+        port,
+        capture_data,
+        out_dir,
+        far_audio_info,
+        args.box_ref_channel,
+        args.stackchan_ref_channel,
+        args.playback_volume,
+    )
     (out_dir / "report.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     write_summary(report, out_dir)
 
