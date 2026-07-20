@@ -6,7 +6,13 @@
 #include <driver/gpio.h>
 #include <driver/uart.h>
 
-#define AUDIO_INPUT_REFERENCE    true
+// StackChan captures a SINGLE mic with NO device-side AEC: its ES7210 has no
+// validated clean playback-reference channel (a 2-channel AEC there cancels the
+// near-end voice, not just echo). StackChan is not full-duplex — echo is avoided
+// by closing the mic during playback (half_duplex / ptt), so no reference channel
+// is needed. (Full-duplex boards like esp-box-3 keep this true with a validated
+// reference.) Pairs with USE_DEVICE_AEC=n for this board.
+#define AUDIO_INPUT_REFERENCE    false
 #define AUDIO_INPUT_SAMPLE_RATE  24000
 #define AUDIO_OUTPUT_SAMPLE_RATE 24000
 
