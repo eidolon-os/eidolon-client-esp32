@@ -22,6 +22,12 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
+// The qualification harness references CONFIG_EIDOLON_AEC_QUALIFICATION_* symbols
+// that only exist when the feature is enabled, and main.cc only invokes it under
+// the same flag. Compile to an empty TU otherwise so the normal (non-qualification)
+// build does not fail on the missing symbols. This file is always in SOURCES.
+#if CONFIG_EIDOLON_AEC_QUALIFICATION
+
 #if __has_include("aec_qualification_far_audio.h")
 #include "aec_qualification_far_audio.h"
 #endif
@@ -444,3 +450,5 @@ void RunAecQualification()
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
+
+#endif  // CONFIG_EIDOLON_AEC_QUALIFICATION
