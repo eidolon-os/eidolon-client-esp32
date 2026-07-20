@@ -1,6 +1,8 @@
 #include "pcm_push_capture_source.h"
 
+#include <esp_heap_caps.h>
 #include <esp_log.h>
+#include <freertos/idf_additions.h>
 
 #include <cstring>
 
@@ -25,7 +27,17 @@ PcmPushCaptureSource::PcmPushCaptureSource(uint32_t sample_rate) : sample_rate_(
     base_.stop = Stop;
     base_.close = Close;
 
-    ring_ = xStreamBufferCreate(kRingBytes, /*trigger_level=*/1);
+    // Allocate the ring in PSRAM, not internal RAM. It is a pure task-to-task
+    // (AFE producer / capture-fetch consumer) byte buffer — never touched by DMA
+    // hardware or an ISR — so PSRAM is functionally equivalent while keeping 16 KB
+    // of scarce internal DMA-capable RAM free. On internal-SRAM-tight boards
+    // (e.g. m5stack-stackchan: AFE 2ch + WebRTC engine + LCD SPI DMA all compete
+    // for internal RAM) a plain xStreamBufferCreate here fails, which kills the
+    // capture path; PSRAM removes that contention with no audio-quality cost at
+    // 16 kHz mono. Benefits every board (esp-box-3 too) — nothing needs this ring
+    // in internal RAM.
+    ring_ = xStreamBufferCreateWithCaps(kRingBytes, /*trigger_level=*/1,
+                                        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (ring_ == nullptr) {
         ESP_LOGE(TAG, "Failed to allocate %u byte PCM ring", static_cast<unsigned>(kRingBytes));
     }
@@ -33,7 +45,7 @@ PcmPushCaptureSource::PcmPushCaptureSource(uint32_t sample_rate) : sample_rate_(
 
 PcmPushCaptureSource::~PcmPushCaptureSource() {
     if (ring_ != nullptr) {
-        vStreamBufferDelete(ring_);
+        vStreamBufferDeleteWithCaps(ring_);
         ring_ = nullptr;
     }
 }
