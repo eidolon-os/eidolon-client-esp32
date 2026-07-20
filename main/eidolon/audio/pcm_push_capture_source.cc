@@ -63,6 +63,19 @@ void PcmPushCaptureSource::Flush() {
     }
 }
 
+void PcmPushCaptureSource::Quiesce() {
+    // Clear running_ first so ReadFrame's loop (while got<need && running_) will
+    // exit, then wake a reader currently blocked in xStreamBufferReceive with a
+    // 1-sample sentinel so it returns NOW instead of after the 200 ms chunk
+    // timeout. The reader unblocks, sees running_==false, and returns; esp_capture's
+    // fetch thread then exits before the pipeline is torn down.
+    running_ = false;
+    if (ring_ != nullptr) {
+        const int16_t sentinel = 0;
+        xStreamBufferSend(ring_, &sentinel, sizeof(sentinel), /*ticks_to_wait=*/0);
+    }
+}
+
 esp_capture_err_t PcmPushCaptureSource::Open(esp_capture_audio_src_if_t* h) {
     return From(h)->ring_ != nullptr ? ESP_CAPTURE_ERR_OK : ESP_CAPTURE_ERR_NO_MEM;
 }

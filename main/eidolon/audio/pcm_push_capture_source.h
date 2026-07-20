@@ -42,6 +42,16 @@ public:
     // Drop any buffered audio (e.g. on playback flush / session reset).
     void Flush();
 
+    // Deterministic teardown helper: stop the fetch loop (running_=false) AND
+    // immediately unblock any in-flight ReadFrame that is parked in
+    // xStreamBufferReceive, so esp_capture's internal fetch thread returns and
+    // exits promptly. Call this BEFORE esp_capture_close() so the fetch thread
+    // is no longer producing into the pipeline's data queue when data_q_deinit
+    // frees it (otherwise the fetch thread writes into freed memory -> heap
+    // corruption / use-after-free). Idempotent; the source is re-armed by the
+    // esp_capture start callback on the next session.
+    void Quiesce();
+
 private:
     static PcmPushCaptureSource* From(esp_capture_audio_src_if_t* h);
 

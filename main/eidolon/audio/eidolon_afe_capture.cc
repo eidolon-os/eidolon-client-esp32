@@ -96,6 +96,11 @@ void EidolonAfeCapture::Stop() {
         afe_->Stop();
         afe_.reset();
     }
+    // Quiesce the PCM source that esp_capture's fetch thread pulls from, so that
+    // fetch thread unblocks and exits BEFORE the caller tears down the capture
+    // pipeline (esp_capture_close). Without this it stays parked in ReadFrame and
+    // esp_capture frees its data queue out from under it -> use-after-free.
+    pcm_source_.Quiesce();
     ESP_LOGI(TAG, "AFE capture stopped");
 }
 

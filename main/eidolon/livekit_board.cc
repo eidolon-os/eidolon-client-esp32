@@ -405,18 +405,29 @@ extern "C" void eidolon_livekit_board_deinit(void)
         s_av_renderer = nullptr;
     }
     s_audio_renderer = nullptr;
+
+    // Quiesce the capture PRODUCER before destroying the pipeline. esp_capture_close
+    // frees its internal fetch data queue with only a bounded (1 s) wait for its
+    // fetch thread to exit; if a producer keeps the source hot, that fetch thread is
+    // still reading when data_q_deinit frees the queue -> writes into freed memory
+    // -> heap corruption (use-after-free). So stop whoever feeds the active source
+    // FIRST, then close. Both room types feed a PcmPushCaptureSource:
+    //   - control room (data-only): the silence feeder -> s_silent_source
+    //   - voice room: the AFE -> s_afe_capture's internal pcm source
+    // Quiescing the inactive one is a harmless no-op. The silence source/task and
+    // the AFE instance are intentionally kept alive across sessions (their
+    // long-lived tasks cannot be safely torn down); they are re-armed by
+    // build_silent_capturer / build_capturer on the next session.
+    s_silence_feed = false;
+    if (s_silent_source) {
+        s_silent_source->Quiesce();
+    }
+    if (s_afe_capture) {
+        s_afe_capture->Stop();  // stops the AFE and quiesces its pcm source
+    }
     if (s_capturer) {
         esp_capture_close(s_capturer);
         s_capturer = nullptr;
-    }
-    // Idle the silence feeder (the source + task are kept alive across sessions, like
-    // the AFE instance, so the feeder task can never race a delete).
-    s_silence_feed = false;
-    // Keep the EidolonAfeCapture instance alive across sessions: its embedded
-    // AfeAudioProcessor owns a long-lived AFE task that cannot be safely torn
-    // down. Stop() idles it; build_capturer reuses the same instance next time.
-    if (s_afe_capture) {
-        s_afe_capture->Stop();
     }
     s_gated_audio_source = {};
     s_last_playback_us = 0;
