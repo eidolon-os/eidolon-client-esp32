@@ -1813,12 +1813,13 @@ void EidolonVoiceController::DoActivation()
     }
 #endif
 
-    // PTT (half-duplex): land in the ready state on the lightweight control room —
-    // entering the voice room (which plays the welcome) is an explicit tap, so the
-    // device never boots straight into an open session. Full-duplex may auto-join
-    // the voice room on activation (open mic) when the board opts in.
+    // PTT and half-duplex: land in the ready state on the lightweight control
+    // room — entering the voice room (which plays the welcome + opens the mic) is
+    // an explicit "Start session", so the device never boots straight into an open
+    // session. Only full-duplex (always-on companion) may auto-join the voice room
+    // on activation when the board opts in.
 #if CONFIG_EIDOLON_AUTO_JOIN_ON_ACTIVATION
-    if (!ptt_mode_ && HasActiveConfig()) {
+    if (IsFullDuplex() && HasActiveConfig()) {
         DoJoinRoom();
         return;
     }
@@ -2346,14 +2347,22 @@ void EidolonVoiceController::PublishClientAudioState(bool playback_active)
     bool mic_muted;
     bool capture_on;
     if (ptt_mode_) {
-        // Push-to-talk (half-duplex): the mic is open while held and during the
-        // short release tail. Closed otherwise, so playback is not recorded and
-        // the ptt=false edge remains the explicit "I'm done" turn boundary.
+        // Push-to-talk: the mic is open while held and during the short release
+        // tail. Closed otherwise, so playback is not recorded and the ptt=false
+        // edge remains the explicit "I'm done" turn boundary.
         capture_on = mic_enabled_ && ptt_active_;
         mic_muted = !capture_on;
+    } else if (half_duplex_mode_) {
+        // Half-duplex: auto open-mic, but CLOSED while the agent is speaking (and
+        // the playback hangover). This board has no device AEC, so muting the mic
+        // during playback is what stops it recording its own output / self-
+        // interrupting. When the agent is idle the mic is open and the server EOT
+        // decides the turn — no barge-in.
+        capture_on = mic_enabled_ && !playback_active;
+        mic_muted = !capture_on;
     } else {
-        // Auto open-mic (full-duplex): keep capture open during playback so
-        // device-side AEC can support barge-in.
+        // Full-duplex: keep capture open during playback so device-side AEC can
+        // support barge-in.
         capture_on = mic_enabled_;
         mic_muted = !mic_enabled_;
     }

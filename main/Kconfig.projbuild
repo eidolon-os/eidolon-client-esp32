@@ -1202,16 +1202,35 @@ menu "Eidolon Hub"
             should leave this disabled so battery idle auto-shutdown remains
             active.
 
+    # Interaction mode = one of three, selected by these two mutually-exclusive
+    # bools (HALF_DUPLEX depends on !PTT so at most one is y):
+    #   PTT=y                 -> ptt          (hold-to-talk)
+    #   PTT=n, HALF_DUPLEX=y   -> half_duplex  (auto-record, mic closed on playback)
+    #   PTT=n, HALF_DUPLEX=n   -> full_duplex  (open mic + AEC + barge-in)
     config EIDOLON_INTERACTION_MODE_PTT
-        bool "Push-to-talk (hold to talk), half-duplex"
+        bool "Push-to-talk (hold to talk)"
         default y
         depends on EIDOLON_HUB_MODE
         help
             Hold a button to talk, release to send (walkie-talkie). The mic is
             closed except while held, so a board with no usable echo cancellation
             never records its own playback, and the turn boundary is explicit
-            (no VAD/EOT guessing). Disable for full-duplex (open mic + EOT +
-            barge-in) on boards with good hardware AEC.
+            (no VAD/EOT guessing). For wearables / button devices (e.g. waveshare
+            2.06). Disable to pick half_duplex or full_duplex below.
+
+    config EIDOLON_INTERACTION_MODE_HALF_DUPLEX
+        bool "Half-duplex (auto open-mic, closed during playback, no barge-in)"
+        default n
+        depends on EIDOLON_HUB_MODE && !EIDOLON_INTERACTION_MODE_PTT
+        help
+            Auto-record after session start (no button) but close the mic while
+            the agent is speaking, so a board with NO device AEC never records
+            its own playback. STT is committed by the server end-of-turn (EOT)
+            judgment (same as full-duplex); the agent is NOT interruptible.
+            For boards without a validated AEC reference (e.g. m5stack-stackchan).
+            When this and PTT are both n, the mode is full-duplex (open mic +
+            device AEC + barge-in) — the setting for boards with good AEC
+            (e.g. esp-box-3).
 
     config EIDOLON_PTT_RELEASE_TAIL_MS
         int "PTT release capture tail (ms)"
@@ -1247,16 +1266,17 @@ menu "Eidolon Hub"
             event is missed. Set to 0 to disable.
 
     config EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS
-        int "Full-duplex idle teardown fallback timeout (ms)"
+        int "Full-/half-duplex idle teardown fallback timeout (ms)"
         range 0 600000
         default 0
         depends on EIDOLON_HUB_MODE && !EIDOLON_INTERACTION_MODE_PTT
         help
-            Client-side lifecycle fallback for full-duplex rooms. The Channel
-            remains the authoritative idle owner and should send session_end
-            before deleting the voice room. This timer only returns the device
-            to the control room if that server signal or room-close event is
-            missed. Set to 0 to disable.
+            Client-side lifecycle fallback for non-PTT rooms (full-duplex AND
+            half-duplex; half-duplex reuses this timer). The Channel remains the
+            authoritative idle owner and should send session_end before deleting
+            the voice room. This timer only returns the device to the control
+            room if that server signal or room-close event is missed. Set to 0
+            to disable.
 
     config EIDOLON_LIVEKIT_SPEAKER_VOLUME
         int "LiveKit playback volume (0-100)"

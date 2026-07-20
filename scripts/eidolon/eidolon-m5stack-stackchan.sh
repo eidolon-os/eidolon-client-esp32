@@ -486,9 +486,12 @@ ensure_eidolon_trim_sdkconfig() {
   # Keep product builds unchanged; only script-managed dev builds avoid PMIC
   # idle power-off so the serial port stays enumerated.
   set_sdkconfig_bool EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN y
-  # Full-duplex (open mic + EOT + barge-in): this board's hardware AEC is
-  # confirmed good, so it declares full_duplex rather than half-duplex PTT.
+  # Half-duplex (auto open-mic, closed while the agent speaks, no barge-in):
+  # StackChan's ES7210 has no validated clean AEC reference, so it runs with NO
+  # device AEC and avoids recording its own playback by muting the mic during
+  # playback. PTT=n + HALF_DUPLEX=y selects half_duplex.
   set_sdkconfig_bool EIDOLON_INTERACTION_MODE_PTT n
+  set_sdkconfig_bool EIDOLON_INTERACTION_MODE_HALF_DUPLEX y
   # Joining is touch-first (tap the ring) or a remote start-session, so this
   # board does not need microWakeWord in the app partition.
   set_sdkconfig_bool EIDOLON_WAKE_WORD_ENABLE n
@@ -498,23 +501,21 @@ ensure_eidolon_trim_sdkconfig() {
   set_sdkconfig_bool USE_CUSTOM_WAKE_WORD n
   clear_sr_wakenet_models
   set_sdkconfig_value EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS 75000
-  set_sdkconfig_value EIDOLON_LIVEKIT_SPEAKER_VOLUME 40
+  set_sdkconfig_value EIDOLON_LIVEKIT_SPEAKER_VOLUME 50
   # Full-duplex board idles IN the control room (online), it must NOT auto-join a
   # voice session on boot. Auto-join skips ConnectControlRoom(), so the Hub sees no
   # control-room presence and admin shows the device offline. Matches esp-box-3.
   set_sdkconfig_bool EIDOLON_AUTO_JOIN_ON_ACTIVATION n
 
-  # AFE mode: LOW_COST. HIGH_PERF (AFE_TYPE_VC) cannot keep real time on this
-  # board once the LiveKit/WebRTC stack is also running — the AFE task saturates
-  # a core (task_wdt on audio_communica), latency and PSRAM use grow, and the
-  # conversation stalls. LOW_COST runs in real time and still cancels echo via
-  # the confirmed hardware mic+playback reference channel.
+  # AFE mode: LOW_COST (kept for the single-mic AFE noise-suppression path).
   set_sdkconfig_bool EIDOLON_DEVICE_AEC_AFE_MODE_LOW_COST y
   set_sdkconfig_bool EIDOLON_DEVICE_AEC_AFE_MODE_HIGH_PERF n
-  # Device-side echo cancellation — required for full-duplex open-mic so the mic
-  # does not capture the speaker's own TTS. StackChan is in the USE_DEVICE_AEC
-  # Kconfig allowlist and USE_AUDIO_PROCESSOR is already on. Matches esp-box-3.
-  set_sdkconfig_bool USE_DEVICE_AEC y
+  # NO device-side AEC: StackChan's ES7210 has no validated clean playback
+  # reference channel, so a 2-channel AEC there cancels the near-end voice (not
+  # just echo) and STT gets noise. half_duplex mutes the mic during playback
+  # instead, so no AEC is needed. Pairs with AUDIO_INPUT_REFERENCE=false
+  # (single mic) in the board config.h.
+  set_sdkconfig_bool USE_DEVICE_AEC n
 }
 
 ensure_board_sdkconfig() {
@@ -537,10 +538,11 @@ CONFIG_EIDOLON_HUB_MODE=y
 CONFIG_EIDOLON_AUTO_JOIN_ON_ACTIVATION=n
 CONFIG_EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN=y
 # CONFIG_EIDOLON_INTERACTION_MODE_PTT is not set
+CONFIG_EIDOLON_INTERACTION_MODE_HALF_DUPLEX=y
 CONFIG_EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS=75000
-CONFIG_EIDOLON_LIVEKIT_SPEAKER_VOLUME=40
+CONFIG_EIDOLON_LIVEKIT_SPEAKER_VOLUME=50
 CONFIG_USE_AUDIO_PROCESSOR=y
-CONFIG_USE_DEVICE_AEC=y
+CONFIG_USE_DEVICE_AEC=n
 CONFIG_EIDOLON_DEVICE_AEC_AFE_MODE_LOW_COST=y
 # CONFIG_EIDOLON_DEVICE_AEC_AFE_MODE_HIGH_PERF is not set
 # CONFIG_EIDOLON_WAKE_WORD_ENABLE is not set

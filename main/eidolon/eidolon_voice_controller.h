@@ -65,6 +65,10 @@ public:
     void OnPttReleased();
     bool IsPttMode() const { return ptt_mode_; }
     bool IsPttHeld() const { return ptt_active_; }
+    // Half-duplex: auto open-mic that closes while the agent speaks (no device
+    // AEC). Full-duplex = neither PTT nor half-duplex (open mic + AEC + barge-in).
+    bool IsHalfDuplexMode() const { return half_duplex_mode_; }
+    bool IsFullDuplex() const { return !ptt_mode_ && !half_duplex_mode_; }
 
     // Read directly off the controller-owned field. state_ is a word-sized enum
     // written only on the controller task; a cross-thread read is benign (returns a
@@ -270,10 +274,19 @@ private:
     std::string register_url_;
     VoiceSessionState state_ = VoiceSessionState::Idle;
     bool mic_enabled_ = true;
-    // Interaction mode: push-to-talk (half-duplex) vs auto open-mic (full-duplex).
-    // Compile-time per board via Kconfig; runtime field keeps the branch readable.
+    // Interaction mode (one of three, compile-time per board via Kconfig):
+    //   ptt_mode_        -> push-to-talk (mic open only while the button is held)
+    //   half_duplex_mode_-> auto open-mic, closed while the agent speaks (no AEC)
+    //   neither          -> full-duplex (open mic + device AEC + barge-in)
+    // Runtime fields keep the capture-gate branch readable.
     bool ptt_mode_ =
 #if CONFIG_EIDOLON_INTERACTION_MODE_PTT
+        true;
+#else
+        false;
+#endif
+    bool half_duplex_mode_ =
+#if CONFIG_EIDOLON_INTERACTION_MODE_HALF_DUPLEX
         true;
 #else
         false;

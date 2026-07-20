@@ -404,6 +404,8 @@ esp_err_t HubConfigClient::RegisterDevice(const std::string& register_url,
     // half_duplex when absent, so sending it makes the device authoritative rather
     // than relying on that default.
 #if CONFIG_EIDOLON_INTERACTION_MODE_PTT
+    http->SetHeader("X-Device-Interaction-Mode", kInteractionModePtt);
+#elif CONFIG_EIDOLON_INTERACTION_MODE_HALF_DUPLEX
     http->SetHeader("X-Device-Interaction-Mode", kInteractionModeHalfDuplex);
 #else
     http->SetHeader("X-Device-Interaction-Mode", kInteractionModeFullDuplex);
