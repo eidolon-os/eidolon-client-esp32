@@ -24,6 +24,15 @@
 
 #define TAG "M5StackChanBoard"
 
+// The DVP camera's internal/DMA SRAM starves the full_duplex AFE voice
+// capturer: on room.join the mic-path AFE read task (8 KB internal stack)
+// fails to allocate (internal-SRAM low-water ~9 KB), the voice room never
+// forms, and the control room can't rebuild either → device goes offline.
+// esp-box-3 (the full_duplex reference) has no camera. Disabled here until
+// internal-SRAM optimization (buffers→PSRAM, control→voice teardown sync)
+// lets the camera coexist. Flip to 1 to re-enable.
+#define EIDOLON_STACKCHAN_ENABLE_CAMERA 0
+
 class Pmic : public Axp2101 {
 public:
     // Power Init
@@ -131,8 +140,13 @@ public:
     CustomLcdDisplay(esp_lcd_panel_io_handle_t io_handle, esp_lcd_panel_handle_t panel_handle,
                      int width, int height, int offset_x, int offset_y,
                      bool mirror_x, bool mirror_y, bool swap_xy)
+        // draw_buffer_psram=true: StackChan runs the on-device AFE full_duplex
+        // mic path and is internal-SRAM tight (servo/motion tasks + camera cost
+        // that box3 doesn't pay), so move the LVGL draw buffer to PSRAM to free
+        // ~12.8 KB internal for the AFE. The slow-updating avatar face tolerates
+        // the slightly slower flush.
         : SpiLcdDisplay(io_handle, panel_handle, width, height, offset_x, offset_y,
-                        mirror_x, mirror_y, swap_xy) {}
+                        mirror_x, mirror_y, swap_xy, /*draw_buffer_psram=*/true) {}
 
 #if CONFIG_EIDOLON_HUB_MODE
     void SetupUI() override {
@@ -161,7 +175,7 @@ private:
     Aw9523* aw9523_;
     Ft6336* ft6336_;
     LcdDisplay* display_;
-    EspVideo* camera_;
+    EspVideo* camera_ = nullptr;
     esp_timer_handle_t touchpad_timer_;
     StackChanBody* body_ = nullptr;
 
@@ -387,7 +401,9 @@ public:
         I2cDetect();
         InitializeSpi();
         InitializeIli9342Display();
+#if EIDOLON_STACKCHAN_ENABLE_CAMERA
         InitializeCamera();
+#endif
         InitializeFt6336TouchPad();
         InitializeServoBody();
         GetBacklight()->RestoreBrightness();

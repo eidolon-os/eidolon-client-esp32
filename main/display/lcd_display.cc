@@ -107,7 +107,8 @@ LcdDisplay::LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_
 }
 
 SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel,
-                           int width, int height, int offset_x, int offset_y, bool mirror_x, bool mirror_y, bool swap_xy)
+                           int width, int height, int offset_x, int offset_y, bool mirror_x, bool mirror_y, bool swap_xy,
+                           bool draw_buffer_psram)
     : LcdDisplay(panel_io, panel, width, height) {
 
     // draw white
@@ -168,8 +169,11 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
         },
         .color_format = LV_COLOR_FORMAT_RGB565,
         .flags = {
-            .buff_dma = 1,
-            .buff_spiram = 0,
+            // Opt-in per board (draw_buffer_psram): memory-tight boards move the
+            // draw buffer to PSRAM to free internal SRAM. Default is the faster
+            // internal DMA buffer, unchanged for every board that doesn't opt in.
+            .buff_dma = draw_buffer_psram ? 0u : 1u,
+            .buff_spiram = draw_buffer_psram ? 1u : 0u,
             .sw_rotate = 0,
             .swap_bytes = 1,
             .full_refresh = 0,

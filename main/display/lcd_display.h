@@ -61,9 +61,15 @@ public:
 // SPI LCD display
 class SpiLcdDisplay : public LcdDisplay {
 public:
+    // draw_buffer_psram: allocate the LVGL draw buffer in PSRAM instead of
+    // internal DMA-capable SRAM. Default false preserves the faster internal
+    // buffer for every board; memory-tight boards that also run the on-device
+    // AFE full_duplex mic path (e.g. m5stack-stackchan) opt in to free ~width*20*2
+    // bytes of internal SRAM at the cost of a slightly slower flush.
     SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel,
                   int width, int height, int offset_x, int offset_y,
-                  bool mirror_x, bool mirror_y, bool swap_xy);
+                  bool mirror_x, bool mirror_y, bool swap_xy,
+                  bool draw_buffer_psram = false);
 };
 
 // RGB LCD display
