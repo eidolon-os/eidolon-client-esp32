@@ -14,7 +14,10 @@ CoreS3AudioCodec::CoreS3AudioCodec(void* i2c_master_handle, int input_sample_rat
     input_channels_ = input_reference_ ? 2 : 1; // 输入通道数
     input_sample_rate_ = input_sample_rate;
     output_sample_rate_ = output_sample_rate;
-    input_gain_ = 30;
+    // ES7210 mic PGA gain (dB). CoreS3/StackChan mics need more gain than box-3's:
+    // the factory StackChan firmware uses 60; our earlier 30 left near-end speech too
+    // quiet for STT (empty transcripts). Match the factory value.
+    input_gain_ = 60;
 
     CreateDuplexChannels(mclk, bclk, ws, dout, din);
 

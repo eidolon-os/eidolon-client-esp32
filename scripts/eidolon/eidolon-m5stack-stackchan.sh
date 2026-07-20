@@ -498,7 +498,11 @@ ensure_eidolon_trim_sdkconfig() {
   set_sdkconfig_bool USE_CUSTOM_WAKE_WORD n
   clear_sr_wakenet_models
   set_sdkconfig_value EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS 75000
-  set_sdkconfig_value EIDOLON_LIVEKIT_SPEAKER_VOLUME 80
+  set_sdkconfig_value EIDOLON_LIVEKIT_SPEAKER_VOLUME 40
+  # Full-duplex board idles IN the control room (online), it must NOT auto-join a
+  # voice session on boot. Auto-join skips ConnectControlRoom(), so the Hub sees no
+  # control-room presence and admin shows the device offline. Matches esp-box-3.
+  set_sdkconfig_bool EIDOLON_AUTO_JOIN_ON_ACTIVATION n
 
   # AFE mode: LOW_COST. HIGH_PERF (AFE_TYPE_VC) cannot keep real time on this
   # board once the LiveKit/WebRTC stack is also running — the AFE task saturates
@@ -507,6 +511,10 @@ ensure_eidolon_trim_sdkconfig() {
   # the confirmed hardware mic+playback reference channel.
   set_sdkconfig_bool EIDOLON_DEVICE_AEC_AFE_MODE_LOW_COST y
   set_sdkconfig_bool EIDOLON_DEVICE_AEC_AFE_MODE_HIGH_PERF n
+  # Device-side echo cancellation — required for full-duplex open-mic so the mic
+  # does not capture the speaker's own TTS. StackChan is in the USE_DEVICE_AEC
+  # Kconfig allowlist and USE_AUDIO_PROCESSOR is already on. Matches esp-box-3.
+  set_sdkconfig_bool USE_DEVICE_AEC y
 }
 
 ensure_board_sdkconfig() {
@@ -526,11 +534,13 @@ ${SDK_MARKER}
 ${BOARD_KCONFIG}
 CONFIG_USE_WECHAT_MESSAGE_STYLE=n
 CONFIG_EIDOLON_HUB_MODE=y
-CONFIG_EIDOLON_AUTO_JOIN_ON_ACTIVATION=y
+CONFIG_EIDOLON_AUTO_JOIN_ON_ACTIVATION=n
 CONFIG_EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN=y
 # CONFIG_EIDOLON_INTERACTION_MODE_PTT is not set
 CONFIG_EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS=75000
-CONFIG_EIDOLON_LIVEKIT_SPEAKER_VOLUME=80
+CONFIG_EIDOLON_LIVEKIT_SPEAKER_VOLUME=40
+CONFIG_USE_AUDIO_PROCESSOR=y
+CONFIG_USE_DEVICE_AEC=y
 CONFIG_EIDOLON_DEVICE_AEC_AFE_MODE_LOW_COST=y
 # CONFIG_EIDOLON_DEVICE_AEC_AFE_MODE_HIGH_PERF is not set
 # CONFIG_EIDOLON_WAKE_WORD_ENABLE is not set

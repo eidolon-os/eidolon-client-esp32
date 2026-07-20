@@ -384,7 +384,9 @@ private:
         ESP_LOGI(TAG, "Init StackChan servo body");
         body_ = new StackChanBody(i2c_bus_);
         if (body_->Init()) {
-            body_->StartSelfTest();  // boot bring-up sweep (increment 1 verification)
+            // Boot bring-up sweep intentionally NOT run (owner request: no automatic
+            // servo motion on boot). Init() already homes the head to its rest pose;
+            // StartSelfTest() stays available for manual bring-up verification.
         } else {
             ESP_LOGW(TAG, "Servo body unavailable; continuing without head motion");
         }
