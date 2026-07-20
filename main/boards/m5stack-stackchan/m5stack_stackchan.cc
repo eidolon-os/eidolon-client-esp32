@@ -3,7 +3,6 @@
 #include "display/lcd_display.h"
 #include "application.h"
 #include "config.h"
-#include "power_save_timer.h"
 #include "i2c_device.h"
 #include "axp2101.h"
 
@@ -164,24 +163,12 @@ private:
     LcdDisplay* display_;
     EspVideo* camera_;
     esp_timer_handle_t touchpad_timer_;
-    PowerSaveTimer* power_save_timer_;
     StackChanBody* body_ = nullptr;
 
-    void InitializePowerSaveTimer() {
-        power_save_timer_ = new PowerSaveTimer(-1, 60, 300);
-        power_save_timer_->OnEnterSleepMode([this]() {
-            GetDisplay()->SetPowerSaveMode(true);
-            GetBacklight()->SetBrightness(10);
-        });
-        power_save_timer_->OnExitSleepMode([this]() {
-            GetDisplay()->SetPowerSaveMode(false);
-            GetBacklight()->RestoreBrightness();
-        });
-        power_save_timer_->OnShutdownRequest([this]() {
-            pmic_->PowerOff();
-        });
-        power_save_timer_->SetEnabled(true);
-    }
+    // No PowerSaveTimer: StackChan is a full_duplex always-on companion, so it
+    // must never dim/sleep or auto-power-off (matches the esp-box-3 reference).
+    // The stock M5Stack timer both shut the device off at 300s idle AND had a
+    // change-detection bug that fired even on USB power, so it is removed here.
 
     void InitializeI2c() {
         // Initialize I2C peripheral
@@ -394,7 +381,6 @@ private:
 
 public:
     M5StackChanBoard() {
-        InitializePowerSaveTimer();
         InitializeI2c();
         InitializeAxp2101();
         InitializeAw9523();
@@ -431,23 +417,10 @@ public:
     }
 
     virtual bool GetBatteryLevel(int &level, bool& charging, bool& discharging) override {
-        static bool last_discharging = false;
         charging = pmic_->IsCharging();
         discharging = pmic_->IsDischarging();
-        if (discharging != last_discharging) {
-            power_save_timer_->SetEnabled(discharging);
-            last_discharging = discharging;
-        }
-
         level = pmic_->GetBatteryLevel();
         return true;
-    }
-
-    virtual void SetPowerSaveLevel(PowerSaveLevel level) override {
-        if (level != PowerSaveLevel::LOW_POWER) {
-            power_save_timer_->WakeUp();
-        }
-        WifiBoard::SetPowerSaveLevel(level);
     }
 
     virtual Backlight *GetBacklight() override {
