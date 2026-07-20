@@ -123,7 +123,10 @@ private:
         int dh_param_len;
         uint8_t iv[16];
         mbedtls_dhm_context *dhm;
-        esp_aes_context *aes;
+        // Canonical mbedTLS type: identical to esp_aes_context when
+        // CONFIG_MBEDTLS_HARDWARE_AES is on (aes_alt.h alias), and the correct
+        // software type when it is off. All uses below call mbedtls_aes_* APIs.
+        mbedtls_aes_context *aes;
     };
 
     BlufiSecurity *m_sec;
