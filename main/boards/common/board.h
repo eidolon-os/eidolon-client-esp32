@@ -106,6 +106,12 @@ public:
     }
     // Emergency stop: cut head-servo torque and preempt any running gesture.
     virtual void HeadStop() {}
+
+    // Board-local decorative feedback (RGB ring / screen avatar) used by the
+    // owner-presence reflex. No-ops on boards without them. `effect`: "wake"
+    // (marquee) / "off". `emotion`: a short-lived face pulse for ttl_ms.
+    virtual void RgbEffect(const char* effect) { (void)effect; }
+    virtual void AvatarExpress(const char* emotion, int ttl_ms) { (void)emotion; (void)ttl_ms; }
 };
 
 #define DECLARE_BOARD(BOARD_CLASS_NAME) \

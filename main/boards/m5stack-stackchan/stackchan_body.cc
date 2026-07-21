@@ -22,6 +22,7 @@ namespace {
 constexpr float kHomeYawDeg = 0.0f;
 constexpr float kHomePitchDeg = 45.0f;
 constexpr int kDefaultSpeed = 500;
+constexpr int kLedCount = 12;  // RGB ring on the PY32 IO-expander
 
 class MutexGuard {
 public:
@@ -67,6 +68,18 @@ bool StackChanBody::Init() {
     ioe_->setPullMode(PY32_SERVO_POWER_PIN, true);
     ioe_->digitalWrite(PY32_SERVO_POWER_PIN, true);
     vTaskDelay(pdMS_TO_TICKS(200));
+
+    // Bring up the 12-LED RGB ring (WS2812-style data on PY32 pin 13). The data pin
+    // MUST be configured as push-pull output first or the LEDs never light — mirror
+    // the factory sequence (config pin -> count -> settle -> clear twice).
+    ioe_->setDirection(PY32_RGB_DATA_PIN, true);    // output
+    ioe_->setPullMode(PY32_RGB_DATA_PIN, true);     // pull-up
+    ioe_->setDriveMode(PY32_RGB_DATA_PIN, false);   // push-pull
+    ioe_->setLedCount(kLedCount);
+    vTaskDelay(pdMS_TO_TICKS(200));
+    SetAllLeds(0, 0, 0);
+    vTaskDelay(pdMS_TO_TICKS(50));
+    SetAllLeds(0, 0, 0);
 
     // 3) Bring up the SCSCL servo bus.
     if (!scs_.begin(SERVO_UART_PORT, SERVO_UART_BAUD, SERVO_UART_TX_PIN, SERVO_UART_RX_PIN)) {
@@ -161,6 +174,52 @@ void StackChanBody::Stop() {
     motion_->freeze();  // freeze animation + cut torque -> head limp (safety.stop = 断使能)
 }
 
+void StackChanBody::SetAllLeds(uint8_t r, uint8_t g, uint8_t b) {
+    if (!ioe_) return;
+    for (int i = 0; i < kLedCount; ++i) ioe_->setLedColor(i, r, g, b);
+    ioe_->refreshLeds();
+}
+
+void StackChanBody::RgbOff() {
+    rgb_abort_ = true;  // preempt any running marquee before clearing
+    SetAllLeds(0, 0, 0);
+}
+
+void StackChanBody::RgbMarquee() {
+    if (!ioe_ || rgb_busy_) return;  // drop if the IO-expander is absent or one is running
+    rgb_abort_ = false;
+    rgb_busy_ = true;
+    xTaskCreate(
+        [](void* arg) {
+            auto* b = static_cast<StackChanBody*>(arg);
+            b->RunRgbMarquee();
+            b->rgb_busy_ = false;
+            vTaskDelete(nullptr);
+        },
+        "stackchan_rgb", 3072, this, 3, nullptr);
+}
+
+void StackChanBody::RunRgbMarquee() {
+    // Cyan dot chasing around the ring with a short fading tail, a few laps, then dark.
+    const int laps = 3;
+    for (int step = 0; step < kLedCount * laps && !rgb_abort_; ++step) {
+        const int head = step % kLedCount;
+        for (int i = 0; i < kLedCount; ++i) {
+            const int back = (head - i + kLedCount) % kLedCount;  // 0 = head, higher = tail
+            uint8_t level = 0;
+            if (back == 0) level = 255;
+            else if (back == 1) level = 90;
+            else if (back == 2) level = 25;
+            // Tech cyan: green ~0.7 of blue.
+            ioe_->setLedColor(i, static_cast<uint8_t>(0),
+                              static_cast<uint8_t>(level * 7 / 10), level);
+        }
+        ioe_->refreshLeds();
+        vTaskDelay(pdMS_TO_TICKS(45));
+    }
+    SetAllLeds(0, 0, 0);
+}
+
 void StackChanBody::SelfTest() {
     ESP_LOGI(TAG, "self-test sweep begin");
     const int kSettleMs = 1500;
@@ -235,6 +294,13 @@ void StackChanBody::RunGesture() {
         GoHome();
     } else if (g.name == "glance") {  // look toward target, then return
         LookAtNormalized(g.x, g.y); if (!GestureContinue(g.return_ms > 0 ? g.return_ms : 800)) return;
+        GoHome();
+    } else if (g.name == "wake_wobble") {  // cute wake: perk up, quick side-to-side wiggle, settle
+        SetHeadAngles(0.0f, 62.0f);   if (!GestureContinue(200)) return;
+        SetHeadAngles(-15.0f, 60.0f); if (!GestureContinue(140)) return;
+        SetHeadAngles(15.0f, 60.0f);  if (!GestureContinue(140)) return;
+        SetHeadAngles(-9.0f, 58.0f);  if (!GestureContinue(130)) return;
+        SetHeadAngles(6.0f, 58.0f);   if (!GestureContinue(130)) return;
         GoHome();
     } else {
         ESP_LOGW(TAG, "unknown gesture: %s", g.name.c_str());

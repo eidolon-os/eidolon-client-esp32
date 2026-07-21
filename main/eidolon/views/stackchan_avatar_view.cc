@@ -3,6 +3,7 @@
 #include <cstring>
 
 #include <esp_log.h>
+#include <esp_timer.h>
 
 #include "display.h"
 
@@ -61,6 +62,8 @@ void StackChanAvatarView::Build(const BuildContext& ctx)
     // The StackChan default skin is a 320x240 canvas — exactly the CoreS3 screen.
     avatar_->init(ctx.parent, ctx.font);
     avatar_->setEmotion(Emotion::Neutral);
+    base_emotion_code_ = static_cast<int>(Emotion::Neutral);
+    last_applied_code_ = static_cast<int>(Emotion::Neutral);
 
     // Advance decorator/animation lifetimes. lv_timer callbacks run inside the
     // esp_lvgl_port task (which already holds the LVGL lock), so update() here
@@ -73,8 +76,31 @@ void StackChanAvatarView::OnUpdateTimer(lv_timer_t* timer)
 {
     auto* self = static_cast<StackChanAvatarView*>(lv_timer_get_user_data(timer));
     if (self != nullptr && self->avatar_) {
+        self->ApplyEmotion();  // honor a pulse window / revert when it expires
         self->avatar_->update();
     }
+}
+
+void StackChanAvatarView::ApplyEmotion()
+{
+    if (!avatar_) {
+        return;
+    }
+    const int64_t now = esp_timer_get_time();
+    const int code = (now < pulse_until_us_) ? pulse_emotion_code_ : base_emotion_code_;
+    if (code != last_applied_code_) {
+        avatar_->setEmotion(static_cast<Emotion>(code));
+        last_applied_code_ = code;
+    }
+}
+
+void StackChanAvatarView::PulseEmotion(const char* emotion, int ttl_ms)
+{
+    if (ttl_ms <= 0) {
+        return;
+    }
+    pulse_emotion_code_ = static_cast<int>(MapEmotion(emotion));
+    pulse_until_us_ = esp_timer_get_time() + static_cast<int64_t>(ttl_ms) * 1000;
 }
 
 void StackChanAvatarView::Render(const EidolonUiSnapshot& snapshot)
@@ -112,7 +138,10 @@ void StackChanAvatarView::Render(const EidolonUiSnapshot& snapshot)
             break;
         }
     }
-    avatar_->setEmotion(emotion);
+    // Record the resolved mood as the base; a live PulseEmotion window overrides it.
+    // ApplyEmotion (here + on the 20ms timer) is the single place that calls setEmotion.
+    base_emotion_code_ = static_cast<int>(emotion);
+    ApplyEmotion();
 
     // The speech bubble mirrors the live conversation (ShowChatMessage). Outside a
     // voice room there is no dialogue, so clear any stale line.

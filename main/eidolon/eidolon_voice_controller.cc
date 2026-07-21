@@ -1059,6 +1059,7 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload)
         {kControlOpHeadHome, 1, &EidolonVoiceController::HandleHeadHomeCommand},
         {kControlOpHeadGesture, 1, &EidolonVoiceController::HandleHeadGestureCommand},
         {kControlOpSafetyStop, 1, &EidolonVoiceController::HandleSafetyStopCommand},
+        {kControlOpPresenceSet, 1, &EidolonVoiceController::HandlePresenceSetCommand},
 #if CONFIG_EIDOLON_GUARD_SERVICE
         {kControlOpDeviceRollCall, 1, &EidolonVoiceController::HandleDeviceRollCallCommand},
         {kControlOpGuardRuntimeSync, 0, &EidolonVoiceController::HandleGuardRuntimeSyncCommand},
@@ -1644,6 +1645,64 @@ void EidolonVoiceController::HandleSafetyStopCommand(const std::string& command_
     ESP_LOGW(TAG, "Control command -> safety.stop (cut head torque)");
     board.HeadStop();
     AckCommand(command, "completed", "OK");
+}
+
+void EidolonVoiceController::HandlePresenceSetCommand(const std::string& command_id,
+                                                      const std::string& payload)
+{
+    ControlCommand command;
+    command.id = command_id;
+    command.op = kControlOpPresenceSet;
+
+    // Guard -> hub -> body fan-out payload. Only `state` drives a reaction;
+    // guard_epoch/correlation_id come along for the contract but the device is not
+    // authoritative over them (the Hub is). action_id is echoed back in the result.
+    // The Hub delivers state="awake" (owner present/candidate) or "warm" (absent).
+    std::string state, action_id;
+    cJSON* root = cJSON_Parse(payload.c_str());
+    if (root) {
+        const cJSON* js = cJSON_GetObjectItem(root, "state");
+        if (cJSON_IsString(js) && js->valuestring) state = js->valuestring;
+        const cJSON* ja = cJSON_GetObjectItem(root, "action_id");
+        if (cJSON_IsString(ja) && ja->valuestring) action_id = ja->valuestring;
+        cJSON_Delete(root);
+    }
+    if (state.empty()) {
+        AckCommand(command, "failed", "MISSING_PRESENCE_STATE");
+        return;
+    }
+
+    // Render owner presence as a device-local reflex reaction — a generic Hub signal,
+    // device-specific behavior. Each effector is independently safe (no-op if absent),
+    // so no HasHeadMotion gate: sound + avatar work even without the servo body, and
+    // the body serializes its own motion (safety.stop > gesture > idle).
+    //   awake (owner present/candidate): tech chime + cute head wobble + RGB marquee + happy face
+    //   warm  (owner absent):            settle head down + dim the ring + sleepy face
+    auto& board = Board::GetInstance();
+    bool applied = false;
+    if (state == "awake") {
+        PlayStartupCue();
+        board.HeadGesture("wake_wobble", 0, 0.0f, 0.0f, 0, 0);
+        board.RgbEffect("wake");
+        board.AvatarExpress("happy", 4000);
+        applied = true;
+    } else if (state == "warm") {
+        board.HeadGesture("droop", 0, 0.0f, 0.0f, 0, 0);
+        board.RgbEffect("off");
+        board.AvatarExpress("sleepy", 2000);
+        applied = true;
+    } else {
+        ESP_LOGW(TAG, "presence.set unknown state=%s", state.c_str());
+    }
+    ESP_LOGI(TAG, "Control command -> body.presence.set state=%s applied=%d",
+             state.c_str(), applied ? 1 : 0);
+
+    // Result matches the SDK result_schema {action_id, state, applied}.
+    char result[192];
+    snprintf(result, sizeof(result),
+             "{\"action_id\":\"%s\",\"state\":\"%s\",\"applied\":%s}",
+             action_id.c_str(), state.c_str(), applied ? "true" : "false");
+    AckCommand(command, "completed", "OK", "", result);
 }
 
 #if CONFIG_EIDOLON_GUARD_SERVICE

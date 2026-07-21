@@ -55,9 +55,17 @@ public:
     // Boot bring-up sweep in its own task (does not block board construction).
     void StartSelfTest();
 
+    // 12-LED RGB ring on the PY32 IO-expander. RgbMarquee runs a one-shot cyan
+    // chase (cute wake effect); RgbOff clears the ring. No-ops if the IO-expander
+    // is absent. A running marquee is preempted by RgbOff / a new marquee.
+    void RgbMarquee();
+    void RgbOff();
+
 private:
     void SelfTest();
     void RunGesture();
+    void RunRgbMarquee();
+    void SetAllLeds(uint8_t r, uint8_t g, uint8_t b);
     void UpdateLoop();
     // Delay one gesture step, then report whether the gesture may continue (false if a
     // safety stop was requested or the body went unready). Keeps a running gesture from
@@ -76,6 +84,10 @@ private:
     volatile bool gesture_busy_ = false;
     // Set by Stop() to preempt the running gesture; cleared when a new gesture starts.
     volatile bool gesture_abort_ = false;
+    // RGB marquee one-shot task state (LED ring lives on the PY32, separate from the
+    // servo bus). rgb_abort_ preempts a running marquee (RgbOff / new marquee).
+    volatile bool rgb_busy_ = false;
+    volatile bool rgb_abort_ = false;
     // Absolute esp_timer deadline (us) for a look_at TTL hold; 0 = disarmed. Enforced on
     // the 50 Hz update tick so the guardrail can't be bypassed by any caller.
     volatile int64_t look_at_deadline_us_ = 0;

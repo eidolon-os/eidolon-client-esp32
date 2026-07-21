@@ -356,7 +356,7 @@ esp_err_t HubConfigClient::RegisterDevice(const std::string& register_url,
         "\"description\":\"Play a discrete expressive head gesture\","
         "\"input_schema\":{\"type\":\"object\",\"properties\":{"
         "\"name\":{\"type\":\"string\","
-        "\"enum\":[\"nod\",\"shake\",\"perk_up\",\"droop\",\"glance\"]},"
+        "\"enum\":[\"nod\",\"shake\",\"perk_up\",\"droop\",\"glance\",\"wake_wobble\"]},"
         "\"times\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":5},"
         "\"x\":{\"type\":\"number\",\"minimum\":-1,\"maximum\":1},"
         "\"y\":{\"type\":\"number\",\"minimum\":-1,\"maximum\":1},"
@@ -370,7 +370,27 @@ esp_err_t HubConfigClient::RegisterDevice(const std::string& register_url,
         "\"input_schema\":{\"type\":\"object\",\"properties\":{},"
         "\"additionalProperties\":false},"
         "\"result_schema\":{\"type\":\"object\",\"properties\":{},"
-        "\"additionalProperties\":false}}"
+        "\"additionalProperties\":false}},"
+        // Owner-presence body reaction: guard -> hub -> body fan-out selects any
+        // online body-capable device that declares this. state="awake" (owner
+        // present) / "warm" (owner absent); maps to a discrete head gesture.
+        // Schema mirrors eidolon_sdk BODY_OP_PRESENCE_SET exactly (the Hub rebuilds
+        // the payload to these 4 fields; `presence` is dropped before delivery).
+        "{\"name\":\"body.presence.set\",\"version\":1,"
+        "\"description\":\"Set a low-risk local owner-presence state (awake/warm) on the body\","
+        "\"input_schema\":{\"type\":\"object\",\"properties\":{"
+        "\"state\":{\"type\":\"string\"},"
+        "\"guard_epoch\":{\"type\":\"integer\"},"
+        "\"correlation_id\":{\"type\":\"string\"},"
+        "\"action_id\":{\"type\":\"string\"}},"
+        "\"required\":[\"state\",\"guard_epoch\",\"correlation_id\",\"action_id\"],"
+        "\"additionalProperties\":false},"
+        "\"result_schema\":{\"type\":\"object\",\"properties\":{"
+        "\"action_id\":{\"type\":\"string\"},"
+        "\"state\":{\"type\":\"string\"},"
+        "\"applied\":{\"type\":\"boolean\"}},"
+        "\"required\":[\"action_id\",\"applied\"],"
+        "\"additionalProperties\":true}}"
 #endif
         "],"
         // Device identity is HARDWARE ONLY (board type/name); no logical role.

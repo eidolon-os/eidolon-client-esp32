@@ -12,6 +12,7 @@
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_ili9341.h>
 #include <esp_timer.h>
+#include <cstring>
 #include "esp_video.h"
 #include "stackchan_body.h"
 
@@ -161,6 +162,11 @@ public:
         avatar_view_ = new eidolon::StackChanAvatarView();
         avatar_view_->Build(ctx);
         eidolon::SetEidolonView(avatar_view_);
+    }
+
+    // Transient face pulse (owner-presence reflex). Forwards to the avatar view.
+    void PulseAvatar(const char* emotion, int ttl_ms) {
+        if (avatar_view_) avatar_view_->PulseEmotion(emotion, ttl_ms);
     }
 
 private:
@@ -458,6 +464,21 @@ public:
     }
     void HeadStop() override {
         if (body_) body_->Stop();
+    }
+    void RgbEffect(const char* effect) override {
+        if (!body_) return;
+        if (effect != nullptr && std::strcmp(effect, "off") == 0) {
+            body_->RgbOff();
+        } else {
+            body_->RgbMarquee();  // "wake" / default
+        }
+    }
+    void AvatarExpress(const char* emotion, int ttl_ms) override {
+#if CONFIG_EIDOLON_HUB_MODE
+        if (display_) static_cast<CustomLcdDisplay*>(display_)->PulseAvatar(emotion, ttl_ms);
+#else
+        (void)emotion; (void)ttl_ms;
+#endif
     }
 };
 

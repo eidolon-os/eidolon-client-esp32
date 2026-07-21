@@ -54,6 +54,11 @@ inline constexpr const char* kControlOpHeadGesture = "head.gesture";
 // Emergency stop: cut servo torque immediately (head goes limp) and preempt any running
 // gesture. Highest motion priority; safe-risk op any caller may issue.
 inline constexpr const char* kControlOpSafetyStop = "safety.stop";
+// Owner-presence body reaction (guard -> hub -> body fan-out). Low-risk local
+// presence state: state="awake" (owner present) / "warm" (owner absent). Maps to a
+// discrete head gesture on bodies that have one. Source of record:
+// eidolon_sdk.biz.body.capabilities BODY_OP_PRESENCE_SET.
+inline constexpr const char* kControlOpPresenceSet = "body.presence.set";
 inline constexpr const char* kControlOpDeviceRollCall = "device.roll_call";
 inline constexpr const char* kControlOpGuardVisionBenchmark = "guard.vision.benchmark";
 inline constexpr const char* kControlOpGuardRuntimeSync = "guard.runtime.sync";

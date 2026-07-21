@@ -40,12 +40,28 @@ public:
     void Render(const EidolonUiSnapshot& snapshot) override;
     void ShowChatMessage(const char* role, const char* content) override;
 
+    // Transiently override the face with a short-lived emotion (e.g. "happy" on
+    // owner-presence wake). For ttl_ms the pulse wins over the presenter-resolved
+    // emotion; after it expires the face reverts to the resolved mood. Safe to call
+    // from any task (just stores state; the LVGL-task timer applies it).
+    void PulseEmotion(const char* emotion, int ttl_ms);
+
 private:
     static void OnUpdateTimer(lv_timer_t* timer);
+    // Apply the effective emotion (pulse if active, else the resolved base) to the
+    // avatar. Must run under the LVGL lock (Render + OnUpdateTimer both hold it).
+    void ApplyEmotion();
 
     Display* display_ = nullptr;
     std::unique_ptr<stackchan::avatar::DefaultAvatar> avatar_;
     lv_timer_t* update_timer_ = nullptr;
+    // Emotion state as ints (the Emotion enum stays out of this header — the board TU
+    // only sees a forward-declared DefaultAvatar). Render sets base_; PulseEmotion sets
+    // the pulse; ApplyEmotion picks the effective one and de-dupes setEmotion calls.
+    int base_emotion_code_ = 0;
+    int pulse_emotion_code_ = 0;
+    int last_applied_code_ = -1;
+    volatile int64_t pulse_until_us_ = 0;
 };
 
 }  // namespace eidolon
