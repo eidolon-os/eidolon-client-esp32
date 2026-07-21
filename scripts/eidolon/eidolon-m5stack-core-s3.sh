@@ -486,8 +486,11 @@ ensure_eidolon_trim_sdkconfig() {
   # Keep product builds unchanged; only script-managed dev builds avoid PMIC
   # idle power-off so the serial port stays enumerated.
   set_sdkconfig_bool EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN y
-  set_sdkconfig_bool EIDOLON_INTERACTION_MODE_PTT y
-  # Touch-first PTT joins by tapping the ring, so this board does not need
+  set_sdkconfig_bool EIDOLON_INTERACTION_MODE_PTT n
+  set_sdkconfig_bool EIDOLON_INTERACTION_MODE_HALF_DUPLEX y
+  # Half-duplex (no validated AEC reference — same class of hardware as
+  # m5stack-stackchan): auto-record with the mic closed during playback, no
+  # barge-in. The session joins from Start session, so this board does not need
   # microWakeWord in the app partition.
   set_sdkconfig_bool EIDOLON_WAKE_WORD_ENABLE n
   set_sdkconfig_bool WAKE_WORD_DISABLED y
@@ -527,9 +530,8 @@ CONFIG_USE_WECHAT_MESSAGE_STYLE=n
 CONFIG_EIDOLON_HUB_MODE=y
 CONFIG_EIDOLON_AUTO_JOIN_ON_ACTIVATION=y
 CONFIG_EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN=y
-CONFIG_EIDOLON_INTERACTION_MODE_PTT=y
-CONFIG_EIDOLON_PTT_RELEASE_TAIL_MS=150
-CONFIG_EIDOLON_PTT_COMMIT_UI_TIMEOUT_MS=5000
+# CONFIG_EIDOLON_INTERACTION_MODE_PTT is not set
+CONFIG_EIDOLON_INTERACTION_MODE_HALF_DUPLEX=y
 CONFIG_EIDOLON_LIVEKIT_SPEAKER_VOLUME=80
 CONFIG_EIDOLON_DEVICE_AEC_AFE_MODE_HIGH_PERF=y
 # CONFIG_EIDOLON_WAKE_WORD_ENABLE is not set

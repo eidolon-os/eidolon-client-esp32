@@ -7,7 +7,9 @@
                 "CONFIG_SPIRAM_MODE_QUAD=y",
                 "CONFIG_CAMERA_GC0308=y",
                 "CONFIG_CAMERA_GC0308_AUTO_DETECT_DVP_INTERFACE_SENSOR=y",
-                "CONFIG_CAMERA_GC0308_DVP_YUV422_320X240_20FPS=y"
+                "CONFIG_CAMERA_GC0308_DVP_YUV422_320X240_20FPS=y",
+                "CONFIG_EIDOLON_INTERACTION_MODE_PTT=n",
+                "CONFIG_EIDOLON_INTERACTION_MODE_HALF_DUPLEX=y"
             ]
         }
     ]

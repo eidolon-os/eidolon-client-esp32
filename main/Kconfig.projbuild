@@ -1207,9 +1207,14 @@ menu "Eidolon Hub"
     #   PTT=y                 -> ptt          (hold-to-talk)
     #   PTT=n, HALF_DUPLEX=y   -> half_duplex  (auto-record, mic closed on playback)
     #   PTT=n, HALF_DUPLEX=n   -> full_duplex  (open mic + AEC + barge-in)
+    # DEFAULT (board declares nothing) -> half_duplex. It is the only mode that
+    # works on any mic+speaker board without extra hardware: no physical button
+    # (unlike ptt) and no validated AEC reference (unlike full_duplex). Boards
+    # opt IN to ptt (PTT=y, needs a button) or full_duplex (PTT=n + HALF=n,
+    # needs good AEC, e.g. esp-box-3); everything else stays safely half_duplex.
     config EIDOLON_INTERACTION_MODE_PTT
         bool "Push-to-talk (hold to talk)"
-        default y
+        default n
         depends on EIDOLON_HUB_MODE
         help
             Hold a button to talk, release to send (walkie-talkie). The mic is
@@ -1220,7 +1225,7 @@ menu "Eidolon Hub"
 
     config EIDOLON_INTERACTION_MODE_HALF_DUPLEX
         bool "Half-duplex (auto open-mic, closed during playback, no barge-in)"
-        default n
+        default y
         depends on EIDOLON_HUB_MODE && !EIDOLON_INTERACTION_MODE_PTT
         help
             Auto-record after session start (no button) but close the mic while

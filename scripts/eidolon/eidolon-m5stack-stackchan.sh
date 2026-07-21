@@ -2,11 +2,11 @@
 # Eidolon dev toolkit — M5Stack CoreS3 (StackChan body)
 #
 # 交互入口（无参数，启动时自动配置板型）:
-#   ./scripts/eidolon/eidolon-m5stack-core-s3.sh
+#   ./scripts/eidolon/eidolon-m5stack-stackchan.sh
 #
 # 命令行模式:
-#   ./scripts/eidolon/eidolon-m5stack-core-s3.sh build
-#   ./scripts/eidolon/eidolon-m5stack-core-s3.sh flash
+#   ./scripts/eidolon/eidolon-m5stack-stackchan.sh build
+#   ./scripts/eidolon/eidolon-m5stack-stackchan.sh flash
 #
 # 兼容入口:
 #   ./scripts/eidolon/eidolon.sh  -> 转发到本脚本
@@ -594,7 +594,7 @@ verify_board_sdkconfig() {
     die "sdkconfig 芯片不是 esp32s3。请删除 sdkconfig 与 build/ 后重试菜单 [3]"
   fi
   if ! sdkconfig_has_board; then
-    die "sdkconfig 未选中 ${BOARD_NAME}。请在 menuconfig 中选 M5Stack CoreS3"
+    die "sdkconfig 未选中 ${BOARD_NAME}。请在 menuconfig 中选 M5Stack StackChan"
   fi
 }
 
