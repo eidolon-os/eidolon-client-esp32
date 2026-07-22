@@ -46,13 +46,6 @@ constexpr uint32_t kRgb565Fourcc = static_cast<uint32_t>('R') |
                                    (static_cast<uint32_t>('G') << 8) |
                                    (static_cast<uint32_t>('B') << 16) |
                                    (static_cast<uint32_t>('R') << 24);
-// esp_video (V4L2) delivers RGB565 in little-endian byte order (fourcc 'RGBP').
-// The ESP-DL detector/recognizer and the retained Admin reference templates all
-// operate on big-endian 'RGBR' layout, so live frames are byte-swapped below.
-constexpr uint32_t kRgb565LeFourcc = static_cast<uint32_t>('R') |
-                                     (static_cast<uint32_t>('G') << 8) |
-                                     (static_cast<uint32_t>('B') << 16) |
-                                     (static_cast<uint32_t>('P') << 24);
 
 const char* SlotPath(uint8_t slot)
 {
@@ -265,7 +258,6 @@ public:
             Job* stop = nullptr;
             xQueueSend(queue_, &stop, 0);
         }
-        heap_caps_free(live_qvga_be_);
     }
 
     bool QueueSync(const OwnerFaceSyncRequest& request, const std::string& config_url,
@@ -292,8 +284,7 @@ public:
     OwnerFaceLiveResult AnalyzeLiveFrame(const CameraFrame& frame, uint64_t now_ms)
     {
         OwnerFaceLiveResult result;
-        if (frame.data == nullptr || frame.pixel_format != kRgb565LeFourcc ||
-            frame.width == 0 || frame.height == 0 ||
+        if (frame.data == nullptr || frame.pixel_format != kRgb565Fourcc ||
             frame.len < static_cast<size_t>(frame.width) * frame.height * 2 ||
             now_ms < next_live_ms_) {
             return result;
@@ -303,37 +294,10 @@ public:
         if (!lock.owns_lock() || !recognizer_ || !detector_ || !active_) {
             return result;
         }
-        // esp_video delivers SVGA (800x600) little-endian RGB565. The detector,
-        // recognizer, and retained reference templates all operate on 320x240
-        // big-endian RGB565 (see DecodeJpegRgb565QvgaBigEndian). Subsample the
-        // live frame to that exact geometry and byte order in a single pass into
-        // a private buffer, leaving the shared camera frame (also read by the
-        // person-presence path) untouched.
-        if (live_qvga_be_ == nullptr) {
-            live_qvga_be_ = static_cast<uint8_t*>(heap_caps_malloc(
-                kOwnerFaceImageBytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
-            if (live_qvga_be_ == nullptr) {
-                return result;
-            }
-        }
-        const uint16_t* src = reinterpret_cast<const uint16_t*>(frame.data);
-        uint16_t* dst = reinterpret_cast<uint16_t*>(live_qvga_be_);
-        for (size_t y = 0; y < kOwnerFaceImageHeight; ++y) {
-            const size_t source_y = std::min<size_t>(
-                frame.height - 1,
-                ((2 * y + 1) * frame.height) / (2 * kOwnerFaceImageHeight));
-            for (size_t x = 0; x < kOwnerFaceImageWidth; ++x) {
-                const size_t source_x = std::min<size_t>(
-                    frame.width - 1,
-                    ((2 * x + 1) * frame.width) / (2 * kOwnerFaceImageWidth));
-                dst[y * kOwnerFaceImageWidth + x] =
-                    __builtin_bswap16(src[source_y * frame.width + source_x]);
-            }
-        }
         dl::image::img_t image = {
-            .data = live_qvga_be_,
-            .width = static_cast<uint16_t>(kOwnerFaceImageWidth),
-            .height = static_cast<uint16_t>(kOwnerFaceImageHeight),
+            .data = const_cast<uint8_t*>(frame.data),
+            .width = frame.width,
+            .height = frame.height,
             .pix_type = dl::image::DL_IMAGE_PIX_TYPE_RGB565,
         };
         auto& detected = detector_->run(image);
@@ -699,8 +663,6 @@ private:
     std::string current_desired_state_;
     uint64_t next_live_ms_ = 0;
     uint32_t live_interval_ms_ = 1500;
-    // Reusable QVGA big-endian RGB565 scratch for live-frame subsampling.
-    uint8_t* live_qvga_be_ = nullptr;
 };
 
 OwnerFaceEngine::OwnerFaceEngine() : impl_(std::make_unique<Impl>()) {}
