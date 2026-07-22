@@ -41,7 +41,7 @@ constexpr size_t kOwnerFaceImageHeight = 240;
 constexpr size_t kOwnerFaceImageBytes =
     kOwnerFaceImageWidth * kOwnerFaceImageHeight * 2;
 constexpr float kOwnerFaceQueryThreshold = -1.0f;
-constexpr float kOwnerFaceMatchThreshold = 0.5f;
+constexpr float kOwnerFaceMatchThreshold = 0.45f;
 constexpr uint32_t kRgb565Fourcc = static_cast<uint32_t>('R') |
                                    (static_cast<uint32_t>('G') << 8) |
                                    (static_cast<uint32_t>('B') << 16) |
