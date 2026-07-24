@@ -35,6 +35,9 @@ public:
     virtual void ShowNotification(const std::string &notification, int duration_ms = 3000);
     virtual void SetEmotion(const char* emotion);
     virtual void SetChatMessage(const char* role, const char* content);
+    // Compact lifecycle surface. Generic displays fall back to status + system
+    // detail; expression displays additionally render persistent Eidolon chrome.
+    virtual void SetEidolonLifecycle(const char* state, const char* detail);
     virtual void SetVoiceChrome(const char* mode, const char* state, const char* action,
                                 bool action_visible);
     virtual void ClearChatMessages();

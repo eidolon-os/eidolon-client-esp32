@@ -7,6 +7,23 @@
 
 namespace eidolon {
 
+// Device lifecycle before (and around) a voice session. This is deliberately
+// orthogonal to pairing/connection/turn: Wi-Fi or Hub recovery may temporarily
+// take visual precedence without corrupting the underlying voice state.
+enum class LifecyclePhase {
+    Booting,
+    LoadingAssets,
+    WifiScanning,
+    WifiConnecting,
+    WifiSetup,
+    HubDiscovering,
+    HubRegistering,
+    Updating,
+    Operational,
+    Offline,
+    Error,
+};
+
 enum class AgentPhase {
     Silent,
     UserSpeaking,
@@ -62,6 +79,7 @@ struct EidolonUiSnapshot {
     PairingStatus pairing = PairingStatus::Active;
     ConnectionPhase connection = ConnectionPhase::Offline;
     TurnPhase turn = TurnPhase::Idle;
+    EndReason end_reason = EndReason::None;
 
     const char* status_text = "";
     const char* subtitle = "";

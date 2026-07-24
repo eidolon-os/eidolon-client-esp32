@@ -1,8 +1,7 @@
 #include "hub_activator.h"
 
 #include "application.h"
-#include "assets/lang_config.h"
-#include "display.h"
+#include "eidolon_ui_types.h"
 #include "hub_config_client.h"
 #include "hub_config_store.h"
 #include "hub_discovery.h"
@@ -29,21 +28,21 @@ const char* ActivationMessageForStatus(HubConfigStatus status)
 {
     switch (status) {
     case HubConfigStatus::PendingApproval:
-        return Lang::Strings::EIDOLON_WAITING_APPROVAL;
+        return "Waiting for approval";
     case HubConfigStatus::WaitingBinding:
-        return Lang::Strings::EIDOLON_WAITING_BINDING;
+        return "Waiting for Agent";
     case HubConfigStatus::Active:
-        return Lang::Strings::EIDOLON_READY;
+        return "Device registered";
     case HubConfigStatus::Revoked:
     case HubConfigStatus::Unregistered:
-        return Lang::Strings::ERROR;
+        return "Device authorization required";
     }
-    return Lang::Strings::ERROR;
+    return "Device registration failed";
 }
 
 }  // namespace
 
-bool HubActivator::Run(Display* display) {
+bool HubActivator::Run() {
     auto& app = Application::GetInstance();
     const int max_retries = CONFIG_EIDOLON_MDNS_MAX_RETRIES;
     int retry_count = 0;
@@ -55,13 +54,12 @@ bool HubActivator::Run(Display* display) {
     const std::string device_id = SystemInfo::GetMacAddress();
 
     while (retry_count < max_retries) {
-        if (display) {
-            display->SetStatus(Lang::Strings::CHECKING_NEW_VERSION);
-        }
+        app.SetEidolonLifecycleUi(LifecyclePhase::HubDiscovering);
 
         HubTxtRecord txt;
         esp_err_t err = discovery.Discover(txt);
         if (err == ESP_OK) {
+            app.SetEidolonLifecycleUi(LifecyclePhase::HubRegistering);
             Esp32HubConfig config;
             err = client.RegisterDevice(txt.register_url, device_id, config);
             if (err == ESP_OK) {
@@ -84,9 +82,11 @@ bool HubActivator::Run(Display* display) {
                     cJSON_Delete(firmware);
                 }
 
-                if (display) {
-                    display->SetChatMessage("system", ActivationMessageForStatus(config.status));
-                }
+                app.SetEidolonLifecycleUi(
+                    LifecyclePhase::HubRegistering,
+                    config.status == HubConfigStatus::Active
+                        ? "Device registered"
+                        : ActivationMessageForStatus(config.status));
                 return true;
             }
         }
@@ -96,15 +96,15 @@ bool HubActivator::Run(Display* display) {
             ESP_LOGE(TAG, "Hub activation failed after %d retries: %s", retry_count,
                      esp_err_to_name(err));
             char detail[128];
-            snprintf(detail, sizeof(detail), "Hub err=%d", (int)err);
-            app.Alert(Lang::Strings::ERROR, detail, "cloud_slash", Lang::Sounds::OGG_EXCLAMATION);
+            snprintf(detail, sizeof(detail), "Hub unavailable (%s)", esp_err_to_name(err));
+            app.SetEidolonLifecycleUi(LifecyclePhase::Error, detail);
             return false;
         }
 
-        char buffer[256];
-        snprintf(buffer, sizeof(buffer), Lang::Strings::CHECK_NEW_VERSION_FAILED, retry_delay,
-                 esp_err_to_name(err));
-        app.Alert(Lang::Strings::ERROR, buffer, "cloud_slash", Lang::Sounds::OGG_EXCLAMATION);
+        char buffer[96];
+        snprintf(buffer, sizeof(buffer), "Hub retry in %ds (%d/%d)", retry_delay,
+                 retry_count, max_retries);
+        app.SetEidolonLifecycleUi(LifecyclePhase::HubDiscovering, buffer);
 
         ESP_LOGW(TAG, "Hub activation failed (%s), retry in %ds (%d/%d)",
                  esp_err_to_name(err), retry_delay, retry_count, max_retries);

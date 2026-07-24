@@ -172,6 +172,7 @@ EidolonUiSnapshot UiStateMapper::Map(VoiceSessionState session_state,
     snapshot.pairing = PairingStatusFor(session_state);
     snapshot.connection = ConnectionPhaseFor(session_state);
     snapshot.turn = TurnPhaseFor(agent_phase, ptt_recording, ptt_committing);
+    snapshot.end_reason = end_reason;
 
     if (snapshot.pairing != PairingStatus::Active) {
         snapshot.button_state = VoiceSessionButtonState::Hidden;
@@ -222,32 +223,6 @@ EidolonUiSnapshot UiStateMapper::Map(VoiceSessionState session_state,
     default:
         RenderConversation(snapshot);
         break;
-    }
-
-    // End-of-session overlay (plan §3.2): when we have settled back on the ready
-    // screen (control room up, not in a voice room) after the channel told us the
-    // conversation ended, say so — instead of a bare "待命" that reads like a
-    // never-started JOIN. The CONNECT/Talk button stays so the user can re-engage;
-    // the device is still reachable on the control room even after an error.
-    // Superseded is intentionally silent: a newer session is already taking over.
-    if (snapshot.connection == ConnectionPhase::Ready &&
-        snapshot.pairing == PairingStatus::Active) {
-        switch (end_reason) {
-        case EndReason::IdleNormalEnd:
-        case EndReason::ProactiveDone:
-        case EndReason::UserLeft:
-            snapshot.status_text = Lang::Strings::EIDOLON_SESSION_ENDED;
-            snapshot.emotion = "neutral";
-            break;
-        case EndReason::Error:
-            snapshot.status_text = Lang::Strings::EIDOLON_SESSION_ENDED;
-            snapshot.emotion = "sad";
-            break;
-        case EndReason::Superseded:
-        case EndReason::None:
-        default:
-            break;
-        }
     }
 
     if (!last_transcription.empty()) {

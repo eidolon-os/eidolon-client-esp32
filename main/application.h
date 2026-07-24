@@ -20,6 +20,7 @@
 
 #if CONFIG_EIDOLON_HUB_MODE
 namespace eidolon {
+enum class LifecyclePhase;
 enum class VoiceSessionState;
 }
 #if CONFIG_EIDOLON_WAKE_WORD_ENABLE
@@ -141,6 +142,8 @@ public:
     void ToggleMicrophone();
     void PttPress();
     void PttRelease();
+    void SetEidolonLifecycleUi(eidolon::LifecyclePhase phase,
+                               const std::string& detail = "");
 #endif
     
     /**
@@ -171,6 +174,7 @@ private:
     bool has_server_time_ = false;
     bool aborted_ = false;
     bool assets_version_checked_ = false;
+    bool assets_applied_ = false;
     bool play_popup_on_listening_ = false;  // Flag to play popup sound after state changes to listening
     int clock_ticks_ = 0;
     TaskHandle_t activation_task_handle_ = nullptr;
@@ -178,6 +182,8 @@ private:
 #if CONFIG_EIDOLON_HUB_MODE
     std::unique_ptr<eidolon::IVoiceSessionTransport> voice_transport_;
     std::unique_ptr<eidolon::EidolonUiPresenter> ui_presenter_;
+    bool network_connected_ = false;
+    bool hub_activation_done_ = false;
 #if CONFIG_EIDOLON_GUARD_SERVICE
     std::unique_ptr<eidolon::GuardService> guard_service_;
 #endif
@@ -206,6 +212,7 @@ private:
     void ActivationTask();
 
     // Helper methods
+    void ApplyLocalAssets();
     void CheckAssetsVersion();
     void CheckNewVersion();
     void InitializeProtocol();

@@ -46,10 +46,10 @@ static constexpr uint32_t kChromeExitBg = 0x2B0E14;
 static constexpr uint32_t kChromeCaptionText = 0xE5E7EB;
 static constexpr uint32_t kChromeCaptionBg = 0x111827;
 
-static const char* kModeLabel = "eidolon_mode_label";
-static const char* kStateLabel = "eidolon_state_label";
-static const char* kExitLabel = "eidolon_exit_label";
-static const char* kCaptionLabel = "eidolon_caption_label";
+static constexpr const char* kModeLabel = "eidolon_mode_label";
+static constexpr const char* kStateLabel = "eidolon_state_label";
+static constexpr const char* kExitLabel = "eidolon_exit_label";
+static constexpr const char* kCaptionLabel = "eidolon_caption_label";
 
 // ============================================================================
 // Forward Declarations
@@ -75,8 +75,18 @@ static bool OnFlushIoReady(const esp_lcd_panel_io_handle_t panel_io,
 static void OnFlushCallback(int x_start, int y_start, int x_end, int y_end, const void* data, emote_handle_t handle)
 {
     esp_lcd_panel_handle_t panel = (esp_lcd_panel_handle_t)emote_get_user_data(handle);
-    if (panel != nullptr) {
-        esp_lcd_panel_draw_bitmap(panel, x_start, y_start, x_end, y_end, data);
+    if (panel == nullptr) {
+        ESP_LOGE(TAG, "LCD flush skipped: panel is null");
+        emote_notify_flush_finished(handle);
+        return;
+    }
+    esp_err_t err = esp_lcd_panel_draw_bitmap(panel, x_start, y_start, x_end, y_end, data);
+    if (err != ESP_OK) {
+        // A rejected asynchronous transaction has no completion callback. The
+        // graphics task is waiting while holding its render mutex, so it must be
+        // released explicitly or every later UI update blocks indefinitely.
+        ESP_LOGE(TAG, "LCD flush rejected: %s", esp_err_to_name(err));
+        emote_notify_flush_finished(handle);
     }
 }
 
@@ -190,8 +200,9 @@ void EmoteDisplay::SetEmotion(const char* const emotion)
              normalized ? normalized : "(ignored)");
     if (emote_handle_ && normalized) {
         pending_emotion_ = normalized;
-        if (assets_loaded_) {
-            emote_set_anim_emoji(emote_handle_, pending_emotion_.c_str());
+        if (assets_loaded_ && applied_emotion_ != pending_emotion_ &&
+            emote_set_anim_emoji(emote_handle_, pending_emotion_.c_str()) == ESP_OK) {
+            applied_emotion_ = pending_emotion_;
         }
     }
 }
@@ -202,8 +213,21 @@ void EmoteDisplay::SetChatMessage(const char* const role, const char* const cont
     if (!emote_handle_ || !content) {
         return;
     }
+    pending_chat_role_ = role ? role : "system";
+    pending_chat_message_ = content;
+    if (!assets_loaded_) {
+        return;
+    }
+    if (applied_chat_role_ == pending_chat_role_ &&
+        applied_chat_message_ == pending_chat_message_) {
+        return;
+    }
     if (strlen(content) == 0) {
-        SetOverlayLabel(kCaptionLabel, "", false, kChromeCaptionText, kChromeCaptionBg, true);
+        if (SetOverlayLabel(kCaptionLabel, "", false, kChromeCaptionText,
+                            kChromeCaptionBg, true)) {
+            applied_chat_role_ = pending_chat_role_;
+            applied_chat_message_ = pending_chat_message_;
+        }
         return;
     }
     const char* safe_role = role ? role : "";
@@ -214,15 +238,30 @@ void EmoteDisplay::SetChatMessage(const char* const role, const char* const cont
         std::replace(new_content, new_content + len, static_cast<char>(0x0A), static_cast<char>(0x20));
         emote_set_event_msg(emote_handle_, EMOTE_MGR_EVT_SYS, new_content);
         delete[] new_content;
+        applied_chat_role_ = pending_chat_role_;
+        applied_chat_message_ = pending_chat_message_;
         return;
     }
-    SetOverlayLabel(kCaptionLabel, content, true, kChromeCaptionText, kChromeCaptionBg, true);
+    if (SetOverlayLabel(kCaptionLabel, content, true, kChromeCaptionText,
+                        kChromeCaptionBg, true)) {
+        applied_chat_role_ = pending_chat_role_;
+        applied_chat_message_ = pending_chat_message_;
+    }
+}
+
+void EmoteDisplay::SetEidolonLifecycle(const char* state, const char* detail)
+{
+    SetVoiceChrome("EIDOLON", state ? state : "", "", false);
+    SetChatMessage("system", detail ? detail : "");
 }
 
 void EmoteDisplay::SetStatus(const char* const status)
 {
     ESP_LOGI(TAG, "SetStatus: %s", status);
     if (emote_handle_ && status && strlen(status) > 0) {
+        if (applied_status_ == status) {
+            return;
+        }
         if (std::strcmp(status, Lang::Strings::LISTENING) == 0) {
             emote_set_event_msg(emote_handle_, EMOTE_MGR_EVT_LISTEN, NULL);
         } else if (std::strcmp(status, Lang::Strings::STANDBY) == 0) {
@@ -232,6 +271,7 @@ void EmoteDisplay::SetStatus(const char* const status)
         } else if (std::strcmp(status, Lang::Strings::ERROR) == 0) {
             emote_set_event_msg(emote_handle_, EMOTE_MGR_EVT_SET, NULL);
         }
+        applied_status_ = status;
     }
 }
 
@@ -309,13 +349,37 @@ bool EmoteDisplay::InsertAnimDialog(const char* emoji_name, uint32_t duration_ms
     return false;
 }
 
+void EmoteDisplay::OnAssetsUnloaded()
+{
+    assets_loaded_ = false;
+    applied_emotion_.clear();
+    applied_status_.clear();
+    applied_chat_role_.clear();
+    applied_chat_message_.clear();
+    applied_chrome_mode_.clear();
+    applied_chrome_state_.clear();
+    applied_chrome_action_.clear();
+    applied_chrome_action_visible_ = false;
+    chrome_applied_ = false;
+}
+
 void EmoteDisplay::OnAssetsLoaded()
 {
     assets_loaded_ = true;
-    if (emote_handle_ && !pending_emotion_.empty()) {
-        emote_set_anim_emoji(emote_handle_, pending_emotion_.c_str());
+    if (!EnsureVoiceChromeObjects()) {
+        ESP_LOGE(TAG, "Failed to create Eidolon voice chrome objects");
+    }
+    applied_emotion_.clear();
+    applied_status_.clear();
+    applied_chat_role_.clear();
+    applied_chat_message_.clear();
+    chrome_applied_ = false;
+    if (emote_handle_ && !pending_emotion_.empty() &&
+        emote_set_anim_emoji(emote_handle_, pending_emotion_.c_str()) == ESP_OK) {
+        applied_emotion_ = pending_emotion_;
     }
     ApplyVoiceChrome();
+    SetChatMessage(pending_chat_role_.c_str(), pending_chat_message_.c_str());
 }
 
 void EmoteDisplay::RefreshAll()
@@ -326,31 +390,107 @@ void EmoteDisplay::RefreshAll()
     }
 }
 
+bool EmoteDisplay::EnsureVoiceChromeObjects()
+{
+    if (!emote_handle_) {
+        return false;
+    }
+
+    struct LabelLayout {
+        const char* name;
+        uint8_t align;
+        int16_t x;
+        int16_t y;
+        uint16_t width;
+        uint16_t height;
+        gfx_text_align_t text_align;
+        gfx_label_long_mode_t long_mode;
+        int scroll_speed;
+    };
+    static constexpr LabelLayout kLayouts[] = {
+        {kModeLabel, GFX_ALIGN_TOP_LEFT, 12, 18, 112, 24,
+         GFX_TEXT_ALIGN_LEFT, GFX_LABEL_LONG_CLIP, 0},
+        {kExitLabel, GFX_ALIGN_TOP_RIGHT, -12, 14, 58, 30,
+         GFX_TEXT_ALIGN_CENTER, GFX_LABEL_LONG_CLIP, 0},
+        {kStateLabel, GFX_ALIGN_BOTTOM_MID, 0, -42, 96, 28,
+         GFX_TEXT_ALIGN_CENTER, GFX_LABEL_LONG_CLIP, 0},
+        {kCaptionLabel, GFX_ALIGN_BOTTOM_MID, 0, -10, 292, 30,
+         GFX_TEXT_ALIGN_CENTER, GFX_LABEL_LONG_CLIP, 0},
+    };
+
+    bool success = true;
+    for (const auto& layout : kLayouts) {
+        gfx_obj_t* obj = emote_get_obj_by_name(emote_handle_, layout.name);
+        if (!obj) {
+            // Create after emote_load_assets(): the animation objects already
+            // exist, so these labels remain above the expression scene.
+            obj = emote_create_obj_by_type(emote_handle_, EMOTE_OBJ_TYPE_LABEL,
+                                           layout.name);
+        }
+        if (!obj) {
+            ESP_LOGE(TAG, "Failed to create overlay label: %s", layout.name);
+            success = false;
+            continue;
+        }
+
+        emote_lock(emote_handle_);
+        gfx_obj_align(obj, layout.align, layout.x, layout.y);
+        gfx_obj_set_size(obj, layout.width, layout.height);
+        gfx_label_set_text_align(obj, layout.text_align);
+        gfx_label_set_long_mode(obj, layout.long_mode);
+        if (layout.long_mode == GFX_LABEL_LONG_SCROLL) {
+            gfx_label_set_scroll_speed(obj, layout.scroll_speed);
+            gfx_label_set_scroll_loop(obj, true);
+        }
+        gfx_obj_set_visible(obj, false);
+        emote_unlock(emote_handle_);
+    }
+    return success;
+}
+
 void EmoteDisplay::ApplyVoiceChrome()
 {
     if (!emote_handle_ || !assets_loaded_) {
         return;
     }
-    SetOverlayLabel(kModeLabel, chrome_mode_.c_str(), !chrome_mode_.empty(),
-                    kChromeSubtleText, 0, false);
-    SetOverlayLabel(kStateLabel, chrome_state_.c_str(), !chrome_state_.empty(),
-                    kChromeStateText, kChromeStateBg, true);
-    SetOverlayLabel(kExitLabel, chrome_action_.c_str(), chrome_action_visible_,
-                    kChromeExitText, kChromeExitBg, true);
+    bool success = true;
+    if (!chrome_applied_ || applied_chrome_mode_ != chrome_mode_) {
+        success = SetOverlayLabel(kModeLabel, chrome_mode_.c_str(), !chrome_mode_.empty(),
+                                  kChromeSubtleText, 0, false) && success;
+    }
+    if (!chrome_applied_ || applied_chrome_state_ != chrome_state_) {
+        success = SetOverlayLabel(kStateLabel, chrome_state_.c_str(), !chrome_state_.empty(),
+                                  kChromeStateText, kChromeStateBg, true) && success;
+    }
+    if (!chrome_applied_ || applied_chrome_action_ != chrome_action_ ||
+        applied_chrome_action_visible_ != chrome_action_visible_) {
+        success = SetOverlayLabel(kExitLabel, chrome_action_.c_str(), chrome_action_visible_,
+                                  kChromeExitText, kChromeExitBg, true) && success;
+    }
+    if (success) {
+        applied_chrome_mode_ = chrome_mode_;
+        applied_chrome_state_ = chrome_state_;
+        applied_chrome_action_ = chrome_action_;
+        applied_chrome_action_visible_ = chrome_action_visible_;
+        chrome_applied_ = true;
+    }
 }
 
-void EmoteDisplay::SetOverlayLabel(const char* name, const char* text, bool visible,
+bool EmoteDisplay::SetOverlayLabel(const char* name, const char* text, bool visible,
                                    uint32_t color, uint32_t bg_color, bool bg_enabled)
 {
     if (!emote_handle_ || !assets_loaded_ || !name) {
-        return;
+        return false;
     }
     gfx_obj_t* obj = emote_get_obj_by_name(emote_handle_, name);
     if (!obj) {
         ESP_LOGD(TAG, "Overlay label not found: %s", name);
-        return;
+        return false;
     }
-    emote_lock(emote_handle_);
+    if (emote_lock(emote_handle_) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to lock overlay label: %s", name);
+        return false;
+    }
     gfx_label_set_text(obj, text ? text : "");
     gfx_label_set_color(obj, GFX_COLOR_HEX(color));
     gfx_label_set_bg_enable(obj, bg_enabled);
@@ -360,6 +500,7 @@ void EmoteDisplay::SetOverlayLabel(const char* name, const char* text, bool visi
     }
     gfx_obj_set_visible(obj, visible);
     emote_unlock(emote_handle_);
+    return true;
 }
 
 } // namespace emote

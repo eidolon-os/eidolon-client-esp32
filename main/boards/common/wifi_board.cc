@@ -5,6 +5,9 @@
 #include "system_info.h"
 #include "settings.h"
 #include "assets/lang_config.h"
+#if CONFIG_EIDOLON_HUB_MODE
+#include "eidolon/eidolon_ui_types.h"
+#endif
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -167,12 +170,21 @@ void WifiBoard::StartWifiConfigMode() {
 
     // Show config prompt after a short delay
     Application::GetInstance().Schedule([&wifi_manager]() {
+#if CONFIG_EIDOLON_HUB_MODE && CONFIG_USE_EMOTE_MESSAGE_STYLE
+        std::string hint = "Join ";
+        hint += wifi_manager.GetApSsid();
+        hint += " then open ";
+        hint += wifi_manager.GetApWebUrl();
+        Application::GetInstance().SetEidolonLifecycleUi(
+            eidolon::LifecyclePhase::WifiSetup, hint);
+#else
         std::string hint = Lang::Strings::CONNECT_TO_HOTSPOT;
         hint += wifi_manager.GetApSsid();
         hint += Lang::Strings::ACCESS_VIA_BROWSER;
         hint += wifi_manager.GetApWebUrl();
 
         Application::GetInstance().Alert(Lang::Strings::WIFI_CONFIG_MODE, hint.c_str(), "gear", Lang::Sounds::OGG_WIFICONFIG);
+#endif
     });
 #elif CONFIG_USE_ESP_BLUFI_WIFI_PROVISIONING
     auto &blufi = Blufi::GetInstance();

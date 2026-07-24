@@ -105,6 +105,14 @@ eidolon::GuardService* Application::GetGuardService()
 #endif
 }
 
+void Application::SetEidolonLifecycleUi(eidolon::LifecyclePhase phase,
+                                        const std::string& detail)
+{
+    if (ui_presenter_) {
+        ui_presenter_->SetLifecyclePhase(phase, detail);
+    }
+}
+
 void Application::RequestVoiceJoin()
 {
     ESP_LOGI(TAG, "[voice_request] RequestVoiceJoin transport=%d state=%s",
@@ -282,14 +290,7 @@ void Application::ApplyEidolonDeviceUi(DeviceState state)
     auto& board = Board::GetInstance();
     auto display = board.GetDisplay();
     board.GetLed()->OnStateChanged();
-
-    switch (state) {
-    case kDeviceStateConnecting:
-        display->SetChatMessage("system", "");
-        break;
-    default:
-        break;
-    }
+    (void)state;
     display->UpdateStatusBar(true);
 }
 #else
@@ -318,10 +319,15 @@ void Application::Initialize() {
     // Setup the display
     auto display = board.GetDisplay();
     display->SetupUI();
-    // Print board name/version info
-    display->SetChatMessage("system", Lang::Strings::INITIALIZING);
 
 #if CONFIG_EIDOLON_HUB_MODE
+    // The UI presenter is created before assets/network so it is the sole owner
+    // of every visible Eidolon lifecycle and voice state from this point on.
+    ui_presenter_ = std::make_unique<eidolon::EidolonUiPresenter>(*this);
+    SetEidolonLifecycleUi(eidolon::LifecyclePhase::LoadingAssets);
+    ApplyLocalAssets();
+    SetEidolonLifecycleUi(eidolon::LifecyclePhase::Booting);
+
     {
         eidolon::EidolonDeviceStore device_store;
         if (!device_store.LoadThemeApplied()) {
@@ -331,16 +337,21 @@ void Application::Initialize() {
         }
     }
 
-    ui_presenter_ = std::make_unique<eidolon::EidolonUiPresenter>(*this);
-
     eidolon::VoiceSessionCallbacks callbacks;
     callbacks.on_session_state = [this](eidolon::VoiceSessionState state) {
+        ESP_LOGI(TAG, "[EIDOLON_UI] queue session_state=%s",
+                 eidolon::EidolonVoiceController::VoiceStateName(state));
         Schedule([this, state]() {
             if (!voice_transport_ || !ui_presenter_) {
                 return;
             }
+            ESP_LOGI(TAG, "[EIDOLON_UI] dispatch session_state=%s",
+                     eidolon::EidolonVoiceController::VoiceStateName(state));
             ui_presenter_->Apply(state, voice_transport_->IsMicrophoneEnabled(),
                                  voice_transport_->LastEndReason());
+            if (network_connected_ && hub_activation_done_) {
+                ui_presenter_->SetLifecyclePhase(eidolon::LifecyclePhase::Operational);
+            }
 #if CONFIG_EIDOLON_WAKE_WORD_ENABLE
             OnEidolonVoiceSessionState(state);
 #endif
@@ -383,6 +394,9 @@ void Application::Initialize() {
     voice_transport_ = eidolon::CreateLiveKitVoiceTransport(std::move(callbacks));
 #endif
 #else
+    // Print board name/version info
+    display->SetChatMessage("system", Lang::Strings::INITIALIZING);
+
     // Setup the audio service
     auto codec = board.GetAudioCodec();
     audio_service_.Initialize(codec);
@@ -420,10 +434,23 @@ void Application::Initialize() {
         
         switch (event) {
             case NetworkEvent::Scanning:
+#if CONFIG_EIDOLON_HUB_MODE
+                SetEidolonLifecycleUi(eidolon::LifecyclePhase::WifiScanning);
+#else
                 display->ShowNotification(Lang::Strings::SCANNING_WIFI, 30000);
+#endif
                 xEventGroupSetBits(event_group_, MAIN_EVENT_NETWORK_DISCONNECTED);
                 break;
             case NetworkEvent::Connecting: {
+#if CONFIG_EIDOLON_HUB_MODE
+                std::string detail = "Connecting to Wi-Fi";
+                if (!data.empty()) {
+                    detail += " ";
+                    detail += data;
+                }
+                detail += "...";
+                SetEidolonLifecycleUi(eidolon::LifecyclePhase::WifiConnecting, detail);
+#else
                 if (data.empty()) {
                     // Cellular network - registering without carrier info yet
                     display->SetStatus(Lang::Strings::REGISTERING_NETWORK);
@@ -434,23 +461,38 @@ void Application::Initialize() {
                     msg += "...";
                     display->ShowNotification(msg.c_str(), 30000);
                 }
+#endif
                 break;
             }
             case NetworkEvent::Connected: {
+#if CONFIG_EIDOLON_HUB_MODE
+                SetEidolonLifecycleUi(eidolon::LifecyclePhase::HubDiscovering,
+                                      "Wi-Fi connected");
+#else
                 std::string msg = Lang::Strings::CONNECTED_TO;
                 msg += data;
                 display->ShowNotification(msg.c_str(), 30000);
+#endif
                 xEventGroupSetBits(event_group_, MAIN_EVENT_NETWORK_CONNECTED);
                 break;
             }
             case NetworkEvent::Disconnected:
+#if CONFIG_EIDOLON_HUB_MODE
+                SetEidolonLifecycleUi(eidolon::LifecyclePhase::Offline,
+                                      "Wi-Fi disconnected");
+#endif
                 xEventGroupSetBits(event_group_, MAIN_EVENT_NETWORK_DISCONNECTED);
                 break;
             case NetworkEvent::WifiConfigModeEnter:
-                // WiFi config mode enter is handled by WifiBoard internally
+#if CONFIG_EIDOLON_HUB_MODE
+                SetEidolonLifecycleUi(eidolon::LifecyclePhase::WifiSetup);
+#endif
                 break;
             case NetworkEvent::WifiConfigModeExit:
-                // WiFi config mode exit is handled by WifiBoard internally
+#if CONFIG_EIDOLON_HUB_MODE
+                SetEidolonLifecycleUi(eidolon::LifecyclePhase::WifiScanning,
+                                      "Applying Wi-Fi settings...");
+#endif
                 break;
             // Cellular modem specific events
             case NetworkEvent::ModemDetecting:
@@ -579,9 +621,15 @@ void Application::Run() {
 void Application::HandleNetworkConnectedEvent() {
     ESP_LOGI(TAG, "Network connected");
     auto state = GetDeviceState();
+#if CONFIG_EIDOLON_HUB_MODE
+    network_connected_ = true;
+#endif
 
     if (state == kDeviceStateStarting || state == kDeviceStateWifiConfiguring) {
         // Network is ready, start activation
+#if CONFIG_EIDOLON_HUB_MODE
+        SetEidolonLifecycleUi(eidolon::LifecyclePhase::HubDiscovering);
+#endif
         SetDeviceState(kDeviceStateActivating);
         if (activation_task_handle_ != nullptr) {
             ESP_LOGW(TAG, "Activation task already running");
@@ -599,6 +647,9 @@ void Application::HandleNetworkConnectedEvent() {
         if (voice_transport_) {
             voice_transport_->OnNetworkRestored();
         }
+        if (hub_activation_done_) {
+            SetEidolonLifecycleUi(eidolon::LifecyclePhase::Operational);
+        }
 #endif
     }
 
@@ -609,6 +660,13 @@ void Application::HandleNetworkConnectedEvent() {
 
 void Application::HandleNetworkDisconnectedEvent() {
 #if CONFIG_EIDOLON_HUB_MODE
+    network_connected_ = false;
+    auto state = GetDeviceState();
+    if (state != kDeviceStateStarting &&
+        state != kDeviceStateWifiConfiguring &&
+        state != kDeviceStateActivating) {
+        SetEidolonLifecycleUi(eidolon::LifecyclePhase::Offline);
+    }
     if (voice_transport_) {
         voice_transport_->OnNetworkLost();
     }
@@ -637,14 +695,13 @@ void Application::HandleActivationDoneEvent() {
     SystemInfo::PrintHeapStats();
     SetDeviceState(kDeviceStateIdle);
 
-    auto display = Board::GetInstance().GetDisplay();
     auto& board = Board::GetInstance();
 
 #if CONFIG_EIDOLON_HUB_MODE
     has_server_time_ = false;
+    hub_activation_done_ = true;
     auto app_desc = esp_app_get_description();
-    std::string message = std::string(Lang::Strings::VERSION) + app_desc->version;
-    display->ShowNotification(message.c_str());
+    ESP_LOGI(TAG, "[EIDOLON_UI] firmware ready version=%s", app_desc->version);
     board.SetPowerSaveLevel(PowerSaveLevel::PERFORMANCE);
     if (voice_transport_) {
         voice_transport_->OnActivationComplete();
@@ -658,6 +715,7 @@ void Application::HandleActivationDoneEvent() {
     StartEidolonWakeWord();
 #endif
 #else
+    auto display = board.GetDisplay();
     has_server_time_ = ota_->HasServerTime();
 
     std::string message = std::string(Lang::Strings::VERSION) + ota_->GetCurrentVersion();
@@ -693,9 +751,9 @@ void Application::ActivationTask() {
 
     CheckAssetsVersion();
 
-    auto display = Board::GetInstance().GetDisplay();
+    SetEidolonLifecycleUi(eidolon::LifecyclePhase::HubDiscovering);
     eidolon::HubActivator activator;
-    if (!activator.Run(display)) {
+    if (!activator.Run()) {
         ESP_LOGE(TAG, "Hub activation failed, staying in activating state");
         activation_task_handle_ = nullptr;
         vTaskDelete(NULL);
@@ -712,6 +770,23 @@ void Application::ActivationTask() {
     xEventGroupSetBits(event_group_, MAIN_EVENT_ACTIVATION_DONE);
 }
 
+void Application::ApplyLocalAssets() {
+    if (assets_applied_) {
+        return;
+    }
+    auto& assets = Assets::GetInstance();
+    if (!assets.partition_valid()) {
+        ESP_LOGW(TAG, "Assets partition is disabled for board %s", BOARD_NAME);
+        return;
+    }
+#if CONFIG_EIDOLON_HUB_MODE
+    assets_applied_ = assets.Apply(false);
+#else
+    assets_applied_ = assets.Apply();
+#endif
+    ESP_LOGI(TAG, "[EIDOLON_UI] local assets applied=%d", assets_applied_ ? 1 : 0);
+}
+
 void Application::CheckAssetsVersion() {
     // Only allow CheckAssetsVersion to be called once
     if (assets_version_checked_) {
@@ -720,7 +795,9 @@ void Application::CheckAssetsVersion() {
     assets_version_checked_ = true;
 
     auto& board = Board::GetInstance();
+#if !CONFIG_EIDOLON_HUB_MODE
     auto display = board.GetDisplay();
+#endif
     auto& assets = Assets::GetInstance();
 
     if (!assets.partition_valid()) {
@@ -735,29 +812,54 @@ void Application::CheckAssetsVersion() {
     if (!download_url.empty()) {
         settings.EraseKey("download_url");
 
+#if CONFIG_EIDOLON_HUB_MODE
+        SetEidolonLifecycleUi(eidolon::LifecyclePhase::Updating,
+                              "Downloading UI assets...");
+#endif
+#if !CONFIG_EIDOLON_HUB_MODE
         char message[256];
-        snprintf(message, sizeof(message), Lang::Strings::FOUND_NEW_ASSETS, download_url.c_str());
+        snprintf(message, sizeof(message), Lang::Strings::FOUND_NEW_ASSETS,
+                 download_url.c_str());
         Alert(Lang::Strings::LOADING_ASSETS, message, "cloud_arrow_down", Lang::Sounds::OGG_UPGRADE);
+#endif
         
         // Wait for the audio service to be idle for 3 seconds
         vTaskDelay(pdMS_TO_TICKS(3000));
         SetDeviceState(kDeviceStateUpgrading);
         board.SetPowerSaveLevel(PowerSaveLevel::PERFORMANCE);
+#if !CONFIG_EIDOLON_HUB_MODE
         display->SetChatMessage("system", Lang::Strings::PLEASE_WAIT);
+#endif
 
-        bool success = assets.Download(download_url, [this, display](int progress, size_t speed) -> void {
+        assets_applied_ = false;
+#if CONFIG_EIDOLON_HUB_MODE
+        bool success = assets.Download(download_url, [this](int progress, size_t speed) {
+            char buffer[32];
+            snprintf(buffer, sizeof(buffer), "%d%% %uKB/s", progress, speed / 1024);
+            Schedule([this, message = std::string(buffer)]() {
+                SetEidolonLifecycleUi(eidolon::LifecyclePhase::Updating, message);
+            });
+        });
+#else
+        bool success = assets.Download(download_url, [this, display](int progress, size_t speed) {
             char buffer[32];
             snprintf(buffer, sizeof(buffer), "%d%% %uKB/s", progress, speed / 1024);
             Schedule([display, message = std::string(buffer)]() {
                 display->SetChatMessage("system", message.c_str());
             });
         });
+#endif
 
         board.SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);
         vTaskDelay(pdMS_TO_TICKS(1000));
 
         if (!success) {
+#if CONFIG_EIDOLON_HUB_MODE
+            SetEidolonLifecycleUi(eidolon::LifecyclePhase::Error,
+                                  "UI asset update failed");
+#else
             Alert(Lang::Strings::ERROR, Lang::Strings::DOWNLOAD_ASSETS_FAILED, "circle_xmark", Lang::Sounds::OGG_EXCLAMATION);
+#endif
             vTaskDelay(pdMS_TO_TICKS(2000));
             SetDeviceState(kDeviceStateActivating);
             return;
@@ -765,9 +867,11 @@ void Application::CheckAssetsVersion() {
     }
 
     // Apply assets
-    assets.Apply();
+    ApplyLocalAssets();
+#if !CONFIG_EIDOLON_HUB_MODE
     display->SetChatMessage("system", "");
     display->SetEmotion("microchip_ai");
+#endif
 }
 
 void Application::CheckNewVersion() {
@@ -1363,10 +1467,14 @@ void Application::Reboot() {
 
 bool Application::UpgradeFirmware(const std::string& url, const std::string& version) {
     auto& board = Board::GetInstance();
+#if !CONFIG_EIDOLON_HUB_MODE
     auto display = board.GetDisplay();
+#endif
 
     std::string upgrade_url = url;
+#if !CONFIG_EIDOLON_HUB_MODE
     std::string version_info = version.empty() ? "(Manual upgrade)" : version;
+#endif
 
     // Close audio channel if it's open
     if (protocol_ && protocol_->IsAudioChannelOpened()) {
@@ -1375,18 +1483,35 @@ bool Application::UpgradeFirmware(const std::string& url, const std::string& ver
     }
     ESP_LOGI(TAG, "Starting firmware upgrade from URL: %s", upgrade_url.c_str());
 
+#if CONFIG_EIDOLON_HUB_MODE
+    SetEidolonLifecycleUi(eidolon::LifecyclePhase::Updating,
+                          version.empty() ? "Installing firmware..."
+                                          : "Installing firmware " + version);
+#else
     Alert(Lang::Strings::OTA_UPGRADE, Lang::Strings::UPGRADING, "download", Lang::Sounds::OGG_UPGRADE);
+#endif
     vTaskDelay(pdMS_TO_TICKS(3000));
 
     SetDeviceState(kDeviceStateUpgrading);
 
+#if !CONFIG_EIDOLON_HUB_MODE
     std::string message = std::string(Lang::Strings::NEW_VERSION) + version_info;
     display->SetChatMessage("system", message.c_str());
+#endif
 
     board.SetPowerSaveLevel(PowerSaveLevel::PERFORMANCE);
     audio_service_.Stop();
     vTaskDelay(pdMS_TO_TICKS(1000));
 
+#if CONFIG_EIDOLON_HUB_MODE
+    bool upgrade_success = Ota::Upgrade(upgrade_url, [this](int progress, size_t speed) {
+        char buffer[32];
+        snprintf(buffer, sizeof(buffer), "%d%% %uKB/s", progress, speed / 1024);
+        Schedule([this, message = std::string(buffer)]() {
+            SetEidolonLifecycleUi(eidolon::LifecyclePhase::Updating, message);
+        });
+    });
+#else
     bool upgrade_success = Ota::Upgrade(upgrade_url, [this, display](int progress, size_t speed) {
         char buffer[32];
         snprintf(buffer, sizeof(buffer), "%d%% %uKB/s", progress, speed / 1024);
@@ -1394,19 +1519,35 @@ bool Application::UpgradeFirmware(const std::string& url, const std::string& ver
             display->SetChatMessage("system", message.c_str());
         });
     });
+#endif
 
     if (!upgrade_success) {
         // Upgrade failed, restart audio service and continue running
         ESP_LOGE(TAG, "Firmware upgrade failed, restarting audio service and continuing operation...");
         audio_service_.Start(); // Restart audio service
         board.SetPowerSaveLevel(PowerSaveLevel::LOW_POWER); // Restore power save level
+#if CONFIG_EIDOLON_HUB_MODE
+        SetEidolonLifecycleUi(eidolon::LifecyclePhase::Error,
+                              "Firmware update failed");
+#else
         Alert(Lang::Strings::ERROR, Lang::Strings::UPGRADE_FAILED, "circle_xmark", Lang::Sounds::OGG_EXCLAMATION);
+#endif
         vTaskDelay(pdMS_TO_TICKS(3000));
+#if CONFIG_EIDOLON_HUB_MODE
+        SetEidolonLifecycleUi(network_connected_ && hub_activation_done_
+                                  ? eidolon::LifecyclePhase::Operational
+                                  : eidolon::LifecyclePhase::Offline);
+#endif
         return false;
     } else {
         // Upgrade success, reboot immediately
         ESP_LOGI(TAG, "Firmware upgrade successful, rebooting...");
+#if CONFIG_EIDOLON_HUB_MODE
+        SetEidolonLifecycleUi(eidolon::LifecyclePhase::Updating,
+                              "Update complete. Restarting...");
+#else
         display->SetChatMessage("system", "Upgrade successful, rebooting...");
+#endif
         vTaskDelay(pdMS_TO_TICKS(1000)); // Brief pause to show message
         Reboot();
         return true;

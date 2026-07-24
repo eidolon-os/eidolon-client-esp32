@@ -24,6 +24,7 @@ public:
     void OnTranscription(const TranscriptionEvent& event);
     void OnAgentPhase(AgentPhase phase);
     void OnPttTurnStatus(const std::string& outcome);
+    void SetLifecyclePhase(LifecyclePhase phase, const std::string& detail = "");
     // Push-to-talk: the user is currently holding the talk button (mic recording).
     void SetPttRecording(bool recording);
 
@@ -31,6 +32,7 @@ public:
 
 private:
     void Reapply();
+    void ApplyLifecycle();
     void ApplySnapshot(const EidolonUiSnapshot& snapshot);
     void SyncDeviceState();
     DeviceState MapToDeviceState(VoiceSessionState session_state, AgentPhase phase) const;
@@ -42,6 +44,9 @@ private:
 
     Application& app_;
     AgentSessionTracker tracker_;
+    LifecyclePhase lifecycle_phase_ = LifecyclePhase::Booting;
+    std::string lifecycle_detail_;
+    std::string last_visible_state_;
     VoiceSessionState session_state_ = VoiceSessionState::Idle;
     EndReason end_reason_ = EndReason::None;
     bool mic_enabled_ = true;

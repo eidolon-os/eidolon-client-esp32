@@ -4,6 +4,7 @@
 #include "board.h"
 #include "device_state.h"
 #include "display.h"
+#include "eidolon_ui_labels.h"
 #include "eidolon_view.h"
 #include "ui_state_mapper.h"
 
@@ -24,44 +25,6 @@ namespace {
 
 constexpr uint64_t kCommitTimeoutUs =
     static_cast<uint64_t>(CONFIG_EIDOLON_PTT_COMMIT_UI_TIMEOUT_MS) * 1000ULL;
-
-const char* CompactStateLabel(const EidolonUiSnapshot& snapshot)
-{
-    switch (snapshot.connection) {
-    case ConnectionPhase::Connecting:
-        return "JOINING";
-    case ConnectionPhase::Reconnecting:
-        return "REJOIN";
-    case ConnectionPhase::Unreachable:
-        return "OFFLINE";
-    case ConnectionPhase::Error:
-        return "ERROR";
-    case ConnectionPhase::InRoom:
-        switch (snapshot.turn) {
-        case TurnPhase::Recording:
-        case TurnPhase::UserSpeaking:
-            return "LISTEN";
-        case TurnPhase::Committing:
-        case TurnPhase::AgentThinking:
-            return "THINK";
-        case TurnPhase::AgentSpeaking:
-            return "SPEAK";
-        case TurnPhase::Idle:
-        default:
-            return "LISTEN";
-        }
-    case ConnectionPhase::Ready:
-        return "READY";
-    case ConnectionPhase::Offline:
-    default:
-        return "OFFLINE";
-    }
-}
-
-const char* CompactModeLabel(const EidolonUiSnapshot& snapshot)
-{
-    return snapshot.mode == InteractionMode::PushToTalk ? "PTT" : "FULL DUPLEX";
-}
 }
 
 EidolonUiPresenter::EidolonUiPresenter(Application& app) : app_(app)
@@ -145,6 +108,9 @@ void EidolonUiPresenter::SyncDeviceState()
 void EidolonUiPresenter::Apply(VoiceSessionState session_state, bool mic_enabled,
                                EndReason end_reason)
 {
+    ESP_LOGI(TAG, "[EIDOLON_UI] apply session_state=%s end_reason=%d",
+             EidolonVoiceController::VoiceStateName(session_state),
+             static_cast<int>(end_reason));
     session_state_ = session_state;
     end_reason_ = end_reason;
     mic_enabled_ = mic_enabled;
@@ -160,12 +126,7 @@ void EidolonUiPresenter::Apply(VoiceSessionState session_state, bool mic_enabled
         tracker_.OnRoomDisconnected();
     }
 
-    auto snapshot = UiStateMapper::Map(session_state, tracker_.GetPhase(),
-                                       tracker_.LastTranscription(),
-                                       tracker_.LastTranscriptionSource(), mic_enabled,
-                                       ptt_recording_, ptt_committing_, {}, end_reason_);
-    ApplySnapshot(snapshot);
-    SyncDeviceState();
+    Reapply();
 }
 
 void EidolonUiPresenter::OnTranscription(const TranscriptionEvent& event)
@@ -228,6 +189,25 @@ void EidolonUiPresenter::OnPttTurnStatus(const std::string& outcome)
     Reapply();
 }
 
+void EidolonUiPresenter::SetLifecyclePhase(LifecyclePhase phase, const std::string& detail)
+{
+    if (lifecycle_phase_ == phase && lifecycle_detail_ == detail) {
+        return;
+    }
+    const auto old_phase = lifecycle_phase_;
+    lifecycle_phase_ = phase;
+    lifecycle_detail_ = detail;
+    ESP_LOGI(TAG, "[EIDOLON_UI] lifecycle %s -> %s detail=%s",
+             LifecycleLabel(old_phase), LifecycleLabel(phase),
+             lifecycle_detail_.empty() ? DefaultLifecycleDetail(phase)
+                                       : lifecycle_detail_.c_str());
+    if (phase == LifecyclePhase::Operational) {
+        Reapply();
+    } else {
+        ApplyLifecycle();
+    }
+}
+
 void EidolonUiPresenter::SetPttRecording(bool recording)
 {
     if (ptt_recording_ == recording) {
@@ -246,12 +226,34 @@ void EidolonUiPresenter::SetPttRecording(bool recording)
 
 void EidolonUiPresenter::Reapply()
 {
+    if (lifecycle_phase_ != LifecyclePhase::Operational) {
+        ApplyLifecycle();
+        return;
+    }
     auto snapshot = UiStateMapper::Map(session_state_, tracker_.GetPhase(),
                                        tracker_.LastTranscription(),
                                        tracker_.LastTranscriptionSource(), mic_enabled_,
                                        ptt_recording_, ptt_committing_, {}, end_reason_);
-    ApplySnapshot(snapshot);
+    // Functional input routing must not sit behind a potentially slow display
+    // backend. The UI is a projection of session state, not its owner.
     SyncDeviceState();
+    ApplySnapshot(snapshot);
+}
+
+void EidolonUiPresenter::ApplyLifecycle()
+{
+    auto display = Board::GetInstance().GetDisplay();
+    if (!display) {
+        return;
+    }
+    const char* state = LifecycleLabel(lifecycle_phase_);
+    const char* detail = lifecycle_detail_.empty() ? DefaultLifecycleDetail(lifecycle_phase_)
+                                                   : lifecycle_detail_.c_str();
+    if (last_visible_state_ != state) {
+        ESP_LOGI(TAG, "[EIDOLON_UI] visible state=%s source=lifecycle", state);
+        last_visible_state_ = state;
+    }
+    display->SetEidolonLifecycle(state, detail);
 }
 
 void EidolonUiPresenter::ApplySnapshot(const EidolonUiSnapshot& snapshot)
@@ -265,7 +267,15 @@ void EidolonUiPresenter::ApplySnapshot(const EidolonUiSnapshot& snapshot)
     if (!display) {
         return;
     }
-    display->SetVoiceChrome(CompactModeLabel(snapshot), CompactStateLabel(snapshot), "EXIT",
+    const char* state = CompactStateLabel(snapshot);
+    if (last_visible_state_ != state) {
+        ESP_LOGI(TAG,
+                 "[EIDOLON_UI] visible state=%s source=voice pairing=%d connection=%d turn=%d",
+                 state, static_cast<int>(snapshot.pairing),
+                 static_cast<int>(snapshot.connection), static_cast<int>(snapshot.turn));
+        last_visible_state_ = state;
+    }
+    display->SetVoiceChrome(EidolonBrandLabel(), state, "EXIT",
                             snapshot.connection == ConnectionPhase::InRoom);
     if (snapshot.emotion && snapshot.emotion[0] != '\0') {
         display->SetEmotion(snapshot.emotion);
@@ -273,10 +283,13 @@ void EidolonUiPresenter::ApplySnapshot(const EidolonUiSnapshot& snapshot)
     if (snapshot.status_text && snapshot.status_text[0] != '\0') {
         display->SetStatus(snapshot.status_text);
     }
-    if (snapshot.subtitle && snapshot.subtitle[0] != '\0') {
-        display->SetChatMessage(snapshot.subtitle_role ? snapshot.subtitle_role : "system",
-                                snapshot.subtitle);
-    }
+    const bool conversation_visible = snapshot.pairing == PairingStatus::Active &&
+                                      snapshot.connection == ConnectionPhase::InRoom;
+    const bool has_subtitle = conversation_visible && snapshot.subtitle &&
+                              snapshot.subtitle[0] != '\0';
+    display->SetChatMessage(has_subtitle && snapshot.subtitle_role ? snapshot.subtitle_role
+                                                                   : "system",
+                            has_subtitle ? snapshot.subtitle : CompactVoiceDetail(snapshot));
 }
 
 }  // namespace eidolon

@@ -1074,6 +1074,7 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/device_identity.cc"
         "eidolon/eidolon_lvgl_theme.cc"
         "eidolon/fonts/font_eidolon_ui_30.c"
+        "eidolon/eidolon_ui_labels.cc"
         "eidolon/eidolon_ui_presenter.cc"
         "eidolon/eidolon_view.cc"
         "eidolon/hub_activator.cc"
@@ -1454,6 +1455,16 @@ if ("${size}" AND "${offset}")
 
         if(EMOTE_EXTERNAL_PATH)
             build_speaker_assets_bin("${ASSETS_PARTITION}" ${EMOTE_RESOLUTION} ${ASSETS_FILE} ${CONFIG_MMAP_FILE_NAME_LENGTH} "${EMOTE_EXTERNAL_PATH}")
+            # The upstream helper only depends on its Python packer, so changes
+            # to a board's external layout/emote files otherwise leave a stale
+            # expression_assets.bin in incremental builds.
+            file(GLOB_RECURSE EMOTE_EXTERNAL_ASSET_FILES CONFIGURE_DEPENDS
+                "${EMOTE_EXTERNAL_PATH}/*")
+            add_custom_command(
+                OUTPUT ${ASSETS_FILE}
+                APPEND
+                DEPENDS ${EMOTE_EXTERNAL_ASSET_FILES}
+            )
         else()
             build_speaker_assets_bin("${ASSETS_PARTITION}" ${EMOTE_RESOLUTION} ${ASSETS_FILE} ${CONFIG_MMAP_FILE_NAME_LENGTH})
         endif()

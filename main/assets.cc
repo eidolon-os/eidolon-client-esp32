@@ -390,6 +390,7 @@ void Assets::EmoteStrategy::UnApplyPartition(Assets* assets) {
     auto display = Board::GetInstance().GetDisplay();
     auto* emote_display = dynamic_cast<emote::EmoteDisplay*>(display);
     if (emote_display && emote_display->GetEmoteHandle() != nullptr) {
+        emote_display->OnAssetsUnloaded();
         emote_unmount_assets(emote_display->GetEmoteHandle());
     }
     (void)assets; // Unused parameter
