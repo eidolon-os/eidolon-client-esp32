@@ -9,6 +9,7 @@
 #include "mcp_server.h"
 #include "assets.h"
 #include "settings.h"
+#include "eidolon/eidolon_build_stamp.h"
 
 #if CONFIG_EIDOLON_HUB_MODE
 #include "eidolon/eidolon_audio_input.h"
@@ -303,6 +304,14 @@ bool Application::SetDeviceState(DeviceState state) {
 }
 
 void Application::Initialize() {
+    // One-line build fingerprint (git commit / branch / LiveKit SDK), printed early
+    // and unconditionally on every boot so we can confirm exactly which firmware +
+    // SDK the device is running — PROJECT_VER alone is a static "1.0.0".
+    // eidolon-common.sh reads this back over serial after flashing to catch a
+    // stale binary / wrong flash path / cached SDK.
+    ESP_LOGW(TAG, "EIDOLON-BUILDSTAMP git=%s sdk=%s branch=%s built=%s %s",
+             EIDOLON_BUILD_GIT, EIDOLON_BUILD_SDK, EIDOLON_BUILD_BRANCH, __DATE__, __TIME__);
+
     auto& board = Board::GetInstance();
     SetDeviceState(kDeviceStateStarting);
 
@@ -349,6 +358,15 @@ void Application::Initialize() {
             if (ui_presenter_) {
                 ui_presenter_->OnAgentPhase(phase);
             }
+            // Motor-rail noise gate (StackChan): in half_duplex the mic is hot for
+            // uplink in every phase except while the agent is speaking (the mic is
+            // closed then). Cut the board's servo power rail whenever the mic is hot
+            // so its switching whine can't rail the ADC and drown out near-end speech;
+            // restore it when the agent speaks so the head can animate. No-op on boards
+            // without a noisy motor rail.
+            const bool mic_hot = phase != eidolon::AgentPhase::AgentSpeaking &&
+                                 (!voice_transport_ || voice_transport_->IsMicrophoneEnabled());
+            Board::GetInstance().SetCaptureQuiet(mic_hot);
         });
     };
     callbacks.on_ptt_turn_status = [this](const std::string& outcome) {

@@ -465,6 +465,11 @@ public:
     void HeadStop() override {
         if (body_) body_->Stop();
     }
+    // Mic-capture noise gate: while the mic is hot, cut the servo power rail so its
+    // switching whine can't corrupt the uplink (head goes limp during capture).
+    void SetCaptureQuiet(bool quiet) override {
+        if (body_) body_->SetCaptureQuiet(quiet);
+    }
     void RgbEffect(const char* effect) override {
         if (!body_) return;
         if (effect != nullptr && std::strcmp(effect, "off") == 0) {

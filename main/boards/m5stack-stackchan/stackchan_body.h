@@ -46,6 +46,14 @@ public:
     // the head goes limp. Highest motion priority. The next command re-engages torque.
     void Stop();
 
+    // Mic-capture quiet gate. quiet=true cuts the servo power rail (PY32 VM EN) so the
+    // servo DC-DC/PWM switching whine can't couple into the on-board mic during uplink
+    // capture (head goes limp); quiet=false restores the rail so motion can resume.
+    // Idle torque-release alone does NOT silence it — the rail keeps switching — so the
+    // rail itself must be powered down. While quiet, motion commands are dropped and the
+    // 50 Hz animation tick is skipped (the servos are unpowered).
+    void SetCaptureQuiet(bool quiet);
+
     // Discrete expressive gesture: name in {nod, shake, perk_up, droop, glance}.
     // Runs a short motion sequence in a one-shot task; a new gesture is dropped while
     // one is running. Unused params per gesture are ignored.
@@ -78,6 +86,10 @@ private:
     std::unique_ptr<stackchan::motion::Motion> motion_;
     SemaphoreHandle_t motion_mutex_ = nullptr;
     bool ready_ = false;
+    // True while the mic is hot for uplink: the servo power rail is cut and motion is
+    // suppressed so servo switching whine can't corrupt the captured audio. Read on the
+    // 50 Hz update tick and by the motion command guards; written under motion_mutex_.
+    volatile bool capture_quiet_ = false;
 
     // Pending gesture params, consumed by the one-shot gesture task. Guarded by
     // gesture_busy_ (only one gesture runs at a time).

@@ -127,17 +127,48 @@ void StackChanBody::UpdateLoop() {
     for (;;) {
         {
             MutexGuard lock(motion_mutex_);
-            if (motion_) motion_->update();
+            // While the mic is hot the servo rail is powered down for silent capture:
+            // the servos are dead, so skip the animation tick (driving the SCSCL bus
+            // now would write to unpowered servos and can stall the UART). capture_quiet_
+            // is read under the mutex so it stays consistent with the rail state set in
+            // SetCaptureQuiet().
+            if (motion_ && !capture_quiet_) motion_->update();
         }
         // Guardrail: a look_at with ttl_ms returns home when its hold expires. Enforced
         // here (not in the caller) so no motion source can hold the head off-center past
         // its TTL. GoHome takes the mutex itself, so call it outside the block above.
-        int64_t deadline = look_at_deadline_us_;
-        if (deadline != 0 && esp_timer_get_time() >= deadline) {
-            look_at_deadline_us_ = 0;
-            GoHome();
+        // Skipped while quiet (no power / no motion to unwind).
+        if (!capture_quiet_) {
+            int64_t deadline = look_at_deadline_us_;
+            if (deadline != 0 && esp_timer_get_time() >= deadline) {
+                look_at_deadline_us_ = 0;
+                GoHome();
+            }
         }
         vTaskDelay(pdMS_TO_TICKS(20));
+    }
+}
+
+void StackChanBody::SetCaptureQuiet(bool quiet) {
+    if (!ready_ || !ioe_) return;
+    MutexGuard lock(motion_mutex_);
+    if (quiet == capture_quiet_) return;
+    capture_quiet_ = quiet;
+    if (quiet) {
+        // Mic went hot: cut torque (head limp) while the rail is still up, then drop the
+        // servo power rail (PY32 VM EN). The rail's switching whine is the noise source;
+        // powering it down is the only thing that silences it. Head droop while listening
+        // is the accepted trade-off.
+        look_at_deadline_us_ = 0;
+        if (motion_) motion_->freeze();
+        ioe_->digitalWrite(PY32_SERVO_POWER_PIN, false);
+        ESP_LOGI(TAG, "capture quiet: servo rail off (silent mic)");
+    } else {
+        // Mic closed (agent speaking / not capturing): restore the rail so motion can
+        // resume. Torque stays released until the next motion command re-engages it; the
+        // servos need a short boot before they track again.
+        ioe_->digitalWrite(PY32_SERVO_POWER_PIN, true);
+        ESP_LOGI(TAG, "capture live: servo rail on");
     }
 }
 
@@ -147,7 +178,7 @@ bool StackChanBody::GestureContinue(int delay_ms) {
 }
 
 void StackChanBody::SetHeadAngles(float yaw_deg, float pitch_deg, int speed) {
-    if (!ready_) return;
+    if (!ready_ || capture_quiet_) return;  // rail down during capture -> head limp
     look_at_deadline_us_ = 0;  // any explicit angle move supersedes a look_at TTL hold
     MutexGuard lock(motion_mutex_);
     motion_->moveWithSpeed(static_cast<int>(std::lround(yaw_deg * 10.0f)),
@@ -155,7 +186,7 @@ void StackChanBody::SetHeadAngles(float yaw_deg, float pitch_deg, int speed) {
 }
 
 void StackChanBody::LookAtNormalized(float x, float y, int speed, int ttl_ms) {
-    if (!ready_) return;
+    if (!ready_ || capture_quiet_) return;  // rail down during capture -> head limp
     MutexGuard lock(motion_mutex_);
     motion_->lookAtNormalized(x, y, speed);
     // Arm the return-home guardrail; 0 = hold until the next command moves the head.
@@ -171,7 +202,10 @@ void StackChanBody::Stop() {
     gesture_abort_ = true;  // set before the lock so a mid-step gesture bails out
     MutexGuard lock(motion_mutex_);
     look_at_deadline_us_ = 0;
-    motion_->freeze();  // freeze animation + cut torque -> head limp (safety.stop = 断使能)
+    // While quiet the rail is down and the head is already limp; skip the bus write.
+    if (!capture_quiet_ && motion_) {
+        motion_->freeze();  // freeze animation + cut torque -> head limp (safety.stop = 断使能)
+    }
 }
 
 void StackChanBody::SetAllLeds(uint8_t r, uint8_t g, uint8_t b) {
@@ -249,7 +283,7 @@ void StackChanBody::StartSelfTest() {
 
 void StackChanBody::HeadGesture(const std::string& name, int times, float x, float y,
                                 int hold_ms, int return_ms) {
-    if (!ready_ || gesture_busy_) return;  // drop if a gesture is already running
+    if (!ready_ || gesture_busy_ || capture_quiet_) return;  // drop if busy or rail down (capture)
     gesture_.name = name;
     gesture_.times = times;
     gesture_.x = x;

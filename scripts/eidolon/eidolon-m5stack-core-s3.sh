@@ -40,6 +40,11 @@ readonly SCRIPT_LABEL="eidolon-m5stack-core-s3"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
+# Shared helper: SDK version pin + forced re-resolution, build fingerprint,
+# post-flash serial verification. See scripts/eidolon/eidolon-common.sh.
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/eidolon-common.sh"
+
 INTERACTIVE=0
 BOARD_AUTO_CONFIGURED=0
 IDF_EXPORT_FILE=""
@@ -629,6 +634,7 @@ cmd_build() {
   configure_target
   ensure_board_sdkconfig
   verify_board_sdkconfig
+  eidolon_prepare_build "${PROJECT_ROOT}"
   run idf.py \
     -DBOARD_NAME="${BOARD_NAME}" \
     -DBOARD_TYPE="${BOARD_PATH}" \
@@ -705,6 +711,7 @@ erase_partitions() {
 
 cmd_flash() {
   require_idf
+  eidolon_prepare_build "${PROJECT_ROOT}"
   if ! PORT="$(detect_port)"; then
     echo "error: 未找到串口" >&2
     return 1
@@ -1061,6 +1068,11 @@ dispatch_cli() {
       auto_configure_board 1 || true
       parse_flash_args "$@"
       cmd_flash
+      eidolon_verify_flashed "${PROJECT_ROOT}" "${PORT}"
+      ;;
+    verify)
+      if ! PORT="$(detect_port)"; then die "未找到串口"; fi
+      eidolon_verify_flashed "${PROJECT_ROOT}" "${PORT}"
       ;;
     monitor)
       auto_configure_board 1 || true

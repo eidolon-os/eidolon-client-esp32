@@ -107,6 +107,13 @@ public:
     // Emergency stop: cut head-servo torque and preempt any running gesture.
     virtual void HeadStop() {}
 
+    // Mic-capture noise gate for boards whose motor/servo power rail whines into
+    // the on-board mic (e.g. StackChan). `quiet=true` while the mic is hot for
+    // uplink so the board can power the rail down (head goes limp) and keep the
+    // captured audio clean; `quiet=false` when the mic is closed so motion can
+    // resume. No-op on boards without a noisy body.
+    virtual void SetCaptureQuiet(bool quiet) { (void)quiet; }
+
     // Board-local decorative feedback (RGB ring / screen avatar) used by the
     // owner-presence reflex. No-ops on boards without them. `effect`: "wake"
     // (marquee) / "off". `emotion`: a short-lived face pulse for ttl_ms.

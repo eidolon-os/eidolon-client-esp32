@@ -9,6 +9,8 @@ sdkconfig.old
 sdkconfig
 dependencies.lock
 .env
+.eidolon_expected_stamp
+main/eidolon/eidolon_build_stamp.gen.h
 releases/
 reports/aec_qualification/
 main/assets/lang_config.h

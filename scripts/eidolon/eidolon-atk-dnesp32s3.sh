@@ -25,6 +25,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PORT="${EIDOLON_PORT:-}"
 
+# Shared helper: SDK version pin + forced re-resolution, build fingerprint,
+# post-flash serial verification. See scripts/eidolon/eidolon-common.sh.
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/eidolon-common.sh"
+
 die() {
   echo "error: $*" >&2
   exit 1
@@ -330,25 +335,30 @@ Usage: $0 <command>
 
 Commands:
   build       Build ATK-DNESP32S3 Eidolon firmware
-  flash       Flash ATK-DNESP32S3 Eidolon firmware
+  flash       Flash ATK-DNESP32S3 Eidolon firmware (auto-verifies the build stamp)
   monitor     Open idf.py monitor
+  verify      Read the boot build stamp over serial and diff vs the last build
   clean       Remove ${BUILD_DIR}
   list-ports  Print detected serial ports
 
 Environment:
   EIDOLON_PORT=/dev/cu.usbmodemXXXX
+  EIDOLON_LIVEKIT_SDK=0.3.7   Pin the LiveKit SDK version (forces clean re-resolve)
 EOF
 }
 
 cmd="${1:-build}"
 case "${cmd}" in
   build)
+    eidolon_prepare_build "${PROJECT_ROOT}"
     run_idf build
     ;;
   flash)
     PORT="$(detect_port)"
     info "Using serial port: ${PORT}"
+    eidolon_prepare_build "${PROJECT_ROOT}"
     run_idf -p "${PORT}" flash
+    eidolon_verify_flashed "${PROJECT_ROOT}" "${PORT}"
     ;;
   monitor)
     PORT="$(detect_port)"
@@ -360,6 +370,10 @@ case "${cmd}" in
     ;;
   list-ports)
     list_ports
+    ;;
+  verify)
+    PORT="$(detect_port)"
+    eidolon_verify_flashed "${PROJECT_ROOT}" "${PORT}"
     ;;
   help|-h|--help)
     usage
