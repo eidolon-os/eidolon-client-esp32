@@ -25,6 +25,13 @@ private:
     std::string name_;
 };
 
+enum class PresenceState {
+    Unavailable,
+    Calibrating,
+    Vacant,
+    Present,
+};
+
 class Display {
 public:
     Display();
@@ -40,6 +47,7 @@ public:
     virtual void SetEidolonLifecycle(const char* state, const char* detail);
     virtual void SetVoiceChrome(const char* mode, const char* state, const char* action,
                                 bool action_visible);
+    virtual void SetPresenceState(PresenceState state);
     virtual void ClearChatMessages();
     virtual void SetTheme(Theme* theme);
     virtual Theme* GetTheme() { return current_theme_; }

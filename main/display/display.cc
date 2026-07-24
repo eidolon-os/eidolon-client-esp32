@@ -58,6 +58,10 @@ void Display::SetVoiceChrome(const char* mode, const char* state, const char* ac
     (void)action_visible;
 }
 
+void Display::SetPresenceState(PresenceState state) {
+    (void)state;
+}
+
 void Display::ClearChatMessages() {
     // Default empty implementation, override in subclasses if needed
 }

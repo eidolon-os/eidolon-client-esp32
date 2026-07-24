@@ -9,6 +9,7 @@
 #include "esp_lcd_touch_tt21100.h"
 #include "application.h"
 #include "button.h"
+#include "box3_radar_presence.h"
 #include "config.h"
 
 #include <esp_log.h>
@@ -50,6 +51,8 @@ private:
     };
 
     i2c_master_bus_handle_t i2c_bus_;
+    i2c_master_bus_handle_t sensor_i2c_bus_ = nullptr;
+    std::unique_ptr<Box3RadarPresence> radar_presence_;
     Button boot_button_;
     Display* display_;
     esp_lcd_touch_handle_t touch_ = nullptr;
@@ -79,6 +82,57 @@ private:
             },
         };
         ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_cfg, &i2c_bus_));
+    }
+
+    void InitializeSensorDock() {
+        i2c_master_bus_config_t sensor_bus_config = {
+            .i2c_port = I2C_NUM_0,
+            .sda_io_num = SENSOR_DOCK_I2C_SDA_PIN,
+            .scl_io_num = SENSOR_DOCK_I2C_SCL_PIN,
+            .clk_source = I2C_CLK_SRC_DEFAULT,
+            .glitch_ignore_cnt = 7,
+            .intr_priority = 0,
+            .trans_queue_depth = 0,
+            .flags = {
+                .enable_internal_pullup = 1,
+            },
+        };
+        esp_err_t err = i2c_new_master_bus(&sensor_bus_config, &sensor_i2c_bus_);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "[radar] sensor I2C init failed: %s", esp_err_to_name(err));
+            display_->SetPresenceState(PresenceState::Unavailable);
+            return;
+        }
+
+        radar_presence_ = std::make_unique<Box3RadarPresence>();
+        err = radar_presence_->Start(sensor_i2c_bus_, [](RadarPresenceState state) {
+            PresenceState display_state = PresenceState::Unavailable;
+            switch (state) {
+            case RadarPresenceState::Calibrating:
+                display_state = PresenceState::Calibrating;
+                break;
+            case RadarPresenceState::Vacant:
+                display_state = PresenceState::Vacant;
+                break;
+            case RadarPresenceState::Present:
+                display_state = PresenceState::Present;
+                break;
+            case RadarPresenceState::Unavailable:
+            default:
+                break;
+            }
+            Application::GetInstance().Schedule([display_state]() {
+                if (auto* display = Board::GetInstance().GetDisplay()) {
+                    display->SetPresenceState(display_state);
+                }
+            });
+        });
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "[radar] presence monitor start failed: %s",
+                     esp_err_to_name(err));
+            radar_presence_.reset();
+            display_->SetPresenceState(PresenceState::Unavailable);
+        }
     }
 
     void InitializeSpi() {
@@ -333,6 +387,7 @@ public:
         InitializeIli9341Display();
         InitializeTouch();
         InitializeButtons();
+        InitializeSensorDock();
         GetBacklight()->RestoreBrightness();
     }
 

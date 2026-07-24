@@ -45,11 +45,18 @@ static constexpr uint32_t kChromeExitText = 0xFF6B6B;
 static constexpr uint32_t kChromeExitBg = 0x2B0E14;
 static constexpr uint32_t kChromeCaptionText = 0xE5E7EB;
 static constexpr uint32_t kChromeCaptionBg = 0x111827;
+static constexpr uint32_t kPresenceMutedText = 0x94A3B8;
+static constexpr uint32_t kPresenceMutedBg = 0x172033;
+static constexpr uint32_t kPresenceWarmupText = 0xFACC15;
+static constexpr uint32_t kPresenceWarmupBg = 0x332A0A;
+static constexpr uint32_t kPresenceActiveText = 0x86EFAC;
+static constexpr uint32_t kPresenceActiveBg = 0x12351F;
 
 static constexpr const char* kModeLabel = "eidolon_mode_label";
 static constexpr const char* kStateLabel = "eidolon_state_label";
 static constexpr const char* kExitLabel = "eidolon_exit_label";
 static constexpr const char* kCaptionLabel = "eidolon_caption_label";
+static constexpr const char* kPresenceLabel = "eidolon_presence_label";
 
 // ============================================================================
 // Forward Declarations
@@ -262,15 +269,10 @@ void EmoteDisplay::SetStatus(const char* const status)
         if (applied_status_ == status) {
             return;
         }
-        if (std::strcmp(status, Lang::Strings::LISTENING) == 0) {
-            emote_set_event_msg(emote_handle_, EMOTE_MGR_EVT_LISTEN, NULL);
-        } else if (std::strcmp(status, Lang::Strings::STANDBY) == 0) {
-            emote_set_event_msg(emote_handle_, EMOTE_MGR_EVT_IDLE, NULL);
-        } else if (std::strcmp(status, Lang::Strings::SPEAKING) == 0) {
-            emote_set_event_msg(emote_handle_, EMOTE_MGR_EVT_SPEAK, NULL);
-        } else if (std::strcmp(status, Lang::Strings::ERROR) == 0) {
-            emote_set_event_msg(emote_handle_, EMOTE_MGR_EVT_SET, NULL);
-        }
+        // Eidolon owns state text and expression selection. The legacy emote
+        // events also paint a microphone/speaker icon in the top-left corner,
+        // which is now reserved for the radar presence badge.
+        HideLegacyStatusObjects();
         applied_status_ = status;
     }
 }
@@ -291,6 +293,15 @@ void EmoteDisplay::SetVoiceChrome(const char* mode, const char* state, const cha
     chrome_action_ = action ? action : "";
     chrome_action_visible_ = action_visible && !chrome_action_.empty();
     ApplyVoiceChrome();
+}
+
+void EmoteDisplay::SetPresenceState(PresenceState state)
+{
+    if (presence_state_ == state && presence_applied_) {
+        return;
+    }
+    presence_state_ = state;
+    ApplyPresenceState();
 }
 
 void EmoteDisplay::UpdateStatusBar(bool update_all)
@@ -361,6 +372,7 @@ void EmoteDisplay::OnAssetsUnloaded()
     applied_chrome_action_.clear();
     applied_chrome_action_visible_ = false;
     chrome_applied_ = false;
+    presence_applied_ = false;
 }
 
 void EmoteDisplay::OnAssetsLoaded()
@@ -369,6 +381,7 @@ void EmoteDisplay::OnAssetsLoaded()
     if (!EnsureVoiceChromeObjects()) {
         ESP_LOGE(TAG, "Failed to create Eidolon voice chrome objects");
     }
+    HideLegacyStatusObjects();
     applied_emotion_.clear();
     applied_status_.clear();
     applied_chat_role_.clear();
@@ -379,6 +392,7 @@ void EmoteDisplay::OnAssetsLoaded()
         applied_emotion_ = pending_emotion_;
     }
     ApplyVoiceChrome();
+    ApplyPresenceState();
     SetChatMessage(pending_chat_role_.c_str(), pending_chat_message_.c_str());
 }
 
@@ -408,13 +422,15 @@ bool EmoteDisplay::EnsureVoiceChromeObjects()
         int scroll_speed;
     };
     static constexpr LabelLayout kLayouts[] = {
-        {kModeLabel, GFX_ALIGN_TOP_LEFT, 12, 18, 112, 24,
-         GFX_TEXT_ALIGN_LEFT, GFX_LABEL_LONG_CLIP, 0},
-        {kExitLabel, GFX_ALIGN_TOP_RIGHT, -12, 14, 58, 30,
+        {kPresenceLabel, GFX_ALIGN_TOP_LEFT, 8, 10, 98, 26,
          GFX_TEXT_ALIGN_CENTER, GFX_LABEL_LONG_CLIP, 0},
-        {kStateLabel, GFX_ALIGN_BOTTOM_MID, 0, -42, 96, 28,
+        {kModeLabel, GFX_ALIGN_TOP_MID, 0, 8, 92, 22,
          GFX_TEXT_ALIGN_CENTER, GFX_LABEL_LONG_CLIP, 0},
-        {kCaptionLabel, GFX_ALIGN_BOTTOM_MID, 0, -10, 292, 30,
+        {kExitLabel, GFX_ALIGN_TOP_RIGHT, -8, 8, 58, 28,
+         GFX_TEXT_ALIGN_CENTER, GFX_LABEL_LONG_CLIP, 0},
+        {kStateLabel, GFX_ALIGN_TOP_MID, 0, 34, 100, 28,
+         GFX_TEXT_ALIGN_CENTER, GFX_LABEL_LONG_CLIP, 0},
+        {kCaptionLabel, GFX_ALIGN_BOTTOM_MID, 0, -4, 300, 26,
          GFX_TEXT_ALIGN_CENTER, GFX_LABEL_LONG_CLIP, 0},
     };
 
@@ -474,6 +490,65 @@ void EmoteDisplay::ApplyVoiceChrome()
         applied_chrome_action_visible_ = chrome_action_visible_;
         chrome_applied_ = true;
     }
+}
+
+void EmoteDisplay::ApplyPresenceState()
+{
+    if (!emote_handle_ || !assets_loaded_ ||
+        (presence_applied_ && applied_presence_state_ == presence_state_)) {
+        return;
+    }
+
+    const char* text = "RADAR --";
+    uint32_t text_color = kPresenceMutedText;
+    uint32_t bg_color = kPresenceMutedBg;
+    switch (presence_state_) {
+    case PresenceState::Calibrating:
+        text = "RADAR ...";
+        text_color = kPresenceWarmupText;
+        bg_color = kPresenceWarmupBg;
+        break;
+    case PresenceState::Vacant:
+        text = "VACANT";
+        break;
+    case PresenceState::Present:
+        text = "PRESENT";
+        text_color = kPresenceActiveText;
+        bg_color = kPresenceActiveBg;
+        break;
+    case PresenceState::Unavailable:
+    default:
+        break;
+    }
+    if (SetOverlayLabel(kPresenceLabel, text, true, text_color, bg_color, true)) {
+        applied_presence_state_ = presence_state_;
+        presence_applied_ = true;
+    }
+}
+
+void EmoteDisplay::HideLegacyStatusObjects()
+{
+    if (!emote_handle_ || !assets_loaded_) {
+        return;
+    }
+    static constexpr const char* kLegacyObjects[] = {
+        "status_icon",
+        "charge_icon",
+        "battery_label",
+        "clock_label",
+        "listen_anim",
+        "toast_label",
+    };
+    if (emote_lock(emote_handle_) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to lock legacy status objects");
+        return;
+    }
+    for (const char* name : kLegacyObjects) {
+        if (gfx_obj_t* obj = emote_get_obj_by_name(emote_handle_, name)) {
+            gfx_obj_set_visible(obj, false);
+        }
+    }
+    emote_unlock(emote_handle_);
 }
 
 bool EmoteDisplay::SetOverlayLabel(const char* name, const char* text, bool visible,
