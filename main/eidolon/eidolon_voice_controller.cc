@@ -243,16 +243,18 @@ EidolonVoiceController::EidolonVoiceController(GuardService* guard_service)
         vQueueDelete(event_queue_);
         event_queue_ = nullptr;
     }
+#if CONFIG_EIDOLON_RADAR_PRESENCE_PUBLISH
     esp_timer_create_args_t presence_timer_args = {};
-    presence_timer_args.callback =
-        &EidolonVoiceController::PresenceWakeTimerCb;
+    presence_timer_args.callback = &EidolonVoiceController::PresenceWakeTimerCb;
     presence_timer_args.arg = this;
     presence_timer_args.dispatch_method = ESP_TIMER_TASK;
     presence_timer_args.name = "presence_wake";
     if (esp_timer_create(&presence_timer_args, &presence_wake_timer_) != ESP_OK) {
         presence_wake_timer_ = nullptr;
     }
-#if CONFIG_EIDOLON_GUARD_SERVICE && CONFIG_EIDOLON_OWNER_FACE_PROFILE
+#endif
+#if CONFIG_EIDOLON_GUARD_SERVICE && CONFIG_EIDOLON_OWNER_FACE_PROFILE && \
+    CONFIG_EIDOLON_OWNER_RECOGNITION_ON_PRESENCE
     if (guard_service_ != nullptr) {
         RegisterDeviceEventHandler(
             kAmbientPresenceChangedType,
@@ -285,7 +287,8 @@ EidolonVoiceController::EidolonVoiceController(GuardService* guard_service)
 
 EidolonVoiceController::~EidolonVoiceController()
 {
-#if CONFIG_EIDOLON_GUARD_SERVICE && CONFIG_EIDOLON_OWNER_FACE_PROFILE
+#if CONFIG_EIDOLON_GUARD_SERVICE && CONFIG_EIDOLON_OWNER_FACE_PROFILE && \
+    CONFIG_EIDOLON_OWNER_RECOGNITION_ON_PRESENCE
     if (guard_service_ != nullptr) {
         guard_service_->SetOwnerRecognitionCallback({});
     }
@@ -1491,7 +1494,7 @@ void EidolonVoiceController::HandleOwnerPresenceConfirmedEvent(
              static_cast<unsigned long long>(now_ms));
     SetPresenceWakePhase(PresenceWakePhase::OwnerRecognized);
 #if CONFIG_EIDOLON_OWNER_PRESENCE_VOICE_WAKE
-    pending_session_intent_ = "proactive_initiated";
+    pending_session_intent_ = kSessionIntentProactive;
     const esp_err_t join_err = DoJoinRoom();
     pending_session_intent_.clear();
     if (join_err != ESP_OK) {
@@ -1915,7 +1918,8 @@ void EidolonVoiceController::HandleRoomJoinCommand(const std::string& command_id
     // A proactive wake (Phase 3) arrives as room.join with a payload that carries
     // session_intent ("proactive_initiated"). Stash it so the JOIN's token-fetch
     // declares it to the Hub (→ token metadata → channel suppresses the welcome).
-    // A plain user-initiated room.join has no payload; pending stays empty.
+    // A user-initiated room.join may omit the payload or explicitly carry
+    // "user_initiated"; in both cases pending stays empty.
     pending_session_intent_.clear();
     if (!payload.empty()) {
         cJSON* root = cJSON_Parse(payload.c_str());
@@ -1925,7 +1929,7 @@ void EidolonVoiceController::HandleRoomJoinCommand(const std::string& command_id
                 const char* value = intent->valuestring;
                 if (strcmp(value, kSessionIntentProactive) == 0) {
                     pending_session_intent_ = value;
-                } else {
+                } else if (strcmp(value, kSessionIntentUserInitiated) != 0) {
                     ESP_LOGW(TAG, "Ignoring unsupported session_intent=%s", value);
                 }
             }
@@ -2486,7 +2490,7 @@ esp_err_t EidolonVoiceController::DoJoinRoom()
 {
     const bool presence_initiated =
         presence_wake_phase_ == PresenceWakePhase::OwnerRecognized &&
-        pending_session_intent_ == "proactive_initiated";
+        pending_session_intent_ == kSessionIntentProactive;
     if (!presence_initiated) {
         CancelPresenceWake("manual_join");
     }

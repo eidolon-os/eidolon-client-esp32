@@ -9,14 +9,11 @@
 namespace eidolon {
 
 namespace {
-// 0.5 s of 16 kHz mono 16-bit PCM. Large enough to absorb scheduling jitter
-// between the AFE producer and the encoder consumer, small enough to bound
-// added latency.
-constexpr size_t kRingBytes = 16000;
 constexpr TickType_t kReadChunkTimeout = pdMS_TO_TICKS(200);
 }  // namespace
 
-PcmPushCaptureSource::PcmPushCaptureSource(uint32_t sample_rate) : sample_rate_(sample_rate) {
+PcmPushCaptureSource::PcmPushCaptureSource(uint32_t sample_rate, size_t ring_capacity_bytes)
+    : sample_rate_(sample_rate) {
     base_.open = Open;
     base_.get_support_codecs = GetSupportCodecs;
     base_.negotiate_caps = NegotiateCaps;
@@ -25,9 +22,10 @@ PcmPushCaptureSource::PcmPushCaptureSource(uint32_t sample_rate) : sample_rate_(
     base_.stop = Stop;
     base_.close = Close;
 
-    ring_ = xStreamBufferCreate(kRingBytes, /*trigger_level=*/1);
+    ring_ = xStreamBufferCreate(ring_capacity_bytes, /*trigger_level=*/1);
     if (ring_ == nullptr) {
-        ESP_LOGE(TAG, "Failed to allocate %u byte PCM ring", static_cast<unsigned>(kRingBytes));
+        ESP_LOGE(TAG, "Failed to allocate %u byte PCM ring",
+                 static_cast<unsigned>(ring_capacity_bytes));
     }
 }
 

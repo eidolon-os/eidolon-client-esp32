@@ -221,17 +221,28 @@ bool DeviceEventBus::Parse(const std::string& json, DeviceEventMessage* event) c
 
 bool DeviceEventBus::IsDuplicate(const std::string& event_id)
 {
-    const auto existing =
-        std::find(recent_event_ids_.begin(), recent_event_ids_.end(), event_id);
-    if (existing != recent_event_ids_.end()) {
-        recent_event_ids_.erase(existing);
-        recent_event_ids_.push_back(event_id);
+    for (size_t index = 0; index < recent_event_count_; ++index) {
+        if (recent_event_ids_[index] != event_id) {
+            continue;
+        }
+        // Preserve LRU behavior: a duplicate becomes the newest retained ID.
+        std::string retained = std::move(recent_event_ids_[index]);
+        for (size_t next = index + 1; next < recent_event_count_; ++next) {
+            recent_event_ids_[next - 1] = std::move(recent_event_ids_[next]);
+        }
+        recent_event_ids_[recent_event_count_ - 1] = std::move(retained);
         return true;
     }
-    recent_event_ids_.push_back(event_id);
-    while (recent_event_ids_.size() > recent_event_limit_) {
-        recent_event_ids_.pop_front();
+
+    if (recent_event_count_ < recent_event_limit_) {
+        recent_event_ids_[recent_event_count_++] = event_id;
+        return false;
     }
+
+    for (size_t index = 1; index < recent_event_count_; ++index) {
+        recent_event_ids_[index - 1] = std::move(recent_event_ids_[index]);
+    }
+    recent_event_ids_[recent_event_count_ - 1] = event_id;
     return false;
 }
 

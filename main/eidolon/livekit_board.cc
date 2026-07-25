@@ -217,7 +217,12 @@ static void silence_feed_task(void*)
 static esp_err_t build_silent_capturer(void)
 {
     if (s_silent_source == nullptr) {
-        s_silent_source = new eidolon::PcmPushCaptureSource(16000);
+        // The control-room source is synthetic silence and has no latency or
+        // scheduling-jitter requirement. Four 20 ms frames are sufficient for
+        // the SDK puller while avoiding the voice path's 16 KB internal-SRAM
+        // jitter buffer on the memory-constrained camera board.
+        constexpr size_t kSilentRingBytes = 4 * 640;
+        s_silent_source = new eidolon::PcmPushCaptureSource(16000, kSilentRingBytes);
     }
     if (s_silence_task == nullptr) {
         // Without this feeder the capturer below has no producer: 0.3.10 would

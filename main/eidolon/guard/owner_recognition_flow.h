@@ -34,8 +34,11 @@ enum class OwnerRecognitionRequestResult {
 
 class OwnerRecognitionFlowTracker {
 public:
-    static constexpr size_t kMaxPendingFlows = 8;
-    static constexpr size_t kMaxRecentFlows = 32;
+    // The radar -> owner-recognition orchestration is deliberately serial.
+    // A second trigger must wait for the current bounded flow to finish rather
+    // than consuming camera and SRAM resources in parallel.
+    static constexpr size_t kMaxPendingFlows = 1;
+    static constexpr size_t kMaxRecentFlows = 8;
 
     explicit OwnerRecognitionFlowTracker(OwnerRecognitionFlowConfig config = {});
 

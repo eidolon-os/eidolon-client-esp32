@@ -25,7 +25,10 @@ namespace eidolon {
 // (capture fetch task), which the stream buffer supports without extra locking.
 class PcmPushCaptureSource {
 public:
-    explicit PcmPushCaptureSource(uint32_t sample_rate = 16000);
+    static constexpr size_t kDefaultRingBytes = 16000;
+
+    explicit PcmPushCaptureSource(uint32_t sample_rate = 16000,
+                                  size_t ring_capacity_bytes = kDefaultRingBytes);
     ~PcmPushCaptureSource();
 
     PcmPushCaptureSource(const PcmPushCaptureSource&) = delete;

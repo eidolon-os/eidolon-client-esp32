@@ -23,17 +23,25 @@ int main()
     assert(tracker.Request("flow-stale", "event-other", 1001, false, 0) ==
            OwnerRecognitionRequestResult::Duplicate);
 
+    // The hardware flow is intentionally serial: overlapping triggers are
+    // rejected until the current recognition request completes.
     assert(tracker.Request("flow-2", "event-2", 1100, false, 0) ==
-           OwnerRecognitionRequestResult::Pending);
+           OwnerRecognitionRequestResult::Rejected);
     tracker.RecordFaceMatch(1200);
     assert(!tracker.NeedsFaceSample(1200));
     assert(tracker.CompleteIfOwnerPresent(1700, false).empty());
     auto completed = tracker.CompleteIfOwnerPresent(1800, true);
-    assert(completed.size() == 2);
+    assert(completed.size() == 1);
     assert(completed[0].flow_id == "flow-stale");
     assert(completed[0].causation_id == "event-stale");
-    assert(completed[1].flow_id == "flow-2");
     assert(!tracker.HasPending());
+
+    assert(tracker.Request("flow-2", "event-2", 1801, false, 0) ==
+           OwnerRecognitionRequestResult::Pending);
+    tracker.RecordFaceMatch(1802);
+    completed = tracker.CompleteIfOwnerPresent(1803, true);
+    assert(completed.size() == 1);
+    assert(completed[0].flow_id == "flow-2");
     assert(tracker.Request("flow-2", "event-new", 1900, true, 1800) ==
            OwnerRecognitionRequestResult::Duplicate);
 

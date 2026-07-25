@@ -150,6 +150,10 @@ CONFIG_EIDOLON_LIVEKIT_SPEAKER_VOLUME=50
 CONFIG_EIDOLON_OWNER_FACE_PROFILE=y
 CONFIG_EIDOLON_OWNER_PERSON_PRESENCE=y
 CONFIG_EIDOLON_OWNER_RECOGNITION_ON_PRESENCE=y
+# Prefer PSRAM for medium-sized C++ orchestration objects and queue storage.
+# LiveKit/FreeRTOS/DMA allocations that explicitly require internal memory keep
+# using the reserved internal pool.
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=256
 CONFIG_HUMAN_FACE_DETECT_MODEL_IN_FLASH_PARTITION=y
 # CONFIG_HUMAN_FACE_DETECT_MODEL_IN_FLASH_RODATA is not set
 CONFIG_HUMAN_FACE_FEAT_MODEL_IN_FLASH_PARTITION=y
@@ -254,6 +258,7 @@ sync_existing_sdkconfig() {
   set_sdkconfig_value CONFIG_EIDOLON_OWNER_FACE_PROFILE y
   set_sdkconfig_value CONFIG_EIDOLON_OWNER_PERSON_PRESENCE y
   set_sdkconfig_value CONFIG_EIDOLON_OWNER_RECOGNITION_ON_PRESENCE y
+  set_sdkconfig_value CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL 256
   # Interaction mode = half_duplex (no AEC on this board): enforce on an
   # existing sdkconfig too, else a stale PTT=y from the 2-mode era survives a
   # re-run (ESP-IDF does not re-apply overlay defaults to an existing config).

@@ -4,7 +4,6 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <deque>
 #include <functional>
 #include <string>
 
@@ -36,8 +35,11 @@ public:
 
     static constexpr size_t kMaxEventBytes = 2048;
     static constexpr uint64_t kMaxTtlMs = 3000;
-    static constexpr size_t kMaxHandlers = 8;
-    static constexpr size_t kMaxRecentEvents = 64;
+    // Embedded participants currently consume one orchestration topic per role.
+    // Keep one spare slot without reserving a desktop-sized handler table in
+    // scarce internal SRAM.
+    static constexpr size_t kMaxHandlers = 2;
+    static constexpr size_t kMaxRecentEvents = 8;
 
     explicit DeviceEventBus(size_t recent_event_limit = kMaxRecentEvents);
 
@@ -56,7 +58,8 @@ private:
     std::array<HandlerEntry, kMaxHandlers> handlers_ = {};
     size_t handler_count_ = 0;
     size_t recent_event_limit_;
-    std::deque<std::string> recent_event_ids_;
+    std::array<std::string, kMaxRecentEvents> recent_event_ids_ = {};
+    size_t recent_event_count_ = 0;
 };
 
 }  // namespace eidolon
