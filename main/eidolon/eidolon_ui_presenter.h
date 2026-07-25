@@ -24,6 +24,7 @@ public:
     void OnTranscription(const TranscriptionEvent& event);
     void OnAgentPhase(AgentPhase phase);
     void OnPttTurnStatus(const std::string& outcome);
+    void OnPresenceWakePhase(PresenceWakePhase phase);
     void SetLifecyclePhase(LifecyclePhase phase, const std::string& detail = "");
     // Push-to-talk: the user is currently holding the talk button (mic recording).
     void SetPttRecording(bool recording);
@@ -52,6 +53,7 @@ private:
     bool mic_enabled_ = true;
     bool ptt_recording_ = false;
     bool ptt_committing_ = false;
+    PresenceWakePhase presence_wake_phase_ = PresenceWakePhase::Idle;
     esp_timer_handle_t commit_timer_ = nullptr;
 };
 

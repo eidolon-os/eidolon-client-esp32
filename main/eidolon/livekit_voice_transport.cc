@@ -25,6 +25,9 @@ LiveKitVoiceTransport::LiveKitVoiceTransport(VoiceSessionCallbacks cb, GuardServ
     if (cb.on_agent_phase) {
         controller_->SetOnAgentPhase(std::move(cb.on_agent_phase));
     }
+    if (cb.on_presence_wake_phase) {
+        controller_->SetOnPresenceWakePhase(std::move(cb.on_presence_wake_phase));
+    }
     if (cb.on_ptt_turn_status) {
         controller_->SetOnPttTurnStatus(std::move(cb.on_ptt_turn_status));
     }
@@ -46,6 +49,11 @@ void LiveKitVoiceTransport::OnNetworkLost()
 void LiveKitVoiceTransport::OnNetworkRestored()
 {
     controller_->OnNetworkRestored();
+}
+
+void LiveKitVoiceTransport::OnAmbientPresenceChanged(bool present)
+{
+    controller_->OnAmbientPresenceChanged(present);
 }
 
 void LiveKitVoiceTransport::JoinSession()

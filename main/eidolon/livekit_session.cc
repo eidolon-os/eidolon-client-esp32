@@ -187,6 +187,12 @@ void LiveKitSession::OnDataReceived(const livekit_data_received_t* data, void* c
         session->on_session_control_(payload);
         return;
     }
+    if (strcmp(topic, kEventTopic) == 0 && session->on_device_event_) {
+        std::string payload(reinterpret_cast<const char*>(data->payload.bytes),
+                            data->payload.size);
+        session->on_device_event_(payload, session->generation_);
+        return;
+    }
     if (strcmp(topic, kControlTopic) != 0 || !session->on_control_command_) {
         return;
     }

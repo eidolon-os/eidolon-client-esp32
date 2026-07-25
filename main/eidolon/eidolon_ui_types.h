@@ -31,6 +31,12 @@ enum class AgentPhase {
     AgentSpeaking,
 };
 
+enum class PresenceWakePhase {
+    Idle,
+    VerifyingOwner,
+    OwnerRecognized,
+};
+
 enum class TranscriptionSource {
     Unknown,
     User,
@@ -80,6 +86,7 @@ struct EidolonUiSnapshot {
     ConnectionPhase connection = ConnectionPhase::Offline;
     TurnPhase turn = TurnPhase::Idle;
     EndReason end_reason = EndReason::None;
+    PresenceWakePhase presence_wake = PresenceWakePhase::Idle;
 
     const char* status_text = "";
     const char* subtitle = "";

@@ -28,6 +28,8 @@ public:
     using AgentPhaseCallback = std::function<void(AgentPhase phase)>;
     using ControlCommandCallback = std::function<void(const std::string& payload)>;
     using SessionControlCallback = std::function<void(const std::string& payload)>;
+    using DeviceEventCallback =
+        std::function<void(const std::string& payload, uint32_t generation)>;
 
     esp_err_t Connect(const Esp32HubConfig& config, uint32_t generation);
     esp_err_t ConnectDataOnly(const Esp32HubConfig& config, uint32_t generation);
@@ -43,6 +45,7 @@ public:
     void SetOnAgentPhase(AgentPhaseCallback cb) { on_agent_phase_ = std::move(cb); }
     void SetOnControlCommand(ControlCommandCallback cb) { on_control_command_ = std::move(cb); }
     void SetOnSessionControl(SessionControlCallback cb) { on_session_control_ = std::move(cb); }
+    void SetOnDeviceEvent(DeviceEventCallback cb) { on_device_event_ = std::move(cb); }
 
 private:
     static void OnRoomStateChanged(livekit_connection_state_t state, void* ctx);
@@ -72,6 +75,7 @@ private:
     AgentPhaseCallback on_agent_phase_;
     ControlCommandCallback on_control_command_;
     SessionControlCallback on_session_control_;
+    DeviceEventCallback on_device_event_;
 };
 
 }  // namespace eidolon

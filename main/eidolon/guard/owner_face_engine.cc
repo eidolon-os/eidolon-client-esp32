@@ -281,12 +281,13 @@ public:
         return true;
     }
 
-    OwnerFaceLiveResult AnalyzeLiveFrame(const CameraFrame& frame, uint64_t now_ms)
+    OwnerFaceLiveResult AnalyzeLiveFrame(const CameraFrame& frame, uint64_t now_ms,
+                                         bool force)
     {
         OwnerFaceLiveResult result;
         if (frame.data == nullptr || frame.pixel_format != kRgb565Fourcc ||
             frame.len < static_cast<size_t>(frame.width) * frame.height * 2 ||
-            now_ms < next_live_ms_) {
+            (!force && now_ms < next_live_ms_)) {
             return result;
         }
         next_live_ms_ = now_ms + live_interval_ms_;
@@ -677,9 +678,9 @@ bool OwnerFaceEngine::QueueSync(const OwnerFaceSyncRequest& request,
 }
 
 OwnerFaceLiveResult OwnerFaceEngine::AnalyzeLiveFrame(const CameraFrame& frame,
-                                                      uint64_t now_ms)
+                                                      uint64_t now_ms, bool force)
 {
-    return impl_->AnalyzeLiveFrame(frame, now_ms);
+    return impl_->AnalyzeLiveFrame(frame, now_ms, force);
 }
 
 void OwnerFaceEngine::SetLiveIntervalMs(uint32_t interval_ms)

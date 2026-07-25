@@ -153,6 +153,25 @@ void TestReadyAndRecoveryDetails()
     ExpectStateAndDetail(snapshot, "REJOIN", "Restoring connection...");
 }
 
+void TestPresenceWakeProjectionAndReset()
+{
+    eidolon::EidolonUiSnapshot snapshot;
+    snapshot.pairing = eidolon::PairingStatus::Active;
+    snapshot.connection = eidolon::ConnectionPhase::Ready;
+    snapshot.presence_wake = eidolon::PresenceWakePhase::VerifyingOwner;
+    ExpectStateAndDetail(snapshot, "VERIFY", "Checking owner...");
+
+    snapshot.presence_wake = eidolon::PresenceWakePhase::OwnerRecognized;
+    ExpectStateAndDetail(snapshot, "OWNER", "Owner recognized");
+
+    snapshot.connection = eidolon::ConnectionPhase::Connecting;
+    ExpectStateAndDetail(snapshot, "JOINING", "Owner recognized");
+
+    snapshot.presence_wake = eidolon::PresenceWakePhase::Idle;
+    snapshot.connection = eidolon::ConnectionPhase::Ready;
+    ExpectStateAndDetail(snapshot, "READY", "Press BOOT to talk");
+}
+
 }  // namespace
 
 int main()
@@ -163,5 +182,6 @@ int main()
     TestConnectionProjection();
     TestConnectionOwnsTurnProjection();
     TestReadyAndRecoveryDetails();
+    TestPresenceWakeProjectionAndReset();
     return 0;
 }

@@ -7,10 +7,11 @@
 #   ./scripts/eidolon/eidolon-esp-box-3.sh monitor
 #
 # Environment:
-#   EIDOLON_PORT        Serial port, for example /dev/cu.usbmodem1101
-#   EIDOLON_IDF_EXPORT Full path to ESP-IDF export.sh
-#   EIDOLON_IDF_PATH   ESP-IDF root directory
-#   IDF_PATH           ESP-IDF root directory
+#   EIDOLON_PORT                       Serial port, for example /dev/cu.usbmodem1101
+#   EIDOLON_IDF_EXPORT                 Full path to ESP-IDF export.sh
+#   EIDOLON_IDF_PATH                   ESP-IDF root directory
+#   EIDOLON_OWNER_PRESENCE_VOICE_WAKE Enable owner-confirmed voice join: y/n (default n)
+#   IDF_PATH                           ESP-IDF root directory
 
 set -euo pipefail
 
@@ -24,6 +25,13 @@ readonly SDKCONFIG_OVERLAY="${BUILD_DIR}/sdkconfig.overlay.esp-box-3"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PORT="${EIDOLON_PORT:-}"
+OWNER_PRESENCE_VOICE_WAKE="${EIDOLON_OWNER_PRESENCE_VOICE_WAKE:-n}"
+
+if [[ "${OWNER_PRESENCE_VOICE_WAKE}" != "y" &&
+      "${OWNER_PRESENCE_VOICE_WAKE}" != "n" ]]; then
+  echo "error: EIDOLON_OWNER_PRESENCE_VOICE_WAKE must be y or n" >&2
+  exit 2
+fi
 
 # Shared helper: SDK version pin + forced re-resolution, build fingerprint,
 # post-flash serial verification. See scripts/eidolon/eidolon-common.sh.
@@ -148,6 +156,8 @@ CONFIG_EIDOLON_DEVICE_AEC_AFE_MODE_LOW_COST=y
 CONFIG_EIDOLON_HUB_MODE=y
 CONFIG_EIDOLON_AUTO_JOIN_ON_ACTIVATION=n
 CONFIG_EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN=y
+CONFIG_EIDOLON_RADAR_PRESENCE_PUBLISH=y
+CONFIG_EIDOLON_OWNER_PRESENCE_VOICE_WAKE=${OWNER_PRESENCE_VOICE_WAKE}
 # CONFIG_EIDOLON_INTERACTION_MODE_PTT is not set
 # CONFIG_EIDOLON_INTERACTION_MODE_HALF_DUPLEX is not set
 CONFIG_EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS=75000
@@ -218,6 +228,8 @@ ensure_box3_sdkconfig() {
   set_sdkconfig_bool EIDOLON_HUB_MODE y
   set_sdkconfig_bool EIDOLON_AUTO_JOIN_ON_ACTIVATION n
   set_sdkconfig_bool EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN y
+  set_sdkconfig_bool EIDOLON_RADAR_PRESENCE_PUBLISH y
+  set_sdkconfig_bool EIDOLON_OWNER_PRESENCE_VOICE_WAKE "${OWNER_PRESENCE_VOICE_WAKE}"
   set_sdkconfig_bool EIDOLON_INTERACTION_MODE_PTT n
   set_sdkconfig_bool USE_DEVICE_AEC y
   set_sdkconfig_bool EIDOLON_INTERACTION_MODE_HALF_DUPLEX n
@@ -291,6 +303,8 @@ Commands:
 Environment:
   EIDOLON_PORT=/dev/cu.usbmodemXXXX
   EIDOLON_LIVEKIT_SDK=0.3.7   Pin the LiveKit SDK version (forces clean re-resolve)
+  EIDOLON_OWNER_PRESENCE_VOICE_WAKE=y
+                               Compile owner-confirmed automatic voice join
 EOF
 }
 

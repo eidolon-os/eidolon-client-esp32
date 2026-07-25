@@ -163,7 +163,8 @@ EidolonUiSnapshot UiStateMapper::Map(VoiceSessionState session_state,
                                      bool ptt_recording,
                                      bool ptt_committing,
                                      VoiceInputPolicy input_policy,
-                                     EndReason end_reason)
+                                     EndReason end_reason,
+                                     PresenceWakePhase presence_wake)
 {
     EidolonUiSnapshot snapshot;
     snapshot.show_mute_icon = !mic_enabled;
@@ -173,6 +174,7 @@ EidolonUiSnapshot UiStateMapper::Map(VoiceSessionState session_state,
     snapshot.connection = ConnectionPhaseFor(session_state);
     snapshot.turn = TurnPhaseFor(agent_phase, ptt_recording, ptt_committing);
     snapshot.end_reason = end_reason;
+    snapshot.presence_wake = presence_wake;
 
     if (snapshot.pairing != PairingStatus::Active) {
         snapshot.button_state = VoiceSessionButtonState::Hidden;
@@ -239,6 +241,25 @@ EidolonUiSnapshot UiStateMapper::Map(VoiceSessionState session_state,
         default:
             snapshot.subtitle_role = "assistant";
             break;
+        }
+    }
+
+    if (snapshot.connection != ConnectionPhase::InRoom) {
+        if (presence_wake == PresenceWakePhase::VerifyingOwner) {
+            snapshot.status_text = "VERIFYING";
+            snapshot.subtitle = "Checking owner...";
+            snapshot.subtitle_role = "system";
+            snapshot.emotion = "neutral";
+            snapshot.button_state = VoiceSessionButtonState::Hidden;
+        } else if (presence_wake == PresenceWakePhase::OwnerRecognized) {
+            snapshot.subtitle = "Owner recognized";
+            snapshot.subtitle_role = "system";
+            snapshot.emotion = "happy";
+            if (snapshot.connection != ConnectionPhase::Connecting &&
+                snapshot.connection != ConnectionPhase::Reconnecting) {
+                snapshot.status_text = "OWNER FOUND";
+                snapshot.button_state = VoiceSessionButtonState::Hidden;
+            }
         }
     }
 

@@ -56,7 +56,8 @@ public:
                    const std::string& config_url,
                    const std::string& device_id,
                    OwnerFaceApplyCallback callback);
-    OwnerFaceLiveResult AnalyzeLiveFrame(const CameraFrame& frame, uint64_t now_ms);
+    OwnerFaceLiveResult AnalyzeLiveFrame(const CameraFrame& frame, uint64_t now_ms,
+                                         bool force = false);
     void SetLiveIntervalMs(uint32_t interval_ms);
     bool TryGetProfileStatus(OwnerFaceProfileStatus& out);
 

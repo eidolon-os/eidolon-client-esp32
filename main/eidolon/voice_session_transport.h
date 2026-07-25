@@ -16,6 +16,7 @@ struct VoiceSessionCallbacks {
     std::function<void(VoiceSessionState)> on_session_state;
     std::function<void(const TranscriptionEvent&)> on_transcription;
     std::function<void(AgentPhase)> on_agent_phase;
+    std::function<void(PresenceWakePhase)> on_presence_wake_phase;
     std::function<void(const std::string& outcome)> on_ptt_turn_status;
     std::function<void(const std::string&)> on_error;
 };
@@ -27,6 +28,7 @@ public:
     virtual void OnActivationComplete() = 0;
     virtual void OnNetworkLost() = 0;
     virtual void OnNetworkRestored() = 0;
+    virtual void OnAmbientPresenceChanged(bool present) = 0;
 
     virtual void ToggleSession() = 0;
     virtual void JoinSession() = 0;

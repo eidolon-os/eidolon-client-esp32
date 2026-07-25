@@ -105,15 +105,15 @@ struct GuardRuntimeHubConfig {
     std::string guard_companion_id;
     std::string desired_runtime_state;
     uint32_t runtime_revision = 0;
-    uint32_t sample_interval_ms = 500;
+    uint32_t sample_interval_ms = 200;
     uint32_t preview_interval_ms = 1000;
     uint32_t motion_threshold = 18;
     uint32_t motion_clear_threshold = 9;
     uint32_t candidate_debounce_ms = 1000;
     uint32_t absence_timeout_ms = 180000;
     uint32_t consecutive_capture_failures = 5;
-    uint32_t owner_face_interval_ms = 1500;
-    uint32_t owner_presence_enter_ms = 2500;
+    uint32_t owner_face_interval_ms = 500;
+    uint32_t owner_presence_enter_ms = 600;
     uint32_t owner_presence_exit_ms = 12000;
     uint32_t owner_presence_heartbeat_ms = 10000;
     uint32_t owner_presence_lease_ms = 30000;

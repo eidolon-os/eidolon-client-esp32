@@ -19,6 +19,7 @@ public:
     void OnActivationComplete() override;
     void OnNetworkLost() override;
     void OnNetworkRestored() override;
+    void OnAmbientPresenceChanged(bool present) override;
 
     void ToggleSession() override;
     void JoinSession() override;

@@ -139,6 +139,13 @@ void Application::RequestVoiceLeave()
     }
 }
 
+void Application::OnAmbientPresenceChanged(bool present)
+{
+    if (voice_transport_) {
+        voice_transport_->OnAmbientPresenceChanged(present);
+    }
+}
+
 void Application::ToggleVoiceSession()
 {
     Schedule([this]() {
@@ -378,6 +385,13 @@ void Application::Initialize() {
             const bool mic_hot = phase != eidolon::AgentPhase::AgentSpeaking &&
                                  (!voice_transport_ || voice_transport_->IsMicrophoneEnabled());
             Board::GetInstance().SetCaptureQuiet(mic_hot);
+        });
+    };
+    callbacks.on_presence_wake_phase = [this](eidolon::PresenceWakePhase phase) {
+        Schedule([this, phase]() {
+            if (ui_presenter_) {
+                ui_presenter_->OnPresenceWakePhase(phase);
+            }
         });
     };
     callbacks.on_ptt_turn_status = [this](const std::string& outcome) {

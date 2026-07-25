@@ -9,16 +9,20 @@
 #include <deque>
 #include <functional>
 #include <string>
+#include <type_traits>
 
 #include "sdkconfig.h"
 #include "control_protocol.h"
 #include "control_room_recovery.h"
+#include "device_event_bus.h"
 #if CONFIG_EIDOLON_GUARD_SERVICE
 #include "guard/guard_presence_adapter.h"
+#include "guard/guard_service.h"
 #include "guard/owner_presence_adapter.h"
 #endif
 #include "hub_types.h"
 #include "livekit_session.h"
+#include "presence_wake_flow.h"
 
 namespace eidolon {
 
@@ -53,6 +57,7 @@ public:
     void OnHubActivationSucceeded();
     void OnNetworkLost();
     void OnNetworkRestored();
+    void OnAmbientPresenceChanged(bool present);
 
     esp_err_t JoinRoom();
     esp_err_t LeaveRoom();
@@ -83,10 +88,16 @@ public:
     void SetOnStateChanged(StateCallback cb) { on_state_changed_ = std::move(cb); }
     void SetOnTranscription(std::function<void(const TranscriptionEvent&)> cb);
     void SetOnAgentPhase(std::function<void(AgentPhase)> cb);
+    void SetOnPresenceWakePhase(std::function<void(PresenceWakePhase)> cb)
+    {
+        on_presence_wake_phase_ = std::move(cb);
+    }
     void SetOnPttTurnStatus(std::function<void(const std::string&)> cb)
     {
         on_ptt_turn_status_ = std::move(cb);
     }
+    bool RegisterDeviceEventHandler(const std::string& type, DeviceEventBus::Handler handler);
+    esp_err_t PublishDeviceEvent(const std::string& payload);
 
 private:
     // ---- Event loop ----
@@ -104,12 +115,17 @@ private:
 #if CONFIG_EIDOLON_GUARD_SERVICE
         GuardObservation,
         OwnerPresence,
+        OwnerRecognitionConfirmed,
 #endif
 #if CONFIG_EIDOLON_OWNER_FACE_PROFILE
         OwnerFaceProfileCompleted,
 #endif
         ControlCommand,
         SessionControl,
+        DeviceEvent,
+        PublishDeviceEvent,
+        AmbientPresence,
+        PresenceWakeTimeout,
         AgentPhaseChanged,
         SessionActivity,
         AudioTick,
@@ -126,6 +142,9 @@ private:
 #if CONFIG_EIDOLON_GUARD_SERVICE
         GuardObservation guard_observation;
         OwnerPresenceObservation owner_presence_observation;
+        // FreeRTOS queues copy Event as raw bytes, so non-trivial confirmation
+        // strings must stay behind an explicitly owned pointer.
+        OwnerRecognitionConfirmation* owner_recognition_confirmation = nullptr;
 #endif
         // Snapshot of session_generation_ taken when the SDK callback fired (on the
         // SDK task), so DoLiveKitState can tell whether a LiveKit event belongs to
@@ -135,9 +154,11 @@ private:
         uint32_t generation = 0;
         std::string* payload = nullptr;  // owned; the loop deletes it after dispatch
     };
+    static_assert(std::is_trivially_copyable_v<Event>,
+                  "FreeRTOS queue events must be safe for raw byte copies");
     static void TaskTrampoline(void* arg);
     void ControllerLoop();
-    void Enqueue(Event ev);  // thread-safe; frees ev.payload if the queue is full
+    void Enqueue(Event ev);  // thread-safe; frees owned pointers if the queue is full
     void Dispatch(const Event& ev);
 
     // ---- Handlers (run only on the controller task) ----
@@ -155,12 +176,19 @@ private:
     void DoGuardObservation(const GuardObservation& observation, uint32_t runtime_generation);
     void DoOwnerPresence(const OwnerPresenceObservation& observation,
                          uint32_t runtime_generation);
+    void DoOwnerRecognitionConfirmed(
+        const OwnerRecognitionConfirmation& confirmation);
+    void HandleAmbientPresenceEvent(const DeviceEventMessage& event);
 #endif
 #if CONFIG_EIDOLON_OWNER_FACE_PROFILE
     void DoOwnerFaceProfileCompleted(const std::string& payload);
 #endif
     void DoControlCommand(const std::string& payload);
     void DoSessionControl(const std::string& payload);
+    void DoDeviceEvent(const std::string& payload, uint32_t event_generation);
+    void DoPublishDeviceEvent(const std::string& payload);
+    void DoAmbientPresenceChanged(bool present);
+    void DoPresenceWakeTimeout();
     void DoAgentPhase(AgentPhase phase);
     void DoSessionActivity();
     void DoAudioTick();
@@ -222,6 +250,7 @@ private:
     void HandleGuardVisionBenchmarkCommand(const std::string& command_id, const std::string& payload);
 #endif
     void HandleIdleTimeoutCommand();
+    void HandleOwnerPresenceConfirmedEvent(const DeviceEventMessage& event);
     // Parse and act on a session_end{reason} packet from the channel: record the
     // reason for the UI, tear the voice room down gracefully, and pick the
     // resulting state (Ready for a normal end, Error for a server error).
@@ -259,6 +288,9 @@ private:
     static void IdleLeaveCb(void* arg);
     static void FullDuplexIdleFallbackCb(void* arg);
     static void PttReleaseTailCb(void* arg);
+    static void PresenceWakeTimerCb(void* arg);
+    void SetPresenceWakePhase(PresenceWakePhase phase);
+    void CancelPresenceWake(const char* reason);
 
     // Audio-state publisher (timer-driven tick on the controller task).
     void StartAudioStatePublisher();
@@ -271,6 +303,7 @@ private:
     esp_err_t StopLocalPlayback(const char* reason);
 
     LiveKitSession session_;
+    DeviceEventBus device_event_bus_;
     Esp32HubConfig config_;
     std::string register_url_;
     VoiceSessionState state_ = VoiceSessionState::Idle;
@@ -345,11 +378,15 @@ private:
     esp_timer_handle_t idle_leave_timer_ = nullptr;
     esp_timer_handle_t full_duplex_idle_timer_ = nullptr;
     esp_timer_handle_t ptt_release_tail_timer_ = nullptr;
+    esp_timer_handle_t presence_wake_timer_ = nullptr;
 
     StateCallback on_state_changed_;
     std::function<void(const TranscriptionEvent&)> on_transcription_;
     std::function<void(AgentPhase)> on_agent_phase_;
+    std::function<void(PresenceWakePhase)> on_presence_wake_phase_;
     std::function<void(const std::string&)> on_ptt_turn_status_;
+    PresenceWakeFlowTracker presence_wake_flow_;
+    PresenceWakePhase presence_wake_phase_ = PresenceWakePhase::Idle;
 };
 
 }  // namespace eidolon

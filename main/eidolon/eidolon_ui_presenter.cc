@@ -189,6 +189,17 @@ void EidolonUiPresenter::OnPttTurnStatus(const std::string& outcome)
     Reapply();
 }
 
+void EidolonUiPresenter::OnPresenceWakePhase(PresenceWakePhase phase)
+{
+    if (presence_wake_phase_ == phase) {
+        return;
+    }
+    presence_wake_phase_ = phase;
+    ESP_LOGI(TAG, "[EIDOLON_UI] presence_wake phase=%d",
+             static_cast<int>(phase));
+    Reapply();
+}
+
 void EidolonUiPresenter::SetLifecyclePhase(LifecyclePhase phase, const std::string& detail)
 {
     if (lifecycle_phase_ == phase && lifecycle_detail_ == detail) {
@@ -233,7 +244,8 @@ void EidolonUiPresenter::Reapply()
     auto snapshot = UiStateMapper::Map(session_state_, tracker_.GetPhase(),
                                        tracker_.LastTranscription(),
                                        tracker_.LastTranscriptionSource(), mic_enabled_,
-                                       ptt_recording_, ptt_committing_, {}, end_reason_);
+                                       ptt_recording_, ptt_committing_, {}, end_reason_,
+                                       presence_wake_phase_);
     // Functional input routing must not sit behind a potentially slow display
     // backend. The UI is a projection of session state, not its owner.
     SyncDeviceState();

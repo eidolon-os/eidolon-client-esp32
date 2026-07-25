@@ -80,6 +80,17 @@ const char* CompactStateLabel(const EidolonUiSnapshot& snapshot)
         break;
     }
 
+    if (snapshot.presence_wake == PresenceWakePhase::VerifyingOwner &&
+        snapshot.connection != ConnectionPhase::InRoom) {
+        return "VERIFY";
+    }
+    if (snapshot.presence_wake == PresenceWakePhase::OwnerRecognized &&
+        snapshot.connection != ConnectionPhase::Connecting &&
+        snapshot.connection != ConnectionPhase::Reconnecting &&
+        snapshot.connection != ConnectionPhase::InRoom) {
+        return "OWNER";
+    }
+
     switch (snapshot.connection) {
     case ConnectionPhase::Connecting:
         return "JOINING";
@@ -122,6 +133,15 @@ const char* CompactVoiceDetail(const EidolonUiSnapshot& snapshot)
     case PairingStatus::Active:
     default:
         break;
+    }
+
+    if (snapshot.presence_wake == PresenceWakePhase::VerifyingOwner &&
+        snapshot.connection != ConnectionPhase::InRoom) {
+        return "Checking owner...";
+    }
+    if (snapshot.presence_wake == PresenceWakePhase::OwnerRecognized &&
+        snapshot.connection != ConnectionPhase::InRoom) {
+        return "Owner recognized";
     }
 
     switch (snapshot.connection) {

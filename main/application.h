@@ -142,6 +142,7 @@ public:
     void ToggleMicrophone();
     void PttPress();
     void PttRelease();
+    void OnAmbientPresenceChanged(bool present);
     void SetEidolonLifecycleUi(eidolon::LifecyclePhase phase,
                                const std::string& detail = "");
 #endif

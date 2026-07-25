@@ -2,6 +2,7 @@
 
 #include "board.h"
 #include "control_protocol.h"
+#include "device_event_builder.h"
 #include "eidolon_topics.h"
 #include "eidolon_local_feedback.h"
 #if CONFIG_EIDOLON_GUARD_SERVICE
@@ -25,6 +26,7 @@
 #include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <ctime>
@@ -117,6 +119,110 @@ const char* AgentPhaseName(eidolon::AgentPhase phase)
     }
     return "unknown";
 }
+
+#if CONFIG_EIDOLON_OWNER_RECOGNITION_ON_PRESENCE
+bool IsPresentAmbientPayload(const std::string& payload)
+{
+    const char* parse_end = nullptr;
+    cJSON* root = cJSON_ParseWithLengthOpts(
+        payload.data(), payload.size(), &parse_end, false);
+    if (root == nullptr || parse_end != payload.data() + payload.size() ||
+        !cJSON_IsObject(root) || cJSON_GetArraySize(root) != 3) {
+        cJSON_Delete(root);
+        return false;
+    }
+    int state_count = 0;
+    int modality_count = 0;
+    int edge_count = 0;
+    bool only_known_fields = true;
+    for (const cJSON* item = root->child; item != nullptr; item = item->next) {
+        const char* key = item->string ? item->string : "";
+        if (strcmp(key, "state") == 0) {
+            ++state_count;
+        } else if (strcmp(key, "modality") == 0) {
+            ++modality_count;
+        } else if (strcmp(key, "edge") == 0) {
+            ++edge_count;
+        } else {
+            only_known_fields = false;
+        }
+    }
+    const cJSON* state = cJSON_GetObjectItemCaseSensitive(root, "state");
+    const cJSON* modality = cJSON_GetObjectItemCaseSensitive(root, "modality");
+    const cJSON* edge = cJSON_GetObjectItemCaseSensitive(root, "edge");
+    const bool valid =
+        only_known_fields && state_count == 1 && modality_count == 1 &&
+        edge_count == 1 && cJSON_IsString(state) &&
+        strcmp(state->valuestring, "present") == 0 &&
+        cJSON_IsString(modality) &&
+        strcmp(modality->valuestring, "mmwave") == 0 &&
+        cJSON_IsString(edge) &&
+        strcmp(edge->valuestring, "vacant_to_present") == 0;
+    cJSON_Delete(root);
+    return valid;
+}
+#endif
+
+#if CONFIG_EIDOLON_RADAR_PRESENCE_PUBLISH
+bool IsOwnerConfirmationPayload(const std::string& payload)
+{
+    const char* parse_end = nullptr;
+    cJSON* root = cJSON_ParseWithLengthOpts(
+        payload.data(), payload.size(), &parse_end, false);
+    if (root == nullptr || parse_end != payload.data() + payload.size() ||
+        !cJSON_IsObject(root) || cJSON_GetArraySize(root) != 5) {
+        cJSON_Delete(root);
+        return false;
+    }
+    int profile_count = 0;
+    int epoch_count = 0;
+    int sequence_count = 0;
+    int evidence_count = 0;
+    int retention_count = 0;
+    bool only_known_fields = true;
+    for (const cJSON* item = root->child; item != nullptr; item = item->next) {
+        const char* key = item->string ? item->string : "";
+        if (strcmp(key, "profile_revision") == 0) {
+            ++profile_count;
+        } else if (strcmp(key, "guard_epoch") == 0) {
+            ++epoch_count;
+        } else if (strcmp(key, "presence_sequence") == 0) {
+            ++sequence_count;
+        } else if (strcmp(key, "evidence") == 0) {
+            ++evidence_count;
+        } else if (strcmp(key, "raw_retention") == 0) {
+            ++retention_count;
+        } else {
+            only_known_fields = false;
+        }
+    }
+    const cJSON* profile =
+        cJSON_GetObjectItemCaseSensitive(root, "profile_revision");
+    const cJSON* epoch =
+        cJSON_GetObjectItemCaseSensitive(root, "guard_epoch");
+    const cJSON* sequence =
+        cJSON_GetObjectItemCaseSensitive(root, "presence_sequence");
+    const cJSON* evidence =
+        cJSON_GetObjectItemCaseSensitive(root, "evidence");
+    const cJSON* retention =
+        cJSON_GetObjectItemCaseSensitive(root, "raw_retention");
+    const bool valid =
+        only_known_fields && profile_count == 1 && epoch_count == 1 &&
+        sequence_count == 1 && evidence_count == 1 && retention_count == 1 &&
+        cJSON_IsNumber(profile) && profile->valuedouble >= 1 &&
+        std::floor(profile->valuedouble) == profile->valuedouble &&
+        cJSON_IsNumber(epoch) && epoch->valuedouble >= 0 &&
+        std::floor(epoch->valuedouble) == epoch->valuedouble &&
+        cJSON_IsNumber(sequence) && sequence->valuedouble >= 1 &&
+        std::floor(sequence->valuedouble) == sequence->valuedouble &&
+        cJSON_IsString(evidence) &&
+        strcmp(evidence->valuestring, "local_owner_face") == 0 &&
+        cJSON_IsString(retention) &&
+        strcmp(retention->valuestring, "none") == 0;
+    cJSON_Delete(root);
+    return valid;
+}
+#endif
 }  // namespace
 
 namespace eidolon {
@@ -137,14 +243,58 @@ EidolonVoiceController::EidolonVoiceController(GuardService* guard_service)
         vQueueDelete(event_queue_);
         event_queue_ = nullptr;
     }
+    esp_timer_create_args_t presence_timer_args = {};
+    presence_timer_args.callback =
+        &EidolonVoiceController::PresenceWakeTimerCb;
+    presence_timer_args.arg = this;
+    presence_timer_args.dispatch_method = ESP_TIMER_TASK;
+    presence_timer_args.name = "presence_wake";
+    if (esp_timer_create(&presence_timer_args, &presence_wake_timer_) != ESP_OK) {
+        presence_wake_timer_ = nullptr;
+    }
+#if CONFIG_EIDOLON_GUARD_SERVICE && CONFIG_EIDOLON_OWNER_FACE_PROFILE
+    if (guard_service_ != nullptr) {
+        RegisterDeviceEventHandler(
+            kAmbientPresenceChangedType,
+            [this](const DeviceEventMessage& event) {
+                HandleAmbientPresenceEvent(event);
+            });
+        guard_service_->SetOwnerRecognitionCallback(
+            [this](const OwnerRecognitionConfirmation& confirmation) {
+                Event ev;
+                ev.type = EventType::OwnerRecognitionConfirmed;
+                ev.generation = confirmation.request_generation;
+                ev.owner_recognition_confirmation =
+                    new (std::nothrow) OwnerRecognitionConfirmation(confirmation);
+                if (ev.owner_recognition_confirmation == nullptr) {
+                    ESP_LOGW(TAG, "Owner confirmation dropped: allocation failed");
+                    return;
+                }
+                Enqueue(ev);
+            });
+    }
+#endif
+#if CONFIG_BOARD_TYPE_ESP_BOX_3
+    RegisterDeviceEventHandler(
+        kIdentityOwnerPresenceConfirmedType,
+        [this](const DeviceEventMessage& event) {
+            HandleOwnerPresenceConfirmedEvent(event);
+        });
+#endif
 }
 
 EidolonVoiceController::~EidolonVoiceController()
 {
+#if CONFIG_EIDOLON_GUARD_SERVICE && CONFIG_EIDOLON_OWNER_FACE_PROFILE
+    if (guard_service_ != nullptr) {
+        guard_service_->SetOwnerRecognitionCallback({});
+    }
+#endif
     // Best-effort teardown; in practice the controller lives for the app lifetime.
     for (esp_timer_handle_t* t :
          {&audio_timer_, &reconnect_timer_, &connect_watchdog_, &idle_leave_timer_,
-          &full_duplex_idle_timer_, &ptt_release_tail_timer_}) {
+          &full_duplex_idle_timer_, &ptt_release_tail_timer_,
+          &presence_wake_timer_}) {
         if (*t != nullptr) {
             esp_timer_stop(*t);
             esp_timer_delete(*t);
@@ -159,6 +309,9 @@ EidolonVoiceController::~EidolonVoiceController()
         Event ev;
         while (xQueueReceive(event_queue_, &ev, 0) == pdTRUE) {
             delete ev.payload;
+#if CONFIG_EIDOLON_GUARD_SERVICE
+            delete ev.owner_recognition_confirmation;
+#endif
         }
         vQueueDelete(event_queue_);
         event_queue_ = nullptr;
@@ -177,7 +330,10 @@ void EidolonVoiceController::ControllerLoop()
     for (;;) {
         if (xQueueReceive(event_queue_, &ev, portMAX_DELAY) == pdTRUE) {
             Dispatch(ev);
-            delete ev.payload;  // null-safe; only set for string-carrying events
+            delete ev.payload;
+#if CONFIG_EIDOLON_GUARD_SERVICE
+            delete ev.owner_recognition_confirmation;
+#endif
         }
     }
 }
@@ -186,6 +342,9 @@ void EidolonVoiceController::Enqueue(Event ev)
 {
     if (event_queue_ == nullptr) {
         delete ev.payload;
+#if CONFIG_EIDOLON_GUARD_SERVICE
+        delete ev.owner_recognition_confirmation;
+#endif
         return;
     }
     // The queue copies the struct (including the payload pointer); on success the
@@ -193,6 +352,9 @@ void EidolonVoiceController::Enqueue(Event ev)
     if (xQueueSend(event_queue_, &ev, 0) != pdTRUE) {
         ESP_LOGW(TAG, "Event queue full; dropped event type=%d", static_cast<int>(ev.type));
         delete ev.payload;
+#if CONFIG_EIDOLON_GUARD_SERVICE
+        delete ev.owner_recognition_confirmation;
+#endif
     }
 }
 
@@ -236,6 +398,11 @@ void EidolonVoiceController::Dispatch(const Event& ev)
     case EventType::OwnerPresence:
         DoOwnerPresence(ev.owner_presence_observation, ev.generation);
         break;
+    case EventType::OwnerRecognitionConfirmed:
+        if (ev.owner_recognition_confirmation != nullptr) {
+            DoOwnerRecognitionConfirmed(*ev.owner_recognition_confirmation);
+        }
+        break;
 #endif
 #if CONFIG_EIDOLON_OWNER_FACE_PROFILE
     case EventType::OwnerFaceProfileCompleted:
@@ -253,6 +420,22 @@ void EidolonVoiceController::Dispatch(const Event& ev)
         if (ev.payload != nullptr) {
             DoSessionControl(*ev.payload);
         }
+        break;
+    case EventType::DeviceEvent:
+        if (ev.payload != nullptr) {
+            DoDeviceEvent(*ev.payload, ev.generation);
+        }
+        break;
+    case EventType::PublishDeviceEvent:
+        if (ev.payload != nullptr) {
+            DoPublishDeviceEvent(*ev.payload);
+        }
+        break;
+    case EventType::AmbientPresence:
+        DoAmbientPresenceChanged(ev.flag);
+        break;
+    case EventType::PresenceWakeTimeout:
+        DoPresenceWakeTimeout();
         break;
     case EventType::AgentPhaseChanged:
         DoAgentPhase(ev.phase);
@@ -310,6 +493,14 @@ void EidolonVoiceController::OnNetworkRestored()
     Enqueue(ev);
 }
 
+void EidolonVoiceController::OnAmbientPresenceChanged(bool present)
+{
+    Event ev;
+    ev.type = EventType::AmbientPresence;
+    ev.flag = present;
+    Enqueue(ev);
+}
+
 esp_err_t EidolonVoiceController::JoinRoom()
 {
     ESP_LOGI(TAG, "[lifecycle] enqueue join state=%s room_kind=%s gen=%lu",
@@ -337,6 +528,27 @@ esp_err_t EidolonVoiceController::SetMicEnabled(bool enabled)
     Event ev;
     ev.type = EventType::SetMic;
     ev.flag = enabled;
+    Enqueue(ev);
+    return ESP_OK;
+}
+
+bool EidolonVoiceController::RegisterDeviceEventHandler(
+    const std::string& type, DeviceEventBus::Handler handler)
+{
+    return device_event_bus_.RegisterHandler(type, std::move(handler));
+}
+
+esp_err_t EidolonVoiceController::PublishDeviceEvent(const std::string& payload)
+{
+    if (payload.empty() || payload.size() > DeviceEventBus::kMaxEventBytes) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    Event ev;
+    ev.type = EventType::PublishDeviceEvent;
+    ev.payload = new (std::nothrow) std::string(payload);
+    if (ev.payload == nullptr) {
+        return ESP_ERR_NO_MEM;
+    }
     Enqueue(ev);
     return ESP_OK;
 }
@@ -661,6 +873,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
     case LiveKitConnectionState::Connected:
         control_recovery_.OnVoiceConnected();
         SetState(VoiceSessionState::InRoom, "voice_connected");
+        SetPresenceWakePhase(PresenceWakePhase::Idle);
         StartAudioStatePublisher();
         if (pending_room_join_command_active_ &&
             (pending_room_join_generation_ == 0 ||
@@ -677,6 +890,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         SetState(VoiceSessionState::Reconnecting, "voice_reconnecting");
         break;
     case LiveKitConnectionState::Failed:
+        SetPresenceWakePhase(PresenceWakePhase::Idle);
         StopAudioStatePublisher();
         agent_phase_ = AgentPhase::Silent;
         CompletePendingRoomJoinCommand(
@@ -701,6 +915,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         }
         break;
     case LiveKitConnectionState::Disconnected:
+        SetPresenceWakePhase(PresenceWakePhase::Idle);
         // A control-room teardown during a JOIN handoff is now dropped by the
         // generation gate above (it carries the pre-bump generation), so anything
         // reaching here under the current generation is a genuine voice-room drop.
@@ -902,6 +1117,14 @@ void EidolonVoiceController::PttReleaseTailCb(void* arg)
     auto* self = static_cast<EidolonVoiceController*>(arg);
     Event ev;
     ev.type = EventType::PttReleaseTail;
+    self->Enqueue(ev);
+}
+
+void EidolonVoiceController::PresenceWakeTimerCb(void* arg)
+{
+    auto* self = static_cast<EidolonVoiceController*>(arg);
+    Event ev;
+    ev.type = EventType::PresenceWakeTimeout;
     self->Enqueue(ev);
 }
 
@@ -1142,6 +1365,286 @@ void EidolonVoiceController::DoSessionControl(const std::string& payload)
     }
     HandleSessionEnd(reason);
 }
+
+void EidolonVoiceController::DoDeviceEvent(const std::string& payload,
+                                           uint32_t event_generation)
+{
+    if (event_generation != session_generation_) {
+        ESP_LOGD(TAG,
+                 "Dropped stale device event generation=%lu current=%lu",
+                 static_cast<unsigned long>(event_generation),
+                 static_cast<unsigned long>(session_generation_));
+        return;
+    }
+    const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    const uint64_t now_epoch_ms =
+        now >= 1'700'000'000'000LL ? static_cast<uint64_t>(now) : 0;
+    const auto result = device_event_bus_.Dispatch(payload, now_epoch_ms);
+    if (result == DeviceEventDispatchResult::Invalid) {
+        ESP_LOGW(TAG, "Rejected malformed device event");
+    } else if (result == DeviceEventDispatchResult::Expired) {
+        ESP_LOGD(TAG, "Ignored expired device event");
+    }
+}
+
+void EidolonVoiceController::DoPublishDeviceEvent(const std::string& payload)
+{
+    if (!control_room_ || !session_.IsConnected()) {
+        ESP_LOGD(TAG, "Dropped volatile device event: control room unavailable");
+        return;
+    }
+    const esp_err_t err = session_.PublishData(kEventTopic, payload, true);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Device event publish failed: %s", esp_err_to_name(err));
+    }
+}
+
+void EidolonVoiceController::DoAmbientPresenceChanged(bool present)
+{
+#if !CONFIG_EIDOLON_RADAR_PRESENCE_PUBLISH
+    (void)present;
+    return;
+#else
+    if (!present) {
+        CancelPresenceWake("radar_vacant");
+        return;
+    }
+    if (!control_room_ || !session_.IsConnected() ||
+        (state_ != VoiceSessionState::ConfigReady &&
+         state_ != VoiceSessionState::Idle)) {
+        return;
+    }
+    const auto epoch_now = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    if (epoch_now < 1'700'000'000'000LL) {
+        ESP_LOGD(TAG, "Radar presence not published: system clock unavailable");
+        return;
+    }
+    const uint64_t monotonic_ms =
+        static_cast<uint64_t>(esp_timer_get_time() / 1000);
+    const std::string flow_id =
+        MakeDeviceEventId("flow-presence", monotonic_ms, esp_random());
+    const std::string event_id =
+        MakeDeviceEventId("evt-radar", monotonic_ms, esp_random());
+    if (presence_wake_flow_.Start(flow_id, event_id, monotonic_ms) !=
+        PresenceWakeStartResult::Started) {
+        return;
+    }
+    const std::string event_json = BuildDeviceEventJson({
+        .event_id = event_id,
+        .flow_id = flow_id,
+        .causation_id = "",
+        .type = kAmbientPresenceChangedType,
+        .source_device_id = SystemInfo::GetMacAddress(),
+        .source_component = "radar",
+        .occurred_at_ms = static_cast<uint64_t>(epoch_now),
+        .expires_at_ms =
+            static_cast<uint64_t>(epoch_now) + DeviceEventBus::kMaxTtlMs,
+        .payload_json =
+            "{\"state\":\"present\",\"modality\":\"mmwave\","
+            "\"edge\":\"vacant_to_present\"}",
+    });
+    if (event_json.empty() ||
+        session_.PublishData(kEventTopic, event_json, true) != ESP_OK) {
+        presence_wake_flow_.Cancel();
+        ESP_LOGW(TAG, "Radar presence event publish failed");
+        return;
+    }
+    ESP_LOGI(TAG,
+             "radar_presence_published flow_id=%s t2_ms=%llu",
+             flow_id.c_str(),
+             static_cast<unsigned long long>(monotonic_ms));
+    SetPresenceWakePhase(PresenceWakePhase::VerifyingOwner);
+    if (presence_wake_timer_ != nullptr) {
+        esp_timer_stop(presence_wake_timer_);
+        esp_timer_start_once(
+            presence_wake_timer_,
+            static_cast<uint64_t>(DeviceEventBus::kMaxTtlMs) * 1000ULL);
+    }
+#endif
+}
+
+void EidolonVoiceController::HandleOwnerPresenceConfirmedEvent(
+    const DeviceEventMessage& event)
+{
+#if !CONFIG_EIDOLON_RADAR_PRESENCE_PUBLISH
+    (void)event;
+    return;
+#else
+    if (!control_room_ || !IsOwnerConfirmationPayload(event.payload_json) ||
+        event.causation_id != presence_wake_flow_.ambient_event_id()) {
+        return;
+    }
+    const uint64_t now_ms =
+        static_cast<uint64_t>(esp_timer_get_time() / 1000);
+    if (presence_wake_flow_.Confirm(event.flow_id, now_ms) !=
+        PresenceWakeConfirmationResult::Matched) {
+        return;
+    }
+    if (presence_wake_timer_ != nullptr) {
+        esp_timer_stop(presence_wake_timer_);
+    }
+    ESP_LOGI(TAG,
+             "owner_confirmation_received flow_id=%s t8_ms=%llu",
+             event.flow_id.c_str(),
+             static_cast<unsigned long long>(now_ms));
+    SetPresenceWakePhase(PresenceWakePhase::OwnerRecognized);
+#if CONFIG_EIDOLON_OWNER_PRESENCE_VOICE_WAKE
+    pending_session_intent_ = "proactive_initiated";
+    const esp_err_t join_err = DoJoinRoom();
+    pending_session_intent_.clear();
+    if (join_err != ESP_OK) {
+        ESP_LOGW(TAG, "Owner-confirmed automatic join failed: %s",
+                 esp_err_to_name(join_err));
+        CancelPresenceWake("auto_join_failed");
+    }
+#else
+    if (presence_wake_timer_ != nullptr) {
+        esp_timer_start_once(presence_wake_timer_, 700ULL * 1000ULL);
+    }
+#endif
+#endif
+}
+
+void EidolonVoiceController::DoPresenceWakeTimeout()
+{
+    const uint64_t now_ms =
+        static_cast<uint64_t>(esp_timer_get_time() / 1000);
+    if (presence_wake_flow_.Expire(now_ms)) {
+        ESP_LOGI(TAG, "owner_recognition_timeout");
+    }
+    if (!presence_wake_flow_.waiting()) {
+        SetPresenceWakePhase(PresenceWakePhase::Idle);
+    }
+}
+
+void EidolonVoiceController::SetPresenceWakePhase(PresenceWakePhase phase)
+{
+    if (presence_wake_phase_ == phase) {
+        return;
+    }
+    presence_wake_phase_ = phase;
+    if (on_presence_wake_phase_) {
+        on_presence_wake_phase_(phase);
+    }
+}
+
+void EidolonVoiceController::CancelPresenceWake(const char* reason)
+{
+    const bool was_active =
+        presence_wake_flow_.Cancel() ||
+        presence_wake_phase_ != PresenceWakePhase::Idle;
+    if (presence_wake_timer_ != nullptr) {
+        esp_timer_stop(presence_wake_timer_);
+    }
+    if (was_active) {
+        ESP_LOGI(TAG, "presence_wake_cancelled reason=%s",
+                 reason != nullptr ? reason : "unspecified");
+        SetPresenceWakePhase(PresenceWakePhase::Idle);
+    }
+}
+
+#if CONFIG_EIDOLON_GUARD_SERVICE
+void EidolonVoiceController::HandleAmbientPresenceEvent(
+    const DeviceEventMessage& event)
+{
+#if !CONFIG_EIDOLON_OWNER_RECOGNITION_ON_PRESENCE
+    (void)event;
+    return;
+#else
+    if (guard_service_ == nullptr || !control_room_ ||
+        !IsPresentAmbientPayload(event.payload_json)) {
+        return;
+    }
+    const auto result = guard_service_->RequestOwnerRecognition(
+        event.flow_id, event.event_id, session_generation_);
+    if (result == OwnerRecognitionRequestResult::Pending) {
+        ESP_LOGI(TAG,
+                 "owner_recognition_started flow_id=%s source=%s",
+                 event.flow_id.c_str(), event.source_device_id.c_str());
+    } else if (result == OwnerRecognitionRequestResult::Confirmed) {
+        ESP_LOGI(TAG,
+                 "owner_recognition_fresh_match flow_id=%s",
+                 event.flow_id.c_str());
+    } else if (result == OwnerRecognitionRequestResult::Rejected) {
+        ESP_LOGD(TAG,
+                 "owner_recognition_ignored flow_id=%s reason=unavailable",
+                 event.flow_id.c_str());
+    }
+#endif
+}
+
+void EidolonVoiceController::DoOwnerRecognitionConfirmed(
+    const OwnerRecognitionConfirmation& confirmation)
+{
+#if !CONFIG_EIDOLON_OWNER_RECOGNITION_ON_PRESENCE
+    (void)confirmation;
+    return;
+#else
+    if (confirmation.request_generation != session_generation_ ||
+        !control_room_ || !session_.IsConnected()) {
+        ESP_LOGD(TAG,
+                 "Dropped stale owner confirmation flow_id=%s generation=%lu current=%lu",
+                 confirmation.flow_id.c_str(),
+                 static_cast<unsigned long>(confirmation.request_generation),
+                 static_cast<unsigned long>(session_generation_));
+        return;
+    }
+    if (confirmation.profile_revision == 0 ||
+        confirmation.presence_sequence == 0) {
+        ESP_LOGW(TAG, "Rejected incomplete local owner confirmation");
+        return;
+    }
+    const auto epoch_now = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    if (epoch_now < 1'700'000'000'000LL) {
+        ESP_LOGW(TAG, "Dropped owner confirmation: system clock is not synchronized");
+        return;
+    }
+    char payload[192] = {};
+    const int payload_length = std::snprintf(
+        payload, sizeof(payload),
+        "{\"profile_revision\":%lu,\"guard_epoch\":%lu,"
+        "\"presence_sequence\":%lu,\"evidence\":\"local_owner_face\","
+        "\"raw_retention\":\"none\"}",
+        static_cast<unsigned long>(confirmation.profile_revision),
+        static_cast<unsigned long>(confirmation.guard_epoch),
+        static_cast<unsigned long>(confirmation.presence_sequence));
+    if (payload_length <= 0 ||
+        static_cast<size_t>(payload_length) >= sizeof(payload)) {
+        return;
+    }
+    const uint64_t monotonic_ms =
+        static_cast<uint64_t>(esp_timer_get_time() / 1000);
+    const std::string event_json = BuildDeviceEventJson({
+        .event_id = MakeDeviceEventId("evt-owner", monotonic_ms, esp_random()),
+        .flow_id = confirmation.flow_id,
+        .causation_id = confirmation.causation_id,
+        .type = kIdentityOwnerPresenceConfirmedType,
+        .source_device_id = SystemInfo::GetMacAddress(),
+        .source_component = "owner_face",
+        .occurred_at_ms = static_cast<uint64_t>(epoch_now),
+        .expires_at_ms =
+            static_cast<uint64_t>(epoch_now) + DeviceEventBus::kMaxTtlMs,
+        .payload_json = payload,
+    });
+    if (event_json.empty()) {
+        ESP_LOGW(TAG, "Failed to build owner confirmation event");
+        return;
+    }
+    const uint64_t local_delay_ms =
+        monotonic_ms >= confirmation.confirmed_at_ms
+            ? monotonic_ms - confirmation.confirmed_at_ms
+            : 0;
+    ESP_LOGI(TAG,
+             "owner_recognition_published flow_id=%s local_delay_ms=%llu",
+             confirmation.flow_id.c_str(),
+             static_cast<unsigned long long>(local_delay_ms));
+    DoPublishDeviceEvent(event_json);
+#endif
+}
+#endif
 
 void EidolonVoiceController::HandleConfigRefreshCommand(const std::string& command_id,
                                                         const std::string& /*payload*/)
@@ -1840,6 +2343,15 @@ void EidolonVoiceController::DoActivation()
         ev.generation = generation;
         Enqueue(ev);
     });
+    session_.SetOnDeviceEvent([this](const std::string& payload, uint32_t generation) {
+        Event ev;
+        ev.type = EventType::DeviceEvent;
+        ev.generation = generation;
+        ev.payload = new (std::nothrow) std::string(payload);
+        if (ev.payload != nullptr) {
+            Enqueue(ev);
+        }
+    });
     session_.SetOnControlCommand([this](const std::string& payload) {
         Event ev;
         ev.type = EventType::ControlCommand;
@@ -1896,6 +2408,7 @@ void EidolonVoiceController::DoNetworkLost()
              VoiceStateName(state_), CurrentRoomKind(),
              static_cast<unsigned long>(session_generation_), session_.IsConnected() ? 1 : 0,
              config_.active.room_name.c_str(), config_.control.room_name.c_str());
+    CancelPresenceWake("network_lost");
     StopAudioStatePublisher();
     control_recovery_.OnNetworkLost();
     if (reconnect_timer_ != nullptr) {
@@ -1971,6 +2484,12 @@ void EidolonVoiceController::DoNetworkRestored()
 
 esp_err_t EidolonVoiceController::DoJoinRoom()
 {
+    const bool presence_initiated =
+        presence_wake_phase_ == PresenceWakePhase::OwnerRecognized &&
+        pending_session_intent_ == "proactive_initiated";
+    if (!presence_initiated) {
+        CancelPresenceWake("manual_join");
+    }
     ESP_LOGI(TAG,
              "[lifecycle] join executing state=%s room_kind=%s gen=%lu control_room=%d "
              "connected=%d voice_room=%s control_room_name=%s intent=%s",
@@ -2299,6 +2818,7 @@ uint64_t EidolonVoiceController::GuardEventTimestampMs(uint64_t monotonic_ms)
 
 esp_err_t EidolonVoiceController::DoLeaveRoom()
 {
+    CancelPresenceWake("leave_room");
     bool playback_recent = PlaybackActiveRecently();
     ESP_LOGI(TAG,
              "[lifecycle] leave executing state=%s room_kind=%s gen=%lu connected=%d "

@@ -8,6 +8,7 @@ namespace eidolon {
 // (kControlTopic was even defined twice), which risked drift. Keep in sync with
 // eidolon_sdk.biz.contracts.
 inline constexpr const char* kControlTopic = "eidolon.control";
+inline constexpr const char* kEventTopic = "eidolon.event";
 inline constexpr const char* kClientAudioStateTopic = "eidolon.audio_state";
 inline constexpr const char* kUiStateTopic = "eidolon.ui_state";
 inline constexpr const char* kSessionControlTopic = "eidolon.session_control";
@@ -23,6 +24,10 @@ inline constexpr const char* kAgentSessionTopic = "lk.agent.session";
 
 // Bump in lockstep with Python WIRE_SCHEMA_VERSION on a breaking envelope change.
 inline constexpr int kWireSchemaVersion = 1;
+inline constexpr int kDeviceEventSchemaVersion = 1;
+inline constexpr const char* kAmbientPresenceChangedType = "ambient.presence.changed";
+inline constexpr const char* kIdentityOwnerPresenceConfirmedType =
+    "identity.owner_presence.confirmed";
 
 // client.audio_state — body "type" label (NOT the routing topic above) + enums.
 inline constexpr const char* kClientAudioStateType = "client.audio_state";

@@ -149,6 +149,7 @@ CONFIG_EIDOLON_INTERACTION_MODE_HALF_DUPLEX=y
 CONFIG_EIDOLON_LIVEKIT_SPEAKER_VOLUME=50
 CONFIG_EIDOLON_OWNER_FACE_PROFILE=y
 CONFIG_EIDOLON_OWNER_PERSON_PRESENCE=y
+CONFIG_EIDOLON_OWNER_RECOGNITION_ON_PRESENCE=y
 CONFIG_HUMAN_FACE_DETECT_MODEL_IN_FLASH_PARTITION=y
 # CONFIG_HUMAN_FACE_DETECT_MODEL_IN_FLASH_RODATA is not set
 CONFIG_HUMAN_FACE_FEAT_MODEL_IN_FLASH_PARTITION=y
@@ -252,6 +253,7 @@ sync_existing_sdkconfig() {
   set_sdkconfig_value CONFIG_CAMERA_DMA_BUFFER_SIZE_MAX 8192
   set_sdkconfig_value CONFIG_EIDOLON_OWNER_FACE_PROFILE y
   set_sdkconfig_value CONFIG_EIDOLON_OWNER_PERSON_PRESENCE y
+  set_sdkconfig_value CONFIG_EIDOLON_OWNER_RECOGNITION_ON_PRESENCE y
   # Interaction mode = half_duplex (no AEC on this board): enforce on an
   # existing sdkconfig too, else a stale PTT=y from the 2-mode era survives a
   # re-run (ESP-IDF does not re-apply overlay defaults to an existing config).

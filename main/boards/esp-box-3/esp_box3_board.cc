@@ -53,6 +53,8 @@ private:
     i2c_master_bus_handle_t i2c_bus_;
     i2c_master_bus_handle_t sensor_i2c_bus_ = nullptr;
     std::unique_ptr<Box3RadarPresence> radar_presence_;
+    RadarPresenceState last_radar_state_ = RadarPresenceState::Unavailable;
+    bool has_last_radar_state_ = false;
     Button boot_button_;
     Display* display_;
     esp_lcd_touch_handle_t touch_ = nullptr;
@@ -105,7 +107,7 @@ private:
         }
 
         radar_presence_ = std::make_unique<Box3RadarPresence>();
-        err = radar_presence_->Start(sensor_i2c_bus_, [](RadarPresenceState state) {
+        err = radar_presence_->Start(sensor_i2c_bus_, [this](RadarPresenceState state) {
             PresenceState display_state = PresenceState::Unavailable;
             switch (state) {
             case RadarPresenceState::Calibrating:
@@ -121,10 +123,31 @@ private:
             default:
                 break;
             }
-            Application::GetInstance().Schedule([display_state]() {
+            const bool entered =
+                has_last_radar_state_ &&
+                last_radar_state_ == RadarPresenceState::Vacant &&
+                state == RadarPresenceState::Present;
+            const bool left_or_unavailable =
+                has_last_radar_state_ &&
+                last_radar_state_ == RadarPresenceState::Present &&
+                state != RadarPresenceState::Present;
+            last_radar_state_ = state;
+            has_last_radar_state_ = true;
+            Application::GetInstance().Schedule(
+                [display_state, entered, left_or_unavailable]() {
                 if (auto* display = Board::GetInstance().GetDisplay()) {
                     display->SetPresenceState(display_state);
                 }
+#if CONFIG_EIDOLON_HUB_MODE
+                if (entered) {
+                    Application::GetInstance().OnAmbientPresenceChanged(true);
+                } else if (left_or_unavailable) {
+                    Application::GetInstance().OnAmbientPresenceChanged(false);
+                }
+#else
+                (void)entered;
+                (void)left_or_unavailable;
+#endif
             });
         });
         if (err != ESP_OK) {

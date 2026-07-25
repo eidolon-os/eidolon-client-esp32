@@ -16,7 +16,9 @@ public:
                                  bool ptt_recording = false,
                                  bool ptt_committing = false,
                                  VoiceInputPolicy input_policy = {},
-                                 EndReason end_reason = EndReason::None);
+                                 EndReason end_reason = EndReason::None,
+                                 PresenceWakePhase presence_wake =
+                                     PresenceWakePhase::Idle);
 };
 
 }  // namespace eidolon
