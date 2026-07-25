@@ -1353,6 +1353,18 @@ menu "Eidolon Hub"
             VACANT-to-PRESENT edge. Events are volatile, owner-scoped by Hub,
             and never replayed after reconnect.
 
+    config EIDOLON_BOX3_RADAR_THRESHOLD_DELTA
+        int "BOX-3 radar detection threshold"
+        range 0 1023
+        default 450
+        depends on BOARD_TYPE_ESP_BOX_3
+        help
+            Configures the AT581X signal threshold at each boot. A larger value
+            shortens the sensing distance. The value is unitless: enclosure,
+            orientation, reflections, and target motion all affect the actual
+            distance. 450 is a conservative desktop starting point targeting
+            approximately one metre and must be calibrated on the real dock.
+
     config EIDOLON_OWNER_PRESENCE_VOICE_WAKE
         bool "Enable owner-confirmed BOX-3 automatic voice join"
         default n

@@ -10,7 +10,8 @@
 #   EIDOLON_PORT                       Serial port, for example /dev/cu.usbmodem1101
 #   EIDOLON_IDF_EXPORT                 Full path to ESP-IDF export.sh
 #   EIDOLON_IDF_PATH                   ESP-IDF root directory
-#   EIDOLON_OWNER_PRESENCE_VOICE_WAKE Enable owner-confirmed voice join: y/n (default n)
+#   EIDOLON_OWNER_PRESENCE_VOICE_WAKE Enable owner-confirmed voice join: y/n (default y)
+#   EIDOLON_BOX3_RADAR_THRESHOLD_DELTA Radar threshold: 0-1023, larger is nearer (default 450)
 #   IDF_PATH                           ESP-IDF root directory
 
 set -euo pipefail
@@ -25,11 +26,17 @@ readonly SDKCONFIG_OVERLAY="${BUILD_DIR}/sdkconfig.overlay.esp-box-3"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PORT="${EIDOLON_PORT:-}"
-OWNER_PRESENCE_VOICE_WAKE="${EIDOLON_OWNER_PRESENCE_VOICE_WAKE:-n}"
+OWNER_PRESENCE_VOICE_WAKE="${EIDOLON_OWNER_PRESENCE_VOICE_WAKE:-y}"
+RADAR_THRESHOLD_DELTA="${EIDOLON_BOX3_RADAR_THRESHOLD_DELTA:-450}"
 
 if [[ "${OWNER_PRESENCE_VOICE_WAKE}" != "y" &&
       "${OWNER_PRESENCE_VOICE_WAKE}" != "n" ]]; then
   echo "error: EIDOLON_OWNER_PRESENCE_VOICE_WAKE must be y or n" >&2
+  exit 2
+fi
+if [[ ! "${RADAR_THRESHOLD_DELTA}" =~ ^[0-9]+$ ]] ||
+   ((RADAR_THRESHOLD_DELTA < 0 || RADAR_THRESHOLD_DELTA > 1023)); then
+  echo "error: EIDOLON_BOX3_RADAR_THRESHOLD_DELTA must be an integer from 0 to 1023" >&2
   exit 2
 fi
 
@@ -157,6 +164,7 @@ CONFIG_EIDOLON_HUB_MODE=y
 CONFIG_EIDOLON_AUTO_JOIN_ON_ACTIVATION=n
 CONFIG_EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN=y
 CONFIG_EIDOLON_RADAR_PRESENCE_PUBLISH=y
+CONFIG_EIDOLON_BOX3_RADAR_THRESHOLD_DELTA=${RADAR_THRESHOLD_DELTA}
 CONFIG_EIDOLON_OWNER_PRESENCE_VOICE_WAKE=${OWNER_PRESENCE_VOICE_WAKE}
 # CONFIG_EIDOLON_INTERACTION_MODE_PTT is not set
 # CONFIG_EIDOLON_INTERACTION_MODE_HALF_DUPLEX is not set
@@ -229,6 +237,7 @@ ensure_box3_sdkconfig() {
   set_sdkconfig_bool EIDOLON_AUTO_JOIN_ON_ACTIVATION n
   set_sdkconfig_bool EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN y
   set_sdkconfig_bool EIDOLON_RADAR_PRESENCE_PUBLISH y
+  set_sdkconfig_value EIDOLON_BOX3_RADAR_THRESHOLD_DELTA "${RADAR_THRESHOLD_DELTA}"
   set_sdkconfig_bool EIDOLON_OWNER_PRESENCE_VOICE_WAKE "${OWNER_PRESENCE_VOICE_WAKE}"
   set_sdkconfig_bool EIDOLON_INTERACTION_MODE_PTT n
   set_sdkconfig_bool USE_DEVICE_AEC y
@@ -304,7 +313,9 @@ Environment:
   EIDOLON_PORT=/dev/cu.usbmodemXXXX
   EIDOLON_LIVEKIT_SDK=0.3.7   Pin the LiveKit SDK version (forces clean re-resolve)
   EIDOLON_OWNER_PRESENCE_VOICE_WAKE=y
-                               Compile owner-confirmed automatic voice join
+                               Compile owner-confirmed automatic voice join (default y)
+  EIDOLON_BOX3_RADAR_THRESHOLD_DELTA=450
+                               Unitless AT581X threshold; larger is nearer
 EOF
 }
 
