@@ -16,13 +16,115 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
+#include <cstring>
 #include <set>
+#include <sys/time.h>
+#include <time.h>
 
 #define TAG "HubConfigClient"
 
 namespace eidolon {
 
 namespace {
+
+constexpr time_t kValidUnixTimeFloor = 1'700'000'000;
+
+int HttpMonthNumber(const char* month)
+{
+    static constexpr const char* kMonths[] = {
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    };
+    for (int index = 0; index < 12; ++index) {
+        if (std::strcmp(month, kMonths[index]) == 0) {
+            return index + 1;
+        }
+    }
+    return 0;
+}
+
+bool IsLeapYear(int year)
+{
+    return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+}
+
+bool ParseHttpDate(const std::string& value, time_t* unix_seconds)
+{
+    int day = 0;
+    int year = 0;
+    int hour = 0;
+    int minute = 0;
+    int second = 0;
+    char month_text[4] = {};
+    char zone[4] = {};
+    char trailing = '\0';
+    if (std::sscanf(value.c_str(), "%*3s, %d %3s %d %d:%d:%d %3s%c",
+                    &day, month_text, &year, &hour, &minute, &second,
+                    zone, &trailing) != 7 ||
+        std::strcmp(zone, "GMT") != 0) {
+        return false;
+    }
+
+    const int month = HttpMonthNumber(month_text);
+    static constexpr int kDaysPerMonth[] = {
+        31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31,
+    };
+    const int days_in_month =
+        month == 2 && IsLeapYear(year) ? 29 :
+        (month >= 1 && month <= 12 ? kDaysPerMonth[month - 1] : 0);
+    if (year < 2023 || year > 2100 || day < 1 || day > days_in_month ||
+        hour < 0 || hour > 23 || minute < 0 || minute > 59 ||
+        second < 0 || second > 60) {
+        return false;
+    }
+
+    // Gregorian civil date to days since 1970-01-01. This avoids applying the
+    // device's local timezone while parsing the RFC 7231 GMT Date header.
+    int adjusted_year = year - (month <= 2 ? 1 : 0);
+    const int era =
+        (adjusted_year >= 0 ? adjusted_year : adjusted_year - 399) / 400;
+    const unsigned year_of_era =
+        static_cast<unsigned>(adjusted_year - era * 400);
+    const unsigned day_of_year =
+        (153U * static_cast<unsigned>(month + (month > 2 ? -3 : 9)) + 2U) /
+            5U +
+        static_cast<unsigned>(day - 1);
+    const unsigned day_of_era =
+        year_of_era * 365U + year_of_era / 4U - year_of_era / 100U +
+        day_of_year;
+    const int64_t days =
+        static_cast<int64_t>(era) * 146097LL +
+        static_cast<int64_t>(day_of_era) - 719468LL;
+    const int64_t seconds =
+        days * 86400LL + hour * 3600LL + minute * 60LL + second;
+    if (seconds < kValidUnixTimeFloor) {
+        return false;
+    }
+    *unix_seconds = static_cast<time_t>(seconds);
+    return true;
+}
+
+void MaybeSyncClockFromHubDate(const std::string& date_header)
+{
+    if (std::time(nullptr) >= kValidUnixTimeFloor) {
+        return;
+    }
+    time_t server_time = 0;
+    if (!ParseHttpDate(date_header, &server_time)) {
+        ESP_LOGW(TAG, "Hub clock sync skipped: invalid or missing HTTP Date");
+        return;
+    }
+    const timeval tv = {
+        .tv_sec = server_time,
+        .tv_usec = 0,
+    };
+    if (settimeofday(&tv, nullptr) != 0) {
+        ESP_LOGW(TAG, "Hub clock sync failed");
+        return;
+    }
+    ESP_LOGI(TAG, "System clock synchronized from Hub HTTP Date");
+}
 
 void ParseOptionalFirmware(cJSON* root, bool* has_pending, bool* force, std::string* version,
                            std::string* url) {
@@ -446,6 +548,7 @@ esp_err_t HubConfigClient::RegisterDevice(const std::string& register_url,
 
     int status = http->GetStatusCode();
     std::string response = http->ReadAll();
+    const std::string hub_date = http->GetResponseHeader("Date");
     http->Close();
 
     if (status != 200) {
@@ -470,6 +573,7 @@ esp_err_t HubConfigClient::RegisterDevice(const std::string& register_url,
     if (parse_err != ESP_OK) {
         return parse_err;
     }
+    MaybeSyncClockFromHubDate(hub_date);
 
     ESP_LOGI(TAG, "Registered device %s status=%s", out.active.identity.c_str(),
              HubConfigStatusToString(out.status));
