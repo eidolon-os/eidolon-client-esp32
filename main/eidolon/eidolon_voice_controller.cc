@@ -744,8 +744,9 @@ esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist)
     }
     HubConfigClient client;
     Esp32HubConfig fresh;
-    // pending_session_intent_ is set only by a proactive room.join and is empty
-    // otherwise, so a normal refresh/JOIN sends no intent (Hub → user_initiated).
+    // pending_session_intent_ is set only by an orchestrated room.join or a
+    // verified local presence wake. A normal refresh/JOIN sends no intent, so
+    // Hub defaults it to user_initiated.
     esp_err_t err = client.RegisterDevice(register_url_, SystemInfo::GetMacAddress(), fresh,
                                           pending_session_intent_);
     if (err == ESP_ERR_NOT_ALLOWED) {
@@ -1494,7 +1495,7 @@ void EidolonVoiceController::HandleOwnerPresenceConfirmedEvent(
              static_cast<unsigned long long>(now_ms));
     SetPresenceWakePhase(PresenceWakePhase::OwnerRecognized);
 #if CONFIG_EIDOLON_OWNER_PRESENCE_VOICE_WAKE
-    pending_session_intent_ = kSessionIntentProactive;
+    pending_session_intent_ = kSessionIntentPresence;
     const esp_err_t join_err = DoJoinRoom();
     pending_session_intent_.clear();
     if (join_err != ESP_OK) {
@@ -1915,9 +1916,9 @@ void EidolonVoiceController::DoOwnerFaceProfileCompleted(const std::string& payl
 void EidolonVoiceController::HandleRoomJoinCommand(const std::string& command_id,
                                                    const std::string& payload)
 {
-    // A proactive wake (Phase 3) arrives as room.join with a payload that carries
-    // session_intent ("proactive_initiated"). Stash it so the JOIN's token-fetch
-    // declares it to the Hub (→ token metadata → channel suppresses the welcome).
+    // An orchestrated wake arrives as room.join with a session_intent. Preserve
+    // trusted presence/proactive intents through the JOIN token fetch; Channel
+    // derives opening and idle behavior from the exact intent.
     // A user-initiated room.join may omit the payload or explicitly carry
     // "user_initiated"; in both cases pending stays empty.
     pending_session_intent_.clear();
@@ -1927,7 +1928,8 @@ void EidolonVoiceController::HandleRoomJoinCommand(const std::string& command_id
             const cJSON* intent = cJSON_GetObjectItem(root, "session_intent");
             if (cJSON_IsString(intent) && intent->valuestring != nullptr) {
                 const char* value = intent->valuestring;
-                if (strcmp(value, kSessionIntentProactive) == 0) {
+                if (strcmp(value, kSessionIntentPresence) == 0 ||
+                    strcmp(value, kSessionIntentProactive) == 0) {
                     pending_session_intent_ = value;
                 } else if (strcmp(value, kSessionIntentUserInitiated) != 0) {
                     ESP_LOGW(TAG, "Ignoring unsupported session_intent=%s", value);
@@ -2490,7 +2492,7 @@ esp_err_t EidolonVoiceController::DoJoinRoom()
 {
     const bool presence_initiated =
         presence_wake_phase_ == PresenceWakePhase::OwnerRecognized &&
-        pending_session_intent_ == kSessionIntentProactive;
+        pending_session_intent_ == kSessionIntentPresence;
     if (!presence_initiated) {
         CancelPresenceWake("manual_join");
     }

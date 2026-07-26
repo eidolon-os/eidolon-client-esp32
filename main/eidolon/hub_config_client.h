@@ -12,10 +12,10 @@ namespace eidolon {
 
 class HubConfigClient {
 public:
-    // ``session_intent`` (optional) declares why this voice session exists; when
-    // non-empty it rides the ``X-Device-Session-Intent`` header so the Hub can
-    // stamp it into the voice token's metadata (channel suppresses the welcome
-    // on a proactive wake). Empty = a normal JOIN (Hub defaults user_initiated).
+    // ``session_intent`` (optional) declares why this voice session exists.
+    // Presence wakes keep a welcome but use a bounded idle window; proactive
+    // report sessions suppress the canned welcome because their report opens
+    // the conversation. Empty = a normal JOIN (Hub defaults user_initiated).
     esp_err_t RegisterDevice(const std::string& register_url, const std::string& device_id,
                              Esp32HubConfig& out, const std::string& session_intent = "");
 #if CONFIG_EIDOLON_GUARD_SERVICE

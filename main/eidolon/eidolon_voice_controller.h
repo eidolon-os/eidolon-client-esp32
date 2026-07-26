@@ -327,10 +327,10 @@ private:
 #endif
     bool ptt_active_ = false;  // PTT: held or in the short release tail (mic open)
     bool ptt_release_tail_pending_ = false;
-    // Session intent for the NEXT voice JOIN, set by a proactive room.join
-    // control command and consumed (then cleared) by DoJoinRoom so it rides the
-    // token-fetch as the X-Device-Session-Intent header. Empty for a normal user
-    // JOIN. Controller-task only.
+    // Session intent for the NEXT voice JOIN, set by an orchestrated room.join
+    // or verified owner-presence wake and consumed by DoJoinRoom so it rides
+    // the token fetch as X-Device-Session-Intent. Empty for a normal user JOIN.
+    // Controller-task only.
     std::string pending_session_intent_;
     // True means the current session generation targets the data-only control
     // plane. It intentionally covers Connecting/Reconnecting/Connected; actual
