@@ -66,10 +66,23 @@ public:
     // buffer for every board; memory-tight boards that also run the on-device
     // AFE full_duplex mic path (e.g. m5stack-stackchan) opt in to free ~width*20*2
     // bytes of internal SRAM at the cost of a slightly slower flush.
+    //
+    // NOTE for esp_lcd_panel_io_spi panels: the LVGL 9 port has no bounce buffer
+    // (trans_size is lvgl8-only), so a PSRAM draw buffer makes spi_master allocate
+    // a temporary internal DMA buffer per transfer. That allocation fails exactly
+    // when internal RAM is scarce ("setup_dma_priv_buffer ... Failed to allocate
+    // priv TX buffer"), wedging the flush. Prefer draw_buffer_lines on SPI panels;
+    // draw_buffer_psram is for panels whose flush path does not need DMA-capable
+    // source memory.
+    //
+    // draw_buffer_lines: height in lines of the LVGL draw buffer (default 20).
+    // Halving it halves the internal DMA reservation at the cost of more flushes
+    // per frame — the safe way to reclaim internal SRAM on a SPI/QSPI panel.
     SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel,
                   int width, int height, int offset_x, int offset_y,
                   bool mirror_x, bool mirror_y, bool swap_xy,
-                  bool draw_buffer_psram = false);
+                  bool draw_buffer_psram = false,
+                  int draw_buffer_lines = 20);
 };
 
 // RGB LCD display
