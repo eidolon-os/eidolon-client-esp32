@@ -380,7 +380,8 @@ esp_err_t ParseEsp32ConfigResponse(const std::string& body, Esp32HubConfig& out,
 esp_err_t HubConfigClient::RegisterDevice(const std::string& register_url,
                                           const std::string& device_id,
                                           Esp32HubConfig& out,
-                                          const std::string& session_intent) {
+                                          const std::string& session_intent,
+                                          const std::string& session_flow_id) {
     out = Esp32HubConfig{};
     has_pending_firmware_ = false;
     pending_firmware_force_ = false;
@@ -538,6 +539,9 @@ esp_err_t HubConfigClient::RegisterDevice(const std::string& register_url,
     // only ever yield a *less* surprising (non-proactive) session.
     if (!session_intent.empty()) {
         http->SetHeader("X-Device-Session-Intent", session_intent.c_str());
+    }
+    if (!session_flow_id.empty()) {
+        http->SetHeader(kSessionFlowIdHeader, session_flow_id.c_str());
     }
 
     http->SetContent(std::string(body));

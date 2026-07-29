@@ -17,7 +17,8 @@ public:
     // report sessions suppress the canned welcome because their report opens
     // the conversation. Empty = a normal JOIN (Hub defaults user_initiated).
     esp_err_t RegisterDevice(const std::string& register_url, const std::string& device_id,
-                             Esp32HubConfig& out, const std::string& session_intent = "");
+                             Esp32HubConfig& out, const std::string& session_intent = "",
+                             const std::string& session_flow_id = "");
 #if CONFIG_EIDOLON_GUARD_SERVICE
     // Fetch GuardBinding-local runtime config with the same signed device
     // identity as /api/config. It never fetches persona or policy config.

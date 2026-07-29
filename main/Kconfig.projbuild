@@ -1335,23 +1335,25 @@ menu "Eidolon Hub"
             identity session; it can never establish or transfer identity.
             No image, embedding, or inference score leaves the device.
 
-    config EIDOLON_OWNER_RECOGNITION_ON_PRESENCE
-        bool "Enable event-triggered ATK owner recognition"
+    config EIDOLON_AMBIENT_PRESENCE_OWNER_AUTH
+        bool "Enable ambient-presence-gated ATK owner authentication"
         default n
         depends on EIDOLON_OWNER_PERSON_PRESENCE
         help
-            Allows a short-lived ambient.presence.changed event to wake local
-            owner recognition and publish a flow-correlated confirmation. This
-            low-risk orchestration policy is deliberately disabled by default.
+            Maintains source-scoped ambient.presence.state assertions and
+            correlates continuous local owner facts to every active assertion.
+            Owner authentication is driven by local visual state, not by
+            bounded remote recognition requests or retry timers.
 
-    config EIDOLON_RADAR_PRESENCE_PUBLISH
-        bool "Enable BOX-3 radar presence event publishing"
+    config EIDOLON_RADAR_PRESENCE_BROADCAST
+        bool "Enable BOX-3 radar presence state broadcasting"
         default n
         depends on EIDOLON_HUB_MODE && BOARD_TYPE_ESP_BOX_3
         help
-            Publishes one ambient.presence.changed event for each debounced
-            VACANT-to-PRESENT edge. Events are volatile, owner-scoped by Hub,
-            and never replayed after reconnect.
+            Publishes source-scoped ambient.presence.state edge facts, a
+            reconnect snapshot, and low-frequency lease heartbeats while
+            present. Heartbeats repair state only and never trigger owner
+            authentication.
 
     config EIDOLON_BOX3_RADAR_THRESHOLD_DELTA
         int "BOX-3 radar detection threshold"
@@ -1368,11 +1370,12 @@ menu "Eidolon Hub"
     config EIDOLON_OWNER_PRESENCE_VOICE_WAKE
         bool "Enable owner-confirmed BOX-3 automatic voice join"
         default n
-        depends on EIDOLON_RADAR_PRESENCE_PUBLISH
+        depends on EIDOLON_RADAR_PRESENCE_BROADCAST
         help
-            Allows the BOX-3 that originated a still-pending radar flow to join
-            a short Voice Room after an owner confirmation. Disabled by default
-            because this policy opens the microphone without a BOOT press.
+            Allows the BOX-3 with an active radar presence assertion to join a
+            Voice Room after a flow-correlated owner confirmation. Disabled by
+            default because this policy opens the microphone without a BOOT
+            press.
 
     config EIDOLON_GUARD_SAMPLE_INTERVAL_MS
         int "ATK guard sample interval in milliseconds"

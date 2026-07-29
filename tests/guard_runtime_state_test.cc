@@ -330,19 +330,31 @@ void TestOwnerPresenceHasSmoothEnterExitAndHeartbeat()
     assert(observation.state == eidolon::OwnerPresenceState::AbsentPending);
     assert(observation.identity_session_active);
 
+    // Returning before the 6s exit dwell preserves the authenticated session
+    // and epoch. NO FACE during this interval is only an observation, not a
+    // completed owner departure.
+    observation = machine.Process(PersonSample(10000, true));
+    assert(observation.state == eidolon::OwnerPresenceState::Present);
+    assert(observation.fact == eidolon::OwnerPresenceFact::None);
+    assert(observation.epoch == epoch);
+    assert(observation.identity_session_active);
+
+    observation = machine.Process(PersonSample(11000, false));
+    assert(observation.state == eidolon::OwnerPresenceState::AbsentPending);
+
     // An empty frame does not immediately declare the owner absent.
-    observation = machine.Process(PersonSample(12999, false));
+    observation = machine.Process(PersonSample(15999, false));
     assert(observation.fact == eidolon::OwnerPresenceFact::None);
     assert(observation.state == eidolon::OwnerPresenceState::AbsentPending);
-    observation = machine.Process(PersonSample(13000, false));
+    observation = machine.Process(PersonSample(16000, false));
     assert(observation.state == eidolon::OwnerPresenceState::Watching);
     assert(observation.fact == eidolon::OwnerPresenceFact::Absent);
     assert(observation.epoch == epoch);
 
     // Re-entry is face-gated and opens a new epoch.
-    observation = machine.Process(OwnerSample(14000, true));
+    observation = machine.Process(OwnerSample(17000, true));
     assert(observation.state == eidolon::OwnerPresenceState::PresentPending);
-    observation = machine.Process(OwnerSample(16000, true));
+    observation = machine.Process(OwnerSample(19000, true));
     assert(observation.state == eidolon::OwnerPresenceState::Present);
     assert(observation.fact == eidolon::OwnerPresenceFact::Present);
     assert(observation.epoch == epoch + 1);

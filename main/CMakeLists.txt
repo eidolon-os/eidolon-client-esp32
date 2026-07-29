@@ -1087,7 +1087,7 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/livekit_board.cc"
         "eidolon/livekit_session.cc"
         "eidolon/livekit_voice_transport.cc"
-        "eidolon/presence_wake_flow.cc"
+        "eidolon/ambient_presence_state.cc"
         "eidolon/eidolon_voice_controller.cc"
         "eidolon/ui_state_mapper.cc"
     )
@@ -1097,7 +1097,6 @@ if(CONFIG_EIDOLON_HUB_MODE)
             "eidolon/guard/guard_motion.cc"
             "eidolon/guard/guard_display.cc"
             "eidolon/guard/guard_presence_adapter.cc"
-            "eidolon/guard/owner_recognition_flow.cc"
             "eidolon/guard/owner_presence_adapter.cc"
             "eidolon/guard/owner_presence_state_machine.cc"
             "eidolon/guard/guard_service.cc"

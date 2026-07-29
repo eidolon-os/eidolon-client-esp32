@@ -105,6 +105,7 @@ bool GuardService::Start(const GuardRuntimeConfig& config, const char* reason)
             .heartbeat_ms = config.owner_presence_heartbeat_ms,
             .lease_ms = config.owner_presence_lease_ms,
         });
+        owner_presence_lease_ms_ = config.owner_presence_lease_ms;
 #if CONFIG_EIDOLON_OWNER_FACE_PROFILE
         if (owner_face_engine_ != nullptr) {
             owner_face_engine_->SetLiveIntervalMs(
@@ -159,7 +160,6 @@ void GuardService::Stop(const char* reason)
         should_publish = observation.sequence != published_sequence_;
         published_sequence_ = observation.sequence;
         owner_presence = owner_presence_state_machine_.Stop(NowMs());
-        owner_recognition_flows_.Clear();
 #if CONFIG_EIDOLON_OWNER_PERSON_PRESENCE
         last_person_presence_result_ = {};
 #endif
@@ -184,75 +184,22 @@ void GuardService::SetOwnerPresenceCallback(OwnerPresenceCallback callback)
     owner_presence_callback_ = std::move(callback);
 }
 
-void GuardService::SetOwnerRecognitionCallback(OwnerRecognitionCallback callback)
-{
-    std::lock_guard<std::mutex> lock(mutex_);
-    owner_recognition_callback_ = std::move(callback);
-}
-
-OwnerRecognitionRequestResult GuardService::RequestOwnerRecognition(
-    const std::string& flow_id, const std::string& causation_id,
-    uint32_t request_generation)
-{
-#if !CONFIG_EIDOLON_OWNER_FACE_PROFILE
-    (void)flow_id;
-    (void)causation_id;
-    (void)request_generation;
-    return OwnerRecognitionRequestResult::Rejected;
-#else
-    OwnerFaceProfileStatus profile;
-    const bool profile_updated =
-        owner_face_engine_ != nullptr && owner_face_engine_->TryGetProfileStatus(profile);
-    OwnerRecognitionConfirmation immediate;
-    OwnerRecognitionCallback callback;
-    OwnerRecognitionRequestResult result;
-    const uint64_t now_ms = NowMs();
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (profile_updated) {
-            last_owner_face_profile_status_ = profile;
-        } else {
-            profile = last_owner_face_profile_status_;
-        }
-        if (!running_ || !profile.active || profile.revision == 0) {
-            return OwnerRecognitionRequestResult::Rejected;
-        }
-        const bool owner_is_present =
-            last_owner_presence_observation_.state == OwnerPresenceState::Present;
-        const bool matching_face_result =
-            last_owner_face_result_.evaluated &&
-            last_owner_face_result_.profile_revision == profile.revision &&
-            last_owner_face_result_.id >= 0;
-        result = owner_recognition_flows_.Request(
-            flow_id, causation_id, now_ms, owner_is_present,
-            matching_face_result ? last_owner_face_result_.evaluated_at_ms : 0,
-            request_generation);
-        if (result == OwnerRecognitionRequestResult::Confirmed) {
-            immediate = {
-                .flow_id = flow_id,
-                .causation_id = causation_id,
-                .profile_revision = profile.revision,
-                .guard_epoch = last_owner_presence_observation_.epoch,
-                .presence_sequence = last_owner_presence_observation_.sequence,
-                .confirmed_at_ms = now_ms,
-                .request_generation = request_generation,
-            };
-            callback = owner_recognition_callback_;
-        }
-    }
-    if (result == OwnerRecognitionRequestResult::Pending && task_handle_ != nullptr) {
-        xTaskNotifyGive(task_handle_);
-    } else if (result == OwnerRecognitionRequestResult::Confirmed && callback) {
-        callback(immediate);
-    }
-    return result;
-#endif
-}
-
 GuardObservation GuardService::CurrentObservation() const
 {
     std::lock_guard<std::mutex> lock(mutex_);
     return last_observation_;
+}
+
+OwnerPresenceObservation GuardService::CurrentOwnerPresence() const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    return owner_presence_state_machine_.Current(NowMs());
+}
+
+uint32_t GuardService::OwnerPresenceLeaseMs() const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    return owner_presence_lease_ms_;
 }
 
 std::string GuardService::StatusJson() const
@@ -333,10 +280,6 @@ void GuardService::TaskLoop()
         }
 
         const uint64_t now_ms = NowMs();
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            owner_recognition_flows_.Expire(now_ms);
-        }
         const GuardSample sample = CaptureSample(now_ms);
         GuardObservation observation;
         bool should_publish = false;
@@ -361,12 +304,6 @@ void GuardService::TaskLoop()
             loop_interval_ms = std::min(loop_interval_ms, kOwnerAcquireIntervalMs);
         }
 #endif
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            if (owner_recognition_flows_.HasPending()) {
-                loop_interval_ms = std::min(loop_interval_ms, kOwnerAcquireIntervalMs);
-            }
-        }
         ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(loop_interval_ms));
     }
 }
@@ -394,19 +331,15 @@ GuardSample GuardService::CaptureSample(uint64_t now_ms)
     OwnerFaceProfileStatus owner_profile;
     bool owner_profile_updated = false;
     OwnerPresenceObservation owner_presence;
-    std::vector<OwnerRecognitionFlow> completed_recognition_flows;
     bool run_owner_face = true;
-    bool force_owner_face = false;
 #endif
 #if CONFIG_EIDOLON_OWNER_PERSON_PRESENCE
     PersonPresenceResult person_presence;
     bool run_person_presence = false;
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        force_owner_face = owner_recognition_flows_.NeedsFaceSample(now_ms);
         run_person_presence =
-            last_owner_presence_observation_.identity_session_active &&
-            !force_owner_face;
+            last_owner_presence_observation_.identity_session_active;
         run_owner_face = !run_person_presence;
     }
 #endif
@@ -425,7 +358,7 @@ GuardSample GuardService::CaptureSample(uint64_t now_ms)
 #if CONFIG_EIDOLON_OWNER_FACE_PROFILE
         if (frame_ready && run_owner_face && owner_face_engine_ != nullptr) {
             owner_face =
-                owner_face_engine_->AnalyzeLiveFrame(frame, now_ms, force_owner_face);
+                owner_face_engine_->AnalyzeLiveFrame(frame, now_ms);
         }
 #endif
         return frame_ready;
@@ -433,7 +366,20 @@ GuardSample GuardService::CaptureSample(uint64_t now_ms)
     if (!sample.frame_ok || !frame_ready) {
         return sample;
     }
+    // Inference is synchronous and can take hundreds of milliseconds. State
+    // transitions and deadlines must use completion time rather than the stale
+    // timestamp captured before the camera/inference call.
+    now_ms = NowMs();
+    sample.now_ms = now_ms;
 #if CONFIG_EIDOLON_OWNER_FACE_PROFILE
+    if (owner_face.evaluated) {
+        owner_face.evaluated_at_ms = now_ms;
+    }
+#if CONFIG_EIDOLON_OWNER_PERSON_PRESENCE
+    if (person_presence.evaluated) {
+        person_presence.evaluated_at_ms = now_ms;
+    }
+#endif
     if (owner_face.evaluated && owner_face.faces > 0) {
         ESP_LOGI(kTag,
                  "owner_face_fact revision=%lu faces=%d id=%d similarity=%.3f",
@@ -474,13 +420,6 @@ GuardSample GuardService::CaptureSample(uint64_t now_ms)
 #endif
         });
         last_owner_presence_observation_ = owner_presence;
-        if (owner_face.evaluated && owner_face.id >= 0) {
-            owner_recognition_flows_.RecordFaceMatch(now_ms);
-        }
-        owner_recognition_flows_.Expire(now_ms);
-        completed_recognition_flows =
-            owner_recognition_flows_.CompleteIfOwnerPresent(
-                now_ms, owner_presence.state == OwnerPresenceState::Present);
 #endif
 #if CONFIG_EIDOLON_OWNER_PERSON_PRESENCE
         sample.motion_valid = true;
@@ -502,7 +441,6 @@ GuardSample GuardService::CaptureSample(uint64_t now_ms)
     }
 #if CONFIG_EIDOLON_OWNER_FACE_PROFILE
     PublishOwnerPresence(owner_presence);
-    PublishOwnerRecognitionConfirmations(completed_recognition_flows, owner_presence);
 #endif
     return sample;
 }
@@ -552,40 +490,6 @@ void GuardService::PublishOwnerPresence(const OwnerPresenceObservation& observat
              static_cast<unsigned long>(observation.sequence));
     if (callback) {
         callback(observation);
-    }
-}
-
-void GuardService::PublishOwnerRecognitionConfirmations(
-    const std::vector<OwnerRecognitionFlow>& completed,
-    const OwnerPresenceObservation& owner_presence)
-{
-    if (completed.empty()) {
-        return;
-    }
-    OwnerRecognitionCallback callback;
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        callback = owner_recognition_callback_;
-    }
-    if (!callback) {
-        return;
-    }
-    for (const auto& flow : completed) {
-        ESP_LOGI(kTag,
-                 "owner_recognition_confirmed flow_id=%s revision=%lu epoch=%lu sequence=%lu",
-                 flow.flow_id.c_str(),
-                 static_cast<unsigned long>(owner_presence.profile_revision),
-                 static_cast<unsigned long>(owner_presence.epoch),
-                 static_cast<unsigned long>(owner_presence.sequence));
-        callback({
-            .flow_id = flow.flow_id,
-            .causation_id = flow.causation_id,
-            .profile_revision = owner_presence.profile_revision,
-            .guard_epoch = owner_presence.epoch,
-            .presence_sequence = owner_presence.sequence,
-            .confirmed_at_ms = owner_presence.now_ms,
-            .request_generation = flow.context,
-        });
     }
 }
 

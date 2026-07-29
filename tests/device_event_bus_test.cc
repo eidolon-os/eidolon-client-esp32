@@ -8,7 +8,7 @@
 namespace {
 
 std::string Event(const std::string& event_id = "evt-1",
-                  const std::string& type = eidolon::kAmbientPresenceChangedType,
+                  const std::string& type = eidolon::kAmbientPresenceStateType,
                   uint64_t occurred_at_ms = 1'700'000'000'000ULL,
                   uint64_t expires_at_ms = 1'700'000'003'000ULL,
                   const std::string& payload =
@@ -27,7 +27,7 @@ void TestValidEventDispatch()
     eidolon::DeviceEventBus bus;
     int calls = 0;
     assert(bus.RegisterHandler(
-        eidolon::kAmbientPresenceChangedType,
+        eidolon::kAmbientPresenceStateType,
         [&](const eidolon::DeviceEventMessage& event) {
             ++calls;
             assert(event.event_id == "evt-1");
@@ -76,11 +76,11 @@ void TestRejectsMalformedEnvelope()
     assert(bus.Dispatch("") == eidolon::DeviceEventDispatchResult::Invalid);
     assert(bus.Dispatch(Event() + "x") ==
            eidolon::DeviceEventDispatchResult::Invalid);
-    assert(bus.Dispatch(Event("long-ttl", eidolon::kAmbientPresenceChangedType,
+    assert(bus.Dispatch(Event("long-ttl", eidolon::kAmbientPresenceStateType,
                               1'700'000'000'000ULL, 1'700'000'003'001ULL)) ==
            eidolon::DeviceEventDispatchResult::Invalid);
     assert(bus.Dispatch(
-               Event("bad-payload", eidolon::kAmbientPresenceChangedType,
+               Event("bad-payload", eidolon::kAmbientPresenceStateType,
                      1'700'000'000'000ULL, 1'700'000'003'000ULL, "[]")) ==
            eidolon::DeviceEventDispatchResult::Invalid);
 

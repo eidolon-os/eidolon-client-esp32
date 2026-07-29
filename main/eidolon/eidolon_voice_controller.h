@@ -12,6 +12,7 @@
 #include <type_traits>
 
 #include "sdkconfig.h"
+#include "ambient_presence_state.h"
 #include "control_protocol.h"
 #include "control_room_recovery.h"
 #include "device_event_bus.h"
@@ -22,7 +23,6 @@
 #endif
 #include "hub_types.h"
 #include "livekit_session.h"
-#include "presence_wake_flow.h"
 
 namespace eidolon {
 
@@ -115,7 +115,6 @@ private:
 #if CONFIG_EIDOLON_GUARD_SERVICE
         GuardObservation,
         OwnerPresence,
-        OwnerRecognitionConfirmed,
 #endif
 #if CONFIG_EIDOLON_OWNER_FACE_PROFILE
         OwnerFaceProfileCompleted,
@@ -125,7 +124,7 @@ private:
         DeviceEvent,
         PublishDeviceEvent,
         AmbientPresence,
-        PresenceWakeTimeout,
+        AmbientPresenceTimer,
         AgentPhaseChanged,
         SessionActivity,
         AudioTick,
@@ -142,9 +141,6 @@ private:
 #if CONFIG_EIDOLON_GUARD_SERVICE
         GuardObservation guard_observation;
         OwnerPresenceObservation owner_presence_observation;
-        // FreeRTOS queues copy Event as raw bytes, so non-trivial confirmation
-        // strings must stay behind an explicitly owned pointer.
-        OwnerRecognitionConfirmation* owner_recognition_confirmation = nullptr;
 #endif
         // Snapshot of session_generation_ taken when the SDK callback fired (on the
         // SDK task), so DoLiveKitState can tell whether a LiveKit event belongs to
@@ -176,8 +172,6 @@ private:
     void DoGuardObservation(const GuardObservation& observation, uint32_t runtime_generation);
     void DoOwnerPresence(const OwnerPresenceObservation& observation,
                          uint32_t runtime_generation);
-    void DoOwnerRecognitionConfirmed(
-        const OwnerRecognitionConfirmation& confirmation);
     void HandleAmbientPresenceEvent(const DeviceEventMessage& event);
 #endif
 #if CONFIG_EIDOLON_OWNER_FACE_PROFILE
@@ -188,7 +182,17 @@ private:
     void DoDeviceEvent(const std::string& payload, uint32_t event_generation);
     void DoPublishDeviceEvent(const std::string& payload);
     void DoAmbientPresenceChanged(bool present);
-    void DoPresenceWakeTimeout();
+    void DoAmbientPresenceTimer();
+    void PublishRadarPresenceState(AmbientPresenceObservation observation);
+    void ScheduleAmbientPresenceTimer(uint64_t delay_ms);
+#if CONFIG_EIDOLON_AMBIENT_PRESENCE_OWNER_AUTH
+    void ScheduleAmbientPresenceLeaseExpiry(uint64_t now_ms);
+    void PublishPendingOwnerConfirmations(
+        const OwnerPresenceObservation& owner_presence);
+    bool PublishOwnerConfirmation(
+        const AmbientPresenceAssertion& assertion,
+        const OwnerPresenceObservation& owner_presence);
+#endif
     void DoAgentPhase(AgentPhase phase);
     void DoSessionActivity();
     void DoAudioTick();
@@ -251,6 +255,13 @@ private:
 #endif
     void HandleIdleTimeoutCommand();
     void HandleOwnerPresenceConfirmedEvent(const DeviceEventMessage& event);
+    void HandleOwnerPresenceChangedEvent(const DeviceEventMessage& event);
+    void PublishFlowNode(const std::string& flow_id,
+                         const std::string& causation_id,
+                         const char* stage, const char* status,
+                         const char* label);
+    void ResetPresenceManagedSession();
+    void CheckOwnerPresenceLease();
     // Parse and act on a session_end{reason} packet from the channel: record the
     // reason for the UI, tear the voice room down gracefully, and pick the
     // resulting state (Ready for a normal end, Error for a server error).
@@ -288,9 +299,8 @@ private:
     static void IdleLeaveCb(void* arg);
     static void FullDuplexIdleFallbackCb(void* arg);
     static void PttReleaseTailCb(void* arg);
-    static void PresenceWakeTimerCb(void* arg);
+    static void AmbientPresenceTimerCb(void* arg);
     void SetPresenceWakePhase(PresenceWakePhase phase);
-    void CancelPresenceWake(const char* reason);
 
     // Audio-state publisher (timer-driven tick on the controller task).
     void StartAudioStatePublisher();
@@ -332,6 +342,13 @@ private:
     // the token fetch as X-Device-Session-Intent. Empty for a normal user JOIN.
     // Controller-task only.
     std::string pending_session_intent_;
+    std::string pending_session_flow_id_;
+    std::string current_presence_flow_id_;
+    std::string owner_lease_source_device_id_;
+    uint64_t owner_lease_deadline_ms_ = 0;
+    uint32_t owner_lease_guard_epoch_ = 0;
+    uint32_t owner_lease_sequence_ = 0;
+    bool presence_managed_voice_session_ = false;
     // True means the current session generation targets the data-only control
     // plane. It intentionally covers Connecting/Reconnecting/Connected; actual
     // health is tracked by control_recovery_ / LiveKitSession::IsConnected().
@@ -378,14 +395,27 @@ private:
     esp_timer_handle_t idle_leave_timer_ = nullptr;
     esp_timer_handle_t full_duplex_idle_timer_ = nullptr;
     esp_timer_handle_t ptt_release_tail_timer_ = nullptr;
-    esp_timer_handle_t presence_wake_timer_ = nullptr;
+    esp_timer_handle_t ambient_presence_timer_ = nullptr;
 
     StateCallback on_state_changed_;
     std::function<void(const TranscriptionEvent&)> on_transcription_;
     std::function<void(AgentPhase)> on_agent_phase_;
     std::function<void(PresenceWakePhase)> on_presence_wake_phase_;
     std::function<void(const std::string&)> on_ptt_turn_status_;
-    PresenceWakeFlowTracker presence_wake_flow_;
+#if CONFIG_EIDOLON_RADAR_PRESENCE_BROADCAST
+    bool radar_presence_known_ = false;
+    bool radar_present_ = false;
+    bool radar_presence_dirty_ = false;
+    uint32_t radar_presence_epoch_ = 0;
+    uint32_t radar_presence_sequence_ = 0;
+    std::string radar_presence_flow_id_;
+    AmbientPresenceObservation radar_pending_observation_ =
+        AmbientPresenceObservation::Snapshot;
+    AmbientPresenceActivationGate radar_activation_gate_;
+#endif
+#if CONFIG_EIDOLON_AMBIENT_PRESENCE_OWNER_AUTH
+    AmbientPresenceRegistry ambient_presence_registry_;
+#endif
     PresenceWakePhase presence_wake_phase_ = PresenceWakePhase::Idle;
 };
 

@@ -25,9 +25,12 @@ inline constexpr const char* kAgentSessionTopic = "lk.agent.session";
 // Bump in lockstep with Python WIRE_SCHEMA_VERSION on a breaking envelope change.
 inline constexpr int kWireSchemaVersion = 1;
 inline constexpr int kDeviceEventSchemaVersion = 1;
-inline constexpr const char* kAmbientPresenceChangedType = "ambient.presence.changed";
+inline constexpr const char* kAmbientPresenceStateType = "ambient.presence.state";
 inline constexpr const char* kIdentityOwnerPresenceConfirmedType =
     "identity.owner_presence.confirmed";
+inline constexpr const char* kIdentityOwnerPresenceChangedType =
+    "identity.owner_presence.changed";
+inline constexpr const char* kCompanionFlowNodeType = "companion.flow.node";
 
 // client.audio_state — body "type" label (NOT the routing topic above) + enums.
 inline constexpr const char* kClientAudioStateType = "client.audio_state";
@@ -83,6 +86,7 @@ inline constexpr const char* kInteractionModePtt = "ptt";
 inline constexpr const char* kSessionIntentUserInitiated = "user_initiated";
 inline constexpr const char* kSessionIntentPresence = "presence_initiated";
 inline constexpr const char* kSessionIntentProactive = "proactive_initiated";
+inline constexpr const char* kSessionFlowIdHeader = "X-Device-Session-Flow-Id";
 
 }  // namespace eidolon
 

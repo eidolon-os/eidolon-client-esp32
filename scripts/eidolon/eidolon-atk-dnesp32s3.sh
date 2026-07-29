@@ -149,7 +149,7 @@ CONFIG_EIDOLON_INTERACTION_MODE_HALF_DUPLEX=y
 CONFIG_EIDOLON_LIVEKIT_SPEAKER_VOLUME=50
 CONFIG_EIDOLON_OWNER_FACE_PROFILE=y
 CONFIG_EIDOLON_OWNER_PERSON_PRESENCE=y
-CONFIG_EIDOLON_OWNER_RECOGNITION_ON_PRESENCE=y
+CONFIG_EIDOLON_AMBIENT_PRESENCE_OWNER_AUTH=y
 # Prefer PSRAM for medium-sized C++ orchestration objects and queue storage.
 # LiveKit/FreeRTOS/DMA allocations that explicitly require internal memory keep
 # using the reserved internal pool.
@@ -257,7 +257,7 @@ sync_existing_sdkconfig() {
   set_sdkconfig_value CONFIG_CAMERA_DMA_BUFFER_SIZE_MAX 8192
   set_sdkconfig_value CONFIG_EIDOLON_OWNER_FACE_PROFILE y
   set_sdkconfig_value CONFIG_EIDOLON_OWNER_PERSON_PRESENCE y
-  set_sdkconfig_value CONFIG_EIDOLON_OWNER_RECOGNITION_ON_PRESENCE y
+  set_sdkconfig_value CONFIG_EIDOLON_AMBIENT_PRESENCE_OWNER_AUTH y
   set_sdkconfig_value CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL 256
   # Interaction mode = half_duplex (no AEC on this board): enforce on an
   # existing sdkconfig too, else a stale PTT=y from the 2-mode era survives a
