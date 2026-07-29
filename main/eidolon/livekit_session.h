@@ -58,6 +58,11 @@ private:
     void RegisterTranscriptionHandler();
     void RegisterAgentSessionDrainHandler();
     void UnregisterStreamHandlers();
+    // `data_only` selects WHICH media board is required, not merely whether one
+    // exists: the voice board owns the codec+AFE (microphone) capturer, the
+    // control board a mic-free silent capturer. A board of the wrong kind is
+    // released and rebuilt rather than reused, so a control room can never
+    // inherit the voice room's microphone capturer.
     esp_err_t EnsureMediaBoard(bool data_only);
     void ReleaseMediaBoard();
 
@@ -66,6 +71,7 @@ private:
     bool connected_ = false;
     bool using_media_ = false;
     bool media_board_initialized_ = false;
+    bool media_board_data_only_ = false;
     bool transcription_registered_ = false;
     bool agent_session_registered_ = false;
     livekit_failure_reason_t last_failure_reason_ = LIVEKIT_FAILURE_REASON_NONE;

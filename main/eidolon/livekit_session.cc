@@ -5,6 +5,7 @@
 #include "livekit_board.h"
 
 #include <cJSON.h>
+#include <esp_heap_caps.h>
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -40,6 +41,21 @@ const char* JsonString(cJSON* root, const char* key)
 {
     cJSON* item = cJSON_GetObjectItem(root, key);
     return cJSON_IsString(item) ? item->valuestring : nullptr;
+}
+
+// livekit_room_create()/engine_init() allocates its task stack, event queue and
+// websocket client from INTERNAL RAM and reports every one of those failures as a
+// single silent "Failed to create engine". Log the internal budget around the call
+// so a memory cliff is diagnosable from the serial log alone: the largest
+// contiguous block matters more than the total, because the engine needs an
+// 8 KiB task stack and a multi-KiB event queue in one piece each.
+void LogInternalHeapBudget(const char* phase, const char* room_kind)
+{
+    ESP_LOGI(TAG, "[mem] %s room_kind=%s internal_free=%u largest_block=%u min_free=%u",
+             phase, room_kind,
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
+             static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)),
+             static_cast<unsigned>(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL)));
 }
 
 bool JsonBool(cJSON* root, const char* key, bool fallback)
@@ -295,12 +311,24 @@ void LiveKitSession::UnregisterStreamHandlers()
 esp_err_t LiveKitSession::EnsureMediaBoard(bool data_only)
 {
     if (media_board_initialized_) {
-        return ESP_OK;
+        if (media_board_data_only_ == data_only) {
+            return ESP_OK;
+        }
+        // Wrong kind for this room. Reusing it would (a) let a control room
+        // publish from the voice board's microphone capturer, breaking the
+        // mic-free control-room invariant, and (b) keep the voice board's
+        // internal-SRAM footprint resident, which is exactly what starves
+        // livekit_room_create on memory-tight boards.
+        ESP_LOGI(TAG, "Media board kind mismatch (have=%s want=%s); rebuilding",
+                 media_board_data_only_ ? "control" : "voice",
+                 data_only ? "control" : "voice");
+        ReleaseMediaBoard();
     }
     esp_err_t err = data_only ? eidolon_livekit_board_init_data_only()
                               : eidolon_livekit_board_init();
     if (err == ESP_OK) {
         media_board_initialized_ = true;
+        media_board_data_only_ = data_only;
     } else {
         // board_init can fail after constructing only part of the provider.
         // Always return it to a clean state so the next bounded retry starts
@@ -363,11 +391,18 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
     room_options.on_data_received = OnDataReceived;
     room_options.ctx = this;
 
+    LogInternalHeapBudget("room_create", "voice");
     if (livekit_room_create(&room_handle_, &room_options) != LIVEKIT_ERR_NONE) {
         ESP_LOGE(TAG, "livekit_room_create failed");
+        LogInternalHeapBudget("room_create_failed", "voice");
         room_handle_ = nullptr;
         transcription_registered_ = false;
         agent_session_registered_ = false;
+        // Release the media board on the way out, mirroring ConnectDataOnly.
+        // Leaving the codec/AFE/renderer resident makes the caller's bounded
+        // retry AND the control-room fallback fail for the very same reason
+        // this attempt did, turning one recoverable failure into a flap.
+        ReleaseMediaBoard();
         return ESP_FAIL;
     }
 
@@ -384,6 +419,8 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
         UnregisterStreamHandlers();
         livekit_room_destroy(room_handle_);
         room_handle_ = nullptr;
+        using_media_ = false;
+        ReleaseMediaBoard();
         return ESP_FAIL;
     }
 
@@ -440,8 +477,10 @@ esp_err_t LiveKitSession::ConnectDataOnly(const Esp32HubConfig& config, uint32_t
     room_options.ctx = this;
     using_media_ = false;
 
+    LogInternalHeapBudget("room_create", "control");
     if (livekit_room_create(&room_handle_, &room_options) != LIVEKIT_ERR_NONE) {
         ESP_LOGE(TAG, "livekit_room_create data-only failed");
+        LogInternalHeapBudget("room_create_failed", "control");
         room_handle_ = nullptr;
         transcription_registered_ = false;
         agent_session_registered_ = false;
