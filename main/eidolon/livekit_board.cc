@@ -3,7 +3,7 @@
 #include "livekit_board.h"
 
 #include "audio_codec.h"
-#include "audio/eidolon_afe_capture.h"
+#include "audio/eidolon_mic_capture.h"
 #include "audio/pcm_push_capture_source.h"
 #include "eidolon_audio_input.h"
 
@@ -27,7 +27,7 @@
 #define LIVEKIT_SPEAKER_VOLUME CONFIG_EIDOLON_LIVEKIT_SPEAKER_VOLUME
 
 static esp_capture_sink_handle_t s_capturer;
-static eidolon::EidolonAfeCapture* s_afe_capture;
+static eidolon::EidolonMicCapture* s_mic_capture;
 static audio_render_handle_t s_audio_renderer;
 static av_render_handle_t s_av_renderer;
 static volatile int64_t s_last_playback_us;
@@ -35,7 +35,7 @@ static volatile uint32_t s_recent_capture_rms_ppm;
 static volatile uint32_t s_recent_playback_rms_ppm;
 
 // Data-only control-room capture: a mic-free silent PCM source. Kept alive across
-// sessions (like s_afe_capture) so the feeder task never races a delete.
+// sessions (like s_mic_capture) so the feeder task never races a delete.
 static eidolon::PcmPushCaptureSource* s_silent_source;
 static TaskHandle_t s_silence_task;
 static volatile bool s_silence_feed;
@@ -179,19 +179,20 @@ static int on_audio_render_reference(uint8_t* data, int len, void*)
 
 static esp_err_t build_capturer(AudioCodec* codec)
 {
-    // Device-side AEC runs in EidolonAfeCapture (xiaozhi AfeAudioProcessor, voice
-    // profile). The cancelled PCM is exposed as a push-based esp_capture source,
-    // replacing esp_capture's wake-word-tuned AEC source.
-    if (s_afe_capture == nullptr) {
-        s_afe_capture = new eidolon::EidolonAfeCapture();
+    // EidolonMicCapture owns the mic and exposes it as a push-based esp_capture
+    // source, replacing esp_capture's wake-word-tuned AEC source. Its topology is
+    // compile-time per board capability (AFE echo cancellation vs raw mic) — the
+    // per-mode mic gating is the wrapper below, not the topology.
+    if (s_mic_capture == nullptr) {
+        s_mic_capture = new eidolon::EidolonMicCapture();
     }
-    esp_err_t err = s_afe_capture->Start(codec);
+    esp_err_t err = s_mic_capture->Start(codec);
     if (err != ESP_OK) {
         return err;
     }
 
     esp_capture_audio_src_if_t* gated_source =
-        build_gated_audio_source(s_afe_capture->CaptureSource());
+        build_gated_audio_source(s_mic_capture->CaptureSource());
     esp_capture_cfg_t cfg = {
         .sync_mode = ESP_CAPTURE_SYNC_MODE_AUDIO,
         .audio_src = gated_source,
@@ -300,7 +301,7 @@ extern "C" esp_err_t eidolon_livekit_board_init(void)
         std::lock_guard<std::mutex> lock(audio_in.Mutex());
         // Output is driven by av_render through the raw play handle, so keep the
         // codec's own output path closed. Input stays managed by the codec
-        // because EidolonAfeCapture reads mic+reference PCM through it.
+        // because EidolonMicCapture reads mic (+reference) PCM through it.
         if (codec->output_enabled()) {
             codec->EnableOutput(false);
         }
@@ -418,7 +419,7 @@ extern "C" void eidolon_livekit_board_deinit(void)
     // -> heap corruption (use-after-free). So stop whoever feeds the active source
     // FIRST, then close. Both room types feed a PcmPushCaptureSource:
     //   - control room (data-only): the silence feeder -> s_silent_source
-    //   - voice room: the AFE -> s_afe_capture's internal pcm source
+    //   - voice room: the AFE -> s_mic_capture's internal pcm source
     // Quiescing the inactive one is a harmless no-op. The silence source/task and
     // the AFE instance are intentionally kept alive across sessions (their
     // long-lived tasks cannot be safely torn down); they are re-armed by
@@ -427,8 +428,8 @@ extern "C" void eidolon_livekit_board_deinit(void)
     if (s_silent_source) {
         s_silent_source->Quiesce();
     }
-    if (s_afe_capture) {
-        s_afe_capture->Stop();  // stops the AFE and quiesces its pcm source
+    if (s_mic_capture) {
+        s_mic_capture->Stop();  // stops the AFE and quiesces its pcm source
     }
     if (s_capturer) {
         esp_capture_close(s_capturer);

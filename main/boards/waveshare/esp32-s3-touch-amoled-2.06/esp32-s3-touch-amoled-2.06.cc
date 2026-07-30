@@ -105,19 +105,8 @@ public:
                      bool mirror_x,
                      bool mirror_y,
                      bool swap_xy)
-        // A 410-line-wide RGB565 draw buffer costs 820 B of internal DMA SRAM per
-        // line, held for the lifetime of the device. This board has only ~51 KiB
-        // internal free with no room up, while a voice JOIN needs ~40 KiB for
-        // codec+AFE+renderer plus a CONTIGUOUS 8 KiB task stack for the LiveKit
-        // engine — at 20 lines livekit_room_create fails ("Failed to create
-        // engine"). 10 lines gives back 8.2 KiB for the cost of one extra flush
-        // per frame. PSRAM is deliberately NOT used here: this is a QSPI panel and
-        // the LVGL 9 port has no bounce buffer, so a PSRAM buffer makes spi_master
-        // allocate a priv TX buffer per transfer, which then fails under the very
-        // memory pressure we are fixing (verified on hardware).
         : SpiLcdDisplay(io_handle, panel_handle,
-                        width, height, offset_x, offset_y, mirror_x, mirror_y, swap_xy,
-                        /*draw_buffer_psram=*/false, /*draw_buffer_lines=*/10) {
+                        width, height, offset_x, offset_y, mirror_x, mirror_y, swap_xy) {
         // Note: UI customization should be done in SetupUI(), not in constructor
         // to ensure lvgl objects are created before accessing them
     }

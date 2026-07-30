@@ -10,6 +10,7 @@
 #include "assets.h"
 #include "settings.h"
 #include "eidolon/eidolon_build_stamp.h"
+#include "eidolon/eidolon_device_profile.h"
 
 #if CONFIG_EIDOLON_HUB_MODE
 #include "eidolon/eidolon_audio_input.h"
@@ -284,7 +285,7 @@ void Application::OnEidolonVoiceSessionState(eidolon::VoiceSessionState state)
     case eidolon::VoiceSessionState::ServerUnreachable:
         // Wake word is kept in the build but intentionally disabled for now.
         // During a voice session the codec input is owned by the LiveKit AFE
-        // capture path (EidolonAfeCapture); re-enabling wake word needs the
+        // capture path (EidolonMicCapture); re-enabling wake word needs the
         // single-reader fan-out described in the AEC architecture doc.
         eidolon_audio_input_service_->EnableWakeWordDetection(false);
         break;
@@ -319,6 +320,9 @@ void Application::Initialize() {
     // stale binary / wrong flash path / cached SDK.
     ESP_LOGW(TAG, "EIDOLON-BUILDSTAMP git=%s sdk=%s branch=%s built=%s %s",
              EIDOLON_BUILD_GIT, EIDOLON_BUILD_SDK, EIDOLON_BUILD_BRANCH, __DATE__, __TIME__);
+    // Resolved device profile on the line right after it: which interaction mode
+    // and which capture topology this image actually ended up with.
+    eidolon::LogDeviceProfile(TAG);
 
     auto& board = Board::GetInstance();
     SetDeviceState(kDeviceStateStarting);

@@ -16,6 +16,7 @@
 #include "control_protocol.h"
 #include "control_room_recovery.h"
 #include "device_event_bus.h"
+#include "eidolon_device_profile.h"
 #if CONFIG_EIDOLON_GUARD_SERVICE
 #include "guard/guard_presence_adapter.h"
 #include "guard/guard_service.h"
@@ -322,19 +323,11 @@ private:
     //   ptt_mode_        -> push-to-talk (mic open only while the button is held)
     //   half_duplex_mode_-> auto open-mic, closed while the agent speaks (no AEC)
     //   neither          -> full-duplex (open mic + device AEC + barge-in)
-    // Runtime fields keep the capture-gate branch readable.
-    bool ptt_mode_ =
-#if CONFIG_EIDOLON_INTERACTION_MODE_PTT
-        true;
-#else
-        false;
-#endif
-    bool half_duplex_mode_ =
-#if CONFIG_EIDOLON_INTERACTION_MODE_HALF_DUPLEX
-        true;
-#else
-        false;
-#endif
+    // Runtime fields keep the capture-gate branch readable; the Kconfig -> mode
+    // mapping itself lives once in eidolon_device_profile.h, which also rejects
+    // full_duplex on a board without a validated AEC reference at compile time.
+    bool ptt_mode_ = kModePtt;
+    bool half_duplex_mode_ = kModeHalfDuplex;
     bool ptt_active_ = false;  // PTT: held or in the short release tail (mic open)
     bool ptt_release_tail_pending_ = false;
     // Session intent for the NEXT voice JOIN, set by an orchestrated room.join

@@ -11,19 +11,20 @@
 #define AUDIO_OUTPUT_SAMPLE_RATE 24000
 #endif
 
-// The ES7210 playback-reference channel exists only to feed AEC. In PTT mode the
-// device never captures and plays at the same time and the AFE reports "Device
-// AEC is not supported", so the second channel is pure waste: it doubles the AFE
-// feed/fetch buffers on a board that has ~51 KiB internal SRAM free and needs a
-// contiguous 8 KiB block for the LiveKit engine task at JOIN time. Any non-PTT
-// build (stock wake-word AEC path) keeps the reference. Re-enable this if 2.06
-// ever gains barge-in / full duplex. Framing is safe either way: the ES7210 runs
-// 4-channel TDM and channel_mask selects the channels, while input_channels()
-// drives the AFE input format and every read buffer size.
-#if CONFIG_EIDOLON_INTERACTION_MODE_PTT
-#define AUDIO_INPUT_REFERENCE    false
-#else
+// The ES7210 playback-reference channel exists only to feed AEC, so it follows the
+// board's AEC CAPABILITY, not its interaction mode (see eidolon_device_profile.h:
+// half_duplex StackChan has no reference either, and a future ptt board could have
+// one). Without USE_DEVICE_AEC the second channel is pure waste — it doubles the
+// codec read and, when the AFE still ran, its feed/fetch buffers, on a board that
+// has ~51 KiB internal SRAM free and needs a contiguous 8 KiB block for the LiveKit
+// engine task at JOIN time. Framing is safe either way: the ES7210 runs 4-channel
+// TDM and channel_mask selects the channels, while input_channels() drives every
+// read buffer size. This board is not on the USE_DEVICE_AEC allowlist by default;
+// qualifying its reference (scripts/aec_qualification) is what would flip it back.
+#if CONFIG_USE_DEVICE_AEC
 #define AUDIO_INPUT_REFERENCE    true
+#else
+#define AUDIO_INPUT_REFERENCE    false
 #endif
 
 #define AUDIO_I2S_GPIO_MCLK GPIO_NUM_16

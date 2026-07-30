@@ -2,6 +2,7 @@
 
 #include "board.h"
 #include "device_identity.h"
+#include "eidolon_device_profile.h"
 #include "eidolon_topics.h"
 #include "system_info.h"
 
@@ -519,20 +520,15 @@ esp_err_t HubConfigClient::RegisterDevice(const std::string& register_url,
     http->SetHeader("Accept", "application/json");
     http->SetHeader("Content-Type", "application/json");
     http->SetHeader("User-Agent", SystemInfo::GetUserAgent().c_str());
-    // Declare the board's interaction capability so the Hub can stamp the session
-    // mode into the LiveKit token metadata (Phase 4) and channel can pick the turn
-    // policy (Phase 5). Hardware-determined: boards without usable AEC are PTT-only.
-    // Not part of the signed canonical request — a hint, not a security artifact
-    // (the authoritative per-device override is the admin path). Hub defaults to
-    // half_duplex when absent, so sending it makes the device authoritative rather
-    // than relying on that default.
-#if CONFIG_EIDOLON_INTERACTION_MODE_PTT
-    http->SetHeader("X-Device-Interaction-Mode", kInteractionModePtt);
-#elif CONFIG_EIDOLON_INTERACTION_MODE_HALF_DUPLEX
-    http->SetHeader("X-Device-Interaction-Mode", kInteractionModeHalfDuplex);
-#else
-    http->SetHeader("X-Device-Interaction-Mode", kInteractionModeFullDuplex);
-#endif
+    // Declare the board's interaction mode so the Hub can stamp it into the LiveKit
+    // token metadata (Phase 4) and channel can pick the turn policy (Phase 5). The
+    // Kconfig -> mode mapping lives once in eidolon_device_profile.h; this is the
+    // runtime *declaration* of that single compile-time source. Not part of the
+    // signed canonical request — a hint, not a security artifact (the authoritative
+    // per-device override is the admin path). Hub defaults to half_duplex when
+    // absent, so sending it makes the device authoritative rather than relying on
+    // that default.
+    http->SetHeader("X-Device-Interaction-Mode", InteractionModeName());
     // Why this session exists (Phase 3 proactive wake). Only sent when set, so a
     // normal JOIN omits it and the Hub defaults to user_initiated. Like the mode
     // header, it is an unsigned hint — the Hub validates it, and a bad value can

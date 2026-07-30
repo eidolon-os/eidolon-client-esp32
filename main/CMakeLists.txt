@@ -1065,7 +1065,7 @@ endif()
 if(CONFIG_EIDOLON_HUB_MODE)
     list(APPEND SOURCES
         "eidolon/agent_session_tracker.cc"
-        "eidolon/audio/eidolon_afe_capture.cc"
+        "eidolon/audio/eidolon_mic_capture.cc"
         "eidolon/audio/pcm_push_capture_source.cc"
         "eidolon/control_protocol.cc"
         "eidolon/device_event_bus.cc"
