@@ -225,13 +225,11 @@ void TestRegistrationCredentialsWinAndGenerationNeverRollsBack()
     registration.status = eidolon::HubConfigStatus::Active;
     registration.active = Room("voice-token", "device-identity");
     registration.control = Room("registration-token", "");
-    registration.registration_id = "fresh-registration";
     const eidolon::RoomConfig stale_runtime = Room("stale-runtime-token", "guard-identity");
 
     auto selected = eidolon::BuildControlConnectionConfig(registration, &stale_runtime);
     assert(selected.active.token == "registration-token");
     assert(selected.active.identity == "device-identity");
-    assert(selected.registration_id == "fresh-registration");
 
     registration.status = eidolon::HubConfigStatus::WaitingBinding;
     selected = eidolon::BuildControlConnectionConfig(registration, &stale_runtime);

@@ -1,7 +1,6 @@
 #include "hub_onboarding_client.h"
 
 #include "board.h"
-#include "device_identity.h"
 #include "hub_config_store.h"
 #include "hub_onboarding_protocol.h"
 #include "system_info.h"
@@ -186,7 +185,6 @@ esp_err_t HubOnboardingClient::EnsureEnrollment(const HubDescriptor& descriptor,
     }
     state.enrollment_id = receipt.enrollment_id;
     state.lifecycle_state = receipt.lifecycle_state;
-    state.retrieval_expires_at_ms = receipt.retrieval_expires_at_ms;
     return HubConfigStore().SaveOnboardingState(state);
 }
 
@@ -230,7 +228,6 @@ esp_err_t HubOnboardingClient::Handoff(const HubDescriptor& descriptor,
     }
     out = Esp32HubConfig{};
     out.status = lifecycle;
-    out.device_fingerprint = DeviceIdentity::GetInstance().Fingerprint();
     state.lifecycle_state = HubConfigStatusToString(lifecycle);
     if (lifecycle == HubConfigStatus::Active) {
         std::string binding;
@@ -239,7 +236,7 @@ esp_err_t HubOnboardingClient::Handoff(const HubDescriptor& descriptor,
             ESP_LOGE(TAG, "Provider returned an invalid %s binding", kLiveKitBindingFormat);
             return ESP_ERR_INVALID_RESPONSE;
         }
-        out.registration_id = assignment.channel_id;
+        out.expires_at_ms = assignment.expires_at_ms;
         // The opaque provider credential is consumed in RAM only. Hub never logs
         // or persists it; the device config store atomically caches the parsed
         // credential for bounded offline recovery.
@@ -257,49 +254,58 @@ esp_err_t HubOnboardingClient::Run(const HubTxtRecord& advertised,
         return err;
     }
     HubConfigStore store;
-    HubOnboardingState state;
-    const bool has_saved_state = store.LoadOnboardingState(state);
-    if (has_saved_state &&
-        (state.hub_id != descriptor.hub_id || state.device_id != device_id)) {
-        ESP_LOGE(TAG, "Refusing automatic onboarding state switch to another Hub or device");
-        return ESP_ERR_NOT_ALLOWED;
-    }
-    const bool reusable = has_saved_state && state.has_local_intent();
-    if (!reusable) {
-        store.ClearOnboardingState();
-        state = HubOnboardingState{};
-        state.hub_id = descriptor.hub_id;
-        state.descriptor_uri = descriptor.descriptor_uri;
-        state.enrollment_uri = descriptor.enrollment_uri;
-        state.device_id = device_id;
-        state.request_id = "enroll-" + Base64UrlRandom(16);
-        state.retrieval_token = Base64UrlRandom(32);
-        if (!state.has_local_intent() ||
-            store.SaveOnboardingState(state) != ESP_OK) {
-            return ESP_ERR_NO_MEM;
+    bool restarted_expired_pending = false;
+    for (;;) {
+        HubOnboardingState state;
+        const bool has_saved_state = store.LoadOnboardingState(state);
+        if (has_saved_state &&
+            (state.hub_id != descriptor.hub_id || state.device_id != device_id)) {
+            ESP_LOGE(TAG, "Refusing automatic onboarding state switch to another Hub or device");
+            return ESP_ERR_NOT_ALLOWED;
         }
-    } else if (state.descriptor_uri != descriptor.descriptor_uri ||
-               state.enrollment_uri != descriptor.enrollment_uri) {
-        // The Hub identity is pinned by hub_id. URI changes for that same Hub
-        // reuse the persisted idempotency and retrieval material.
-        state.descriptor_uri = descriptor.descriptor_uri;
-        state.enrollment_uri = descriptor.enrollment_uri;
-        if (store.SaveOnboardingState(state) != ESP_OK) {
-            return ESP_FAIL;
+        const bool reusable = has_saved_state && state.has_local_intent();
+        if (!reusable) {
+            store.ClearOnboardingState();
+            state = HubOnboardingState{};
+            state.hub_id = descriptor.hub_id;
+            state.descriptor_uri = descriptor.descriptor_uri;
+            state.enrollment_uri = descriptor.enrollment_uri;
+            state.device_id = device_id;
+            state.request_id = "enroll-" + Base64UrlRandom(16);
+            state.retrieval_token = Base64UrlRandom(32);
+            if (!state.has_local_intent()) {
+                return ESP_ERR_NO_MEM;
+            }
+            err = store.SaveOnboardingState(state);
+            if (err != ESP_OK) {
+                return err;
+            }
+        } else if (state.descriptor_uri != descriptor.descriptor_uri ||
+                   state.enrollment_uri != descriptor.enrollment_uri) {
+            // The Hub identity is pinned by hub_id. URI changes for that same Hub
+            // reuse the persisted idempotency and retrieval material.
+            state.descriptor_uri = descriptor.descriptor_uri;
+            state.enrollment_uri = descriptor.enrollment_uri;
+            err = store.SaveOnboardingState(state);
+            if (err != ESP_OK) {
+                return err;
+            }
         }
-    }
-    err = EnsureEnrollment(descriptor, state);
-    if (err != ESP_OK) {
-        return err;
-    }
-    err = Handoff(descriptor, state, out);
-    if (err == ESP_ERR_TIMEOUT && state.lifecycle_state == "pending-approval") {
-        // Hub expired an unapproved intent. Drop only that intent and retry
-        // once with a new request ID and retrieval token.
+        err = EnsureEnrollment(descriptor, state);
+        if (err != ESP_OK) {
+            return err;
+        }
+        err = Handoff(descriptor, state, out);
+        if (err != ESP_ERR_TIMEOUT || state.lifecycle_state != "pending-approval" ||
+            restarted_expired_pending) {
+            return err;
+        }
+        // A pending intent may be recreated exactly once after Hub reports that
+        // its retrieval window expired. Never recurse or re-enroll an approved
+        // device: Owner admission remains authoritative.
         store.ClearOnboardingState();
-        return Run(advertised, device_id, out);
+        restarted_expired_pending = true;
     }
-    return err;
 }
 
 esp_err_t HubOnboardingClient::Resume(const std::string& descriptor_uri,

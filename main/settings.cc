@@ -12,13 +12,26 @@ Settings::Settings(const std::string& ns, bool read_write) : ns_(ns), read_write
 Settings::~Settings() {
     if (nvs_handle_ != 0) {
         if (read_write_ && dirty_) {
-            esp_err_t err = nvs_commit(nvs_handle_);
-            if (err != ESP_OK) {
-                ESP_LOGE(TAG, "nvs_commit(%s) failed: %s", ns_.c_str(), esp_err_to_name(err));
-            }
+            Commit();
         }
         nvs_close(nvs_handle_);
     }
+}
+
+esp_err_t Settings::Commit() {
+    if (nvs_handle_ == 0 || !read_write_) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (!dirty_) {
+        return ESP_OK;
+    }
+    esp_err_t err = nvs_commit(nvs_handle_);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "nvs_commit(%s) failed: %s", ns_.c_str(), esp_err_to_name(err));
+        return err;
+    }
+    dirty_ = false;
+    return ESP_OK;
 }
 
 std::string Settings::GetString(const std::string& key, const std::string& default_value) {
@@ -42,10 +55,10 @@ std::string Settings::GetString(const std::string& key, const std::string& defau
     return value;
 }
 
-void Settings::SetString(const std::string& key, const std::string& value) {
-    if (!read_write_) {
+esp_err_t Settings::SetString(const std::string& key, const std::string& value) {
+    if (!read_write_ || nvs_handle_ == 0) {
         ESP_LOGW(TAG, "Namespace %s is not open for writing", ns_.c_str());
-        return;
+        return ESP_ERR_INVALID_STATE;
     }
     // Dedup: a config refresh usually re-saves an identical blob. Skipping the
     // unchanged write spares NVS space and flash wear (and avoids needlessly
@@ -58,7 +71,7 @@ void Settings::SetString(const std::string& key, const std::string& value) {
                 current.pop_back();
             }
             if (current == value) {
-                return;
+                return ESP_OK;
             }
         }
     }
@@ -70,9 +83,10 @@ void Settings::SetString(const std::string& key, const std::string& value) {
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "nvs_set_str(%s/%s) failed: %s", ns_.c_str(), key.c_str(),
                  esp_err_to_name(err));
-        return;
+        return err;
     }
     dirty_ = true;
+    return ESP_OK;
 }
 
 int32_t Settings::GetInt(const std::string& key, int32_t default_value) {

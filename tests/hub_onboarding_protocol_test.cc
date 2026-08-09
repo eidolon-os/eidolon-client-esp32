@@ -96,7 +96,6 @@ void TestReceiptHandoffAndProviderBinding()
     eidolon::HubEnrollmentReceipt parsed;
     assert(eidolon::ParseEnrollmentReceiptResponse(receipt, state, parsed));
     state.enrollment_id = parsed.enrollment_id;
-    state.retrieval_expires_at_ms = parsed.retrieval_expires_at_ms;
 
     const std::string pending =
         "{\"operation\":\"device.handoff-outcome\","
@@ -123,6 +122,7 @@ void TestReceiptHandoffAndProviderBinding()
                                          assignment));
     assert(status == HubConfigStatus::Active);
     assert(assignment.channel_id == "livekit-1");
+    assert(assignment.expires_at_ms == 1786000000000);
 
     const std::string binding =
         "{\"schema_version\":1,\"active\":{\"server_url\":\"wss://lk\","

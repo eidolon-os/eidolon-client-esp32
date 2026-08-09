@@ -31,7 +31,6 @@ const char* ActivationMessageForStatus(HubConfigStatus status)
     case HubConfigStatus::Active:
         return "Device registered";
     case HubConfigStatus::Revoked:
-    case HubConfigStatus::Unregistered:
         return "Device authorization required";
     }
     return "Device registration failed";
@@ -60,8 +59,10 @@ bool HubActivator::Run() {
             Esp32HubConfig config;
             err = client.Run(txt, device_id, config);
             if (err == ESP_OK) {
-                store.SaveTxtRecord(txt);
-                store.SaveHubConfig(config, txt.descriptor_uri);
+                if (store.SaveHubConfig(config, txt.descriptor_uri) != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to persist Hub activation state");
+                    return false;
+                }
 
                 app.SetEidolonLifecycleUi(
                     LifecyclePhase::HubRegistering,

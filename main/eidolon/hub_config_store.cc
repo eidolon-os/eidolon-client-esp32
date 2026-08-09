@@ -9,43 +9,15 @@
 
 namespace eidolon {
 
-static std::string EntriesToJson(const std::map<std::string, std::string>& entries) {
-    cJSON* root = cJSON_CreateObject();
-    if (!root) {
-        return "{}";
-    }
-    for (const auto& kv : entries) {
-        cJSON_AddStringToObject(root, kv.first.c_str(), kv.second.c_str());
-    }
-    char* printed = cJSON_PrintUnformatted(root);
-    std::string json = printed ? printed : "{}";
-    if (printed) {
-        cJSON_free(printed);
-    }
-    cJSON_Delete(root);
-    return json;
-}
-
-esp_err_t HubConfigStore::SaveTxtRecord(const HubTxtRecord& txt) {
-    Settings settings(kNvsNamespace, true);
-    settings.SetString("descriptor_uri", txt.descriptor_uri);
-    settings.SetString("enrollment_uri", txt.enrollment_uri);
-    settings.SetInt("txtvers", txt.txtvers);
-    settings.SetString("mdns_txt_json", EntriesToJson(txt.entries));
-    ESP_LOGI(TAG, "Saved mDNS TXT (txtvers=%d, descriptor_uri=%s)",
-             txt.txtvers, txt.descriptor_uri.c_str());
-    return ESP_OK;
-}
-
 // The whole Hub config is persisted as a single JSON object under one NVS key.
 // This makes a save atomic: a crash/power-loss either leaves the previous value
 // intact or commits the new one whole — never a torn mix of old and new fields
 // (e.g. a fresh server_url paired with a stale token).
 static constexpr const char* kConfigKey = "config";
 static constexpr const char* kOnboardingKey = "onboarding";
-static constexpr int kConfigSchemaVersion = 2;
+static constexpr int kConfigSchemaVersion = 3;
 // Version 2 is the screen-independent manual-admission state. Version 1 held
-// an abandoned local pairing secret and must start a fresh Enrollment intent.
+// abandoned screen-bound claim material and must start a fresh Enrollment intent.
 static constexpr int kOnboardingSchemaVersion = 2;
 
 static std::string JsonStringField(cJSON* root, const char* key) {
@@ -75,8 +47,8 @@ esp_err_t HubConfigStore::SaveHubConfig(const Esp32HubConfig& config,
     cJSON_AddStringToObject(root, "ctrl_token", config.control.token.c_str());
     cJSON_AddStringToObject(root, "ctrl_id", config.control.identity.c_str());
     cJSON_AddStringToObject(root, "ctrl_room", config.control.room_name.c_str());
-    cJSON_AddStringToObject(root, "registration_id", config.registration_id.c_str());
-    cJSON_AddStringToObject(root, "fingerprint", config.device_fingerprint.c_str());
+    cJSON_AddNumberToObject(root, "expires_at_ms",
+                           static_cast<double>(config.expires_at_ms));
     cJSON_AddNumberToObject(root, "sample_rate", config.sample_rate);
     cJSON_AddNumberToObject(root, "channels", config.channels);
 
@@ -85,11 +57,16 @@ esp_err_t HubConfigStore::SaveHubConfig(const Esp32HubConfig& config,
     if (!printed) {
         return ESP_ERR_NO_MEM;
     }
-    {
-        Settings settings(kNvsNamespace, true);
-        settings.SetString(kConfigKey, printed);
-    }
+    Settings settings(kNvsNamespace, true);
+    const esp_err_t write_err = settings.SetString(kConfigKey, printed);
     cJSON_free(printed);
+    if (write_err != ESP_OK) {
+        return write_err;
+    }
+    const esp_err_t commit_err = settings.Commit();
+    if (commit_err != ESP_OK) {
+        return commit_err;
+    }
 
     ESP_LOGI(TAG, "Saved Hub config identity=%s status=%s room=%s server=%s",
              config.active.identity.c_str(), HubConfigStatusToString(config.status),
@@ -131,8 +108,10 @@ bool HubConfigStore::Load(Esp32HubConfig& config, std::string* descriptor_uri) c
     config.control.token = JsonStringField(root, "ctrl_token");
     config.control.identity = JsonStringField(root, "ctrl_id");
     config.control.room_name = JsonStringField(root, "ctrl_room");
-    config.registration_id = JsonStringField(root, "registration_id");
-    config.device_fingerprint = JsonStringField(root, "fingerprint");
+    const cJSON* expires = cJSON_GetObjectItem(root, "expires_at_ms");
+    if (cJSON_IsNumber(expires) && expires->valuedouble >= 0) {
+        config.expires_at_ms = static_cast<int64_t>(expires->valuedouble);
+    }
     config.sample_rate = JsonIntField(root, "sample_rate", 16000);
     config.channels = JsonIntField(root, "channels", 1);
 
@@ -159,17 +138,15 @@ esp_err_t HubConfigStore::SaveOnboardingState(const HubOnboardingState& state) {
     cJSON_AddStringToObject(root, "retrieval_token", state.retrieval_token.c_str());
     cJSON_AddStringToObject(root, "enrollment_id", state.enrollment_id.c_str());
     cJSON_AddStringToObject(root, "lifecycle_state", state.lifecycle_state.c_str());
-    cJSON_AddNumberToObject(root, "retrieval_expires_at_ms",
-                           static_cast<double>(state.retrieval_expires_at_ms));
     char* printed = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
     if (!printed) {
         return ESP_ERR_NO_MEM;
     }
     Settings settings(kNvsNamespace, true);
-    settings.SetString(kOnboardingKey, printed);
+    const esp_err_t write_err = settings.SetString(kOnboardingKey, printed);
     cJSON_free(printed);
-    return ESP_OK;
+    return write_err == ESP_OK ? settings.Commit() : write_err;
 }
 
 bool HubConfigStore::LoadOnboardingState(HubOnboardingState& state) const {
@@ -190,11 +167,6 @@ bool HubConfigStore::LoadOnboardingState(HubOnboardingState& state) const {
     state.retrieval_token = JsonStringField(root, "retrieval_token");
     state.enrollment_id = JsonStringField(root, "enrollment_id");
     state.lifecycle_state = JsonStringField(root, "lifecycle_state");
-    const cJSON* expires = cJSON_GetObjectItem(root, "retrieval_expires_at_ms");
-    if (cJSON_IsNumber(expires) && expires->valuedouble >= 0) {
-        state.retrieval_expires_at_ms =
-            static_cast<int64_t>(expires->valuedouble);
-    }
     cJSON_Delete(root);
     return !state.hub_id.empty() && !state.descriptor_uri.empty() &&
            !state.enrollment_uri.empty() && !state.device_id.empty() &&

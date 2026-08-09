@@ -116,8 +116,7 @@ std::string BuildDeviceManifestJson(const std::string& board_name)
         cJSON_free(encoded_title);
     }
     cJSON_Delete(title);
-    // Sorted keys and compact separators are part of the signed manifest
-    // revision shared with Hub's canonical JSON mapper.
+    // Keep a compact deterministic representation for the manifest wire contract.
     return "{\"actions\":[],\"events\":[],\"media\":[{\"codecs\":[\"opus\"],"
            "\"direction\":\"bidirectional\",\"kind\":\"audio\"}],\"properties\":[],"
            "\"schema_version\":1,\"title\":" + escaped + "}";
@@ -197,7 +196,8 @@ bool ParseHandoffResponse(const std::string& body,
         assignment.binding_format = JsonString(item, "binding_format");
         assignment.opaque_binding = JsonString(item, "opaque_binding");
         if (!assignment.channel_id.empty() && !assignment.opaque_binding.empty() &&
-            ReadInt64(item, "expires_at_ms", assignment.expires_at_ms)) {
+            ReadInt64(item, "expires_at_ms", assignment.expires_at_ms) &&
+            assignment.expires_at_ms > 0) {
             break;
         }
         assignment = HubChannelAssignment{};

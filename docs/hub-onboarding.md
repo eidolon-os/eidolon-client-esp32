@@ -20,7 +20,8 @@ Before the first Enrollment POST, the client atomically persists an onboarding
 object containing the Hub/device identity, request ID and 256-bit retrieval
 token. A lost HTTP response or reboot therefore retries the identical Enrollment
 request instead of creating parallel pending devices. The receipt's enrollment
-ID, lifecycle and deadline are saved into the same object before handoff.
+ID and last observed lifecycle are saved into the same object before handoff;
+the Hub remains authoritative for the retrieval deadline through HTTP 410.
 
 The device never creates or exposes an Owner pairing secret. It does not require
 a screen, QR renderer, camera, button, BLE transport or Mobile callback. A
@@ -69,10 +70,12 @@ After base64 decoding `opaque_binding`, the Provider-owned JSON must be:
 ```
 
 This binding is parsed only on the device. Hub must remain Provider-neutral.
-Provider credential renewal after the bounded Hub handoff window belongs to the
-Provider binding contract; the ESP32 may use its last atomically cached config
-for bounded recovery but must not resurrect a revoked or unknown lifecycle.
+The ESP32 stores the assignment expiry with its short-lived Provider config and
+rejects an expired cached binding once wall-clock time is available. It may ask
+the existing handoff for a refreshed binding only while the bounded retrieval
+window remains open. Long-term Provider credential renewal requires a separate
+formal contract; the firmware does not reinterpret Enrollment as permanent
+device authentication or silently resurrect a revoked lifecycle.
 
-The build uses the CMake `BOARD_NAME`/`BOARD_TYPE` values in Enrollment. For the
-target hardware both are `esp32-s3-touch-amoled-2.06`; no Box-3 device kind is
-hard-coded.
+Enrollment uses the active build's CMake `BOARD_NAME`/`BOARD_TYPE` values. The
+onboarding client does not hard-code Box3, Waveshare, or any other board kind.

@@ -58,6 +58,7 @@ constexpr int64_t kAudioStateHeartbeatUs = 500 * 1000;
 constexpr uint32_t kRadarPresenceLeaseMs = 15000;
 constexpr uint32_t kRadarPresenceHeartbeatMs = 5000;
 constexpr uint32_t kRadarStatePublishRetryMs = 1000;
+constexpr time_t kValidUnixTimeFloor = 1'700'000'000;
 // A connect/reconnect attempt that never reaches a terminal LiveKit state within
 // this long is treated as hung and force-recovered. Generous enough to cover a
 // slow mDNS + HTTPS + connect on a healthy-but-slow network.
@@ -359,6 +360,21 @@ bool ParseOwnerPresenceChanged(const std::string& payload, bool* present,
     return valid;
 }
 #endif
+
+bool ProviderBindingExpired(const eidolon::Esp32HubConfig& config)
+{
+    if (config.expires_at_ms <= 0) {
+        return true;
+    }
+    const time_t now = std::time(nullptr);
+    if (now < kValidUnixTimeFloor) {
+        // TLS/SNTP initialization owns wall-clock establishment. Until then,
+        // attempt an online refresh first but do not reject a bounded cached
+        // credential solely because the local clock still reads the epoch.
+        return false;
+    }
+    return static_cast<int64_t>(now) * 1000 >= config.expires_at_ms;
+}
 }  // namespace
 
 namespace eidolon {
@@ -727,7 +743,6 @@ VoiceSessionState EidolonVoiceController::StateForConfig(const Esp32HubConfig& c
     case HubConfigStatus::Active:
         return VoiceSessionState::ConfigReady;
     case HubConfigStatus::Revoked:
-    case HubConfigStatus::Unregistered:
         return VoiceSessionState::Unauthorized;
     }
     return VoiceSessionState::Error;
@@ -740,7 +755,8 @@ bool EidolonVoiceController::HasActiveConfig() const
     // legacy `active` slot.  It must never be treated as a normal voice room.
     return false;
 #else
-    return config_.status == HubConfigStatus::Active && config_.active.usable();
+    return config_.status == HubConfigStatus::Active && config_.active.usable() &&
+           !ProviderBindingExpired(config_);
 #endif
 }
 
@@ -749,7 +765,8 @@ bool EidolonVoiceController::HasControlConfig() const
     if (config_.status != HubConfigStatus::Active) {
         return false;
     }
-    return config_.control.usable() && !config_.control.room_name.empty();
+    return config_.control.usable() && !config_.control.room_name.empty() &&
+           !ProviderBindingExpired(config_);
 }
 
 const char* EidolonVoiceController::VoiceStateName(VoiceSessionState state)
@@ -869,7 +886,10 @@ esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist)
         // Provider credentials may rotate on every approved handoff. The
         // per-JOIN refresh keeps fresh credentials in RAM to avoid NVS wear.
         HubConfigStore store;
-        store.SaveHubConfig(fresh, hub_descriptor_uri_);
+        err = store.SaveHubConfig(fresh, hub_descriptor_uri_);
+        if (err != ESP_OK) {
+            return err;
+        }
     }
     config_ = std::move(fresh);
     SetState(StateForConfig(config_), "config_refreshed");
@@ -904,8 +924,9 @@ esp_err_t EidolonVoiceController::RediscoverHub()
     hub_descriptor_uri_ = txt.descriptor_uri;
     config_ = std::move(fresh);
     HubConfigStore store;
-    store.SaveTxtRecord(txt);
-    store.SaveHubConfig(config_, hub_descriptor_uri_);
+    if (store.SaveHubConfig(config_, hub_descriptor_uri_) != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to persist rediscovered Hub config");
+    }
     SetState(StateForConfig(config_), "hub_rediscovered");
     if (config_.status == HubConfigStatus::PendingApproval ||
         config_.status == HubConfigStatus::WaitingBinding) {
@@ -1435,7 +1456,6 @@ const char* EidolonVoiceController::JoinBlockedCode() const
     case HubConfigStatus::WaitingBinding:
         return "NEEDS_BINDING";
     case HubConfigStatus::Revoked:
-    case HubConfigStatus::Unregistered:
         return "UNAUTHORIZED";
     case HubConfigStatus::Active:
         break;
@@ -2900,8 +2920,13 @@ void EidolonVoiceController::DoActivation()
         return;
     }
 
-    if (!HasActiveConfig()) {
-        esp_err_t refresh_err = RefreshHubConfig();
+    if (config_.status == HubConfigStatus::PendingApproval ||
+        config_.status == HubConfigStatus::WaitingBinding) {
+        // HubActivator just performed the first handoff. Avoid immediately
+        // repeating it; the normal bounded poll owns the next attempt.
+        ScheduleOnboardingPoll();
+    } else if (!HasActiveConfig()) {
+        const esp_err_t refresh_err = RefreshHubConfig();
         if (refresh_err != ESP_OK) {
             ESP_LOGW(TAG, "Initial Hub config refresh failed: %s", esp_err_to_name(refresh_err));
         }
@@ -3077,9 +3102,8 @@ esp_err_t EidolonVoiceController::DoJoinRoom()
         return refresh_err;
     }
     if (refresh_err != ESP_OK) {
-        // Hub unreachable: fall back to the cached room+token — degraded (reuses
-        // the last room, so the delete race can reappear) but keeps JOIN working
-        // offline. The race only bites under Hub-up churn anyway.
+        // Hub unreachable: an unexpired cached room+token can provide bounded
+        // recovery. HasActiveConfig below rejects it after Provider expiry.
         ESP_LOGW(TAG, "Join: Hub config refresh failed (%s); using cached room=%s",
                  esp_err_to_name(refresh_err), config_.active.room_name.c_str());
     }

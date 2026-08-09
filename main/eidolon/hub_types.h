@@ -25,7 +25,6 @@ enum class HubConfigStatus {
     WaitingBinding,
     Active,
     Revoked,
-    Unregistered,
 };
 
 inline const char* HubConfigStatusToString(HubConfigStatus status) {
@@ -38,8 +37,6 @@ inline const char* HubConfigStatusToString(HubConfigStatus status) {
         return "approved";
     case HubConfigStatus::Revoked:
         return "revoked";
-    case HubConfigStatus::Unregistered:
-        return "unregistered";
     }
     return "active";
 }
@@ -54,10 +51,7 @@ inline HubConfigStatus ParseHubConfigStatus(const std::string& status) {
     if (status == "revoked") {
         return HubConfigStatus::Revoked;
     }
-    if (status == "unregistered") {
-        return HubConfigStatus::Unregistered;
-    }
-    // "pending_approval" and any unrecognized value fall through here. Default to
+    // "pending-approval" and any unrecognized value fall through here. Default to
     // the most conservative state: never grant voice on an unknown status.
     return HubConfigStatus::PendingApproval;
 }
@@ -88,7 +82,6 @@ struct HubOnboardingState {
     std::string retrieval_token;
     std::string enrollment_id;
     std::string lifecycle_state = "pending-approval";
-    int64_t retrieval_expires_at_ms = 0;
 
     bool has_local_intent() const {
         return !request_id.empty() && !retrieval_token.empty();
@@ -125,15 +118,10 @@ struct Esp32HubConfig {
     // Default to the most conservative status: a config that has not been
     // explicitly populated/parsed must never grant voice access.
     HubConfigStatus status = HubConfigStatus::PendingApproval;
-    // `active` holds the pending room while pending/waiting, and the voice room
-    // once active. `control` is the per-device control room (only when active).
+    // Provider-owned voice and control rooms. Both are usable only while Active.
     RoomConfig active;
     RoomConfig control;
-    // Generation id assigned by Hub for the current signed capability manifest.
-    // It is also embedded in the control-room participant metadata so stale
-    // disconnects cannot retire a newer registration generation.
-    std::string registration_id;
-    std::string device_fingerprint;
+    int64_t expires_at_ms = 0;
     int sample_rate = 16000;
     int channels = 1;
 };
