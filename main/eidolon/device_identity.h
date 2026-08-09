@@ -24,9 +24,6 @@ public:
                           SignedRequestHeaders& out);
     esp_err_t SignGetRequest(const std::string& path_query, const std::string& device_id,
                              SignedRequestHeaders& out);
-    esp_err_t SignEnrollmentProof(const std::string& statement,
-                                  std::string& public_key,
-                                  std::string& signature);
     const std::string& Fingerprint() const { return fingerprint_; }
 
 private:

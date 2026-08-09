@@ -47,9 +47,6 @@ public:
     virtual void SetEidolonLifecycle(const char* state, const char* detail);
     virtual void SetVoiceChrome(const char* mode, const char* state, const char* action,
                                 bool action_visible);
-    // Displays a short-lived local Owner-admission proof. Implementations must
-    // never log payload contents. Passing null or an empty string hides it.
-    virtual bool SetPairingCode(const char* payload);
     virtual void SetPresenceState(PresenceState state);
     virtual void ClearChatMessages();
     virtual void SetTheme(Theme* theme);

@@ -44,6 +44,9 @@ esp_err_t HubConfigStore::SaveTxtRecord(const HubTxtRecord& txt) {
 static constexpr const char* kConfigKey = "config";
 static constexpr const char* kOnboardingKey = "onboarding";
 static constexpr int kConfigSchemaVersion = 2;
+// Version 2 is the screen-independent manual-admission state. Version 1 held
+// an abandoned local pairing secret and must start a fresh Enrollment intent.
+static constexpr int kOnboardingSchemaVersion = 2;
 
 static std::string JsonStringField(cJSON* root, const char* key) {
     cJSON* item = cJSON_GetObjectItem(root, key);
@@ -147,17 +150,14 @@ esp_err_t HubConfigStore::SaveOnboardingState(const HubOnboardingState& state) {
     if (!root) {
         return ESP_ERR_NO_MEM;
     }
-    cJSON_AddNumberToObject(root, "schema_version", 1);
+    cJSON_AddNumberToObject(root, "schema_version", kOnboardingSchemaVersion);
     cJSON_AddStringToObject(root, "hub_id", state.hub_id.c_str());
     cJSON_AddStringToObject(root, "descriptor_uri", state.descriptor_uri.c_str());
     cJSON_AddStringToObject(root, "enrollment_uri", state.enrollment_uri.c_str());
     cJSON_AddStringToObject(root, "device_id", state.device_id.c_str());
     cJSON_AddStringToObject(root, "request_id", state.request_id.c_str());
     cJSON_AddStringToObject(root, "retrieval_token", state.retrieval_token.c_str());
-    cJSON_AddStringToObject(root, "pairing_secret", state.pairing_secret.c_str());
-    cJSON_AddStringToObject(root, "pairing_commitment", state.pairing_commitment.c_str());
     cJSON_AddStringToObject(root, "enrollment_id", state.enrollment_id.c_str());
-    cJSON_AddStringToObject(root, "pairing_claim_uri", state.pairing_claim_uri.c_str());
     cJSON_AddStringToObject(root, "lifecycle_state", state.lifecycle_state.c_str());
     cJSON_AddNumberToObject(root, "retrieval_expires_at_ms",
                            static_cast<double>(state.retrieval_expires_at_ms));
@@ -176,7 +176,8 @@ bool HubConfigStore::LoadOnboardingState(HubOnboardingState& state) const {
     Settings settings(kNvsNamespace, false);
     const std::string blob = settings.GetString(kOnboardingKey);
     cJSON* root = blob.empty() ? nullptr : cJSON_Parse(blob.c_str());
-    if (!root || JsonIntField(root, "schema_version", 0) != 1) {
+    if (!root || JsonIntField(root, "schema_version", 0) !=
+                     kOnboardingSchemaVersion) {
         cJSON_Delete(root);
         return false;
     }
@@ -187,10 +188,7 @@ bool HubConfigStore::LoadOnboardingState(HubOnboardingState& state) const {
     state.device_id = JsonStringField(root, "device_id");
     state.request_id = JsonStringField(root, "request_id");
     state.retrieval_token = JsonStringField(root, "retrieval_token");
-    state.pairing_secret = JsonStringField(root, "pairing_secret");
-    state.pairing_commitment = JsonStringField(root, "pairing_commitment");
     state.enrollment_id = JsonStringField(root, "enrollment_id");
-    state.pairing_claim_uri = JsonStringField(root, "pairing_claim_uri");
     state.lifecycle_state = JsonStringField(root, "lifecycle_state");
     const cJSON* expires = cJSON_GetObjectItem(root, "retrieval_expires_at_ms");
     if (cJSON_IsNumber(expires) && expires->valuedouble >= 0) {
@@ -198,7 +196,9 @@ bool HubConfigStore::LoadOnboardingState(HubOnboardingState& state) const {
             static_cast<int64_t>(expires->valuedouble);
     }
     cJSON_Delete(root);
-    return state.resumable();
+    return !state.hub_id.empty() && !state.descriptor_uri.empty() &&
+           !state.enrollment_uri.empty() && !state.device_id.empty() &&
+           state.has_local_intent();
 }
 
 void HubConfigStore::ClearOnboardingState() {

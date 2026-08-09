@@ -15,10 +15,8 @@ inline constexpr const char* kTxtEnrollmentUri = "enrollment_uri";
 
 inline constexpr int kSupportedTxtVers = 1;
 inline constexpr int kSupportedOnboardingProtocol = 1;
-inline constexpr const char* kPairingMethod = "local-secret-sha256";
 inline constexpr const char* kLiveKitBindingFormat =
     "application/vnd.eidolon.livekit-device+json;v=1";
-inline constexpr size_t kPairingQrPayloadMaxBytes = 106;
 
 inline constexpr const char* kNvsNamespace = "eidolon";
 
@@ -88,28 +86,14 @@ struct HubOnboardingState {
     std::string device_id;
     std::string request_id;
     std::string retrieval_token;
-    std::string pairing_secret;
-    std::string pairing_commitment;
     std::string enrollment_id;
-    std::string pairing_claim_uri;
     std::string lifecycle_state = "pending-approval";
     int64_t retrieval_expires_at_ms = 0;
 
     bool has_local_intent() const {
-        return !request_id.empty() && !retrieval_token.empty() &&
-               !pairing_secret.empty() && !pairing_commitment.empty();
+        return !request_id.empty() && !retrieval_token.empty();
     }
     bool enrolled() const { return !enrollment_id.empty(); }
-    bool resumable() const {
-        if (hub_id.empty() || descriptor_uri.empty() || enrollment_uri.empty() ||
-            device_id.empty() || request_id.empty() || retrieval_token.empty()) {
-            return false;
-        }
-        // Before enrollment the signed request must retain its pairing material.
-        // Once Hub has issued an enrollment ID, the retrieval session survives
-        // approval after the plaintext pairing proof has been erased.
-        return enrolled() || has_local_intent();
-    }
 };
 
 struct HubEnrollmentReceipt {
@@ -117,7 +101,6 @@ struct HubEnrollmentReceipt {
     std::string enrollment_id;
     std::string device_id;
     std::string lifecycle_state;
-    std::string pairing_claim_uri;
     int64_t retrieval_expires_at_ms = 0;
 };
 

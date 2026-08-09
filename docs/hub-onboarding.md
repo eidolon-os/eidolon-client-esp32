@@ -5,7 +5,7 @@ The ESP32 client consumes only the current Hub flow:
 1. discover `txtvers=1`, `descriptor_uri`, and `enrollment_uri` over mDNS;
 2. fetch and cross-check the HTTPS descriptor;
 3. create or resume one crash-safe Enrollment intent;
-4. poll the Enrollment handoff until Owner approval and a compatible Provider
+4. poll the Enrollment handoff until administrator approval and a compatible Provider
    assignment are both available.
 
 There is no fallback to `api=v1`, `register_url`, or `RegisterDevice`.
@@ -14,79 +14,29 @@ Wi-Fi is transport state. It is complete before onboarding starts and is never
 used as evidence of Owner admission. Hub lifecycle is stored separately as
 `pending-approval`, internal `waiting-binding`, `approved`, or `revoked`.
 
-## Persistent identity and retry state
+## Persistent enrollment and retry state
 
-The existing P-256 private key remains in the `eidolon_id/p256_priv` NVS key.
-Before the first Enrollment POST, the client atomically persists a separate
-onboarding object containing the Hub/device identity, request ID, 256-bit
-retrieval token, 256-bit local pairing secret and its SHA-256 commitment. A lost
-HTTP response or reboot therefore retries the identical Enrollment request; it
-does not create parallel secrets. The receipt's enrollment ID, claim URI and
-deadline are saved into the same object before handoff.
+Before the first Enrollment POST, the client atomically persists an onboarding
+object containing the Hub/device identity, request ID and 256-bit retrieval
+token. A lost HTTP response or reboot therefore retries the identical Enrollment
+request instead of creating parallel pending devices. The receipt's enrollment
+ID, lifecycle and deadline are saved into the same object before handoff.
 
-The ESP32 never logs the retrieval token, pairing secret, identity signature or
-opaque Provider binding. The only product physical/near-field Owner-admission
-payload is the compact QR transport below; there is no JSON or `device_id`-only
-alternative. The Emote display renders it while the enrollment is
-`pending-approval`:
+The device never creates or exposes an Owner pairing secret. It does not require
+a screen, QR renderer, camera, button, BLE transport or Mobile callback. A
+trusted administrator reviews the pending device in Hub management, selects the
+Owner and approves it. A screen-capable product may display generic progress
+such as “Waiting for approval”, but display output is not protocol evidence.
 
-```text
-EIDOLON:PAIR:1:<enrollment_id>:<pairing_secret>
-```
-
-Both fields use only base64url-safe ASCII and the whole payload is at most 106
-bytes (QR version 5, ECC Low). It is an admission proof, not a provisioning
-descriptor: the scanner must already have the verified Hub descriptor origin
-and constructs the v1 pairing-claim URI from that origin plus the scanned
-enrollment ID. The QR is hidden outside `pending-approval`; the plaintext secret
-is removed from onboarding NVS after Hub reports approval, waiting for Provider
-binding, or revocation. QR payload content is suppressed from both display-layer
-log tags. There is no unauthenticated LAN endpoint for this secret.
+The ESP32 never logs the retrieval token or opaque Provider binding. Its existing
+P-256 identity remains available to other signed device APIs, but it is not an
+extra enrollment admission mechanism in this manually approved flow.
 
 Pending handoff is a successful onboarding state (`HTTP 202`), not a Wi-Fi or Hub
-failure. The controller polls every five seconds. An expired pending enrollment
-can be replaced with a new persisted intent; an approved enrollment with an
-expired retrieval window cannot be silently re-enrolled because Hub Owner
-admission is authoritative.
-
-## Provisioning transport boundary
-
-The minimum ready path in this firmware assumes Wi-Fi was configured earlier,
-then performs Hub discovery, enrollment, physical QR Owner proof, handoff and
-voice binding. The existing `Xiaozhi-*` captive portal remains a legacy Wi-Fi
-transport: it has no authenticated session or verifiable identity and must not
-be adapted as the Mobile `DeviceProvisioningTransport` contract.
-
-The future authenticated provisioning transport consumed by Mobile is a
-separate firmware feature. Its session descriptor is exactly:
-
-```json
-{
-  "contract_version": "1",
-  "device_id": "<stable device ID>",
-  "device_kind": "<CMake BOARD_TYPE>",
-  "display_name": "<CMake BOARD_NAME>",
-  "identity_fingerprint": "p256:<SHA-256 of DER SPKI>",
-  "session_id": "<fresh 128-bit-or-greater random ID>",
-  "expires_at": "<UTC RFC3339 timestamp>",
-  "trust": "development-tofu"
-}
-```
-
-Its authenticated, encrypted, replay-protected session has three operations and
-keeps their outcomes distinct:
-
-1. `scan-networks` returns SSID/RSSI/security only;
-2. `configure-network` accepts Wi-Fi credentials plus `{hub_id,
-   descriptor_uri}` and returns `network-configured` only;
-3. `await-enrollment` returns `{device_id, enrollment_id, lifecycle_state}` only
-   after the device has independently signed and submitted Hub enrollment.
-
-Wi-Fi credentials, Owner/Controller credentials and the QR pairing secret are
-never persisted in a Mobile checkpoint or sent together in one request. This
-authenticated provisioning transport is **not implemented by this revision**;
-Mobile must treat the current legacy hotspot as Wi-Fi-only and may use the QR
-path only for an already-networked pending enrollment.
+failure. The controller polls every five seconds on both screen and headless
+devices. An expired pending enrollment can be replaced with a new persisted
+intent; an approved enrollment with an expired retrieval window cannot be
+silently re-enrolled because Hub Owner admission is authoritative.
 
 ## Provider binding consumed by this firmware
 
@@ -123,6 +73,6 @@ Provider credential renewal after the bounded Hub handoff window belongs to the
 Provider binding contract; the ESP32 may use its last atomically cached config
 for bounded recovery but must not resurrect a revoked or unknown lifecycle.
 
-The build uses the CMake `BOARD_NAME`/`BOARD_TYPE` values in Enrollment. The
-currently connected ESP-BOX-3 build therefore reports `esp-box-3`; the Waveshare
-build reports its own board values. Neither kind is hard-coded in onboarding.
+The build uses the CMake `BOARD_NAME`/`BOARD_TYPE` values in Enrollment. For the
+target hardware both are `esp32-s3-touch-amoled-2.06`; no Box-3 device kind is
+hard-coded.

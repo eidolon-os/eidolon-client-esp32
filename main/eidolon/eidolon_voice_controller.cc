@@ -1114,7 +1114,7 @@ void EidolonVoiceController::DoOnboardingPoll()
         ScheduleOnboardingPoll();
         return;
     }
-    ESP_LOGI(TAG, "Owner pairing approved; provider binding is ready");
+    ESP_LOGI(TAG, "Administrator approval complete; provider binding is ready");
     if (HasControlConfig()) {
         ConnectControlRoom();
     }

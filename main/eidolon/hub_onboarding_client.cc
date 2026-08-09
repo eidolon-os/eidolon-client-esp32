@@ -5,7 +5,6 @@
 #include "hub_config_store.h"
 #include "hub_onboarding_protocol.h"
 #include "system_info.h"
-#include "display.h"
 
 #include "sdkconfig.h"
 
@@ -13,7 +12,6 @@
 #include <esp_log.h>
 #include <esp_random.h>
 #include <mbedtls/base64.h>
-#include <mbedtls/sha256.h>
 
 #include <cstring>
 #include <utility>
@@ -23,25 +21,6 @@
 namespace eidolon {
 
 namespace {
-
-std::string Hex(const unsigned char* data, size_t size)
-{
-    static constexpr char kHex[] = "0123456789abcdef";
-    std::string out(size * 2, '0');
-    for (size_t i = 0; i < size; ++i) {
-        out[i * 2] = kHex[data[i] >> 4];
-        out[i * 2 + 1] = kHex[data[i] & 0x0f];
-    }
-    return out;
-}
-
-std::string Sha256(const std::string& value)
-{
-    unsigned char digest[32] = {};
-    mbedtls_sha256(reinterpret_cast<const unsigned char*>(value.data()),
-                   value.size(), digest, 0);
-    return "sha256:" + Hex(digest, sizeof(digest));
-}
 
 std::string Base64UrlRandom(size_t bytes)
 {
@@ -103,9 +82,7 @@ std::string PrintJson(cJSON* root)
     return out;
 }
 
-std::string BuildEnrollmentBody(const HubOnboardingState& state,
-                                const std::string& public_key,
-                                const std::string& signature)
+std::string BuildEnrollmentBody(const HubOnboardingState& state)
 {
     const std::string manifest_json = BuildDeviceManifestJson(BOARD_NAME);
     cJSON* root = cJSON_CreateObject();
@@ -118,13 +95,6 @@ std::string BuildEnrollmentBody(const HubOnboardingState& state,
                          cJSON_ParseWithLength(manifest_json.data(), manifest_json.size()));
     cJSON_AddStringToObject(root, "display_name", BOARD_NAME);
     cJSON_AddStringToObject(root, "device_kind", BOARD_TYPE);
-    cJSON* proof = cJSON_AddObjectToObject(root, "identity_proof");
-    cJSON_AddStringToObject(proof, "algorithm", "p256-sha256");
-    cJSON_AddStringToObject(proof, "public_key_spki", public_key.c_str());
-    cJSON_AddStringToObject(proof, "signature", signature.c_str());
-    cJSON* pairing = cJSON_AddObjectToObject(root, "pairing_proof");
-    cJSON_AddStringToObject(pairing, "method", kPairingMethod);
-    cJSON_AddStringToObject(pairing, "commitment", state.pairing_commitment.c_str());
     const std::string body = PrintJson(root);
     cJSON_Delete(root);
     return body;
@@ -152,28 +122,6 @@ esp_err_t StatusError(int status)
         return ESP_ERR_TIMEOUT;
     }
     return ESP_FAIL;
-}
-
-void UpdatePairingDisplay(const HubOnboardingState& state,
-                          HubConfigStatus lifecycle)
-{
-    Display* display = Board::GetInstance().GetDisplay();
-    if (display == nullptr) {
-        return;
-    }
-    if (lifecycle != HubConfigStatus::PendingApproval) {
-        display->SetPairingCode(nullptr);
-        return;
-    }
-    const std::string payload = BuildPairingQrPayload(state);
-    if (payload.empty()) {
-        ESP_LOGE(TAG, "Pending enrollment cannot be encoded as pairing QR");
-        display->SetPairingCode(nullptr);
-        return;
-    }
-    if (!display->SetPairingCode(payload.c_str())) {
-        ESP_LOGW(TAG, "Display has no physical pairing-proof surface");
-    }
 }
 
 }  // namespace
@@ -211,18 +159,7 @@ esp_err_t HubOnboardingClient::EnsureEnrollment(const HubDescriptor& descriptor,
     if (state.enrolled()) {
         return ESP_OK;
     }
-    DeviceIdentity& identity = DeviceIdentity::GetInstance();
-    const std::string manifest = BuildDeviceManifestJson(BOARD_NAME);
-    const std::string statement = BuildEnrollmentProofStatement(
-        state.request_id, state.device_id, Sha256(state.retrieval_token),
-        state.pairing_commitment, BOARD_TYPE, BOARD_NAME, Sha256(manifest));
-    std::string public_key;
-    std::string signature;
-    esp_err_t err = identity.SignEnrollmentProof(statement, public_key, signature);
-    if (err != ESP_OK) {
-        return err;
-    }
-    std::string body = BuildEnrollmentBody(state, public_key, signature);
+    std::string body = BuildEnrollmentBody(state);
     if (body.empty()) {
         return ESP_ERR_NO_MEM;
     }
@@ -248,7 +185,6 @@ esp_err_t HubOnboardingClient::EnsureEnrollment(const HubDescriptor& descriptor,
         return ESP_ERR_INVALID_RESPONSE;
     }
     state.enrollment_id = receipt.enrollment_id;
-    state.pairing_claim_uri = receipt.pairing_claim_uri;
     state.lifecycle_state = receipt.lifecycle_state;
     state.retrieval_expires_at_ms = receipt.retrieval_expires_at_ms;
     return HubConfigStore().SaveOnboardingState(state);
@@ -308,14 +244,6 @@ esp_err_t HubOnboardingClient::Handoff(const HubDescriptor& descriptor,
         // or persists it; the device config store atomically caches the parsed
         // credential for bounded offline recovery.
     }
-    UpdatePairingDisplay(state, lifecycle);
-    if (lifecycle != HubConfigStatus::PendingApproval) {
-        // The Owner proof is one-purpose admission material. Keep the retrieval
-        // session for handoff refresh, but erase the plaintext proof once Hub no
-        // longer reports an approvable pending enrollment.
-        state.pairing_secret.clear();
-        state.pairing_commitment.clear();
-    }
     return HubConfigStore().SaveOnboardingState(state);
 }
 
@@ -336,7 +264,7 @@ esp_err_t HubOnboardingClient::Run(const HubTxtRecord& advertised,
         ESP_LOGE(TAG, "Refusing automatic onboarding state switch to another Hub or device");
         return ESP_ERR_NOT_ALLOWED;
     }
-    const bool reusable = has_saved_state && state.resumable();
+    const bool reusable = has_saved_state && state.has_local_intent();
     if (!reusable) {
         store.ClearOnboardingState();
         state = HubOnboardingState{};
@@ -346,8 +274,6 @@ esp_err_t HubOnboardingClient::Run(const HubTxtRecord& advertised,
         state.device_id = device_id;
         state.request_id = "enroll-" + Base64UrlRandom(16);
         state.retrieval_token = Base64UrlRandom(32);
-        state.pairing_secret = Base64UrlRandom(32);
-        state.pairing_commitment = Sha256(state.pairing_secret);
         if (!state.has_local_intent() ||
             store.SaveOnboardingState(state) != ESP_OK) {
             return ESP_ERR_NO_MEM;
@@ -369,8 +295,7 @@ esp_err_t HubOnboardingClient::Run(const HubTxtRecord& advertised,
     err = Handoff(descriptor, state, out);
     if (err == ESP_ERR_TIMEOUT && state.lifecycle_state == "pending-approval") {
         // Hub expired an unapproved intent. Drop only that intent and retry
-        // once with new request/retrieval/pairing material.
-        UpdatePairingDisplay(state, HubConfigStatus::Unregistered);
+        // once with a new request ID and retrieval token.
         store.ClearOnboardingState();
         return Run(advertised, device_id, out);
     }

@@ -62,7 +62,7 @@ void TestDescriptorIsPinnedToAdvertisedHttpsOrigin()
     assert(!eidolon::ParseHubDescriptorResponse(diverted, advertised, parsed));
 }
 
-void TestCanonicalManifestAndProofStatement()
+void TestCanonicalManifest()
 {
     const std::string manifest =
         eidolon::BuildDeviceManifestJson("esp32-s3-touch-amoled-2.06");
@@ -70,22 +70,6 @@ void TestCanonicalManifestAndProofStatement()
            "{\"actions\":[],\"events\":[],\"media\":[{\"codecs\":[\"opus\"],"
            "\"direction\":\"bidirectional\",\"kind\":\"audio\"}],\"properties\":[],"
            "\"schema_version\":1,\"title\":\"esp32-s3-touch-amoled-2.06\"}");
-    const std::string statement = eidolon::BuildEnrollmentProofStatement(
-        "enroll-a", "aa:bb",
-        "sha256:8a3f8ba8e8f044009aef31324b1a6073e5c20992b8a6b468cd9153bb40a4152d",
-        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "esp32-s3-touch-amoled-2.06", "esp32-s3-touch-amoled-2.06",
-        "sha256:61fbd6624779ccded820c200cb9f289dde23860ec6952a52e5068824758d0175");
-    assert(statement ==
-           "eidolon-device-enrollment-proof-v1\n"
-           "8:enroll-a\n"
-           "5:aa:bb\n"
-           "71:sha256:8a3f8ba8e8f044009aef31324b1a6073e5c20992b8a6b468cd9153bb40a4152d\n"
-           "19:local-secret-sha256\n"
-           "71:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"
-           "26:esp32-s3-touch-amoled-2.06\n"
-           "26:esp32-s3-touch-amoled-2.06\n"
-           "71:sha256:61fbd6624779ccded820c200cb9f289dde23860ec6952a52e5068824758d0175\n");
 }
 
 eidolon::HubOnboardingState PendingState()
@@ -97,8 +81,7 @@ eidolon::HubOnboardingState PendingState()
     state.device_id = "aa:bb";
     state.request_id = "enroll-a";
     state.retrieval_token = "r";
-    state.pairing_secret = "pairing-secret";
-    state.pairing_commitment = "sha256:" + std::string(64, 'a');
+    assert(state.has_local_intent());
     return state;
 }
 
@@ -109,14 +92,10 @@ void TestReceiptHandoffAndProviderBinding()
         "{\"operation\":\"device.enrollment-received\","
         "\"request_id\":\"enroll-a\",\"enrollment_id\":\"enrollment-1\","
         "\"device_id\":\"aa:bb\",\"lifecycle_state\":\"pending-approval\","
-        "\"retrieval_expires_at_ms\":1786000000000,"
-        "\"pairing_claim_uri\":"
-        "\"https://eidolon-hub.local/api/device-management/v1/enrollments/"
-        "enrollment-1/pairing-claims\"}";
+        "\"retrieval_expires_at_ms\":1786000000000}";
     eidolon::HubEnrollmentReceipt parsed;
     assert(eidolon::ParseEnrollmentReceiptResponse(receipt, state, parsed));
     state.enrollment_id = parsed.enrollment_id;
-    state.pairing_claim_uri = parsed.pairing_claim_uri;
     state.retrieval_expires_at_ms = parsed.retrieval_expires_at_ms;
 
     const std::string pending =
@@ -158,40 +137,13 @@ void TestReceiptHandoffAndProviderBinding()
 
 }
 
-void TestPairingQrTransportProfile()
-{
-    auto state = PendingState();
-    state.enrollment_id = "enrollment_0123456789abcdefghijklmn";
-    state.pairing_secret =
-        "0123456789abcdefghijklmnopqrstuvwxyzABCDEFG";
-    const std::string qr = eidolon::BuildPairingQrPayload(state);
-    assert(qr == "EIDOLON:PAIR:1:" + state.enrollment_id + ":" +
-                     state.pairing_secret);
-    assert(qr.size() <= eidolon::kPairingQrPayloadMaxBytes);
-
-    state.pairing_secret = "short-pairing-secret";
-    assert(eidolon::BuildPairingQrPayload(state).empty());
-    state.pairing_secret = std::string(20, 'a') + ":" + std::string(22, 'b');
-    assert(eidolon::BuildPairingQrPayload(state).empty());
-    state.pairing_secret = std::string(80, 'a');
-    assert(eidolon::BuildPairingQrPayload(state).empty());
-
-    state = PendingState();
-    assert(state.resumable());
-    state.enrollment_id = "enrollment_abc";
-    state.pairing_secret.clear();
-    state.pairing_commitment.clear();
-    assert(state.resumable());
-}
-
 }  // namespace
 
 int main()
 {
     TestMdnsConsumesOnlyDescriptorContract();
     TestDescriptorIsPinnedToAdvertisedHttpsOrigin();
-    TestCanonicalManifestAndProofStatement();
+    TestCanonicalManifest();
     TestReceiptHandoffAndProviderBinding();
-    TestPairingQrTransportProfile();
     return 0;
 }

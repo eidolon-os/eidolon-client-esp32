@@ -3,7 +3,6 @@
 #include <cJSON.h>
 
 #include <cstdint>
-#include <cstring>
 
 namespace eidolon {
 
@@ -38,22 +37,6 @@ bool SameOrigin(const std::string& left, const std::string& right)
     return !left_origin.empty() && left_origin == Origin(right);
 }
 
-bool IsPairingQrToken(const std::string& value)
-{
-    if (value.empty()) {
-        return false;
-    }
-    for (const unsigned char character : value) {
-        if (!((character >= 'a' && character <= 'z') ||
-              (character >= 'A' && character <= 'Z') ||
-              (character >= '0' && character <= '9') || character == '-' ||
-              character == '_')) {
-            return false;
-        }
-    }
-    return true;
-}
-
 bool ReadInt64(const cJSON* object, const char* key, int64_t& out)
 {
     const cJSON* item = cJSON_GetObjectItemCaseSensitive(object, key);
@@ -67,14 +50,6 @@ bool ReadInt64(const cJSON* object, const char* key, int64_t& out)
     }
     out = value;
     return true;
-}
-
-void AppendFramed(std::string& out, const std::string& value)
-{
-    out += std::to_string(value.size());
-    out += ':';
-    out += value;
-    out += '\n';
 }
 
 bool ReadRoom(const cJSON* root, const char* key, RoomConfig& out)
@@ -148,27 +123,6 @@ std::string BuildDeviceManifestJson(const std::string& board_name)
            "\"schema_version\":1,\"title\":" + escaped + "}";
 }
 
-std::string BuildEnrollmentProofStatement(
-    const std::string& request_id,
-    const std::string& device_id,
-    const std::string& retrieval_token_hash,
-    const std::string& pairing_commitment,
-    const std::string& device_kind,
-    const std::string& display_name,
-    const std::string& manifest_revision)
-{
-    std::string statement = "eidolon-device-enrollment-proof-v1\n";
-    AppendFramed(statement, request_id);
-    AppendFramed(statement, device_id);
-    AppendFramed(statement, retrieval_token_hash);
-    AppendFramed(statement, kPairingMethod);
-    AppendFramed(statement, pairing_commitment);
-    AppendFramed(statement, device_kind);
-    AppendFramed(statement, display_name);
-    AppendFramed(statement, manifest_revision);
-    return statement;
-}
-
 bool ParseEnrollmentReceiptResponse(const std::string& body,
                                     const HubOnboardingState& expected,
                                     HubEnrollmentReceipt& out)
@@ -183,14 +137,11 @@ bool ParseEnrollmentReceiptResponse(const std::string& body,
     out.enrollment_id = JsonString(root, "enrollment_id");
     out.device_id = JsonString(root, "device_id");
     out.lifecycle_state = JsonString(root, "lifecycle_state");
-    out.pairing_claim_uri = JsonString(root, "pairing_claim_uri");
     const bool valid = JsonString(root, "operation") == "device.enrollment-received" &&
                        out.request_id == expected.request_id &&
                        out.device_id == expected.device_id &&
                        !out.enrollment_id.empty() &&
                        out.lifecycle_state == "pending-approval" &&
-                       IsHttpsUrl(out.pairing_claim_uri) &&
-                       SameOrigin(expected.descriptor_uri, out.pairing_claim_uri) &&
                        ReadInt64(root, "retrieval_expires_at_ms",
                                  out.retrieval_expires_at_ms);
     cJSON_Delete(root);
@@ -286,21 +237,6 @@ bool ParseLiveKitBinding(const std::string& body, Esp32HubConfig& out)
     }
     cJSON_Delete(root);
     return valid;
-}
-
-std::string BuildPairingQrPayload(const HubOnboardingState& state)
-{
-    if (!IsPairingQrToken(state.enrollment_id) ||
-        !IsPairingQrToken(state.pairing_secret) ||
-        state.pairing_secret.size() != 43) {
-        return "";
-    }
-    std::string payload = "EIDOLON:PAIR:1:" + state.enrollment_id + ":" +
-                          state.pairing_secret;
-    if (payload.size() > kPairingQrPayloadMaxBytes) {
-        return "";
-    }
-    return payload;
 }
 
 }  // namespace eidolon
