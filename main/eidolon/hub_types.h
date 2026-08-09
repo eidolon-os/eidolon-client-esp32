@@ -8,15 +8,16 @@
 
 namespace eidolon {
 
-// mDNS TXT record keys (hub/core/discovery.py)
+// mDNS TXT record keys (eidolon_hub discovery contract).
 inline constexpr const char* kTxtVers = "txtvers";
-inline constexpr const char* kTxtApi = "api";
-inline constexpr const char* kTxtVersion = "version";
-inline constexpr const char* kTxtRegisterUrl = "register_url";
+inline constexpr const char* kTxtDescriptorUri = "descriptor_uri";
+inline constexpr const char* kTxtEnrollmentUri = "enrollment_uri";
 
 inline constexpr int kSupportedTxtVers = 1;
-inline constexpr int kSupportedMaxTxtVers = 1;
-inline constexpr const char* kExpectedApi = "v1";
+inline constexpr int kSupportedOnboardingProtocol = 1;
+inline constexpr const char* kPairingMethod = "local-secret-sha256";
+inline constexpr const char* kLiveKitBindingFormat =
+    "application/vnd.eidolon.livekit-device+json;v=1";
 
 inline constexpr const char* kNvsNamespace = "eidolon";
 
@@ -31,11 +32,11 @@ enum class HubConfigStatus {
 inline const char* HubConfigStatusToString(HubConfigStatus status) {
     switch (status) {
     case HubConfigStatus::PendingApproval:
-        return "pending_approval";
+        return "pending-approval";
     case HubConfigStatus::WaitingBinding:
-        return "waiting_binding";
+        return "waiting-binding";
     case HubConfigStatus::Active:
-        return "active";
+        return "approved";
     case HubConfigStatus::Revoked:
         return "revoked";
     case HubConfigStatus::Unregistered:
@@ -45,10 +46,10 @@ inline const char* HubConfigStatusToString(HubConfigStatus status) {
 }
 
 inline HubConfigStatus ParseHubConfigStatus(const std::string& status) {
-    if (status == "active") {
+    if (status == "approved") {
         return HubConfigStatus::Active;
     }
-    if (status == "waiting_binding") {
+    if (status == "waiting-binding") {
         return HubConfigStatus::WaitingBinding;
     }
     if (status == "revoked") {
@@ -65,9 +66,55 @@ inline HubConfigStatus ParseHubConfigStatus(const std::string& status) {
 struct HubTxtRecord {
     int txtvers = 0;
     std::map<std::string, std::string> entries;
-    std::string api;
-    std::string register_url;
-    std::string hub_version;
+    std::string descriptor_uri;
+    std::string enrollment_uri;
+};
+
+struct HubDescriptor {
+    int schema_version = 0;
+    std::string hub_id;
+    std::string descriptor_uri;
+    std::string device_onboarding_uri;
+    std::string enrollment_uri;
+};
+
+// Crash-safe, short-lived enrollment secrets. This state is deliberately
+// independent from Wi-Fi credentials and from the approved channel config.
+struct HubOnboardingState {
+    std::string hub_id;
+    std::string descriptor_uri;
+    std::string enrollment_uri;
+    std::string device_id;
+    std::string request_id;
+    std::string retrieval_token;
+    std::string pairing_secret;
+    std::string pairing_commitment;
+    std::string enrollment_id;
+    std::string pairing_claim_uri;
+    std::string lifecycle_state = "pending-approval";
+    int64_t retrieval_expires_at_ms = 0;
+
+    bool has_local_intent() const {
+        return !request_id.empty() && !retrieval_token.empty() &&
+               !pairing_secret.empty() && !pairing_commitment.empty();
+    }
+    bool enrolled() const { return !enrollment_id.empty(); }
+};
+
+struct HubEnrollmentReceipt {
+    std::string request_id;
+    std::string enrollment_id;
+    std::string device_id;
+    std::string lifecycle_state;
+    std::string pairing_claim_uri;
+    int64_t retrieval_expires_at_ms = 0;
+};
+
+struct HubChannelAssignment {
+    std::string channel_id;
+    std::string binding_format;
+    std::string opaque_binding;
+    int64_t expires_at_ms = 0;
 };
 
 // A single LiveKit room the device can connect to.

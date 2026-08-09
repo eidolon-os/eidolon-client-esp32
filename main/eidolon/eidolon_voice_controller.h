@@ -129,6 +129,7 @@ private:
         AgentPhaseChanged,
         SessionActivity,
         AudioTick,
+        OnboardingPoll,
         ReconnectTick,
         ConnectTimeout,
         IdleLeave,
@@ -197,6 +198,7 @@ private:
     void DoAgentPhase(AgentPhase phase);
     void DoSessionActivity();
     void DoAudioTick();
+    void DoOnboardingPoll();
     void DoReconnectTick();
     void DoConnectTimeout();
     void DoIdleAutoLeave();
@@ -288,6 +290,7 @@ private:
     // Reconnect (timer-driven backoff) + connect watchdog + idle fallbacks. Each
     // timer callback just posts an event; the work runs on the controller task.
     void ScheduleControlReconnect(const char* reason);
+    void ScheduleOnboardingPoll();
     void ArmConnectWatchdog();
     void DisarmConnectWatchdog();
     void UpdateIdleAutoLeave();
@@ -296,6 +299,7 @@ private:
     void CancelPttReleaseTail();
     void FinalizePttRelease(const char* reason);
     static void ReconnectTimerCb(void* arg);
+    static void OnboardingPollTimerCb(void* arg);
     static void ConnectWatchdogCb(void* arg);
     static void IdleLeaveCb(void* arg);
     static void FullDuplexIdleFallbackCb(void* arg);
@@ -316,7 +320,7 @@ private:
     LiveKitSession session_;
     DeviceEventBus device_event_bus_;
     Esp32HubConfig config_;
-    std::string register_url_;
+    std::string hub_descriptor_uri_;
     VoiceSessionState state_ = VoiceSessionState::Idle;
     bool mic_enabled_ = true;
     // Interaction mode (one of three, compile-time per board via Kconfig):
@@ -384,6 +388,7 @@ private:
     TaskHandle_t task_ = nullptr;
     esp_timer_handle_t audio_timer_ = nullptr;
     esp_timer_handle_t reconnect_timer_ = nullptr;
+    esp_timer_handle_t onboarding_poll_timer_ = nullptr;
     esp_timer_handle_t connect_watchdog_ = nullptr;
     esp_timer_handle_t idle_leave_timer_ = nullptr;
     esp_timer_handle_t full_duplex_idle_timer_ = nullptr;

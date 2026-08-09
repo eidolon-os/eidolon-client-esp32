@@ -1083,6 +1083,8 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/hub_config_client.cc"
         "eidolon/hub_config_store.cc"
         "eidolon/hub_discovery.cc"
+        "eidolon/hub_onboarding_client.cc"
+        "eidolon/hub_onboarding_protocol.cc"
         "eidolon/hub_txt_parser.cc"
         "eidolon/livekit_board.cc"
         "eidolon/livekit_session.cc"

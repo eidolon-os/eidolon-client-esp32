@@ -2,15 +2,12 @@
 
 #include "application.h"
 #include "eidolon_ui_types.h"
-#include "hub_config_client.h"
 #include "hub_config_store.h"
 #include "hub_discovery.h"
-#include "ota.h"
+#include "hub_onboarding_client.h"
 #include "system_info.h"
 
 #include "sdkconfig.h"
-
-#include <cJSON.h>
 
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
@@ -49,7 +46,7 @@ bool HubActivator::Run() {
     int retry_delay = 10;
 
     HubDiscovery discovery;
-    HubConfigClient client;
+    HubOnboardingClient client;
     HubConfigStore store;
     const std::string device_id = SystemInfo::GetMacAddress();
 
@@ -61,26 +58,10 @@ bool HubActivator::Run() {
         if (err == ESP_OK) {
             app.SetEidolonLifecycleUi(LifecyclePhase::HubRegistering);
             Esp32HubConfig config;
-            err = client.RegisterDevice(txt.register_url, device_id, config);
+            err = client.Run(txt, device_id, config);
             if (err == ESP_OK) {
                 store.SaveTxtRecord(txt);
-                store.SaveHubConfig(config, txt.register_url);
-
-                if (client.HasPendingFirmware()) {
-                    cJSON* firmware = cJSON_CreateObject();
-                    cJSON_AddStringToObject(firmware, "version",
-                                            client.PendingFirmwareVersion().c_str());
-                    cJSON_AddStringToObject(firmware, "url", client.PendingFirmwareUrl().c_str());
-                    if (client.PendingFirmwareForce()) {
-                        cJSON_AddNumberToObject(firmware, "force", 1);
-                    }
-                    Ota ota;
-                    if (ota.ApplyFirmwareSection(firmware)) {
-                        ESP_LOGI(TAG, "Firmware upgrade pending (phase 2): %s",
-                                 ota.GetFirmwareUrl().c_str());
-                    }
-                    cJSON_Delete(firmware);
-                }
+                store.SaveHubConfig(config, txt.descriptor_uri);
 
                 app.SetEidolonLifecycleUi(
                     LifecyclePhase::HubRegistering,

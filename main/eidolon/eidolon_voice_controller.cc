@@ -17,6 +17,7 @@
 #include "hub_config_client.h"
 #include "hub_config_store.h"
 #include "hub_discovery.h"
+#include "hub_onboarding_client.h"
 #include "livekit_board.h"
 #include "system_info.h"
 
@@ -421,7 +422,7 @@ EidolonVoiceController::~EidolonVoiceController()
     for (esp_timer_handle_t* t :
          {&audio_timer_, &reconnect_timer_, &connect_watchdog_, &idle_leave_timer_,
           &full_duplex_idle_timer_, &ptt_release_tail_timer_,
-          &ambient_presence_timer_}) {
+          &ambient_presence_timer_, &onboarding_poll_timer_}) {
         if (*t != nullptr) {
             esp_timer_stop(*t);
             esp_timer_delete(*t);
@@ -555,6 +556,9 @@ void EidolonVoiceController::Dispatch(const Event& ev)
         break;
     case EventType::AudioTick:
         DoAudioTick();
+        break;
+    case EventType::OnboardingPoll:
+        DoOnboardingPoll();
         break;
     case EventType::ReconnectTick:
         DoReconnectTick();
@@ -743,9 +747,7 @@ bool EidolonVoiceController::HasActiveConfig() const
 bool EidolonVoiceController::HasControlConfig() const
 {
     if (config_.status != HubConfigStatus::Active) {
-        // While pending/waiting, the "active" slot holds the pending room used
-        // as the data-only control channel.
-        return config_.active.usable();
+        return false;
     }
     return config_.control.usable() && !config_.control.room_name.empty();
 }
@@ -835,7 +837,7 @@ void EidolonVoiceController::SetState(VoiceSessionState state, const char* reaso
 esp_err_t EidolonVoiceController::LoadStoredConfig()
 {
     HubConfigStore store;
-    if (!store.Load(config_, &register_url_)) {
+    if (!store.Load(config_, &hub_descriptor_uri_)) {
         ESP_LOGE(TAG, "No valid Hub config in NVS");
         SetState(VoiceSessionState::Error, "no_stored_config");
         return ESP_ERR_NOT_FOUND;
@@ -846,17 +848,12 @@ esp_err_t EidolonVoiceController::LoadStoredConfig()
 
 esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist)
 {
-    if (register_url_.empty()) {
+    if (hub_descriptor_uri_.empty()) {
         return ESP_ERR_INVALID_STATE;
     }
-    HubConfigClient client;
+    HubOnboardingClient client;
     Esp32HubConfig fresh;
-    // pending_session_intent_ is set only by an orchestrated room.join or a
-    // verified local presence wake. A normal refresh/JOIN sends no intent, so
-    // Hub defaults it to user_initiated.
-    esp_err_t err = client.RegisterDevice(register_url_, SystemInfo::GetMacAddress(), fresh,
-                                          pending_session_intent_,
-                                          pending_session_flow_id_);
+    esp_err_t err = client.Resume(hub_descriptor_uri_, SystemInfo::GetMacAddress(), fresh);
     if (err == ESP_ERR_NOT_ALLOWED) {
         // Hub rejected our signed identity (401/403). Stop bouncing on the same
         // rejected key; show "awaiting re-approval" (admin must re-approve / the
@@ -869,14 +866,19 @@ esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist)
         return err;
     }
     if (persist) {
-        // The voice room name now carries a per-session nonce, so persisting on
-        // every refresh would defeat NVS dedup and wear flash; the per-JOIN
-        // refresh passes persist=false and keeps the fresh creds in RAM only.
+        // Provider credentials may rotate on every approved handoff. The
+        // per-JOIN refresh keeps fresh credentials in RAM to avoid NVS wear.
         HubConfigStore store;
-        store.SaveHubConfig(fresh, register_url_);
+        store.SaveHubConfig(fresh, hub_descriptor_uri_);
     }
     config_ = std::move(fresh);
     SetState(StateForConfig(config_), "config_refreshed");
+    if (config_.status == HubConfigStatus::PendingApproval ||
+        config_.status == HubConfigStatus::WaitingBinding) {
+        ScheduleOnboardingPoll();
+    } else if (onboarding_poll_timer_ != nullptr) {
+        esp_timer_stop(onboarding_poll_timer_);
+    }
     return ESP_OK;
 }
 
@@ -885,20 +887,31 @@ esp_err_t EidolonVoiceController::RediscoverHub()
     HubDiscovery discovery;
     HubTxtRecord txt;
     esp_err_t err = discovery.Discover(txt);
-    if (err != ESP_OK || txt.register_url.empty()) {
+    if (err != ESP_OK || txt.descriptor_uri.empty()) {
         ESP_LOGW(TAG, "Hub rediscovery failed: %s", esp_err_to_name(err));
         return err != ESP_OK ? err : ESP_ERR_NOT_FOUND;
     }
-    if (txt.register_url != register_url_) {
-        ESP_LOGI(TAG, "Hub address changed: '%s' -> '%s'", register_url_.c_str(),
-                 txt.register_url.c_str());
-        register_url_ = txt.register_url;
-        HubConfigStore store;
-        store.SaveTxtRecord(txt);
+    if (txt.descriptor_uri != hub_descriptor_uri_) {
+        ESP_LOGI(TAG, "Hub address changed: '%s' -> '%s'", hub_descriptor_uri_.c_str(),
+                 txt.descriptor_uri.c_str());
     }
-    // Re-fetch from the (possibly new) URL: server_url/token/control room are all
-    // derived from the Hub address and stale if it moved.
-    return RefreshHubConfig();
+    HubOnboardingClient client;
+    Esp32HubConfig fresh;
+    err = client.Run(txt, SystemInfo::GetMacAddress(), fresh);
+    if (err != ESP_OK) {
+        return err;
+    }
+    hub_descriptor_uri_ = txt.descriptor_uri;
+    config_ = std::move(fresh);
+    HubConfigStore store;
+    store.SaveTxtRecord(txt);
+    store.SaveHubConfig(config_, hub_descriptor_uri_);
+    SetState(StateForConfig(config_), "hub_rediscovered");
+    if (config_.status == HubConfigStatus::PendingApproval ||
+        config_.status == HubConfigStatus::WaitingBinding) {
+        ScheduleOnboardingPoll();
+    }
+    return ESP_OK;
 }
 
 // ============================ LiveKit state handler ============================
@@ -1057,6 +1070,55 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
 }
 
 // ============================ Reconnect / watchdog / idle ============================
+
+void EidolonVoiceController::ScheduleOnboardingPoll()
+{
+    if (onboarding_poll_timer_ == nullptr) {
+        esp_timer_create_args_t args = {};
+        args.callback = &EidolonVoiceController::OnboardingPollTimerCb;
+        args.arg = this;
+        args.dispatch_method = ESP_TIMER_TASK;
+        args.name = "hub_onboarding";
+        if (esp_timer_create(&args, &onboarding_poll_timer_) != ESP_OK) {
+            onboarding_poll_timer_ = nullptr;
+            ESP_LOGW(TAG, "Failed to create onboarding poll timer");
+            return;
+        }
+    }
+    esp_timer_stop(onboarding_poll_timer_);
+    if (esp_timer_start_once(onboarding_poll_timer_, 5000000ULL) != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to schedule onboarding poll");
+    }
+}
+
+void EidolonVoiceController::OnboardingPollTimerCb(void* arg)
+{
+    auto* self = static_cast<EidolonVoiceController*>(arg);
+    Event ev;
+    ev.type = EventType::OnboardingPoll;
+    self->Enqueue(ev);
+}
+
+void EidolonVoiceController::DoOnboardingPoll()
+{
+    if (state_ != VoiceSessionState::PendingApproval &&
+        state_ != VoiceSessionState::WaitingBinding) {
+        return;
+    }
+    esp_err_t err = RefreshHubConfig();
+    if (err == ESP_ERR_NOT_FOUND) {
+        err = RediscoverHub();
+    }
+    if (err != ESP_OK || config_.status != HubConfigStatus::Active) {
+        ESP_LOGD(TAG, "Onboarding still pending: %s", esp_err_to_name(err));
+        ScheduleOnboardingPoll();
+        return;
+    }
+    ESP_LOGI(TAG, "Owner pairing approved; provider binding is ready");
+    if (HasControlConfig()) {
+        ConnectControlRoom();
+    }
+}
 
 void EidolonVoiceController::ScheduleControlReconnect(const char* reason)
 {
@@ -2218,7 +2280,7 @@ void EidolonVoiceController::HandleGuardOwnerFaceProfileSyncCommand(
     command.op = kControlOpGuardOwnerFaceProfileSync;
     OwnerFaceEngine* engine =
         guard_service_ != nullptr ? guard_service_->owner_face_engine() : nullptr;
-    if (engine == nullptr || register_url_.empty()) {
+    if (engine == nullptr || hub_descriptor_uri_.empty()) {
         AckCommand(command, "failed", "OWNER_FACE_UNAVAILABLE");
         return;
     }
@@ -2276,7 +2338,7 @@ void EidolonVoiceController::HandleGuardOwnerFaceProfileSyncCommand(
     cJSON_Delete(root);
 
     const bool queued = engine->QueueSync(
-        request, register_url_, SystemInfo::GetMacAddress(),
+        request, hub_descriptor_uri_, SystemInfo::GetMacAddress(),
         [this, command_id](const OwnerFaceApplyResult& result) {
             cJSON* completion = cJSON_CreateObject();
             if (completion == nullptr) {
@@ -2897,6 +2959,9 @@ void EidolonVoiceController::DoNetworkLost()
     if (reconnect_timer_ != nullptr) {
         esp_timer_stop(reconnect_timer_);
     }
+    if (onboarding_poll_timer_ != nullptr) {
+        esp_timer_stop(onboarding_poll_timer_);
+    }
 #if CONFIG_EIDOLON_GUARD_SERVICE
     if (guard_service_ != nullptr) {
         // Presence facts are meaningful only while a signed Guard runtime is
@@ -2921,7 +2986,7 @@ void EidolonVoiceController::DoNetworkRestored()
         esp_timer_stop(reconnect_timer_);
     }
 
-    if (register_url_.empty() && LoadStoredConfig() != ESP_OK) {
+    if (hub_descriptor_uri_.empty() && LoadStoredConfig() != ESP_OK) {
         ESP_LOGW(TAG, "Network restored but no stored Hub config is available");
         return;
     }
@@ -3000,12 +3065,10 @@ esp_err_t EidolonVoiceController::DoJoinRoom()
         }
     }
 
-    // Every JOIN mints a FRESH per-session voice room (device-<id>-<nonce>) +
-    // scoped token by re-fetching the Hub config. Root-cause fix for the
-    // rapid-rejoin "Room Deleted" race: a previous session's late delete-by-name
-    // (the old agent deletes device-<id> on device-left/shutdown) can no longer
-    // tear down this session's uniquely-named room. RAM-only (persist=false) so
-    // the changing nonce does not wear NVS. Done BEFORE moving to Connecting so
+    // Ask Hub for a current provider binding before every JOIN. The provider
+    // owns room/token rotation semantics; the device treats the binding as
+    // opaque until it validates the versioned LiveKit payload. RAM-only
+    // (persist=false) avoids NVS wear. Done before moving to Connecting so
     // RefreshHubConfig's internal SetState(ConfigReady) stays a no-op.
     esp_err_t refresh_err = RefreshHubConfig(/*persist=*/false);
     if (refresh_err == ESP_ERR_NOT_ALLOWED) {
@@ -3124,13 +3187,13 @@ esp_err_t EidolonVoiceController::SyncGuardRuntime(const char* reason,
                                                     const std::string* expected_desired_state,
                                                     uint32_t* applied_runtime_revision)
 {
-    if (guard_service_ == nullptr || register_url_.empty()) {
+    if (guard_service_ == nullptr || hub_descriptor_uri_.empty()) {
         return ESP_ERR_INVALID_STATE;
     }
     GuardRuntimeHubConfig runtime;
     HubConfigClient client;
     const esp_err_t err =
-        client.FetchGuardRuntime(register_url_, SystemInfo::GetMacAddress(), runtime);
+        client.FetchGuardRuntime(hub_descriptor_uri_, SystemInfo::GetMacAddress(), runtime);
     if (err == ESP_ERR_NOT_FOUND) {
         ClearGuardPresenceRuntime();
         guard_service_->Stop("guard_binding_missing");

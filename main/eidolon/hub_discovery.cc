@@ -79,11 +79,11 @@ esp_err_t HubDiscovery::QueryOnce(HubTxtRecord& best, const std::string& preferr
         }
 
         if (r->instance_name) {
-            ESP_LOGI(TAG, "Found Hub instance: %s port=%u register_url=%s",
-                     r->instance_name, r->port, parsed.register_url.c_str());
+            ESP_LOGI(TAG, "Found Hub instance: %s port=%u descriptor_uri=%s",
+                     r->instance_name, r->port, parsed.descriptor_uri.c_str());
         } else {
-            ESP_LOGI(TAG, "Found Hub port=%u register_url=%s", r->port,
-                     parsed.register_url.c_str());
+            ESP_LOGI(TAG, "Found Hub port=%u descriptor_uri=%s", r->port,
+                     parsed.descriptor_uri.c_str());
         }
 
         if (r->instance_name && strstr(r->instance_name, preferred_instance_substr.c_str()) != nullptr) {

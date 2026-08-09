@@ -259,6 +259,17 @@ esp_err_t DeviceIdentity::SignGetRequest(const std::string& path_query, const st
     return SignRequest("GET", path_query, device_id, "", out);
 }
 
+esp_err_t DeviceIdentity::SignEnrollmentProof(const std::string& statement,
+                                              std::string& public_key,
+                                              std::string& signature) {
+    esp_err_t err = EnsureKeypair();
+    if (err != ESP_OK) {
+        return err;
+    }
+    public_key = public_key_b64_;
+    return SignCanonical(statement, signature);
+}
+
 std::string EidolonSignedGetPathQuery(const std::string& url) {
     size_t start = 0;
     const size_t scheme = url.find("://");

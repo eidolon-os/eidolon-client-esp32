@@ -12,37 +12,20 @@ namespace eidolon {
 
 class HubConfigClient {
 public:
-    // ``session_intent`` (optional) declares why this voice session exists.
-    // Presence wakes keep a welcome but use a bounded idle window; proactive
-    // report sessions suppress the canned welcome because their report opens
-    // the conversation. Empty = a normal JOIN (Hub defaults user_initiated).
-    esp_err_t RegisterDevice(const std::string& register_url, const std::string& device_id,
-                             Esp32HubConfig& out, const std::string& session_intent = "",
-                             const std::string& session_flow_id = "");
 #if CONFIG_EIDOLON_GUARD_SERVICE
     // Fetch GuardBinding-local runtime config with the same signed device
     // identity as /api/config. It never fetches persona or policy config.
-    esp_err_t FetchGuardRuntime(const std::string& register_url, const std::string& device_id,
+    esp_err_t FetchGuardRuntime(const std::string& descriptor_uri, const std::string& device_id,
                                 GuardRuntimeHubConfig& out);
-    esp_err_t FetchOwnerFaceProfile(const std::string& register_url,
+    esp_err_t FetchOwnerFaceProfile(const std::string& descriptor_uri,
                                     const std::string& device_id,
                                     OwnerFaceProfileHubConfig& out);
-    esp_err_t FetchOwnerFaceReference(const std::string& register_url,
+    esp_err_t FetchOwnerFaceReference(const std::string& descriptor_uri,
                                       const std::string& device_id,
                                       const OwnerFaceReferenceHubConfig& reference,
                                       std::string& out);
 #endif
 
-    bool HasPendingFirmware() const { return has_pending_firmware_; }
-    bool PendingFirmwareForce() const { return pending_firmware_force_; }
-    const std::string& PendingFirmwareVersion() const { return pending_firmware_version_; }
-    const std::string& PendingFirmwareUrl() const { return pending_firmware_url_; }
-
-private:
-    bool has_pending_firmware_ = false;
-    bool pending_firmware_force_ = false;
-    std::string pending_firmware_version_;
-    std::string pending_firmware_url_;
 };
 
 }  // namespace eidolon

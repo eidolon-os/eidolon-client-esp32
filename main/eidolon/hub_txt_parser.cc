@@ -10,7 +10,7 @@
 namespace eidolon {
 
 bool HubTxtParser::HasUrlScheme(const std::string& url) {
-    return url.rfind("http://", 0) == 0 || url.rfind("https://", 0) == 0;
+    return url.rfind("https://", 0) == 0;
 }
 
 void HubTxtParser::ApplyKnownFields(HubTxtRecord& record) {
@@ -19,9 +19,8 @@ void HubTxtParser::ApplyKnownFields(HubTxtRecord& record) {
         return it != record.entries.end() ? it->second : std::string();
     };
 
-    record.api = get(kTxtApi);
-    record.register_url = get(kTxtRegisterUrl);
-    record.hub_version = get(kTxtVersion);
+    record.descriptor_uri = get(kTxtDescriptorUri);
+    record.enrollment_uri = get(kTxtEnrollmentUri);
 
     auto tv = get(kTxtVers);
     if (!tv.empty()) {
@@ -34,20 +33,16 @@ esp_err_t HubTxtParser::ValidateForTxtVers(const HubTxtRecord& record) {
         ESP_LOGE(TAG, "Missing or invalid txtvers");
         return ESP_ERR_INVALID_RESPONSE;
     }
-    if (record.txtvers > kSupportedMaxTxtVers) {
-        ESP_LOGE(TAG, "Unsupported txtvers=%d (max %d)", record.txtvers, kSupportedMaxTxtVers);
-        return ESP_ERR_NOT_SUPPORTED;
-    }
     if (record.txtvers != kSupportedTxtVers) {
         ESP_LOGE(TAG, "Unsupported txtvers=%d (supported %d)", record.txtvers, kSupportedTxtVers);
         return ESP_ERR_NOT_SUPPORTED;
     }
-    if (record.api != kExpectedApi) {
-        ESP_LOGE(TAG, "Unsupported api=%s (expected %s)", record.api.c_str(), kExpectedApi);
-        return ESP_ERR_NOT_SUPPORTED;
+    if (record.descriptor_uri.empty() || !HasUrlScheme(record.descriptor_uri)) {
+        ESP_LOGE(TAG, "Invalid or missing descriptor_uri");
+        return ESP_ERR_INVALID_RESPONSE;
     }
-    if (record.register_url.empty() || !HasUrlScheme(record.register_url)) {
-        ESP_LOGE(TAG, "Invalid or missing register_url");
+    if (record.enrollment_uri.empty() || !HasUrlScheme(record.enrollment_uri)) {
+        ESP_LOGE(TAG, "Invalid or missing enrollment_uri");
         return ESP_ERR_INVALID_RESPONSE;
     }
     return ESP_OK;
