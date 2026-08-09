@@ -34,10 +34,8 @@ bool ParseHandoffResponse(const std::string& body,
 
 bool ParseLiveKitBinding(const std::string& body, Esp32HubConfig& out);
 
-std::string BuildLocalPairingPayload(const HubDescriptor& descriptor,
-                                     const HubOnboardingState& state);
-
-// Compact physical-display profile. The decoded fields are combined with the
+// The only product physical/near-field Owner-admission payload. Its decoded
+// fields are combined with the
 // already-verified Hub provisioning target; this is Owner proof, not Wi-Fi
 // provisioning state.
 std::string BuildPairingQrPayload(const HubOnboardingState& state);

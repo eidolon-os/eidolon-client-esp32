@@ -288,30 +288,6 @@ bool ParseLiveKitBinding(const std::string& body, Esp32HubConfig& out)
     return valid;
 }
 
-std::string BuildLocalPairingPayload(const HubDescriptor& descriptor,
-                                     const HubOnboardingState& state)
-{
-    cJSON* root = cJSON_CreateObject();
-    if (root == nullptr) {
-        return "";
-    }
-    cJSON_AddNumberToObject(root, "schema_version", 1);
-    cJSON_AddStringToObject(root, "hub_id", descriptor.hub_id.c_str());
-    cJSON_AddStringToObject(root, "enrollment_id", state.enrollment_id.c_str());
-    cJSON_AddStringToObject(root, "device_id", state.device_id.c_str());
-    cJSON_AddStringToObject(root, "pairing_claim_uri", state.pairing_claim_uri.c_str());
-    cJSON_AddStringToObject(root, "pairing_secret", state.pairing_secret.c_str());
-    cJSON_AddNumberToObject(root, "expires_at_ms",
-                           static_cast<double>(state.retrieval_expires_at_ms));
-    char* encoded = cJSON_PrintUnformatted(root);
-    std::string payload = encoded ? encoded : "";
-    if (encoded != nullptr) {
-        cJSON_free(encoded);
-    }
-    cJSON_Delete(root);
-    return payload;
-}
-
 std::string BuildPairingQrPayload(const HubOnboardingState& state)
 {
     if (!IsPairingQrToken(state.enrollment_id) ||

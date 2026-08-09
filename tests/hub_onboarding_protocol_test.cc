@@ -156,12 +156,6 @@ void TestReceiptHandoffAndProviderBinding()
     assert(config.active.room_name == "voice");
     assert(config.control.room_name == "control");
 
-    const auto descriptor = eidolon::HubDescriptor{
-        1, "hub-local", Advertised().descriptor_uri,
-        "https://eidolon-hub.local/api/device-onboarding/v1",
-        Advertised().enrollment_uri};
-    const std::string local = eidolon::BuildLocalPairingPayload(descriptor, state);
-    assert(local.find("\"pairing_secret\":\"pairing-secret\"") != std::string::npos);
 }
 
 void TestPairingQrTransportProfile()

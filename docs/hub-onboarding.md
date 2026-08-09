@@ -25,11 +25,10 @@ does not create parallel secrets. The receipt's enrollment ID, claim URI and
 deadline are saved into the same object before handoff.
 
 The ESP32 never logs the retrieval token, pairing secret, identity signature or
-opaque Provider binding. A firmware-side Mobile/Local integration may load the
-state internally and use `BuildLocalPairingPayload` to render the exact
-physical/near-field payload defined by Hub's `device-pairing-proof-v1` contract.
-The Emote display implementation additionally renders this compact QR transport
-profile while the enrollment is `pending-approval`:
+opaque Provider binding. The only product physical/near-field Owner-admission
+payload is the compact QR transport below; there is no JSON or `device_id`-only
+alternative. The Emote display renders it while the enrollment is
+`pending-approval`:
 
 ```text
 EIDOLON:PAIR:1:<enrollment_id>:<pairing_secret>
