@@ -18,6 +18,7 @@ inline constexpr int kSupportedOnboardingProtocol = 1;
 inline constexpr const char* kPairingMethod = "local-secret-sha256";
 inline constexpr const char* kLiveKitBindingFormat =
     "application/vnd.eidolon.livekit-device+json;v=1";
+inline constexpr size_t kPairingQrPayloadMaxBytes = 106;
 
 inline constexpr const char* kNvsNamespace = "eidolon";
 
@@ -99,6 +100,16 @@ struct HubOnboardingState {
                !pairing_secret.empty() && !pairing_commitment.empty();
     }
     bool enrolled() const { return !enrollment_id.empty(); }
+    bool resumable() const {
+        if (hub_id.empty() || descriptor_uri.empty() || enrollment_uri.empty() ||
+            device_id.empty() || request_id.empty() || retrieval_token.empty()) {
+            return false;
+        }
+        // Before enrollment the signed request must retain its pairing material.
+        // Once Hub has issued an enrollment ID, the retrieval session survives
+        // approval after the plaintext pairing proof has been erased.
+        return enrolled() || has_local_intent();
+    }
 };
 
 struct HubEnrollmentReceipt {

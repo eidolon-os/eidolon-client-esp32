@@ -38,6 +38,22 @@ bool SameOrigin(const std::string& left, const std::string& right)
     return !left_origin.empty() && left_origin == Origin(right);
 }
 
+bool IsPairingQrToken(const std::string& value)
+{
+    if (value.empty()) {
+        return false;
+    }
+    for (const unsigned char character : value) {
+        if (!((character >= 'a' && character <= 'z') ||
+              (character >= 'A' && character <= 'Z') ||
+              (character >= '0' && character <= '9') || character == '-' ||
+              character == '_')) {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool ReadInt64(const cJSON* object, const char* key, int64_t& out)
 {
     const cJSON* item = cJSON_GetObjectItemCaseSensitive(object, key);
@@ -293,6 +309,21 @@ std::string BuildLocalPairingPayload(const HubDescriptor& descriptor,
         cJSON_free(encoded);
     }
     cJSON_Delete(root);
+    return payload;
+}
+
+std::string BuildPairingQrPayload(const HubOnboardingState& state)
+{
+    if (!IsPairingQrToken(state.enrollment_id) ||
+        !IsPairingQrToken(state.pairing_secret) ||
+        state.pairing_secret.size() != 43) {
+        return "";
+    }
+    std::string payload = "EIDOLON:PAIR:1:" + state.enrollment_id + ":" +
+                          state.pairing_secret;
+    if (payload.size() > kPairingQrPayloadMaxBytes) {
+        return "";
+    }
     return payload;
 }
 

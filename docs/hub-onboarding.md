@@ -28,13 +28,66 @@ The ESP32 never logs the retrieval token, pairing secret, identity signature or
 opaque Provider binding. A firmware-side Mobile/Local integration may load the
 state internally and use `BuildLocalPairingPayload` to render the exact
 physical/near-field payload defined by Hub's `device-pairing-proof-v1` contract.
-This change does not add a Mobile UI or an unauthenticated LAN endpoint.
+The Emote display implementation additionally renders this compact QR transport
+profile while the enrollment is `pending-approval`:
+
+```text
+EIDOLON:PAIR:1:<enrollment_id>:<pairing_secret>
+```
+
+Both fields use only base64url-safe ASCII and the whole payload is at most 106
+bytes (QR version 5, ECC Low). It is an admission proof, not a provisioning
+descriptor: the scanner must already have the verified Hub descriptor origin
+and constructs the v1 pairing-claim URI from that origin plus the scanned
+enrollment ID. The QR is hidden outside `pending-approval`; the plaintext secret
+is removed from onboarding NVS after Hub reports approval, waiting for Provider
+binding, or revocation. QR payload content is suppressed from both display-layer
+log tags. There is no unauthenticated LAN endpoint for this secret.
 
 Pending handoff is a successful onboarding state (`HTTP 202`), not a Wi-Fi or Hub
 failure. The controller polls every five seconds. An expired pending enrollment
 can be replaced with a new persisted intent; an approved enrollment with an
 expired retrieval window cannot be silently re-enrolled because Hub Owner
 admission is authoritative.
+
+## Provisioning transport boundary
+
+The minimum ready path in this firmware assumes Wi-Fi was configured earlier,
+then performs Hub discovery, enrollment, physical QR Owner proof, handoff and
+voice binding. The existing `Xiaozhi-*` captive portal remains a legacy Wi-Fi
+transport: it has no authenticated session or verifiable identity and must not
+be adapted as the Mobile `DeviceProvisioningTransport` contract.
+
+The future authenticated provisioning transport consumed by Mobile is a
+separate firmware feature. Its session descriptor is exactly:
+
+```json
+{
+  "contract_version": "1",
+  "device_id": "<stable device ID>",
+  "device_kind": "<CMake BOARD_TYPE>",
+  "display_name": "<CMake BOARD_NAME>",
+  "identity_fingerprint": "p256:<SHA-256 of DER SPKI>",
+  "session_id": "<fresh 128-bit-or-greater random ID>",
+  "expires_at": "<UTC RFC3339 timestamp>",
+  "trust": "development-tofu"
+}
+```
+
+Its authenticated, encrypted, replay-protected session has three operations and
+keeps their outcomes distinct:
+
+1. `scan-networks` returns SSID/RSSI/security only;
+2. `configure-network` accepts Wi-Fi credentials plus `{hub_id,
+   descriptor_uri}` and returns `network-configured` only;
+3. `await-enrollment` returns `{device_id, enrollment_id, lifecycle_state}` only
+   after the device has independently signed and submitted Hub enrollment.
+
+Wi-Fi credentials, Owner/Controller credentials and the QR pairing secret are
+never persisted in a Mobile checkpoint or sent together in one request. This
+authenticated provisioning transport is **not implemented by this revision**;
+Mobile must treat the current legacy hotspot as Wi-Fi-only and may use the QR
+path only for an already-networked pending enrollment.
 
 ## Provider binding consumed by this firmware
 
@@ -71,6 +124,6 @@ Provider credential renewal after the bounded Hub handoff window belongs to the
 Provider binding contract; the ESP32 may use its last atomically cached config
 for bounded recovery but must not resurrect a revoked or unknown lifecycle.
 
-The build uses the CMake `BOARD_NAME`/`BOARD_TYPE` values in Enrollment. For the
-target hardware both are `esp32-s3-touch-amoled-2.06`; no Box-3 device kind is
-hard-coded.
+The build uses the CMake `BOARD_NAME`/`BOARD_TYPE` values in Enrollment. The
+currently connected ESP-BOX-3 build therefore reports `esp-box-3`; the Waveshare
+build reports its own board values. Neither kind is hard-coded in onboarding.

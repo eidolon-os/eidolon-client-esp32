@@ -198,9 +198,7 @@ bool HubConfigStore::LoadOnboardingState(HubOnboardingState& state) const {
             static_cast<int64_t>(expires->valuedouble);
     }
     cJSON_Delete(root);
-    return !state.hub_id.empty() && !state.descriptor_uri.empty() &&
-           !state.enrollment_uri.empty() && !state.device_id.empty() &&
-           state.has_local_intent();
+    return state.resumable();
 }
 
 void HubConfigStore::ClearOnboardingState() {

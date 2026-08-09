@@ -57,6 +57,10 @@ static constexpr const char* kStateLabel = "eidolon_state_label";
 static constexpr const char* kExitLabel = "eidolon_exit_label";
 static constexpr const char* kCaptionLabel = "eidolon_caption_label";
 static constexpr const char* kPresenceLabel = "eidolon_presence_label";
+static constexpr const char* kPairingQrCode = "qrcode";
+static constexpr const char* kClosedPairingQrData = "EIDOLON:PAIRING-CLOSED";
+static constexpr uint16_t kPairingQrDisplaySize = 184;
+static constexpr int16_t kPairingQrYOffset = 28;
 
 // ============================================================================
 // Forward Declarations
@@ -295,6 +299,16 @@ void EmoteDisplay::SetVoiceChrome(const char* mode, const char* state, const cha
     ApplyVoiceChrome();
 }
 
+bool EmoteDisplay::SetPairingCode(const char* payload)
+{
+    const std::string next = payload ? payload : "";
+    if (pairing_code_applied_ && pairing_code_ == next) {
+        return true;
+    }
+    pairing_code_ = next;
+    return ApplyPairingCode();
+}
+
 void EmoteDisplay::SetPresenceState(PresenceState state)
 {
     if (presence_state_ == state && presence_applied_) {
@@ -373,6 +387,7 @@ void EmoteDisplay::OnAssetsUnloaded()
     applied_chrome_action_visible_ = false;
     chrome_applied_ = false;
     presence_applied_ = false;
+    pairing_code_applied_ = false;
 }
 
 void EmoteDisplay::OnAssetsLoaded()
@@ -394,6 +409,7 @@ void EmoteDisplay::OnAssetsLoaded()
     ApplyVoiceChrome();
     ApplyPresenceState();
     SetChatMessage(pending_chat_role_.c_str(), pending_chat_message_.c_str());
+    ApplyPairingCode();
 }
 
 void EmoteDisplay::RefreshAll()
@@ -524,6 +540,81 @@ void EmoteDisplay::ApplyPresenceState()
         applied_presence_state_ = presence_state_;
         presence_applied_ = true;
     }
+}
+
+bool EmoteDisplay::ApplyPairingCode()
+{
+    if (!emote_handle_) {
+        return false;
+    }
+    if (!assets_loaded_) {
+        // Cache the value until OnAssetsLoaded creates the managed objects.
+        return true;
+    }
+    gfx_obj_t* qr = emote_get_obj_by_name(emote_handle_, kPairingQrCode);
+    if (!qr) {
+        ESP_LOGW(TAG, "Pairing QR object is unavailable");
+        return false;
+    }
+
+    // Both the widget and its wrapper log QR data at DEBUG. Disable those tags
+    // before handing the local pairing secret to either layer.
+    esp_log_level_set("gfx_qrcode", ESP_LOG_NONE);
+    esp_log_level_set("QRCODE_WRAPPER", ESP_LOG_NONE);
+
+    if (emote_lock(emote_handle_) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to lock pairing QR object");
+        return false;
+    }
+    esp_err_t result = ESP_OK;
+    if (pairing_code_.empty()) {
+        // Overwrite the widget's text allocation before hiding it so a consumed
+        // proof is no longer retained by the graphics object.
+        result = gfx_qrcode_set_data(qr, kClosedPairingQrData);
+        if (result == ESP_OK) {
+            result = gfx_obj_set_visible(qr, false);
+        }
+    } else {
+        result = gfx_obj_align(qr, GFX_ALIGN_CENTER, 0, kPairingQrYOffset);
+        if (result == ESP_OK) {
+            result = gfx_qrcode_set_size(qr, kPairingQrDisplaySize);
+        }
+        if (result == ESP_OK) {
+            result = gfx_qrcode_set_ecc(qr, GFX_QRCODE_ECC_LOW);
+        }
+        if (result == ESP_OK) {
+            result = gfx_qrcode_set_color(qr, GFX_COLOR_HEX(0x000000));
+        }
+        if (result == ESP_OK) {
+            result = gfx_qrcode_set_bg_color(qr, GFX_COLOR_HEX(0xFFFFFF));
+        }
+        if (result == ESP_OK) {
+            result = gfx_qrcode_set_data(qr, pairing_code_.c_str());
+        }
+        if (result == ESP_OK) {
+            result = gfx_obj_set_visible(qr, true);
+        }
+        // The QR object is below the dynamically-created caption in z-order.
+        // Suppress the caption while the proof is visible to preserve its quiet
+        // zone and restore it when the proof is hidden.
+        if (result == ESP_OK) {
+            if (gfx_obj_t* caption = emote_get_obj_by_name(emote_handle_, kCaptionLabel)) {
+                result = gfx_obj_set_visible(caption, false);
+            }
+        }
+    }
+    emote_unlock(emote_handle_);
+
+    if (result != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to update pairing QR object: %s", esp_err_to_name(result));
+        return false;
+    }
+    pairing_code_applied_ = true;
+    if (pairing_code_.empty() && !pending_chat_message_.empty()) {
+        SetOverlayLabel(kCaptionLabel, pending_chat_message_.c_str(), true,
+                        kChromeCaptionText, kChromeCaptionBg, true);
+    }
+    return true;
 }
 
 void EmoteDisplay::HideLegacyStatusObjects()

@@ -20,6 +20,7 @@ public:
     virtual void SetEidolonLifecycle(const char* state, const char* detail) override;
     virtual void SetVoiceChrome(const char* mode, const char* state, const char* action,
                                 bool action_visible) override;
+    virtual bool SetPairingCode(const char* payload) override;
     virtual void SetPresenceState(PresenceState state) override;
     virtual void SetTheme(Theme* theme) override;
     virtual void ShowNotification(const char* notification, int duration_ms = 3000) override;
@@ -62,10 +63,13 @@ private:
     PresenceState presence_state_ = PresenceState::Unavailable;
     PresenceState applied_presence_state_ = PresenceState::Unavailable;
     bool presence_applied_ = false;
+    std::string pairing_code_;
+    bool pairing_code_applied_ = false;
 
     bool EnsureVoiceChromeObjects();
     void ApplyVoiceChrome();
     void ApplyPresenceState();
+    bool ApplyPairingCode();
     void HideLegacyStatusObjects();
     bool SetOverlayLabel(const char* name, const char* text, bool visible,
                          uint32_t color, uint32_t bg_color, bool bg_enabled);

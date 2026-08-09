@@ -58,6 +58,11 @@ void Display::SetVoiceChrome(const char* mode, const char* state, const char* ac
     (void)action_visible;
 }
 
+bool Display::SetPairingCode(const char* payload) {
+    (void)payload;
+    return false;
+}
+
 void Display::SetPresenceState(PresenceState state) {
     (void)state;
 }

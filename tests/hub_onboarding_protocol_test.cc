@@ -164,6 +164,32 @@ void TestReceiptHandoffAndProviderBinding()
     assert(local.find("\"pairing_secret\":\"pairing-secret\"") != std::string::npos);
 }
 
+void TestPairingQrTransportProfile()
+{
+    auto state = PendingState();
+    state.enrollment_id = "enrollment_0123456789abcdefghijklmn";
+    state.pairing_secret =
+        "0123456789abcdefghijklmnopqrstuvwxyzABCDEFG";
+    const std::string qr = eidolon::BuildPairingQrPayload(state);
+    assert(qr == "EIDOLON:PAIR:1:" + state.enrollment_id + ":" +
+                     state.pairing_secret);
+    assert(qr.size() <= eidolon::kPairingQrPayloadMaxBytes);
+
+    state.pairing_secret = "short-pairing-secret";
+    assert(eidolon::BuildPairingQrPayload(state).empty());
+    state.pairing_secret = std::string(20, 'a') + ":" + std::string(22, 'b');
+    assert(eidolon::BuildPairingQrPayload(state).empty());
+    state.pairing_secret = std::string(80, 'a');
+    assert(eidolon::BuildPairingQrPayload(state).empty());
+
+    state = PendingState();
+    assert(state.resumable());
+    state.enrollment_id = "enrollment_abc";
+    state.pairing_secret.clear();
+    state.pairing_commitment.clear();
+    assert(state.resumable());
+}
+
 }  // namespace
 
 int main()
@@ -172,5 +198,6 @@ int main()
     TestDescriptorIsPinnedToAdvertisedHttpsOrigin();
     TestCanonicalManifestAndProofStatement();
     TestReceiptHandoffAndProviderBinding();
+    TestPairingQrTransportProfile();
     return 0;
 }

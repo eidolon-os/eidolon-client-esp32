@@ -5,6 +5,7 @@
 #include "hub_config_store.h"
 #include "hub_onboarding_protocol.h"
 #include "system_info.h"
+#include "display.h"
 
 #include "sdkconfig.h"
 
@@ -153,6 +154,28 @@ esp_err_t StatusError(int status)
     return ESP_FAIL;
 }
 
+void UpdatePairingDisplay(const HubOnboardingState& state,
+                          HubConfigStatus lifecycle)
+{
+    Display* display = Board::GetInstance().GetDisplay();
+    if (display == nullptr) {
+        return;
+    }
+    if (lifecycle != HubConfigStatus::PendingApproval) {
+        display->SetPairingCode(nullptr);
+        return;
+    }
+    const std::string payload = BuildPairingQrPayload(state);
+    if (payload.empty()) {
+        ESP_LOGE(TAG, "Pending enrollment cannot be encoded as pairing QR");
+        display->SetPairingCode(nullptr);
+        return;
+    }
+    if (!display->SetPairingCode(payload.c_str())) {
+        ESP_LOGW(TAG, "Display has no physical pairing-proof surface");
+    }
+}
+
 }  // namespace
 
 esp_err_t HubOnboardingClient::FetchDescriptor(const HubTxtRecord& advertised,
@@ -285,6 +308,14 @@ esp_err_t HubOnboardingClient::Handoff(const HubDescriptor& descriptor,
         // or persists it; the device config store atomically caches the parsed
         // credential for bounded offline recovery.
     }
+    UpdatePairingDisplay(state, lifecycle);
+    if (lifecycle != HubConfigStatus::PendingApproval) {
+        // The Owner proof is one-purpose admission material. Keep the retrieval
+        // session for handoff refresh, but erase the plaintext proof once Hub no
+        // longer reports an approvable pending enrollment.
+        state.pairing_secret.clear();
+        state.pairing_commitment.clear();
+    }
     return HubConfigStore().SaveOnboardingState(state);
 }
 
@@ -305,7 +336,7 @@ esp_err_t HubOnboardingClient::Run(const HubTxtRecord& advertised,
         ESP_LOGE(TAG, "Refusing automatic onboarding state switch to another Hub or device");
         return ESP_ERR_NOT_ALLOWED;
     }
-    const bool reusable = has_saved_state && state.has_local_intent();
+    const bool reusable = has_saved_state && state.resumable();
     if (!reusable) {
         store.ClearOnboardingState();
         state = HubOnboardingState{};
@@ -339,6 +370,7 @@ esp_err_t HubOnboardingClient::Run(const HubTxtRecord& advertised,
     if (err == ESP_ERR_TIMEOUT && state.lifecycle_state == "pending-approval") {
         // Hub expired an unapproved intent. Drop only that intent and retry
         // once with new request/retrieval/pairing material.
+        UpdatePairingDisplay(state, HubConfigStatus::Unregistered);
         store.ClearOnboardingState();
         return Run(advertised, device_id, out);
     }

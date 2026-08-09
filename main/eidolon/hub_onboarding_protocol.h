@@ -37,6 +37,11 @@ bool ParseLiveKitBinding(const std::string& body, Esp32HubConfig& out);
 std::string BuildLocalPairingPayload(const HubDescriptor& descriptor,
                                      const HubOnboardingState& state);
 
+// Compact physical-display profile. The decoded fields are combined with the
+// already-verified Hub provisioning target; this is Owner proof, not Wi-Fi
+// provisioning state.
+std::string BuildPairingQrPayload(const HubOnboardingState& state);
+
 }  // namespace eidolon
 
 #endif  // EIDOLON_HUB_ONBOARDING_PROTOCOL_H_
