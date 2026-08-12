@@ -71,6 +71,43 @@ def _get_manufacturer(cfg: dict) -> Optional[str]:
 
 _BOARDS_DIR = Path("main/boards")
 
+# A board config always lives at main/boards/<board>/ or
+# main/boards/<manufacturer>/<board>/, and always declares "target".
+# Other files named config.json exist under boards (e.g.
+# main/boards/esp-box-3/assets/320_240/config.json is an assets manifest);
+# they are not board configs and must not be collected as variants.
+_MAX_BOARD_PATH_DEPTH = 2
+
+
+def _iter_board_configs(config_filename: str):
+    """Yield (cfg_path, board, cfg) for every real board config under main/boards."""
+    for cfg_path in _BOARDS_DIR.rglob(config_filename):
+        board_dir = cfg_path.parent
+        if board_dir.name == "common":
+            continue
+
+        rel = board_dir.relative_to(_BOARDS_DIR)
+        if not 1 <= len(rel.parts) <= _MAX_BOARD_PATH_DEPTH:
+            # Nested deeper than <manufacturer>/<board>, so not a board config.
+            continue
+
+        try:
+            with cfg_path.open(encoding='utf-8') as f:
+                cfg = json.load(f)
+        except Exception as e:
+            print(f"[ERROR] Failed to parse {cfg_path}: {e}", file=sys.stderr)
+            continue
+
+        if not isinstance(cfg, dict) or "target" not in cfg:
+            print(
+                f"[WARN] {cfg_path} has no \"target\", not a board config, skipping",
+                file=sys.stderr,
+            )
+            continue
+
+        yield cfg_path, rel.as_posix(), cfg
+
+
 def _collect_variants(config_filename: str = "config.json") -> list[dict[str, str]]:
     """Traverse all boards under main/boards, collect variant information.
 
@@ -81,16 +118,8 @@ def _collect_variants(config_filename: str = "config.json") -> list[dict[str, st
     variants: list[dict[str, str]] = []
     errors: list[str] = []
 
-    for cfg_path in _BOARDS_DIR.rglob(config_filename):
-        board_dir = cfg_path.parent
-        if board_dir.name == "common":
-            continue
-        board = board_dir.relative_to(_BOARDS_DIR).as_posix()
-
+    for cfg_path, board, cfg in _iter_board_configs(config_filename):
         try:
-            with cfg_path.open(encoding='utf-8') as f:
-                cfg = json.load(f)
-
             manufacturer = _get_manufacturer(cfg)
 
             # Check manufacturer consistency with directory structure
@@ -126,7 +155,7 @@ def _collect_variants(config_filename: str = "config.json") -> list[dict[str, st
                 })
 
         except Exception as e:
-            print(f"[ERROR] Failed to parse {cfg_path}: {e}", file=sys.stderr)
+            print(f"[ERROR] Failed to read variants from {cfg_path}: {e}", file=sys.stderr)
 
     # Report all errors at once
     if errors:
