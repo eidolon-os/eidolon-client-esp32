@@ -19,12 +19,19 @@ public:
                      Esp32HubConfig& out);
 
 private:
+    // Loaded once per run from what commissioning left behind. Empty means this
+    // device belongs to no Host yet and must not speak to one.
+    esp_err_t LoadCommissionedTrust();
+
     esp_err_t FetchDescriptor(const HubTxtRecord& advertised, HubDescriptor& out);
     esp_err_t EnsureEnrollment(const HubDescriptor& descriptor,
                                HubOnboardingState& state);
     esp_err_t Handoff(const HubDescriptor& descriptor,
                       HubOnboardingState& state,
                       Esp32HubConfig& out);
+
+    std::string certificate_;
+    std::string commissioned_hub_id_;
 };
 
 }  // namespace eidolon

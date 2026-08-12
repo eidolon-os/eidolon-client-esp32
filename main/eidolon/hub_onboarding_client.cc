@@ -1,8 +1,10 @@
 #include "hub_onboarding_client.h"
 
-#include "board.h"
+#include "device_commissioning_protocol.h"
 #include "hub_config_store.h"
 #include "hub_onboarding_protocol.h"
+#include "hub_pinned_http.h"
+#include "hub_trust_store.h"
 #include "system_info.h"
 
 #include "sdkconfig.h"
@@ -99,13 +101,6 @@ std::string BuildEnrollmentBody(const HubOnboardingState& state)
     return body;
 }
 
-void SetJsonHeaders(Http* http)
-{
-    http->SetHeader("Accept", "application/json");
-    http->SetHeader("Content-Type", "application/json");
-    http->SetHeader("User-Agent", SystemInfo::GetUserAgent().c_str());
-}
-
 esp_err_t StatusError(int status)
 {
     if (status == 401 || status == 403) {
@@ -128,24 +123,17 @@ esp_err_t StatusError(int status)
 esp_err_t HubOnboardingClient::FetchDescriptor(const HubTxtRecord& advertised,
                                                HubDescriptor& out)
 {
-    auto network = Board::GetInstance().GetNetwork();
-    auto http = network ? network->CreateHttp(CONFIG_EIDOLON_CONFIG_HTTP_TIMEOUT_MS) : nullptr;
-    if (!http) {
-        return network ? ESP_ERR_NO_MEM : ESP_ERR_INVALID_STATE;
+    HubHttpResponse response;
+    const esp_err_t err = HubHttpRequest("GET", advertised.descriptor_uri, certificate_,
+                                         "", response);
+    if (err != ESP_OK) {
+        return err;
     }
-    http->SetHeader("Accept", "application/json");
-    http->SetHeader("User-Agent", SystemInfo::GetUserAgent().c_str());
-    if (!http->Open("GET", advertised.descriptor_uri)) {
-        return ESP_FAIL;
+    if (response.status != 200) {
+        ESP_LOGW(TAG, "Descriptor HTTP status %d", response.status);
+        return StatusError(response.status);
     }
-    const int status = http->GetStatusCode();
-    const std::string body = http->ReadAll();
-    http->Close();
-    if (status != 200) {
-        ESP_LOGW(TAG, "Descriptor HTTP status %d", status);
-        return StatusError(status);
-    }
-    if (!ParseHubDescriptorResponse(body, advertised, out)) {
+    if (!ParseHubDescriptorResponse(response.body, advertised, out)) {
         ESP_LOGE(TAG, "Hub descriptor violates advertised onboarding contract");
         return ESP_ERR_INVALID_RESPONSE;
     }
@@ -158,29 +146,22 @@ esp_err_t HubOnboardingClient::EnsureEnrollment(const HubDescriptor& descriptor,
     if (state.enrolled()) {
         return ESP_OK;
     }
-    std::string body = BuildEnrollmentBody(state);
+    const std::string body = BuildEnrollmentBody(state);
     if (body.empty()) {
         return ESP_ERR_NO_MEM;
     }
-    auto network = Board::GetInstance().GetNetwork();
-    auto http = network ? network->CreateHttp(CONFIG_EIDOLON_CONFIG_HTTP_TIMEOUT_MS) : nullptr;
-    if (!http) {
-        return network ? ESP_ERR_NO_MEM : ESP_ERR_INVALID_STATE;
+    HubHttpResponse response;
+    const esp_err_t err = HubHttpRequest("POST", descriptor.enrollment_uri, certificate_,
+                                         body, response);
+    if (err != ESP_OK) {
+        return err;
     }
-    SetJsonHeaders(http.get());
-    http->SetContent(std::move(body));
-    if (!http->Open("POST", descriptor.enrollment_uri)) {
-        return ESP_FAIL;
-    }
-    const int status = http->GetStatusCode();
-    const std::string response = http->ReadAll();
-    http->Close();
-    if (status != 200) {
-        ESP_LOGW(TAG, "Enrollment HTTP status %d", status);
-        return StatusError(status);
+    if (response.status != 200) {
+        ESP_LOGW(TAG, "Enrollment HTTP status %d", response.status);
+        return StatusError(response.status);
     }
     HubEnrollmentReceipt receipt;
-    if (!ParseEnrollmentReceiptResponse(response, state, receipt)) {
+    if (!ParseEnrollmentReceiptResponse(response.body, state, receipt)) {
         return ESP_ERR_INVALID_RESPONSE;
     }
     state.enrollment_id = receipt.enrollment_id;
@@ -204,26 +185,18 @@ esp_err_t HubOnboardingClient::Handoff(const HubDescriptor& descriptor,
     }
     const std::string url = descriptor.enrollment_uri + "/" + state.enrollment_id +
                             "/handoff";
-    auto network = Board::GetInstance().GetNetwork();
-    auto http = network ? network->CreateHttp(CONFIG_EIDOLON_CONFIG_HTTP_TIMEOUT_MS) : nullptr;
-    if (!http) {
-        return network ? ESP_ERR_NO_MEM : ESP_ERR_INVALID_STATE;
+    HubHttpResponse response;
+    const esp_err_t err = HubHttpRequest("POST", url, certificate_, body, response);
+    if (err != ESP_OK) {
+        return err;
     }
-    SetJsonHeaders(http.get());
-    http->SetContent(std::move(body));
-    if (!http->Open("POST", url)) {
-        return ESP_FAIL;
-    }
-    const int http_status = http->GetStatusCode();
-    const std::string response = http->ReadAll();
-    http->Close();
-    if (http_status != 200 && http_status != 202) {
-        ESP_LOGW(TAG, "Handoff HTTP status %d", http_status);
-        return StatusError(http_status);
+    if (response.status != 200 && response.status != 202) {
+        ESP_LOGW(TAG, "Handoff HTTP status %d", response.status);
+        return StatusError(response.status);
     }
     HubConfigStatus lifecycle = HubConfigStatus::PendingApproval;
     HubChannelAssignment assignment;
-    if (!ParseHandoffResponse(response, request_id, state, lifecycle, assignment)) {
+    if (!ParseHandoffResponse(response.body, request_id, state, lifecycle, assignment)) {
         return ESP_ERR_INVALID_RESPONSE;
     }
     out = Esp32HubConfig{};
@@ -244,14 +217,37 @@ esp_err_t HubOnboardingClient::Handoff(const HubDescriptor& descriptor,
     return HubConfigStore().SaveOnboardingState(state);
 }
 
+esp_err_t HubOnboardingClient::LoadCommissionedTrust()
+{
+    HubTrustStore trust;
+    commissioned_hub_id_ = trust.CommissionedHubId();
+    certificate_ = trust.Load(commissioned_hub_id_);
+    if (commissioned_hub_id_.empty() || certificate_.empty()) {
+        ESP_LOGE(TAG, "This device has not been commissioned for any Host");
+        return ESP_ERR_NOT_ALLOWED;
+    }
+    return ESP_OK;
+}
+
 esp_err_t HubOnboardingClient::Run(const HubTxtRecord& advertised,
                                    const std::string& device_id,
                                    Esp32HubConfig& out)
 {
-    HubDescriptor descriptor;
-    esp_err_t err = FetchDescriptor(advertised, descriptor);
+    esp_err_t err = LoadCommissionedTrust();
     if (err != ESP_OK) {
         return err;
+    }
+    HubDescriptor descriptor;
+    err = FetchDescriptor(advertised, descriptor);
+    if (err != ESP_OK) {
+        return err;
+    }
+    if (!IsCommissionedHub(commissioned_hub_id_, descriptor.hub_id)) {
+        // Discovery found a Hub, but not the one this device was given. Trust
+        // came from a person, so a different Hub is not a fallback.
+        ESP_LOGE(TAG, "Discovered Hub %s is not the commissioned Host %s",
+                 descriptor.hub_id.c_str(), commissioned_hub_id_.c_str());
+        return ESP_ERR_NOT_ALLOWED;
     }
     HubConfigStore store;
     bool restarted_expired_pending = false;

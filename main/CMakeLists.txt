@@ -1068,6 +1068,8 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/audio/eidolon_mic_capture.cc"
         "eidolon/audio/pcm_push_capture_source.cc"
         "eidolon/control_protocol.cc"
+        "eidolon/device_commissioning.cc"
+        "eidolon/device_commissioning_protocol.cc"
         "eidolon/device_event_bus.cc"
         "eidolon/device_event_builder.cc"
         "eidolon/eidolon_audio_input.cc"
@@ -1084,7 +1086,9 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/hub_config_store.cc"
         "eidolon/hub_discovery.cc"
         "eidolon/hub_onboarding_client.cc"
+        "eidolon/hub_pinned_http.cc"
         "eidolon/hub_onboarding_protocol.cc"
+        "eidolon/hub_trust_store.cc"
         "eidolon/hub_txt_parser.cc"
         "eidolon/livekit_board.cc"
         "eidolon/livekit_session.cc"
@@ -1205,6 +1209,8 @@ idf_component_register(SRCS ${SOURCES}
                     INCLUDE_DIRS ${INCLUDE_DIRS}
                     WHOLE_ARCHIVE
                     PRIV_REQUIRES
+                        esp_http_client
+                        esp_http_server
                         esp_pm
                         esp_psram
                         esp_netif

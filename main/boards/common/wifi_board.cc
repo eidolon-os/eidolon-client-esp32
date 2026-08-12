@@ -6,7 +6,9 @@
 #include "settings.h"
 #include "assets/lang_config.h"
 #if CONFIG_EIDOLON_HUB_MODE
+#include "eidolon/device_commissioning.h"
 #include "eidolon/eidolon_ui_types.h"
+#include "eidolon/hub_trust_store.h"
 #endif
 
 #include <freertos/FreeRTOS.h>
@@ -28,6 +30,35 @@ static const char *TAG = "WifiBoard";
 
 // Connection timeout in seconds
 static constexpr int CONNECT_TIMEOUT_SEC = 60;
+
+#if CONFIG_EIDOLON_HUB_MODE
+namespace {
+
+// How long the commissioner is told to wait for a verdict on the credentials it
+// just handed over. Long enough for a normal DHCP round on a busy access point,
+// short enough that a wrong password comes back as an answer rather than a
+// hang.
+constexpr int kCommissionedJoinTimeoutSec = 25;
+
+bool JoinCommissionedNetwork(const std::string& ssid, const std::string& password) {
+    SsidManager::GetInstance().AddSsid(ssid, password);
+    auto& wifi_manager = WifiManager::GetInstance();
+    wifi_manager.StopConfigAp();
+    wifi_manager.StartStation();
+    for (int elapsed = 0; elapsed < kCommissionedJoinTimeoutSec; ++elapsed) {
+        if (wifi_manager.IsConnected()) {
+            return true;
+        }
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+    // The credentials stay saved: the device keeps retrying on its own, and the
+    // commissioner is told the network did not come up while they were waiting
+    // rather than being told it did.
+    return false;
+}
+
+}  // namespace
+#endif
 
 WifiBoard::WifiBoard() {
     // Create connection timeout timer
@@ -111,6 +142,20 @@ void WifiBoard::OnNetworkEvent(NetworkEvent event, const std::string& data) {
         case NetworkEvent::Connected:
             // Stop timeout timer
             esp_timer_stop(connect_timer_);
+#if CONFIG_EIDOLON_HUB_MODE
+            // A device that belongs to no Host yet can still be told which one
+            // to trust, over the network it just joined. That window closes the
+            // moment it belongs to one: after that, retargeting this device is
+            // a physical act, not something the network may ask for.
+            if (eidolon::HubTrustStore().CommissionedHubId().empty()) {
+                if (commissioning_.Start(&JoinCommissionedNetwork) == ESP_OK) {
+                    ESP_LOGI(TAG, "Awaiting commissioning on port %d",
+                             eidolon::DeviceCommissioningServer::Port());
+                }
+            } else {
+                commissioning_.Stop();
+            }
+#endif
 #ifdef CONFIG_USE_ESP_BLUFI_WIFI_PROVISIONING
             // make sure blufi resources has been released
             Blufi::GetInstance().deinit();
@@ -159,6 +204,7 @@ void WifiBoard::OnWifiConnectTimeout(void* arg) {
     board->StartWifiConfigMode();
 }
 
+
 void WifiBoard::StartWifiConfigMode() {
     in_config_mode_ = true;
     // Transition to wifi configuring state
@@ -167,6 +213,13 @@ void WifiBoard::StartWifiConfigMode() {
     auto& wifi_manager = WifiManager::GetInstance();
 
     wifi_manager.StartConfigAp();
+#if CONFIG_EIDOLON_HUB_MODE
+    // Setup hands over two things at once: the network to join and the Host to
+    // trust on it. The captive portal only knows about the first.
+    if (commissioning_.Start(&JoinCommissionedNetwork) != ESP_OK) {
+        ESP_LOGE(TAG, "Device commissioning endpoint is unavailable");
+    }
+#endif
 
     // Show config prompt after a short delay
     Application::GetInstance().Schedule([&wifi_manager]() {
