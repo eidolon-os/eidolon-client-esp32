@@ -22,9 +22,11 @@ namespace eidolon {
 class DeviceCommissioningServer {
 public:
     // Join Wi-Fi with the credentials just received. Supplied by the board so
-    // this stays free of any particular Wi-Fi implementation; returns false if
-    // the credentials do not work, which is reported back to the commissioner
-    // instead of being written to flash.
+    // this stays free of any particular Wi-Fi implementation. Called only after
+    // the commissioner has been answered, because joining the commissioned
+    // network takes down the access point that answer travels over — so a false
+    // return can no longer be reported in the reply, and the board owes the
+    // commissioner a way back in instead.
     using WifiJoin = std::function<bool(const std::string& ssid, const std::string& password)>;
 
     DeviceCommissioningServer() = default;
@@ -41,6 +43,11 @@ public:
 private:
     static esp_err_t HandleIdentity(httpd_req_t* request);
     static esp_err_t HandleCommission(httpd_req_t* request);
+
+    // Hand the network change to a task of its own, so it happens once this
+    // request has been answered and its connection closed rather than while the
+    // answer is still in flight.
+    void JoinAfterAnswering(const std::string& ssid, const std::string& password);
 
     httpd_handle_t server_ = nullptr;
     WifiJoin join_;

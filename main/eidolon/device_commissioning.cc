@@ -8,9 +8,12 @@
 
 #include <cJSON.h>
 #include <esp_log.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 #include <cstring>
 #include <memory>
+#include <utility>
 
 #define TAG "Commissioning"
 
@@ -26,6 +29,39 @@ constexpr size_t kMaxPayloadBytes = 8 * 1024;
 // our own contract, so it gets its own port rather than a patch to a component
 // the build re-resolves from upstream.
 constexpr int kPort = 8266;
+
+// How long the join waits after the handler has answered. `httpd_resp_send` only
+// hands the answer to the socket, and this answer's last hop is the access point
+// that joining takes down — so the switch waits for the handler to return, for
+// the connection to be closed, and for the commissioner to have read it.
+constexpr int kAnswerDrainMs = 1500;
+
+// Enough for the Wi-Fi switch this performs: saving credentials to NVS, taking
+// the configuration access point and its web server down, bringing the station
+// up. Overrunning it would take the device down mid-setup.
+constexpr int kJoinTaskStackBytes = 6144;
+
+// Everything the join needs, owned by the task that performs it. It outlives the
+// request that asked for it, and may outlive the server too — the access point
+// it was reached on is exactly what it is about to remove.
+struct PendingJoin {
+    DeviceCommissioningServer::WifiJoin join;
+    std::string ssid;
+    std::string password;
+};
+
+void JoinTask(void* argument)
+{
+    const std::unique_ptr<PendingJoin> pending(static_cast<PendingJoin*>(argument));
+    vTaskDelay(pdMS_TO_TICKS(kAnswerDrainMs));
+    ESP_LOGI(TAG, "Joining commissioned network %s", pending->ssid.c_str());
+    if (!pending->join(pending->ssid, pending->password)) {
+        // Reporting this is the board's job: the answer has already left, so
+        // what is left to say has to be said over a way back in.
+        ESP_LOGE(TAG, "Commissioned network %s did not come up", pending->ssid.c_str());
+    }
+    vTaskDelete(nullptr);
+}
 
 esp_err_t SendJson(httpd_req_t* request, const char* status, const std::string& body)
 {
@@ -151,36 +187,42 @@ esp_err_t DeviceCommissioningServer::HandleCommission(httpd_req_t* request)
         received += static_cast<size_t>(read);
     }
 
-    CommissioningIntent intent;
-    if (!ParseCommissioningIntent(raw, intent)) {
-        return SendError(request, "400 Bad Request", "commissioning payload is incomplete");
-    }
+    // The order of what follows is the contract, and it lives apart from this
+    // server so it can be checked without one.
+    esp_err_t sent = ESP_FAIL;
+    CommissioningEffects effects;
+    effects.save_trust = [](const std::string& hub_id, const std::string& certificate_pem) {
+        const esp_err_t saved = HubTrustStore().Save(hub_id, certificate_pem);
+        if (saved != ESP_OK) {
+            ESP_LOGE(TAG, "Rejected commissioned certificate: %s", esp_err_to_name(saved));
+            return false;
+        }
+        ESP_LOGI(TAG, "Commissioned for Hub %s", hub_id.c_str());
+        return true;
+    };
+    effects.reply = [request, &sent](const CommissioningReply& reply) {
+        sent = SendJson(request, reply.status.c_str(), reply.body);
+    };
+    effects.join_network = [self](const std::string& ssid, const std::string& password) {
+        self->JoinAfterAnswering(ssid, password);
+    };
+    Commission(raw, SystemInfo::GetMacAddress(), effects);
+    return sent;
+}
 
-    // Trust first: a device that joins the network without knowing which Host
-    // it belongs to has nothing to do there.
-    HubTrustStore trust;
-    const esp_err_t saved = trust.Save(intent.hub_id, intent.certificate_pem);
-    if (saved != ESP_OK) {
-        ESP_LOGE(TAG, "Rejected commissioned certificate: %s", esp_err_to_name(saved));
-        return SendError(request, "400 Bad Request", "certificate was rejected");
+void DeviceCommissioningServer::JoinAfterAnswering(const std::string& ssid,
+                                                   const std::string& password)
+{
+    if (!join_) {
+        ESP_LOGE(TAG, "Commissioned network %s cannot be joined: no handler", ssid.c_str());
+        return;
     }
-
-    if (intent.changes_network && (!self->join_ || !self->join_(intent.ssid, intent.password))) {
-        // The certificate stays: the Host it names did not become wrong because
-        // the Wi-Fi credentials were. The commissioner can retry the network
-        // without handing the certificate over again.
-        return SendError(request, "409 Conflict", "could not join that network");
+    auto* pending = new PendingJoin{join_, ssid, password};
+    if (xTaskCreate(&JoinTask, "commission_join", kJoinTaskStackBytes, pending, 2, nullptr) !=
+        pdPASS) {
+        ESP_LOGE(TAG, "Could not start the join for %s", ssid.c_str());
+        delete pending;
     }
-
-    ESP_LOGI(TAG, "Commissioned for Hub %s%s%s", intent.hub_id.c_str(),
-             intent.changes_network ? " on network " : " (network unchanged)",
-             intent.changes_network ? intent.ssid.c_str() : "");
-    std::string body = "{\"schema_version\":1,\"device_id\":\"";
-    body += SystemInfo::GetMacAddress();
-    body += "\",\"hub_id\":\"";
-    body += intent.hub_id;
-    body += "\"}";
-    return SendJson(request, "200 OK", body);
 }
 
 }  // namespace eidolon

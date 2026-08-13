@@ -34,15 +34,28 @@ static constexpr int CONNECT_TIMEOUT_SEC = 60;
 #if CONFIG_EIDOLON_HUB_MODE
 namespace {
 
-// How long the commissioner is told to wait for a verdict on the credentials it
-// just handed over. Long enough for a normal DHCP round on a busy access point,
-// short enough that a wrong password comes back as an answer rather than a
-// hang.
+// How long to wait for the commissioned network before treating it as one that
+// is not going to come up. Long enough for a normal DHCP round on a busy access
+// point, short enough that a wrong password becomes a reopened setup access
+// point rather than a device that hangs.
 constexpr int kCommissionedJoinTimeoutSec = 25;
+
+// What this device says to the person standing in front of it during setup.
+void ShowSetupHint(const std::string& hint) {
+#if CONFIG_USE_EMOTE_MESSAGE_STYLE
+    Application::GetInstance().SetEidolonLifecycleUi(eidolon::LifecyclePhase::WifiSetup, hint);
+#else
+    Application::GetInstance().Alert(Lang::Strings::WIFI_CONFIG_MODE, hint.c_str(), "gear",
+                                     Lang::Sounds::OGG_WIFICONFIG);
+#endif
+}
 
 bool JoinCommissionedNetwork(const std::string& ssid, const std::string& password) {
     SsidManager::GetInstance().AddSsid(ssid, password);
     auto& wifi_manager = WifiManager::GetInstance();
+    // Read before the switch takes it away: whether the commissioner reached us
+    // over the setup access point decides how a failure can be reported.
+    const bool commissioned_over_setup_ap = wifi_manager.IsConfigMode();
     wifi_manager.StopConfigAp();
     wifi_manager.StartStation();
     for (int elapsed = 0; elapsed < kCommissionedJoinTimeoutSec; ++elapsed) {
@@ -51,9 +64,31 @@ bool JoinCommissionedNetwork(const std::string& ssid, const std::string& passwor
         }
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
-    // The credentials stay saved: the device keeps retrying on its own, and the
-    // commissioner is told the network did not come up while they were waiting
-    // rather than being told it did.
+
+    ESP_LOGW(TAG, "Commissioned network %s did not come up", ssid.c_str());
+    if (!commissioned_over_setup_ap) {
+        // Commissioning came in over a network this device was already on, and
+        // the credentials for it are still saved. Leave the station retrying:
+        // reopening the setup access point here would take away the recovery it
+        // is already performing.
+        return false;
+    }
+
+    // This is where the old "could not join that network" answer went. It could
+    // not be an answer any more — the answer had to leave before this switch,
+    // over the access point this switch removes — so the report is the way back
+    // in itself: the setup access point returns with the commissioning endpoint
+    // still listening on it, the next attempt overwrites these credentials, and
+    // the screen says so to whoever is standing there. The commissioner learns
+    // the same thing from the enrollment that never arrives at the Host.
+    ESP_LOGW(TAG, "Reopening the setup access point so it can be commissioned again");
+    wifi_manager.StartConfigAp();
+    Application::GetInstance().Schedule([]() {
+        std::string hint = "Wi-Fi did not connect. Rejoin ";
+        hint += WifiManager::GetInstance().GetApSsid();
+        hint += " and set it up again";
+        ShowSetupHint(hint);
+    });
     return false;
 }
 
