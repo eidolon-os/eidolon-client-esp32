@@ -467,15 +467,16 @@ clear_sr_wakenet_models() {
 }
 
 ensure_eidolon_trim_sdkconfig() {
-  # Keep provisioning available. The current hotspot/web flow is temporary, and
-  # future builds still need the Blufi/BLE provisioning capability.
-  set_sdkconfig_bool USE_ESP_BLUFI_WIFI_PROVISIONING y
-  set_sdkconfig_bool BT_ENABLED y
-  set_sdkconfig_bool BT_BLUEDROID_ENABLED y
-  set_sdkconfig_bool BT_BLE_42_FEATURES_SUPPORTED y
-  set_sdkconfig_bool BT_BLE_50_FEATURES_SUPPORTED n
-  set_sdkconfig_bool BT_BLE_BLUFI_ENABLE y
-  set_sdkconfig_bool MBEDTLS_DHM_C y
+  # Provisioning is carried by protocomm over SoftAP on this board, so the
+  # Bluetooth controller and its internal RAM are not paid for. Set
+  # EIDOLON_PROVISIONING_TRANSPORT_BLE=y to move the same session to BLE.
+  set_sdkconfig_bool BT_ENABLED n
+
+  # Setup secret. Enforced on an existing sdkconfig too: ESP-IDF does not
+  # re-apply changed Kconfig defaults, so a stale config would silently keep
+  # an older verifier and the device would fail its first setup handshake.
+  set_sdkconfig_value EIDOLON_PROVISIONING_SALT_HEX '"2133af3845196306f61cb3bb2e18862c"'
+  set_sdkconfig_value EIDOLON_PROVISIONING_VERIFIER_HEX '"8aada0073ed32e1b00edd09c3c3371c3411ee39456de8243f0b5268751608c6bc01bb301f0f5c5a6d42425a34c79d89d70145252944890ae75c4a744398cd0af8a2a151e9db6b6b6092272520040328371be8b663705c5a71eb586005fb5c88539afc7429ac475682aefd2106736799905ae896faf682ed565cbe3d8785f3271d35ad9230fd2b3536536dc2ba74b68a158a68a6b695a52b4502de2db65be5683bc3d158bb753a63b10ba4ccda5029788e8bd2e525902a2fc92c79e279fb03671c65c326cf884a81ba1f9ac5b1c78ca0354521e2daf34959bd3946cd839898dfb1da1ba78dfe5f57ab921f98fdd9c62c7c90c96db02d164ecd41e3706f306c3e24446fe7f882fc66610a4a119e05e60f0ef3dcfd34938d3870f6d276018b76c272dde8dc747cc912dd3c48807d12964d847656f16da90c9608a4278a96cf4d5f186eed531247e947892ac2e421b3d1d8fbe0684e445c00ecd218fc054c59855a50737b642c803d3f8e7f7a5a48735e9631de2356816cb86b2394ffac752002cf0"'
 
   # Keep this board optimized for app partition size. Perf mode was only useful
   # during early bring-up and leaves very little OTA headroom.

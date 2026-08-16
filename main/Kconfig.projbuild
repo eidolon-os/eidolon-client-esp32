@@ -1026,15 +1026,6 @@ menu "WiFi Configuration Method"
         bool "Acoustic"
         help
             Use audio signal to transmit WiFi configuration data
-
-    config USE_ESP_BLUFI_WIFI_PROVISIONING
-        bool "Esp Blufi"
-        help
-            Use esp blufi protocol to transmit WiFi configuration data
-        select BT_ENABLED
-        select BT_BLE_42_FEATURES_SUPPORTED
-        select BT_BLE_BLUFI_ENABLE
-        select MBEDTLS_DHM_C
 endmenu
 
 config AUDIO_DEBUG_UDP_SERVER
@@ -1158,6 +1149,65 @@ menu "Eidolon Hub"
             After WiFi connects, discover Eidolon Hub via mDNS and fetch LiveKit
             config from GET /api/config. Does not use Xiaozhi cloud OTA URL for
             mqtt/websocket. Firmware upgrade from Hub is phase 2.
+
+    config EIDOLON_PROVISIONING_TRANSPORT_BLE
+        bool "Carry device provisioning over BLE instead of SoftAP"
+        default n
+        depends on EIDOLON_HUB_MODE
+        select BT_ENABLED
+        select BT_BLE_42_FEATURES_SUPPORTED
+        help
+            Which transport carries the Eidolon provisioning session. The
+            endpoints, the payloads and the order are identical either way, so
+            this is a per-board hardware choice and not a protocol one. BLE costs
+            the Bluetooth controller's internal RAM; SoftAP costs nothing beyond
+            the Wi-Fi driver already in use.
+
+    config EIDOLON_PROVISIONING_WINDOW_SECONDS
+        int "How long a device offers to be set up (seconds)"
+        default 600
+        range 60 3600
+        depends on EIDOLON_HUB_MODE
+        help
+            An uncommissioned device that never closed its window would let
+            anything on the network claim it. The controller reads this as a
+            duration and computes its own expiry, because a device being set up
+            has no wall clock yet.
+
+    config EIDOLON_PROVISIONING_SALT_HEX
+        string "SRP6a salt for the provisioning session (hex)"
+        default "2133af3845196306f61cb3bb2e18862c"
+        depends on EIDOLON_HUB_MODE
+        help
+            Development builds share one salt and verifier; production builds
+            carry a per-device pair written during manufacturing. Only the value
+            differs — the provisioning act, its endpoints and their order are the
+            same either way, so there is no second code path to keep honest.
+
+            Regenerate either kind with:
+              scripts/eidolon/generate_provisioning_verifier.py --password <p>
+
+            The default pair belongs to the development passphrase
+            "eidolon-dev-setup" and identity "eidolon-setup".
+
+    config EIDOLON_PROVISIONING_VERIFIER_HEX
+        string "SRP6a verifier for the provisioning session (hex)"
+        default "8aada0073ed32e1b00edd09c3c3371c3411ee39456de8243f0b5268751608c6bc01bb301f0f5c5a6d42425a34c79d89d70145252944890ae75c4a744398cd0af8a2a151e9db6b6b6092272520040328371be8b663705c5a71eb586005fb5c88539afc7429ac475682aefd2106736799905ae896faf682ed565cbe3d8785f3271d35ad9230fd2b3536536dc2ba74b68a158a68a6b695a52b4502de2db65be5683bc3d158bb753a63b10ba4ccda5029788e8bd2e525902a2fc92c79e279fb03671c65c326cf884a81ba1f9ac5b1c78ca0354521e2daf34959bd3946cd839898dfb1da1ba78dfe5f57ab921f98fdd9c62c7c90c96db02d164ecd41e3706f306c3e24446fe7f882fc66610a4a119e05e60f0ef3dcfd34938d3870f6d276018b76c272dde8dc747cc912dd3c48807d12964d847656f16da90c9608a4278a96cf4d5f186eed531247e947892ac2e421b3d1d8fbe0684e445c00ecd218fc054c59855a50737b642c803d3f8e7f7a5a48735e9631de2356816cb86b2394ffac752002cf0"
+        depends on EIDOLON_HUB_MODE
+        help
+            Derived from the setup passphrase together with the salt above. The
+            device never stores the passphrase itself, only this verifier, so
+            reading a device out does not yield the code needed to set up the
+            next one.
+
+    config EIDOLON_PROVISIONING_MANUFACTURER_BOUND
+        bool "This build's provisioning identity is bound to a product credential"
+        default n
+        depends on EIDOLON_HUB_MODE
+        help
+            Declared to the controller in the device descriptor, which refuses to
+            silently treat a development device as a production one. Leave off for
+            development builds carrying the shared salt and verifier above.
 
     config EIDOLON_MDNS_SERVICE_TYPE
         string "mDNS service type (without ._tcp suffix)"

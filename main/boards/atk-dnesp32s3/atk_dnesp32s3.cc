@@ -124,12 +124,11 @@ private:
 
     void InitializeButtons() {
         boot_button_.OnClick([this]() {
-            auto& app = Application::GetInstance();
-            if (app.GetDeviceState() == kDeviceStateStarting) {
+            if (WantsSetupGesture()) {
                 EnterWifiConfigMode();
                 return;
             }
-            app.ToggleChatState();
+            Application::GetInstance().ToggleChatState();
         });
         boot_button_.OnDoubleClick([this]() {
             TogglePreview();

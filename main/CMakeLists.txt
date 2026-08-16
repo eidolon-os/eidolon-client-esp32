@@ -911,9 +911,6 @@ if(NOT CONFIG_EIDOLON_HUB_MODE)
 endif()
 
 # Auto Select Additional Sources
-if (CONFIG_USE_ESP_BLUFI_WIFI_PROVISIONING)
-    list(APPEND SOURCES "boards/common/blufi.cpp")
-endif ()
 # Select language directory according to Kconfig
 if(CONFIG_LANGUAGE_ZH_CN)
     set(LANG_DIR "zh-CN")
@@ -1068,8 +1065,8 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/audio/eidolon_mic_capture.cc"
         "eidolon/audio/pcm_push_capture_source.cc"
         "eidolon/control_protocol.cc"
-        "eidolon/device_commissioning.cc"
-        "eidolon/device_commissioning_protocol.cc"
+        "eidolon/device_provisioning.cc"
+        "eidolon/device_provisioning_protocol.cc"
         "eidolon/device_event_bus.cc"
         "eidolon/device_event_builder.cc"
         "eidolon/eidolon_audio_input.cc"
@@ -1229,6 +1226,12 @@ idf_component_register(SRCS ${SOURCES}
                         efuse
                         bt
                         fatfs
+                        # Device provisioning (protocomm over SoftAP or BLE). This has to be
+                        # required unconditionally: the dependency graph is resolved during
+                        # CMake's early expansion pass, where CONFIG_ values are not yet
+                        # defined, so a requirement inside `if(CONFIG_EIDOLON_HUB_MODE)` is
+                        # silently dropped and the headers then go missing at compile time.
+                        wifi_provisioning
                         ${MAIN_PRIV_REQUIRES_EXTRA}
                     )
 

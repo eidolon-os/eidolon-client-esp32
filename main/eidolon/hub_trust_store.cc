@@ -1,6 +1,6 @@
 #include "hub_trust_store.h"
 
-#include "device_commissioning_protocol.h"
+#include "device_provisioning_protocol.h"
 #include "hub_types.h"
 #include "settings.h"
 

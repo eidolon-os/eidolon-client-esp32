@@ -1,6 +1,6 @@
 #include "hub_onboarding_client.h"
 
-#include "device_commissioning_protocol.h"
+#include "device_provisioning_protocol.h"
 #include "hub_config_store.h"
 #include "hub_onboarding_protocol.h"
 #include "hub_pinned_http.h"

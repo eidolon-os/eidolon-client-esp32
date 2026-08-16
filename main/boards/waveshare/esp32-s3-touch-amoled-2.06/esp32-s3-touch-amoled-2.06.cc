@@ -241,18 +241,17 @@ private:
         // semantics never conflict with portable touch UI behaviour. During
         // startup it remains available for Wi-Fi config recovery.
         boot_button_.OnClick([this]() {
-            if (Application::GetInstance().GetDeviceState() == kDeviceStateStarting) {
+            if (WantsSetupGesture()) {
                 EnterWifiConfigMode();
             }
         });
 #else
         boot_button_.OnClick([this]() {
-            auto& app = Application::GetInstance();
-            if (app.GetDeviceState() == kDeviceStateStarting) {
+            if (WantsSetupGesture()) {
                 EnterWifiConfigMode();
                 return;
             }
-            app.ToggleVoiceSession();
+            Application::GetInstance().ToggleVoiceSession();
         });
 
         boot_button_.OnDoubleClick([this]() {

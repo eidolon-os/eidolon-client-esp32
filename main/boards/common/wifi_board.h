@@ -7,19 +7,11 @@
 #include <esp_timer.h>
 
 #include "sdkconfig.h"
-#if CONFIG_EIDOLON_HUB_MODE
-#include "eidolon/device_commissioning.h"
-#endif
 
 class WifiBoard : public Board {
 protected:
     esp_timer_handle_t connect_timer_ = nullptr;
     bool in_config_mode_ = false;
-#if CONFIG_EIDOLON_HUB_MODE
-    // Runs only while the access point is up, which is the only time anyone is
-    // entitled to tell this device which Host it belongs to.
-    eidolon::DeviceCommissioningServer commissioning_;
-#endif
     NetworkEventCallback network_event_callback_ = nullptr;
 
     virtual std::string GetBoardJson() override;
@@ -69,6 +61,18 @@ public:
      * Enter WiFi configuration mode (thread-safe, can be called from any task)
      */
     void EnterWifiConfigMode();
+
+    /**
+     * Whether a press should open setup rather than start a conversation.
+     *
+     * Boards ask instead of testing device states themselves: a device that is
+     * still coming up, or one that keeps failing to be admitted by a Host, has
+     * no conversation to toggle and is exactly the device someone is standing in
+     * front of wanting to set up. Each board deciding this for itself is how the
+     * gesture came to be refused during Hub activation, leaving a stuck device
+     * recoverable only by reflashing it.
+     */
+    bool WantsSetupGesture() const;
     
     /**
      * Check if in WiFi config mode
