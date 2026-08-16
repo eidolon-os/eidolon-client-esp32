@@ -1,5 +1,6 @@
 #include "hub_onboarding_client.h"
 
+#include "board.h"
 #include "device_provisioning_protocol.h"
 #include "hub_config_store.h"
 #include "hub_onboarding_protocol.h"
@@ -85,7 +86,10 @@ std::string PrintJson(cJSON* root)
 
 std::string BuildEnrollmentBody(const HubOnboardingState& state)
 {
-    const std::string manifest_json = BuildDeviceManifestJson(BOARD_NAME);
+    // Ask the board itself rather than assuming: a build with no camera must
+    // not offer one, or the Host provisions a video channel nobody publishes to.
+    const bool has_camera = Board::GetInstance().GetCamera() != nullptr;
+    const std::string manifest_json = BuildDeviceManifestJson(BOARD_NAME, has_camera);
     cJSON* root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "operation", "device.enrollment");
     cJSON_AddStringToObject(root, "request_id", state.request_id.c_str());

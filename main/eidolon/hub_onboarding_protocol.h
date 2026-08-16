@@ -11,7 +11,7 @@ bool ParseHubDescriptorResponse(const std::string& body,
                                 const HubTxtRecord& advertised,
                                 HubDescriptor& out);
 
-std::string BuildDeviceManifestJson(const std::string& board_name);
+std::string BuildDeviceManifestJson(const std::string& board_name, bool has_camera);
 
 bool ParseEnrollmentReceiptResponse(const std::string& body,
                                     const HubOnboardingState& expected,

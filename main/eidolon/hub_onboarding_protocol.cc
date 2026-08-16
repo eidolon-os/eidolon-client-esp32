@@ -1,5 +1,7 @@
 #include "hub_onboarding_protocol.h"
 
+#include "eidolon_device_profile.h"
+
 #include <cJSON.h>
 
 #include <cstdint>
@@ -107,7 +109,7 @@ bool ParseHubDescriptorResponse(const std::string& body,
     return valid;
 }
 
-std::string BuildDeviceManifestJson(const std::string& board_name)
+std::string BuildDeviceManifestJson(const std::string& board_name, bool has_camera)
 {
     cJSON* title = cJSON_CreateString(board_name.c_str());
     char* encoded_title = title ? cJSON_PrintUnformatted(title) : nullptr;
@@ -116,10 +118,34 @@ std::string BuildDeviceManifestJson(const std::string& board_name)
         cJSON_free(encoded_title);
     }
     cJSON_Delete(title);
-    // Keep a compact deterministic representation for the manifest wire contract.
-    return "{\"actions\":[],\"events\":[],\"media\":[{\"codecs\":[\"opus\"],"
-           "\"direction\":\"bidirectional\",\"kind\":\"audio\"}],\"properties\":[],"
-           "\"schema_version\":1,\"title\":" + escaped + "}";
+
+    // The manifest is how this device tells the Host what it can carry, and the
+    // Host provisions its channel from exactly this. Declaring capabilities the
+    // board does not have is not cosmetic: a camera that claims a microphone is
+    // granted one and is assigned a voice agent that waits forever for audio.
+    // Everything below is a compile-time fact about this build, never a guess.
+    std::string media = "{\"codecs\":[\"opus\"],\"direction\":\"bidirectional\",\"kind\":\"audio\"}";
+    if (has_camera) {
+        media += ",{\"codecs\":[\"h264\"],\"direction\":\"publish\",\"kind\":\"video\"}";
+    }
+
+    // Turn taking rides in a property whose schema pins one value: the manifest
+    // carries immutable device attributes this way, and a `const` schema is the
+    // device stating a fact about itself rather than offering a choice. It
+    // belongs to the device because it follows from whether this build has an
+    // echo-cancellation reference, which no deployment-wide setting can know.
+    const char* interaction_mode =
+        kModePtt ? "ptt" : (kModeHalfDuplex ? "half_duplex" : "full_duplex");
+    std::string properties =
+        std::string("{\"name\":\"interaction_mode\",\"observable\":false,\"schema\":{\"const\":\"") +
+        interaction_mode + "\",\"type\":\"string\"},\"writable\":false}";
+
+    // Keep a compact deterministic representation for the manifest wire
+    // contract: keys stay sorted so the Host's manifest revision is stable
+    // across boots that declare the same thing.
+    return "{\"actions\":[],\"events\":[],\"media\":[" + media +
+           "],\"properties\":[" + properties +
+           "],\"schema_version\":1,\"title\":" + escaped + "}";
 }
 
 bool ParseEnrollmentReceiptResponse(const std::string& body,
