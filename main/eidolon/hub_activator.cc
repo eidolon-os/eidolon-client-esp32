@@ -60,8 +60,12 @@ bool HubActivator::Run() {
             err = client.Run(txt, device_id, config);
             if (err == ESP_OK) {
                 if (store.SaveHubConfig(config, txt.descriptor_uri) != ESP_OK) {
-                    ESP_LOGE(TAG, "Failed to persist Hub activation state");
-                    return false;
+                    // The Host already admitted this device and the credential is
+                    // in hand; only the cache of it failed. Refusing to continue
+                    // turned a full NVS partition into a device that could not be
+                    // used at all, when what it actually costs is re-activating on
+                    // the next boot instead of resuming offline.
+                    ESP_LOGW(TAG, "Hub activation could not be cached; using it for this session");
                 }
 
                 app.SetEidolonLifecycleUi(

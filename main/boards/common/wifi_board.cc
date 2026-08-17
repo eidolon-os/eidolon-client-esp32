@@ -266,11 +266,6 @@ void WifiBoard::EnterWifiConfigMode() {
     StartWifiConfigMode();
 }
 
-bool WifiBoard::WantsSetupGesture() const {
-    const auto state = Application::GetInstance().GetDeviceState();
-    return state == kDeviceStateStarting || state == kDeviceStateActivating;
-}
-
 bool WifiBoard::IsInWifiConfigMode() const {
 #if CONFIG_EIDOLON_HUB_MODE
     // Setup runs on the provisioning service rather than on the vendor captive

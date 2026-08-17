@@ -258,12 +258,9 @@ private:
             was_touched = false;
             int64_t touch_duration = (esp_timer_get_time() / 1000) - touch_start_time;
             
-            // 短触：开机 starting 阶段进配网，否则切换对话
+            // 短触：切换对话。进配网走下面的长按，任意状态都可用，不再依赖
+            // 开机那几秒。
             if (touch_duration < TOUCH_THRESHOLD_MS) {
-                if (WantsSetupGesture()) {
-                    EnterWifiConfigMode();
-                    return;
-                }
                 Application::GetInstance().ToggleChatState();
             } else if (touch_duration >= LONG_PRESS_WIFI_CONFIG_MS) {
                 // 长按 >=2s：任意状态下进入 WiFi 配网。这是 CoreS3 的可靠配网入口，

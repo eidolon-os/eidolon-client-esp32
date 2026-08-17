@@ -80,6 +80,19 @@ esp_err_t Settings::SetString(const std::string& key, const std::string& value) 
     // loop -> wipe NVS -> lose P-256 identity" chain. The in-RAM value still works
     // this session; the next boot falls back to the last good stored value.
     esp_err_t err = nvs_set_str(nvs_handle_, key.c_str(), value.c_str());
+    if (err == ESP_ERR_NVS_NOT_ENOUGH_SPACE) {
+        // Replacing a string writes the new value before the old one is dropped,
+        // so on a nearly full partition an entry cannot be replaced even when the
+        // space it needs is held by the very entry it would replace. Dropping
+        // ours first is safe in a way that wiping the partition is not: what is
+        // discarded is this key's previous value, which costs a re-fetch, rather
+        // than the identity that lives beside it and cannot be re-fetched at all.
+        ESP_LOGW(TAG, "%s/%s does not fit; replacing it in place", ns_.c_str(), key.c_str());
+        if (nvs_erase_key(nvs_handle_, key.c_str()) == ESP_OK) {
+            nvs_commit(nvs_handle_);
+            err = nvs_set_str(nvs_handle_, key.c_str(), value.c_str());
+        }
+    }
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "nvs_set_str(%s/%s) failed: %s", ns_.c_str(), key.c_str(),
                  esp_err_to_name(err));

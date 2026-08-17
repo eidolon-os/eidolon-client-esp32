@@ -62,17 +62,6 @@ public:
      */
     void EnterWifiConfigMode();
 
-    /**
-     * Whether a press should open setup rather than start a conversation.
-     *
-     * Boards ask instead of testing device states themselves: a device that is
-     * still coming up, or one that keeps failing to be admitted by a Host, has
-     * no conversation to toggle and is exactly the device someone is standing in
-     * front of wanting to set up. Each board deciding this for itself is how the
-     * gesture came to be refused during Hub activation, leaving a stuck device
-     * recoverable only by reflashing it.
-     */
-    bool WantsSetupGesture() const;
     
     /**
      * Check if in WiFi config mode

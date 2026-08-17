@@ -123,13 +123,16 @@ private:
     }
 
     void InitializeButtons() {
-        boot_button_.OnClick([this]() {
-            if (WantsSetupGesture()) {
-                EnterWifiConfigMode();
-                return;
-            }
-            Application::GetInstance().ToggleChatState();
+        // Opening setup is a long press, in any state, as it is in every
+        // commissioning standard and already is on StackChan. Hanging it off a
+        // click during startup made the window last only as long as the device
+        // took to reach its Host — about fifteen seconds once the Host answers —
+        // so the person who wanted to re-set-up a working device had no way in.
+        boot_button_.OnLongPress([this]() {
+            ESP_LOGI(TAG, "Long press: opening device setup");
+            EnterWifiConfigMode();
         });
+        boot_button_.OnClick([]() { Application::GetInstance().ToggleChatState(); });
         boot_button_.OnDoubleClick([this]() {
             TogglePreview();
         });

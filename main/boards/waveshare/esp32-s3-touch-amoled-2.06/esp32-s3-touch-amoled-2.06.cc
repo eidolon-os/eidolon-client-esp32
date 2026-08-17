@@ -240,19 +240,18 @@ private:
         // Keep BOOT out of the conversation flow so board-specific button
         // semantics never conflict with portable touch UI behaviour. During
         // startup it remains available for Wi-Fi config recovery.
-        boot_button_.OnClick([this]() {
-            if (WantsSetupGesture()) {
-                EnterWifiConfigMode();
-            }
+        // Setup opens on a long press in any state; BOOT stays out of the
+        // conversation flow on this wearable, where touch owns talking.
+        boot_button_.OnLongPress([this]() {
+            ESP_LOGI(TAG, "Long press: opening device setup");
+            EnterWifiConfigMode();
         });
 #else
-        boot_button_.OnClick([this]() {
-            if (WantsSetupGesture()) {
-                EnterWifiConfigMode();
-                return;
-            }
-            Application::GetInstance().ToggleVoiceSession();
+        boot_button_.OnLongPress([this]() {
+            ESP_LOGI(TAG, "Long press: opening device setup");
+            EnterWifiConfigMode();
         });
+        boot_button_.OnClick([]() { Application::GetInstance().ToggleVoiceSession(); });
 
         boot_button_.OnDoubleClick([this]() {
             Application::GetInstance().ToggleMicrophone();
@@ -352,7 +351,7 @@ private:
     }
 
 public:
-    WaveshareEsp32s3TouchAMOLED2inch06() : boot_button_(BOOT_BUTTON_GPIO) {
+    WaveshareEsp32s3TouchAMOLED2inch06() : boot_button_(BOOT_BUTTON_GPIO, false, 2000) {
         InitializePowerSaveTimer();
         InitializeCodecI2c();
         InitializeAxp2101();
