@@ -16,7 +16,7 @@ inline constexpr const char* kTxtEnrollmentUri = "enrollment_uri";
 inline constexpr int kSupportedTxtVers = 1;
 inline constexpr int kSupportedOnboardingProtocol = 1;
 inline constexpr const char* kLiveKitBindingFormat =
-    "application/vnd.eidolon.livekit-device+json;v=1";
+    "application/vnd.eidolon.livekit-session+json;v=2";
 
 inline constexpr const char* kNvsNamespace = "eidolon";
 
@@ -118,9 +118,13 @@ struct Esp32HubConfig {
     // Default to the most conservative status: a config that has not been
     // explicitly populated/parsed must never grant voice access.
     HubConfigStatus status = HubConfigStatus::PendingApproval;
-    // Provider-owned voice and control rooms. Both are usable only while Active.
-    RoomConfig active;
-    RoomConfig control;
+    // The one channel this device has. It used to be two — a control room it
+    // lived in and a voice room it visited — which cost a room teardown and
+    // rebuild at the start of every conversation, and left the device
+    // unreachable in between. One channel is held open for as long as the
+    // device is enrolled; whether anyone is listening is now said out loud
+    // rather than inferred from which room it is standing in.
+    RoomConfig session;
     int64_t expires_at_ms = 0;
     int sample_rate = 16000;
     int channels = 1;

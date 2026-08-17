@@ -15,7 +15,11 @@ namespace eidolon {
 // (e.g. a fresh server_url paired with a stale token).
 static constexpr const char* kConfigKey = "config";
 static constexpr const char* kOnboardingKey = "onboarding";
-static constexpr int kConfigSchemaVersion = 3;
+// Version 4 holds one channel. Version 3 held a voice room and a control room,
+// and a device reading those back would connect to a pair that no longer exists
+// — the Provider issues one. Refusing the old record sends the device to
+// re-provision, which is the only way to be handed the new one.
+static constexpr int kConfigSchemaVersion = 4;
 // Version 2 is the screen-independent manual-admission state. Version 1 held
 // abandoned screen-bound claim material and must start a fresh Enrollment intent.
 static constexpr int kOnboardingSchemaVersion = 2;
@@ -39,14 +43,10 @@ esp_err_t HubConfigStore::SaveHubConfig(const Esp32HubConfig& config,
     cJSON_AddNumberToObject(root, "schema_version", kConfigSchemaVersion);
     cJSON_AddStringToObject(root, "descriptor_uri", descriptor_uri.c_str());
     cJSON_AddStringToObject(root, "status", HubConfigStatusToString(config.status));
-    cJSON_AddStringToObject(root, "server_url", config.active.server_url.c_str());
-    cJSON_AddStringToObject(root, "token", config.active.token.c_str());
-    cJSON_AddStringToObject(root, "identity", config.active.identity.c_str());
-    cJSON_AddStringToObject(root, "room_name", config.active.room_name.c_str());
-    cJSON_AddStringToObject(root, "ctrl_url", config.control.server_url.c_str());
-    cJSON_AddStringToObject(root, "ctrl_token", config.control.token.c_str());
-    cJSON_AddStringToObject(root, "ctrl_id", config.control.identity.c_str());
-    cJSON_AddStringToObject(root, "ctrl_room", config.control.room_name.c_str());
+    cJSON_AddStringToObject(root, "server_url", config.session.server_url.c_str());
+    cJSON_AddStringToObject(root, "token", config.session.token.c_str());
+    cJSON_AddStringToObject(root, "identity", config.session.identity.c_str());
+    cJSON_AddStringToObject(root, "room_name", config.session.room_name.c_str());
     cJSON_AddNumberToObject(root, "expires_at_ms",
                            static_cast<double>(config.expires_at_ms));
     cJSON_AddNumberToObject(root, "sample_rate", config.sample_rate);
@@ -69,8 +69,8 @@ esp_err_t HubConfigStore::SaveHubConfig(const Esp32HubConfig& config,
     }
 
     ESP_LOGI(TAG, "Saved Hub config identity=%s status=%s room=%s server=%s",
-             config.active.identity.c_str(), HubConfigStatusToString(config.status),
-             config.active.room_name.c_str(), config.active.server_url.c_str());
+             config.session.identity.c_str(), HubConfigStatusToString(config.status),
+             config.session.room_name.c_str(), config.session.server_url.c_str());
     return ESP_OK;
 }
 
@@ -100,14 +100,10 @@ bool HubConfigStore::Load(Esp32HubConfig& config, std::string* descriptor_uri) c
     // A missing/unknown status parses to the most conservative state
     // (PendingApproval) — never silently grant voice on an absent field.
     config.status = ParseHubConfigStatus(JsonStringField(root, "status"));
-    config.active.server_url = JsonStringField(root, "server_url");
-    config.active.token = JsonStringField(root, "token");
-    config.active.identity = JsonStringField(root, "identity");
-    config.active.room_name = JsonStringField(root, "room_name");
-    config.control.server_url = JsonStringField(root, "ctrl_url");
-    config.control.token = JsonStringField(root, "ctrl_token");
-    config.control.identity = JsonStringField(root, "ctrl_id");
-    config.control.room_name = JsonStringField(root, "ctrl_room");
+    config.session.server_url = JsonStringField(root, "server_url");
+    config.session.token = JsonStringField(root, "token");
+    config.session.identity = JsonStringField(root, "identity");
+    config.session.room_name = JsonStringField(root, "room_name");
     const cJSON* expires = cJSON_GetObjectItem(root, "expires_at_ms");
     if (cJSON_IsNumber(expires) && expires->valuedouble >= 0) {
         config.expires_at_ms = static_cast<int64_t>(expires->valuedouble);
@@ -116,7 +112,7 @@ bool HubConfigStore::Load(Esp32HubConfig& config, std::string* descriptor_uri) c
     config.channels = JsonIntField(root, "channels", 1);
 
     const bool valid =
-        config.status != HubConfigStatus::Active || config.active.usable();
+        config.status != HubConfigStatus::Active || config.session.usable();
     if (descriptor_uri) {
         *descriptor_uri = JsonStringField(root, "descriptor_uri");
     }

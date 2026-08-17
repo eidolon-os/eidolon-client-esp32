@@ -1,7 +1,6 @@
 #include "livekit_session.h"
 
 #include "eidolon_topics.h"
-#include "livekit_data_only_compat.h"
 #include "livekit_board.h"
 
 #include <cJSON.h>
@@ -308,27 +307,14 @@ void LiveKitSession::UnregisterStreamHandlers()
     }
 }
 
-esp_err_t LiveKitSession::EnsureMediaBoard(bool data_only)
+esp_err_t LiveKitSession::EnsureMediaBoard()
 {
     if (media_board_initialized_) {
-        if (media_board_data_only_ == data_only) {
-            return ESP_OK;
-        }
-        // Wrong kind for this room. Reusing it would (a) let a control room
-        // publish from the voice board's microphone capturer, breaking the
-        // mic-free control-room invariant, and (b) keep the voice board's
-        // internal-SRAM footprint resident, which is exactly what starves
-        // livekit_room_create on memory-tight boards.
-        ESP_LOGI(TAG, "Media board kind mismatch (have=%s want=%s); rebuilding",
-                 media_board_data_only_ ? "control" : "voice",
-                 data_only ? "control" : "voice");
-        ReleaseMediaBoard();
+        return ESP_OK;
     }
-    esp_err_t err = data_only ? eidolon_livekit_board_init_data_only()
-                              : eidolon_livekit_board_init();
+    esp_err_t err = eidolon_livekit_board_init();
     if (err == ESP_OK) {
         media_board_initialized_ = true;
-        media_board_data_only_ = data_only;
     } else {
         // board_init can fail after constructing only part of the provider.
         // Always return it to a clean state so the next bounded retry starts
@@ -353,10 +339,10 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
         Disconnect(true);
     }
 
-    identity_ = config.active.identity;
+    identity_ = config.session.identity;
     generation_ = generation;
 
-    esp_err_t media_err = EnsureMediaBoard(/*data_only=*/false);
+    esp_err_t media_err = EnsureMediaBoard();
     if (media_err != ESP_OK) {
         return media_err;
     }
@@ -410,97 +396,16 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
     RegisterAgentSessionDrainHandler();
     using_media_ = true;
 
-    ESP_LOGI(TAG, "Connecting room=%s identity=%s server=%s", config.active.room_name.c_str(),
-             config.active.identity.c_str(), config.active.server_url.c_str());
+    ESP_LOGI(TAG, "Connecting room=%s identity=%s server=%s", config.session.room_name.c_str(),
+             config.session.identity.c_str(), config.session.server_url.c_str());
 
-    if (livekit_room_connect(room_handle_, config.active.server_url.c_str(),
-                             config.active.token.c_str()) != LIVEKIT_ERR_NONE) {
+    if (livekit_room_connect(room_handle_, config.session.server_url.c_str(),
+                             config.session.token.c_str()) != LIVEKIT_ERR_NONE) {
         ESP_LOGE(TAG, "livekit_room_connect failed");
         UnregisterStreamHandlers();
         livekit_room_destroy(room_handle_);
         room_handle_ = nullptr;
         using_media_ = false;
-        ReleaseMediaBoard();
-        return ESP_FAIL;
-    }
-
-    return ESP_OK;
-}
-
-esp_err_t LiveKitSession::ConnectDataOnly(const Esp32HubConfig& config, uint32_t generation)
-{
-    if (room_handle_ != nullptr) {
-        Disconnect(true);
-    }
-
-    identity_ = config.active.identity;
-    generation_ = generation;
-
-    esp_err_t media_err = EnsureMediaBoard(/*data_only=*/true);
-    if (media_err != ESP_OK) {
-        return media_err;
-    }
-
-    esp_capture_handle_t capturer = eidolon_livekit_board_get_capturer();
-    if (!capturer) {
-        ESP_LOGE(TAG, "Control-room capturer not ready");
-        ReleaseMediaBoard();
-        return ESP_ERR_INVALID_STATE;
-    }
-
-    // LiveKit 0.3.10 forces a working capture sink on every room, so the control
-    // room publishes a MIC-FREE silent Opus track. Two independent layers keep it
-    // effectively data-only, so privacy does not hinge on either one alone:
-    //   1) Source: the capturer is synthetic zero PCM (no codec/AFE); the mic is
-    //      never opened in the control room, so even a published track is silence.
-    //   2) Token: can_publish=false makes the server drop the track. Verified in
-    //      the LiveKit server log: onMediaTrack fires, then "webrtc track published
-    //      but can't find MediaTrack in pendingTracks" with isReceiverAdded:false,
-    //      i.e. no room MediaTrack is created and no participant can subscribe.
-    // subscribe=NONE: control needs no playback path.
-    livekit_room_options_t room_options = {};
-    room_options.publish = {
-        .kind = LIVEKIT_MEDIA_TYPE_AUDIO,
-        .audio_encode =
-            {
-                .codec = LIVEKIT_AUDIO_CODEC_OPUS,
-                .sample_rate = 16000,
-                .channel_count = 1,
-            },
-        .capturer = capturer,
-    };
-    room_options.subscribe = {
-        .kind = LIVEKIT_MEDIA_TYPE_NONE,
-    };
-    room_options.on_state_changed = OnRoomStateChanged;
-    room_options.on_data_received = OnDataReceived;
-    room_options.ctx = this;
-    using_media_ = false;
-
-    LogInternalHeapBudget("room_create", "control");
-    if (livekit_room_create(&room_handle_, &room_options) != LIVEKIT_ERR_NONE) {
-        ESP_LOGE(TAG, "livekit_room_create data-only failed");
-        LogInternalHeapBudget("room_create_failed", "control");
-        room_handle_ = nullptr;
-        transcription_registered_ = false;
-        agent_session_registered_ = false;
-        ReleaseMediaBoard();
-        return ESP_FAIL;
-    }
-    transcription_registered_ = false;
-    agent_session_registered_ = false;
-
-    ESP_LOGI(TAG, "Connecting control room=%s identity=%s server=%s",
-             config.active.room_name.c_str(), config.active.identity.c_str(),
-             config.active.server_url.c_str());
-
-    if (livekit_room_connect(room_handle_, config.active.server_url.c_str(),
-                             config.active.token.c_str()) != LIVEKIT_ERR_NONE) {
-        ESP_LOGE(TAG, "livekit_room_connect data-only failed");
-        livekit_room_destroy(room_handle_);
-        room_handle_ = nullptr;
-        transcription_registered_ = false;
-        agent_session_registered_ = false;
         ReleaseMediaBoard();
         return ESP_FAIL;
     }

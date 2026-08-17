@@ -65,10 +65,16 @@ void TestDescriptorIsPinnedToAdvertisedHttpsOrigin()
 void TestCanonicalManifest()
 {
     const std::string manifest =
-        eidolon::BuildDeviceManifestJson("esp32-s3-touch-amoled-2.06");
+        eidolon::BuildDeviceManifestJson("esp32-s3-touch-amoled-2.06", /*has_camera=*/false);
+    // A device states its turn-taking as an immutable property, so the Provider
+    // reads a fact rather than guessing one. The value follows this build's
+    // compile-time profile — half duplex here, pinned by tests/stubs/sdkconfig.h.
     assert(manifest ==
            "{\"actions\":[],\"events\":[],\"media\":[{\"codecs\":[\"opus\"],"
-           "\"direction\":\"bidirectional\",\"kind\":\"audio\"}],\"properties\":[],"
+           "\"direction\":\"bidirectional\",\"kind\":\"audio\"}],"
+           "\"properties\":[{\"name\":\"interaction_mode\",\"observable\":false,"
+           "\"schema\":{\"const\":\"half_duplex\",\"type\":\"string\"},"
+           "\"writable\":false}],"
            "\"schema_version\":1,\"title\":\"esp32-s3-touch-amoled-2.06\"}");
 }
 
@@ -115,7 +121,7 @@ void TestReceiptHandoffAndProviderBinding()
         "\"lifecycle_state\":\"approved\",\"channels\":[{"
         "\"channel_id\":\"livekit-1\",\"purpose\":\"voice\","
         "\"kinds\":[\"audio\"],\"binding_format\":"
-        "\"application/vnd.eidolon.livekit-device+json;v=1\","
+        "\"application/vnd.eidolon.livekit-session+json;v=2\","
         "\"issued_at_ms\":1,\"expires_at_ms\":1786000000000,"
         "\"opaque_binding\":\"e30=\"}]}";
     assert(eidolon::ParseHandoffResponse(approved, "handoff-a", state, status,
@@ -125,16 +131,25 @@ void TestReceiptHandoffAndProviderBinding()
     assert(assignment.expires_at_ms == 1786000000000);
 
     const std::string binding =
+        "{\"schema_version\":2,\"session\":{\"server_url\":\"wss://lk\","
+        "\"token\":\"tok\",\"identity\":\"device\",\"room_name\":\"channel\"},"
+        "\"audio\":{\"sample_rate\":16000,\"channels\":1}}";
+    eidolon::Esp32HubConfig config;
+    assert(eidolon::ParseLiveKitBinding(binding, config));
+    assert(config.session.room_name == "channel");
+    assert(config.session.token == "tok");
+
+    // The Provider issues one channel. A device that accepted the old pair
+    // would connect to rooms nobody serves, so the shape is refused outright
+    // rather than half-read.
+    const std::string two_rooms =
         "{\"schema_version\":1,\"active\":{\"server_url\":\"wss://lk\","
         "\"token\":\"voice\",\"identity\":\"device\",\"room_name\":\"voice\"},"
         "\"control\":{\"server_url\":\"wss://lk\",\"token\":\"control\","
         "\"identity\":\"device\",\"room_name\":\"control\"},"
         "\"audio\":{\"sample_rate\":16000,\"channels\":1}}";
-    eidolon::Esp32HubConfig config;
-    assert(eidolon::ParseLiveKitBinding(binding, config));
-    assert(config.active.room_name == "voice");
-    assert(config.control.room_name == "control");
-
+    eidolon::Esp32HubConfig stale;
+    assert(!eidolon::ParseLiveKitBinding(two_rooms, stale));
 }
 
 }  // namespace

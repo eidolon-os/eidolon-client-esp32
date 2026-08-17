@@ -32,6 +32,12 @@ inline constexpr const char* kIdentityOwnerPresenceChangedType =
     "identity.owner_presence.changed";
 inline constexpr const char* kCompanionFlowNodeType = "companion.flow.node";
 
+// session_open / session_close — device → server, on kSessionControlTopic. The
+// device holds its channel open for as long as it is enrolled, so being
+// connected no longer says whether it wants to be heard; it says so itself.
+inline constexpr const char* kSessionOpenType = "session_open";
+inline constexpr const char* kSessionCloseType = "session_close";
+
 // client.audio_state — body "type" label (NOT the routing topic above) + enums.
 inline constexpr const char* kClientAudioStateType = "client.audio_state";
 inline constexpr const char* kInputModeAuto = "auto";

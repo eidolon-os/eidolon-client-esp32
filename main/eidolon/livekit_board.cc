@@ -34,12 +34,6 @@ static volatile int64_t s_last_playback_us;
 static volatile uint32_t s_recent_capture_rms_ppm;
 static volatile uint32_t s_recent_playback_rms_ppm;
 
-// Data-only control-room capture: a mic-free silent PCM source. Kept alive across
-// sessions (like s_mic_capture) so the feeder task never races a delete.
-static eidolon::PcmPushCaptureSource* s_silent_source;
-static TaskHandle_t s_silence_task;
-static volatile bool s_silence_feed;
-
 namespace {
 constexpr int kPlaybackPcmMinAvgAbs = 120;
 constexpr uint32_t kRmsScalePpm = 1000000;
@@ -200,53 +194,6 @@ static esp_err_t build_capturer(AudioCodec* codec)
     return esp_capture_open(&cfg, &s_capturer);
 }
 
-// Feeds real-time silence into the silent capture source. LiveKit 0.3.10 forces a
-// working capture path on every room; the control (data-only) room uses this instead
-// of the mic/AFE, so idle never engages the microphone.
-static void silence_feed_task(void*)
-{
-    constexpr int kFrameSamples = 16000 * 20 / 1000;  // 20 ms @ 16 kHz mono
-    static int16_t silence[kFrameSamples] = {0};
-    for (;;) {
-        if (s_silence_feed && s_silent_source != nullptr) {
-            s_silent_source->Push(silence, kFrameSamples);
-        }
-        vTaskDelay(pdMS_TO_TICKS(20));
-    }
-}
-
-static esp_err_t build_silent_capturer(void)
-{
-    if (s_silent_source == nullptr) {
-        // The control-room source is synthetic silence and has no latency or
-        // scheduling-jitter requirement. Four 20 ms frames are sufficient for
-        // the SDK puller while avoiding the voice path's 16 KB internal-SRAM
-        // jitter buffer on the memory-constrained camera board.
-        constexpr size_t kSilentRingBytes = 4 * 640;
-        s_silent_source = new eidolon::PcmPushCaptureSource(16000, kSilentRingBytes);
-    }
-    if (s_silence_task == nullptr) {
-        // Without this feeder the capturer below has no producer: 0.3.10 would
-        // read an empty ring and report a starved capture path as success. Fail
-        // the init instead of standing up a capturer that can never yield PCM.
-        if (xTaskCreate(silence_feed_task, "lk_silence", 2560, nullptr, 4,
-                        &s_silence_task) != pdPASS) {
-            s_silence_task = nullptr;
-            ESP_LOGE(TAG, "Silence feeder task create failed");
-            return ESP_ERR_NO_MEM;
-        }
-    }
-    esp_capture_cfg_t cfg = {
-        .sync_mode = ESP_CAPTURE_SYNC_MODE_AUDIO,
-        .audio_src = s_silent_source->Interface(),
-    };
-    esp_err_t err = esp_capture_open(&cfg, &s_capturer);
-    if (err == ESP_OK) {
-        s_silence_feed = true;
-    }
-    return err;
-}
-
 static esp_err_t build_renderer(esp_codec_dev_handle_t play_handle, uint32_t output_sample_rate)
 {
     i2s_render_cfg_t i2s_cfg = {
@@ -329,24 +276,6 @@ extern "C" esp_err_t eidolon_livekit_board_init(void)
     return ESP_OK;
 }
 
-extern "C" esp_err_t eidolon_livekit_board_init_data_only(void)
-{
-    if (s_capturer != nullptr) {
-        return ESP_OK;
-    }
-    // Control (data-only) room: no codec, no AFE/mic, no renderer — only a mic-free
-    // silent capturer to satisfy 0.3.10's mandatory capture sink. Register the audio
-    // encoder default so the sink's PCM->Opus path is available.
-    esp_audio_enc_register_default();
-    esp_err_t err = build_silent_capturer();
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Silent capturer build failed: %s", esp_err_to_name(err));
-        return err;
-    }
-    ESP_LOGI(TAG, "LiveKit board data-only ready (mic-free silent capture)");
-    return ESP_OK;
-}
-
 extern "C" esp_capture_handle_t eidolon_livekit_board_get_capturer(void)
 {
     return s_capturer;
@@ -417,17 +346,10 @@ extern "C" void eidolon_livekit_board_deinit(void)
     // fetch thread to exit; if a producer keeps the source hot, that fetch thread is
     // still reading when data_q_deinit frees the queue -> writes into freed memory
     // -> heap corruption (use-after-free). So stop whoever feeds the active source
-    // FIRST, then close. Both room types feed a PcmPushCaptureSource:
-    //   - control room (data-only): the silence feeder -> s_silent_source
-    //   - voice room: the AFE -> s_mic_capture's internal pcm source
-    // Quiescing the inactive one is a harmless no-op. The silence source/task and
-    // the AFE instance are intentionally kept alive across sessions (their
-    // long-lived tasks cannot be safely torn down); they are re-armed by
-    // build_silent_capturer / build_capturer on the next session.
-    s_silence_feed = false;
-    if (s_silent_source) {
-        s_silent_source->Quiesce();
-    }
+    // FIRST, then close. The producer is the AFE, feeding s_mic_capture's internal
+    // pcm source. The AFE instance is intentionally kept alive across sessions
+    // (its long-lived tasks cannot be safely torn down); build_capturer re-arms
+    // it on the next session.
     if (s_mic_capture) {
         s_mic_capture->Stop();  // stops the AFE and quiesces its pcm source
     }

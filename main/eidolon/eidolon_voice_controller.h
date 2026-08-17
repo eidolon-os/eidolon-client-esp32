@@ -212,7 +212,8 @@ private:
     // hit and every JOIN would needlessly wear flash).
     esp_err_t RefreshHubConfig(bool persist = true);
     esp_err_t RediscoverHub();
-    esp_err_t ConnectControlRoom();
+    esp_err_t ConnectChannel();
+    esp_err_t PublishSessionRequest(const char* type);
     bool HasActiveConfig() const;
     bool HasControlConfig() const;
     VoiceSessionState StateForConfig(const Esp32HubConfig& config) const;
@@ -349,7 +350,11 @@ private:
     // True means the current session generation targets the data-only control
     // plane. It intentionally covers Connecting/Reconnecting/Connected; actual
     // health is tracked by control_recovery_ / LiveKitSession::IsConnected().
-    bool control_room_ = false;
+    // Connected to the channel, but not in a conversation. This used to be
+    // "I am in the control room rather than the voice room" — the same
+    // distinction, when it was still drawn by which room the device stood in.
+    // The channel no longer moves, so the device says which of the two it is.
+    bool standby_ = false;
     GuardService* guard_service_ = nullptr;
 #if CONFIG_EIDOLON_GUARD_SERVICE
     RoomConfig guard_control_config_;

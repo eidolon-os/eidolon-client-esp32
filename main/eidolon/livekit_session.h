@@ -32,7 +32,6 @@ public:
         std::function<void(const std::string& payload, uint32_t generation)>;
 
     esp_err_t Connect(const Esp32HubConfig& config, uint32_t generation);
-    esp_err_t ConnectDataOnly(const Esp32HubConfig& config, uint32_t generation);
     esp_err_t Disconnect(bool release_media = true);
     bool HasRoom() const { return room_handle_ != nullptr; }
     bool IsConnected() const;
@@ -58,12 +57,12 @@ private:
     void RegisterTranscriptionHandler();
     void RegisterAgentSessionDrainHandler();
     void UnregisterStreamHandlers();
-    // `data_only` selects WHICH media board is required, not merely whether one
-    // exists: the voice board owns the codec+AFE (microphone) capturer, the
-    // control board a mic-free silent capturer. A board of the wrong kind is
-    // released and rebuilt rather than reused, so a control room can never
-    // inherit the voice room's microphone capturer.
-    esp_err_t EnsureMediaBoard(bool data_only);
+    // There is one kind of board now. The device used to keep two — a mic-free
+    // one for the room it lived in and a codec+AFE one for the room it visited
+    // — so the start of every conversation tore one down and built the other,
+    // which is the moment a memory-tight board had least room to build it in.
+    // Built once and kept, because the channel it serves is kept.
+    esp_err_t EnsureMediaBoard();
     void ReleaseMediaBoard();
 
     livekit_room_handle_t room_handle_ = nullptr;
@@ -71,7 +70,6 @@ private:
     bool connected_ = false;
     bool using_media_ = false;
     bool media_board_initialized_ = false;
-    bool media_board_data_only_ = false;
     bool transcription_registered_ = false;
     bool agent_session_registered_ = false;
     livekit_failure_reason_t last_failure_reason_ = LIVEKIT_FAILURE_REASON_NONE;

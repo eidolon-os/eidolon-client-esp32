@@ -131,17 +131,17 @@ inline bool ShouldSurfaceControlServerUnreachable(int attempt)
 
 // Registration credentials are authoritative once registration is active.
 // Guard runtime credentials remain a fallback only before that point.
+//
+// There is nothing left to choose between once a device has one channel; what
+// remains is which credential is trustworthy yet, which is still a real
+// question before registration completes.
 inline Esp32HubConfig BuildControlConnectionConfig(const Esp32HubConfig& registration,
                                                     const RoomConfig* runtime_fallback = nullptr)
 {
     Esp32HubConfig selected = registration;
-    if (registration.status == HubConfigStatus::Active && registration.control.usable()) {
-        selected.active = registration.control;
-        if (selected.active.identity.empty()) {
-            selected.active.identity = registration.active.identity;
-        }
-    } else if (runtime_fallback != nullptr && runtime_fallback->usable()) {
-        selected.active = *runtime_fallback;
+    if (registration.status != HubConfigStatus::Active && runtime_fallback != nullptr &&
+        runtime_fallback->usable()) {
+        selected.session = *runtime_fallback;
     }
     return selected;
 }

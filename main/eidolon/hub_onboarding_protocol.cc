@@ -244,10 +244,8 @@ bool ParseLiveKitBinding(const std::string& body, Esp32HubConfig& out)
     }
     const cJSON* schema = cJSON_GetObjectItemCaseSensitive(root, "schema_version");
     const cJSON* audio = cJSON_GetObjectItemCaseSensitive(root, "audio");
-    const bool valid = cJSON_IsNumber(schema) && schema->valueint == 1 &&
-                       ReadRoom(root, "active", out.active) &&
-                       ReadRoom(root, "control", out.control) &&
-                       cJSON_IsObject(audio);
+    const bool valid = cJSON_IsNumber(schema) && schema->valueint == 2 &&
+                       ReadRoom(root, "session", out.session) && cJSON_IsObject(audio);
     if (valid) {
         const cJSON* sample_rate =
             cJSON_GetObjectItemCaseSensitive(audio, "sample_rate");
