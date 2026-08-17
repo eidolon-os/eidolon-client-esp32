@@ -5,6 +5,9 @@
 #include <string>
 
 #include <esp_err.h>
+#include <wifi_provisioning/manager.h>
+
+#include <vector>
 
 namespace eidolon {
 
@@ -61,6 +64,14 @@ private:
     bool running_ = false;
     std::string session_id_;
     StationHandover handover_;
+    // The security parameters and the buffers they point at must stay alive until
+    // provisioning ends, because protocomm reads them when a controller actually
+    // connects — which is whenever a person gets around to it, long after the
+    // call that started the service returned. Holding them as locals meant the
+    // handshake authenticated against freed stack memory and every proof failed.
+    std::vector<uint8_t> salt_;
+    std::vector<uint8_t> verifier_;
+    wifi_prov_security2_params_t security_params_ = {};
     void* sta_netif_ = nullptr;
     void* ap_netif_ = nullptr;
     void* window_timer_ = nullptr;

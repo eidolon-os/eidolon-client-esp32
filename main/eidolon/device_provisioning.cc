@@ -263,19 +263,17 @@ void DeviceProvisioningService::HandleProvisioningEvent(void*, const char*, int3
 
 esp_err_t DeviceProvisioningService::StartTransport()
 {
-    std::vector<uint8_t> salt;
-    std::vector<uint8_t> verifier;
-    if (!DecodeHex(CONFIG_EIDOLON_PROVISIONING_SALT_HEX, salt) ||
-        !DecodeHex(CONFIG_EIDOLON_PROVISIONING_VERIFIER_HEX, verifier)) {
+    if (!DecodeHex(CONFIG_EIDOLON_PROVISIONING_SALT_HEX, salt_) ||
+        !DecodeHex(CONFIG_EIDOLON_PROVISIONING_VERIFIER_HEX, verifier_)) {
         ESP_LOGE(TAG, "Provisioning salt/verifier are not usable hex");
         return ESP_ERR_INVALID_STATE;
     }
 
-    wifi_prov_security2_params_t security_params = {};
-    security_params.salt = reinterpret_cast<const char*>(salt.data());
-    security_params.salt_len = static_cast<uint16_t>(salt.size());
-    security_params.verifier = reinterpret_cast<const char*>(verifier.data());
-    security_params.verifier_len = static_cast<uint16_t>(verifier.size());
+    security_params_ = {};
+    security_params_.salt = reinterpret_cast<const char*>(salt_.data());
+    security_params_.salt_len = static_cast<uint16_t>(salt_.size());
+    security_params_.verifier = reinterpret_cast<const char*>(verifier_.data());
+    security_params_.verifier_len = static_cast<uint16_t>(verifier_.size());
 
     if (wifi_prov_mgr_endpoint_create(kDescriptorEndpoint) != ESP_OK ||
         wifi_prov_mgr_endpoint_create(kTrustEndpoint) != ESP_OK) {
@@ -285,7 +283,7 @@ esp_err_t DeviceProvisioningService::StartTransport()
 
     const std::string service_name = ServiceName();
     const esp_err_t err = wifi_prov_mgr_start_provisioning(
-        WIFI_PROV_SECURITY_2, &security_params, service_name.c_str(), nullptr);
+        WIFI_PROV_SECURITY_2, &security_params_, service_name.c_str(), nullptr);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Provisioning did not start: %s", esp_err_to_name(err));
         return err;

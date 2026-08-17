@@ -16,6 +16,12 @@ namespace eidolon {
 // whatever a future device class speaks is a transport underneath, and no rule
 // here may depend on which one it was.
 
+// Every request on these endpoints must carry at least one byte, `{}` where
+// there is nothing to say. The session's own encryption cannot process a
+// zero-length payload — it fails before any handler here is reached, so a device
+// cannot be forgiving about it and a controller that sends nothing gets an error
+// that names decryption rather than the empty request that caused it.
+
 // What this device tells a controller about itself before it belongs to anyone.
 struct ProvisioningDescriptor {
     std::string device_id;
