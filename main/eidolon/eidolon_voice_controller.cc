@@ -973,7 +973,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
     }
 
     if (standby_) {
-        StopAudioStatePublisher();
+        CloseConversationAudio();
         switch (lk_state) {
         case LiveKitConnectionState::Connecting:
             control_recovery_.OnConnecting();
@@ -1049,7 +1049,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         break;
     case LiveKitConnectionState::Failed:
         SetPresenceWakePhase(PresenceWakePhase::Idle);
-        StopAudioStatePublisher();
+        CloseConversationAudio();
         agent_phase_ = AgentPhase::Silent;
         CompletePendingRoomJoinCommand(
             "failed", "ROOM_JOIN_FAILED",
@@ -1077,7 +1077,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         // A control-room teardown during a JOIN handoff is now dropped by the
         // generation gate above (it carries the pre-bump generation), so anything
         // reaching here under the current generation is a genuine voice-room drop.
-        StopAudioStatePublisher();
+        CloseConversationAudio();
         agent_phase_ = AgentPhase::Silent;
         CompletePendingRoomJoinCommand("failed", "ROOM_JOIN_DISCONNECTED");
         if (state_ != VoiceSessionState::Idle && state_ != VoiceSessionState::ConfigReady &&
@@ -1261,7 +1261,7 @@ void EidolonVoiceController::DoConnectTimeout()
              "[lifecycle] connect watchdog fired state=%s room_kind=%s gen=%lu; forcing recovery",
              VoiceStateName(state_), CurrentRoomKind(),
              static_cast<unsigned long>(session_generation_));
-    StopAudioStatePublisher();
+    CloseConversationAudio();
     CompletePendingRoomJoinCommand("failed", "ROOM_JOIN_TIMEOUT");
     // Drop the in-flight guards so ScheduleControlReconnect isn't suppressed, then
     // tear down the hung session and fall back to a stable base state.
@@ -2889,7 +2889,7 @@ void EidolonVoiceController::HandleSessionEnd(EndReason reason)
     // The conversation ended, not the channel. Nothing is torn down and nothing
     // is reconnected: the device stays exactly where it is, reachable, and the
     // only thing that changed is that no one is listening any more.
-    StopAudioStatePublisher();
+    CloseConversationAudio();
     standby_ = true;
     SetState(StateForConfig(config_), "session_end");
     RenewSpentSession();
@@ -3020,7 +3020,7 @@ void EidolonVoiceController::DoNetworkLost()
     if (ambient_presence_timer_ != nullptr) {
         esp_timer_stop(ambient_presence_timer_);
     }
-    StopAudioStatePublisher();
+    CloseConversationAudio();
     control_recovery_.OnNetworkLost();
     if (reconnect_timer_ != nullptr) {
         esp_timer_stop(reconnect_timer_);
@@ -3191,6 +3191,11 @@ esp_err_t EidolonVoiceController::DoJoinRoom()
     // connecting, which was likewise before the agent had arrived to say
     // anything. The agent's welcome lands afterwards either way.
     SetState(VoiceSessionState::InRoom, "join_requested");
+    // This used to ride on the LiveKit "Connected" event, back when a
+    // conversation and a connection began together. The connection now predates
+    // the conversation by however long the device sat in standby, so what opens
+    // the microphone has to be the thing that actually starts a conversation.
+    OpenConversationAudio();
     return ESP_OK;
 }
 
@@ -3503,7 +3508,7 @@ esp_err_t EidolonVoiceController::DoLeaveRoom()
             ESP_LOGD(TAG, "Leave-room playback stop skipped: %s", esp_err_to_name(stop_err));
         }
     }
-    StopAudioStatePublisher();
+    CloseConversationAudio();
     // Leaving a conversation is now something the device says, not somewhere it
     // goes. Failing to say it is not worth dropping the channel over: the
     // server ends an unattended session on its own, and staying reachable is
@@ -3520,6 +3525,28 @@ esp_err_t EidolonVoiceController::DoLeaveRoom()
 }
 
 // ============================ Audio state publisher ============================
+
+void EidolonVoiceController::OpenConversationAudio()
+{
+    // A conversation is the only reason this device listens, so the microphone
+    // opens here and nowhere else. How far it opens is the turn-taking profile's
+    // business — push-to-talk, half duplex and full duplex disagree — which
+    // PublishClientAudioState already decides in one place; applying it now
+    // rather than waiting for the first telemetry tick means the mic is open
+    // because the conversation started, not because a timer fired.
+    StartAudioStatePublisher();
+    PublishClientAudioState(AgentOutputActiveRecently());
+}
+
+void EidolonVoiceController::CloseConversationAudio()
+{
+    // Unconditional, unlike the telemetry above it: the channel outlives the
+    // conversation now, so a gate left open is a microphone running for as long
+    // as the device sits in standby — which is most of its life. Whether anyone
+    // can still be told about it is a separate question from whether it closes.
+    StopAudioStatePublisher();
+    eidolon_livekit_board_set_capture_enabled(false);
+}
 
 void EidolonVoiceController::StartAudioStatePublisher()
 {

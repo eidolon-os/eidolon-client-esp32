@@ -186,6 +186,8 @@ private:
     void DoAmbientPresenceChanged(bool present);
     void DoAmbientPresenceTimer();
     void PublishRadarPresenceState(AmbientPresenceObservation observation);
+    void OpenConversationAudio();
+    void CloseConversationAudio();
     void ScheduleAmbientPresenceTimer(uint64_t delay_ms);
 #if CONFIG_EIDOLON_AMBIENT_PRESENCE_OWNER_AUTH
     void ScheduleAmbientPresenceLeaseExpiry(uint64_t now_ms);

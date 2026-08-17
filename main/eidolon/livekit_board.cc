@@ -146,7 +146,12 @@ esp_capture_audio_src_if_t* build_gated_audio_source(esp_capture_audio_src_if_t*
     s_gated_audio_source.base.stop = gated_stop;
     s_gated_audio_source.base.close = gated_close;
     s_gated_audio_source.inner = inner;
-    s_gated_audio_source.enabled = true;
+    // Closed is the resting state. The board is built once and kept for as long
+    // as the device is enrolled, so it exists for far longer than any
+    // conversation; a gate that opened itself would have the microphone running
+    // through every silence in between. Opening it is the conversation's job,
+    // which is the only thing that has a reason to listen.
+    s_gated_audio_source.enabled = false;
     return &s_gated_audio_source.base;
 }
 }
