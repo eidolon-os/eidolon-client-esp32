@@ -40,8 +40,6 @@ const char* ActivationMessageForStatus(HubConfigStatus status)
 
 bool HubActivator::Run() {
     auto& app = Application::GetInstance();
-    const int max_retries = CONFIG_EIDOLON_MDNS_MAX_RETRIES;
-    int retry_count = 0;
     int retry_delay = 10;
 
     HubDiscovery discovery;
@@ -49,7 +47,7 @@ bool HubActivator::Run() {
     HubConfigStore store;
     const std::string device_id = SystemInfo::GetMacAddress();
 
-    while (retry_count < max_retries) {
+    for (;;) {
         app.SetEidolonLifecycleUi(LifecyclePhase::HubDiscovering);
 
         HubTxtRecord txt;
@@ -77,23 +75,17 @@ bool HubActivator::Run() {
             }
         }
 
-        retry_count++;
-        if (retry_count >= max_retries) {
-            ESP_LOGE(TAG, "Hub activation failed after %d retries: %s", retry_count,
-                     esp_err_to_name(err));
-            char detail[128];
-            snprintf(detail, sizeof(detail), "Hub unavailable (%s)", esp_err_to_name(err));
-            app.SetEidolonLifecycleUi(LifecyclePhase::Error, detail);
-            return false;
-        }
-
+        // Keep asking. A Host that is switched off, a network still coming back,
+        // a device nobody has set up yet — none of those are permanent, and
+        // giving up after ten tries turned every one of them into a device that
+        // needed a power cycle to try again. What ends this loop is success, or
+        // the device being put to use another way.
         char buffer[96];
-        snprintf(buffer, sizeof(buffer), "Hub retry in %ds (%d/%d)", retry_delay,
-                 retry_count, max_retries);
+        snprintf(buffer, sizeof(buffer), "Looking for the Hub again in %ds", retry_delay);
         app.SetEidolonLifecycleUi(LifecyclePhase::HubDiscovering, buffer);
 
-        ESP_LOGW(TAG, "Hub activation failed (%s), retry in %ds (%d/%d)",
-                 esp_err_to_name(err), retry_delay, retry_count, max_retries);
+        ESP_LOGW(TAG, "Hub activation failed (%s), retry in %ds", esp_err_to_name(err),
+                 retry_delay);
 
         for (int i = 0; i < retry_delay; ++i) {
             vTaskDelay(pdMS_TO_TICKS(1000));
@@ -106,8 +98,6 @@ bool HubActivator::Run() {
             retry_delay = 120;
         }
     }
-
-    return false;
 }
 
 }  // namespace eidolon

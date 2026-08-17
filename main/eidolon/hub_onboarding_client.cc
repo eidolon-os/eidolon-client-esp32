@@ -255,6 +255,7 @@ esp_err_t HubOnboardingClient::Run(const HubTxtRecord& advertised,
     }
     HubConfigStore store;
     bool restarted_expired_pending = false;
+    bool restarted_after_revocation = false;
     for (;;) {
         HubOnboardingState state;
         const bool has_saved_state = store.LoadOnboardingState(state);
@@ -296,6 +297,22 @@ esp_err_t HubOnboardingClient::Run(const HubTxtRecord& advertised,
             return err;
         }
         err = Handoff(descriptor, state, out);
+        if (err == ESP_OK && state.lifecycle_state == "revoked" &&
+            !restarted_after_revocation) {
+            // The Owner took this device off the Host. The Hub permits a revoked
+            // device to enrol from scratch, and says why: that is the only way one
+            // that was removed, or whose Host was reinstalled, ever comes back.
+            // Without asking again the device sat repeating "authorization
+            // required" while appearing in no list the Owner could approve from —
+            // the grant was gone and nothing was requesting a new one.
+            //
+            // Asking is not being granted. A fresh enrolment lands in
+            // pending-approval, where the Owner decides as they did the first time.
+            ESP_LOGW(TAG, "Host revoked this device; asking to enrol again");
+            store.ClearOnboardingState();
+            restarted_after_revocation = true;
+            continue;
+        }
         if (err != ESP_ERR_TIMEOUT || state.lifecycle_state != "pending-approval" ||
             restarted_expired_pending) {
             return err;

@@ -1224,10 +1224,6 @@ menu "Eidolon Hub"
         default 3
         depends on EIDOLON_HUB_MODE
 
-    config EIDOLON_MDNS_MAX_RETRIES
-        int "Hub activation max retries"
-        default 10
-        depends on EIDOLON_HUB_MODE
 
     config EIDOLON_CONFIG_HTTP_TIMEOUT_MS
         int "Hub config HTTP timeout (ms)"
