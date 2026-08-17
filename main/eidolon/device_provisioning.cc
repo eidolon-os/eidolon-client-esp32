@@ -369,17 +369,32 @@ esp_err_t DeviceProvisioningService::Start(StationHandover handover)
         .skip_unhandled_events = true,
     };
     auto* timer = static_cast<esp_timer_handle_t>(window_timer_);
-    if (timer == nullptr && esp_timer_create(&timer_args, &timer) == ESP_OK) {
+    if (timer == nullptr) {
+        const esp_err_t created = esp_timer_create(&timer_args, &timer);
+        if (created != ESP_OK) {
+            ESP_LOGE(TAG, "Setup window timer could not be created: %s",
+                     esp_err_to_name(created));
+            timer = nullptr;
+        }
         window_timer_ = timer;
     }
+    // Both results are checked and said out loud. An unreported failure here is
+    // what let the window stay open for as long as the board stayed powered: the
+    // service announced a bounded offer it was not in fact keeping, and nothing
+    // in the log contradicted it.
     if (window_timer_ != nullptr) {
-        esp_timer_start_once(static_cast<esp_timer_handle_t>(window_timer_),
-                             static_cast<uint64_t>(kWindowSeconds) * 1000000ULL);
+        const esp_err_t armed = esp_timer_start_once(
+            static_cast<esp_timer_handle_t>(window_timer_),
+            static_cast<uint64_t>(kWindowSeconds) * 1000000ULL);
+        if (armed != ESP_OK) {
+            ESP_LOGE(TAG, "Setup window is not bounded: esp_timer_start_once said %s",
+                     esp_err_to_name(armed));
+        } else {
+            ESP_LOGI(TAG, "Awaiting setup for %d seconds", kWindowSeconds);
+        }
     } else {
         ESP_LOGE(TAG, "Setup window cannot be bounded; it will stay open until reset");
     }
-
-    ESP_LOGI(TAG, "Awaiting setup for %d seconds", kWindowSeconds);
     return ESP_OK;
 }
 
