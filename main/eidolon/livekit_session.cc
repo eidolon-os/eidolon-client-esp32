@@ -413,6 +413,17 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
     return ESP_OK;
 }
 
+esp_err_t LiveKitSession::RenewSession(const Esp32HubConfig& config, uint32_t generation)
+{
+    // release_media=false is the whole point: the board survives, so this costs
+    // a room handle rather than a codec, an AFE and a renderer. Connect() then
+    // finds no room to replace and a board already built.
+    Disconnect(/*release_media=*/false);
+    ESP_LOGI(TAG, "[lifecycle] renewing session on room=%s (board kept)",
+             config.session.room_name.c_str());
+    return Connect(config, generation);
+}
+
 esp_err_t LiveKitSession::Disconnect(bool release_media)
 {
     connected_ = false;

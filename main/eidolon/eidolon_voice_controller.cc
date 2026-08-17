@@ -2892,6 +2892,31 @@ void EidolonVoiceController::HandleSessionEnd(EndReason reason)
     StopAudioStatePublisher();
     standby_ = true;
     SetState(StateForConfig(config_), "session_end");
+    RenewSpentSession();
+}
+
+void EidolonVoiceController::RenewSpentSession()
+{
+    // Done here, on the way back to standby, rather than on the way into the
+    // next conversation: the connection is spent the moment a conversation ends
+    // (see LiveKitSession::RenewSession), and this is the quiet moment. Doing it
+    // when the next conversation is asked for would put a second and a half in
+    // front of someone waiting to be heard.
+    //
+    // Every way back to standby arrives here — the channel's session_end, the
+    // user leaving, and the idle fallback for when no session_end is seen at
+    // all — so the standby invariant holds however the conversation ended:
+    // a device in standby holds a session that has never carried audio.
+    if (!HasActiveConfig() || !session_.HasRoom()) {
+        // Nothing to replace. Whatever put the device here owns getting it back.
+        return;
+    }
+    const uint32_t generation = BeginSessionGeneration("voice");
+    const esp_err_t err = session_.RenewSession(config_, generation);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "[lifecycle] session renew failed: %s", esp_err_to_name(err));
+        ScheduleControlReconnect("session_renew_failed");
+    }
 }
 
 // ============================ Lifecycle handlers ============================

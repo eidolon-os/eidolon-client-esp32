@@ -213,6 +213,7 @@ private:
     esp_err_t RefreshHubConfig(bool persist = true);
     esp_err_t RediscoverHub();
     esp_err_t ConnectChannel();
+    void RenewSpentSession();
     esp_err_t PublishSessionRequest(const char* type);
     bool HasActiveConfig() const;
     bool HasControlConfig() const;
