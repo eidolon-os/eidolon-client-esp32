@@ -152,7 +152,12 @@ v1 的稳定版本为 1.9.2，可以通过 `git checkout v1` 来切换到 v1 版
 
 ## 关于项目
 
-这是一个由虾哥开源的 ESP32 项目，以 MIT 许可证发布，允许任何人免费使用，修改或用于商业用途。
+这是一个基于 MIT 许可 ESP32 上游项目的混合许可证衍生仓库。上游和各贡献者拥有版权的
+部分继续适用 [MIT License](LICENSE)。Li Jinsong 拥有版权的 Eidolon 原创内容适用
+[PolyForm Noncommercial License 1.0.0](LICENSE.eidolon)；其商业使用需要另行取得
+书面授权，请联系 [lijinsong@aimanthor.com](mailto:lijinsong@aimanthor.com)。
+
+准确的许可范围和必要声明见 [LICENSING.md](LICENSING.md) 与 [NOTICE](NOTICE)。
 
 我们希望通过这个项目，能够帮助大家了解 AI 硬件开发，将当下飞速发展的大语言模型应用到实际的硬件设备中。
 

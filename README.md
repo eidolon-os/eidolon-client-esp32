@@ -156,7 +156,14 @@ Custom Assets Tools:
 
 ## About the Project
 
-This is an open-source ESP32 project, released under the MIT license, allowing anyone to use it for free, including for commercial purposes.
+This is a mixed-license derivative of an MIT-licensed ESP32 project. Upstream
+and contributor-owned portions remain under the [MIT License](LICENSE).
+Eidolon-specific original material owned by Li Jinsong is available under the
+[PolyForm Noncommercial License 1.0.0](LICENSE.eidolon); commercial use of
+that material requires a separate written license. Contact
+[lijinsong@aimanthor.com](mailto:lijinsong@aimanthor.com).
+
+See [LICENSING.md](LICENSING.md) and [NOTICE](NOTICE) for the precise scope.
 
 We hope this project helps everyone understand AI hardware development and apply rapidly evolving large language models to real hardware devices.
 

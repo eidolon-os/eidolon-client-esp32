@@ -146,7 +146,7 @@ std::string ServiceName()
     if (tail.size() > 6) {
         tail = tail.substr(tail.size() - 6);
     }
-    return std::string("Eidolon-") + tail;
+    return std::string("eidolon-") + tail;
 }
 
 // protocomm frees what a handler allocated, so answers are handed over as a

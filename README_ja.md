@@ -152,7 +152,15 @@ Feishuドキュメントチュートリアルをご覧ください：
 
 ## プロジェクトについて
 
-これはエビ兄さんがオープンソースで公開しているESP32プロジェクトで、MITライセンスのもと、誰でも無料で、商用利用も可能です。
+これは MIT ライセンスの ESP32 上流プロジェクトから派生した、複数ライセンスの
+リポジトリです。上流および各コントリビューターが著作権を持つ部分には引き続き
+[MIT License](LICENSE) が適用されます。Li Jinsong が著作権を持つ Eidolon 独自部分には
+[PolyForm Noncommercial License 1.0.0](LICENSE.eidolon) が適用され、その商用利用には
+別途書面によるライセンスが必要です。お問い合わせ先:
+[lijinsong@aimanthor.com](mailto:lijinsong@aimanthor.com)。
+
+正確な適用範囲と必要な表示については [LICENSING.md](LICENSING.md) および
+[NOTICE](NOTICE) を参照してください。
 
 このプロジェクトを通じて、AIハードウェア開発を理解し、急速に進化する大規模言語モデルを実際のハードウェアデバイスに応用できるようになることを目指しています。
 

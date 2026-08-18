@@ -71,7 +71,7 @@ void WifiBoard::StartNetwork() {
 
     // Initialize WiFi manager
     WifiManagerConfig config;
-    config.ssid_prefix = "Xiaozhi";
+    config.ssid_prefix = "eidolon";
     config.language = Lang::CODE;
     wifi_manager.Initialize(config);
 
