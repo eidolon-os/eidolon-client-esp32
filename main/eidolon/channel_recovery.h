@@ -1,5 +1,5 @@
-#ifndef EIDOLON_CONTROL_ROOM_RECOVERY_H_
-#define EIDOLON_CONTROL_ROOM_RECOVERY_H_
+#ifndef EIDOLON_CHANNEL_RECOVERY_H_
+#define EIDOLON_CHANNEL_RECOVERY_H_
 
 #include <cstdint>
 
@@ -7,10 +7,16 @@
 
 namespace eidolon {
 
-// Platform-independent control-plane recovery state. The controller owns one of
-// these on its actor task; keeping the retry admission rules here makes the
-// Failed/Disconnected/network/handoff races testable without an ESP32 or LiveKit.
-class ControlRoomRecovery {
+// Platform-independent recovery state for the device's one channel. The
+// controller owns one of these on its actor task; keeping the retry admission
+// rules here makes the Failed/Disconnected/network/handoff races testable
+// without an ESP32 or LiveKit.
+//
+// It used to be called ControlRoomRecovery, from when a device stood in one of
+// two rooms and this tracked the control one. There is one channel now, and
+// what this still distinguishes is standby from a live conversation — the
+// device does not move, so it says which of the two it is in.
+class ChannelRecovery {
 public:
     enum class Phase {
         Idle,
@@ -48,7 +54,7 @@ public:
         reconnect_attempts_ = 0;
     }
 
-    void OnVoiceConnected()
+    void OnConversationStarted()
     {
         phase_ = Phase::Idle;
         reconnect_pending_ = false;
@@ -57,18 +63,18 @@ public:
 
     void OnDisconnected() { phase_ = Phase::Idle; }
 
-    // Intentional voice/control handoff owns the next action. Cancel an ordinary
-    // recovery timer so a queued tick cannot race the handoff.
+    // A deliberate teardown owns the next action. Cancel an ordinary recovery
+    // timer so a queued tick cannot race it.
     void OnIntentionalTeardown()
     {
         phase_ = Phase::Idle;
         reconnect_pending_ = false;
     }
 
-    bool TrySchedule(bool switching_to_voice, bool has_control_config)
+    bool TrySchedule(bool switching_to_voice, bool has_channel_config)
     {
         if (!network_available_ || switching_to_voice || reconnect_pending_ ||
-            !has_control_config) {
+            !has_channel_config) {
             return false;
         }
         reconnect_pending_ = true;
@@ -108,7 +114,7 @@ private:
     Phase phase_ = Phase::Idle;
 };
 
-inline uint32_t ControlReconnectDelayMs(int attempt)
+inline uint32_t ChannelReconnectDelayMs(int attempt)
 {
     constexpr uint32_t kBaseDelayMs = 1000;
     constexpr uint32_t kMaxDelayMs = 30000;
@@ -119,12 +125,12 @@ inline uint32_t ControlReconnectDelayMs(int attempt)
     return delay_ms > kMaxDelayMs ? kMaxDelayMs : delay_ms;
 }
 
-inline bool ShouldRediscoverControlConfig(int attempt)
+inline bool ShouldRediscoverChannelConfig(int attempt)
 {
     return attempt >= 1;
 }
 
-inline bool ShouldSurfaceControlServerUnreachable(int attempt)
+inline bool ShouldSurfaceChannelServerUnreachable(int attempt)
 {
     return attempt >= 2;
 }
@@ -135,7 +141,7 @@ inline bool ShouldSurfaceControlServerUnreachable(int attempt)
 // There is nothing left to choose between once a device has one channel; what
 // remains is which credential is trustworthy yet, which is still a real
 // question before registration completes.
-inline Esp32HubConfig BuildControlConnectionConfig(const Esp32HubConfig& registration,
+inline Esp32HubConfig BuildChannelConnectionConfig(const Esp32HubConfig& registration,
                                                     const RoomConfig* runtime_fallback = nullptr)
 {
     Esp32HubConfig selected = registration;
@@ -148,4 +154,4 @@ inline Esp32HubConfig BuildControlConnectionConfig(const Esp32HubConfig& registr
 
 }  // namespace eidolon
 
-#endif  // EIDOLON_CONTROL_ROOM_RECOVERY_H_
+#endif  // EIDOLON_CHANNEL_RECOVERY_H_

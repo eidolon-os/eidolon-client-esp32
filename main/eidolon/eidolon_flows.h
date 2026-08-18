@@ -35,12 +35,13 @@ enum class PairingStatus {
     Unauthorized,
 };
 
-// Flow B — room connection lifecycle.
+// Flow B — channel connection lifecycle. One channel: these phases say what
+// the device is doing on it, not which of two rooms it is standing in.
 enum class ConnectionPhase {
     Offline,       // no usable config yet / not connected
-    Ready,         // active config, idle (control room may be up), not in voice room
-    Connecting,    // joining the voice room
-    InRoom,        // voice room connected
+    Ready,         // active config, on the channel in standby, not in a conversation
+    Connecting,    // joining a conversation
+    InRoom,        // conversation connected
     Reconnecting,  // transient drop, retrying
     Unreachable,   // repeated failures, rediscovery exhausted
     Error,

@@ -1310,11 +1310,11 @@ menu "Eidolon Hub"
         default 0
         depends on EIDOLON_HUB_MODE && EIDOLON_INTERACTION_MODE_PTT
         help
-            Client-side lifecycle fallback for half-duplex PTT rooms. The
-            Channel remains the authoritative idle owner and should send
-            session_end before deleting the voice room. This timer only returns
-            the device to the control room if that server signal or room-close
-            event is missed. Set to 0 to disable.
+            Client-side lifecycle fallback for half-duplex PTT conversations.
+            The Channel remains the authoritative idle owner and should send
+            session_end before deleting the room. This timer only returns the
+            device to standby if that server signal or room-close event is
+            missed. Set to 0 to disable.
 
     config EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS
         int "Full-/half-duplex idle teardown fallback timeout (ms)"

@@ -4,14 +4,14 @@
 #include <string>
 #include <vector>
 
-#include "eidolon/control_room_recovery.h"
+#include "eidolon/channel_recovery.h"
 
 namespace {
 
 struct RecoveryHarness {
-    eidolon::ControlRoomRecovery recovery;
+    eidolon::ChannelRecovery recovery;
     bool switching_to_voice = false;
-    bool has_control_config = true;
+    bool has_channel_config = true;
     bool control_generation = false;
     bool server_unreachable = false;
     bool rediscovered = false;
@@ -22,7 +22,7 @@ struct RecoveryHarness {
 
     bool Schedule()
     {
-        if (!recovery.TrySchedule(switching_to_voice, has_control_config)) {
+        if (!recovery.TrySchedule(switching_to_voice, has_channel_config)) {
             return false;
         }
         ++timers_scheduled;
@@ -71,9 +71,9 @@ struct RecoveryHarness {
         if (!recovery.BeginRetry(&attempt)) {
             return false;
         }
-        rediscovered = eidolon::ShouldRediscoverControlConfig(attempt);
+        rediscovered = eidolon::ShouldRediscoverChannelConfig(attempt);
         server_unreachable =
-            server_unreachable || eidolon::ShouldSurfaceControlServerUnreachable(attempt);
+            server_unreachable || eidolon::ShouldSurfaceChannelServerUnreachable(attempt);
         const bool ok = ConnectControl();
         recovery.FinishRetry();
         if (!ok) {
@@ -200,7 +200,7 @@ void TestBackoffRediscoveryAndServerUnreachable()
     const std::vector<uint32_t> expected_delays = {1000, 2000, 4000, 8000, 16000,
                                                    30000, 30000};
     for (size_t i = 0; i < expected_delays.size(); ++i) {
-        assert(eidolon::ControlReconnectDelayMs(static_cast<int>(i)) == expected_delays[i]);
+        assert(eidolon::ChannelReconnectDelayMs(static_cast<int>(i)) == expected_delays[i]);
     }
 
     assert(h.FireTimer());  // attempt 0: cached credentials, sync fail
@@ -226,12 +226,12 @@ void TestRegistrationCredentialsWinAndGenerationNeverRollsBack()
     registration.session = Room("registration-token", "device-identity");
     const eidolon::RoomConfig stale_runtime = Room("stale-runtime-token", "guard-identity");
 
-    auto selected = eidolon::BuildControlConnectionConfig(registration, &stale_runtime);
+    auto selected = eidolon::BuildChannelConnectionConfig(registration, &stale_runtime);
     assert(selected.session.token == "registration-token");
     assert(selected.session.identity == "device-identity");
 
     registration.status = eidolon::HubConfigStatus::WaitingBinding;
-    selected = eidolon::BuildControlConnectionConfig(registration, &stale_runtime);
+    selected = eidolon::BuildChannelConnectionConfig(registration, &stale_runtime);
     assert(selected.session.token == "stale-runtime-token");
 
     RecoveryHarness h;

@@ -14,7 +14,7 @@
 #include "sdkconfig.h"
 #include "ambient_presence_state.h"
 #include "control_protocol.h"
-#include "control_room_recovery.h"
+#include "channel_recovery.h"
 #include "device_event_bus.h"
 #include "eidolon_device_profile.h"
 #if CONFIG_EIDOLON_GUARD_SERVICE
@@ -217,7 +217,7 @@ private:
     esp_err_t ConnectChannel();
     esp_err_t PublishSessionRequest(const char* type);
     bool HasActiveConfig() const;
-    bool HasControlConfig() const;
+    bool HasChannelConfig() const;
     VoiceSessionState StateForConfig(const Esp32HubConfig& config) const;
     void SetState(VoiceSessionState state, const char* reason = "unspecified");
     // Begin a new connection attempt: bump session_generation_, remember which
@@ -292,7 +292,7 @@ private:
 
     // Reconnect (timer-driven backoff) + connect watchdog + idle fallbacks. Each
     // timer callback just posts an event; the work runs on the controller task.
-    void ScheduleControlReconnect(const char* reason);
+    void ScheduleChannelReconnect(const char* reason);
     void ScheduleOnboardingPoll();
     void ArmConnectWatchdog();
     void DisarmConnectWatchdog();
@@ -349,13 +349,14 @@ private:
     uint32_t owner_lease_guard_epoch_ = 0;
     uint32_t owner_lease_sequence_ = 0;
     bool presence_managed_voice_session_ = false;
-    // True means the current session generation targets the data-only control
-    // plane. It intentionally covers Connecting/Reconnecting/Connected; actual
-    // health is tracked by control_recovery_ / LiveKitSession::IsConnected().
-    // Connected to the channel, but not in a conversation. This used to be
-    // "I am in the control room rather than the voice room" — the same
-    // distinction, when it was still drawn by which room the device stood in.
-    // The channel no longer moves, so the device says which of the two it is.
+    // Connected to the channel, but not in a conversation. It intentionally
+    // covers Connecting/Reconnecting/Connected; actual health is tracked by
+    // channel_recovery_ / LiveKitSession::IsConnected().
+    //
+    // This used to be "I am in the control room rather than the voice room" —
+    // the same distinction, when it was still drawn by which room the device
+    // stood in. The channel no longer moves, so the device says which of the
+    // two it is.
     bool standby_ = false;
     GuardService* guard_service_ = nullptr;
 #if CONFIG_EIDOLON_GUARD_SERVICE
@@ -367,7 +368,7 @@ private:
     uint32_t guard_runtime_generation_ = 0;
 #endif
     bool switching_to_voice_ = false;
-    ControlRoomRecovery control_recovery_;
+    ChannelRecovery channel_recovery_;
     bool pending_room_join_command_active_ = false;
     uint32_t pending_room_join_generation_ = 0;
     ControlCommand pending_room_join_command_;

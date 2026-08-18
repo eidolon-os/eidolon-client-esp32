@@ -27,11 +27,11 @@
 
 // The DVP camera's internal/DMA SRAM starves the full_duplex AFE voice
 // capturer: on room.join the mic-path AFE read task (8 KB internal stack)
-// fails to allocate (internal-SRAM low-water ~9 KB), the voice room never
-// forms, and the control room can't rebuild either → device goes offline.
+// fails to allocate (internal-SRAM low-water ~9 KB), the conversation never
+// forms, and the channel can't be rebuilt either → device goes offline.
 // esp-box-3 (the full_duplex reference) has no camera. Disabled here until
-// internal-SRAM optimization (buffers→PSRAM, control→voice teardown sync)
-// lets the camera coexist. Flip to 1 to re-enable.
+// internal-SRAM optimization (buffers→PSRAM, standby→conversation teardown
+// sync) lets the camera coexist. Flip to 1 to re-enable.
 #define EIDOLON_STACKCHAN_ENABLE_CAMERA 0
 
 class Pmic : public Axp2101 {
