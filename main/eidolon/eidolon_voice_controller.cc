@@ -1149,7 +1149,7 @@ void EidolonVoiceController::ScheduleChannelReconnect(const char* reason)
     const int scheduled_attempt = channel_recovery_.reconnect_attempts();
     const uint32_t delay_ms = ChannelReconnectDelayMs(scheduled_attempt);
     ESP_LOGI(TAG,
-             "[lifecycle] control reconnect scheduled reason=%s attempt=%d delay_ms=%lu gen=%lu",
+             "[lifecycle] channel reconnect scheduled reason=%s attempt=%d delay_ms=%lu gen=%lu",
              reason ? reason : "disconnect", scheduled_attempt,
              static_cast<unsigned long>(delay_ms),
              static_cast<unsigned long>(session_generation_));
@@ -1189,7 +1189,7 @@ void EidolonVoiceController::DoReconnectTick()
     if (!channel_recovery_.BeginRetry(&attempt)) {
         return;
     }
-    ESP_LOGI(TAG, "[lifecycle] control reconnect tick attempt=%d gen=%lu",
+    ESP_LOGI(TAG, "[lifecycle] channel reconnect tick attempt=%d gen=%lu",
              attempt, static_cast<unsigned long>(session_generation_));
     if (ShouldRediscoverChannelConfig(attempt)) {
         // The Hub address may have changed; re-query mDNS and re-fetch config
@@ -1212,7 +1212,7 @@ void EidolonVoiceController::DoReconnectTick()
     esp_err_t err = ConnectChannel();
     channel_recovery_.FinishRetry();
     if (err != ESP_OK) {
-        ScheduleChannelReconnect("control_retry");
+        ScheduleChannelReconnect("channel_retry");
     }
 }
 
@@ -1253,8 +1253,8 @@ void EidolonVoiceController::DoConnectTimeout()
     // The attempt may have completed between the timer firing and now.
     const bool voice_connecting =
         state_ == VoiceSessionState::Connecting || state_ == VoiceSessionState::Reconnecting;
-    const bool control_connecting = standby_ && channel_recovery_.connect_in_flight();
-    if (!voice_connecting && !control_connecting) {
+    const bool standby_connecting = standby_ && channel_recovery_.connect_in_flight();
+    if (!voice_connecting && !standby_connecting) {
         return;
     }
     ESP_LOGW(TAG,
