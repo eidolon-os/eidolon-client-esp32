@@ -208,6 +208,7 @@ private:
 
     // ---- Internal helpers (controller task only) ----
     esp_err_t LoadStoredConfig();
+    esp_err_t LoadAuthorityRoutes();
     // Fetch fresh Hub config (server_url/token/room_name/...). persist=true also
     // writes it to NVS; the per-JOIN refresh passes persist=false because each
     // JOIN now gets a unique nonce'd voice room+token (so NVS dedup would never
@@ -323,7 +324,7 @@ private:
     LiveKitSession session_;
     DeviceEventBus device_event_bus_;
     Esp32HubConfig config_;
-    std::string hub_descriptor_uri_;
+    std::string device_control_uri_;
     VoiceSessionState state_ = VoiceSessionState::Idle;
     bool mic_enabled_ = true;
     // Interaction mode (one of three, compile-time per board via Kconfig):

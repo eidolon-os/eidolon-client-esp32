@@ -18,6 +18,9 @@
 #include "hub_config_store.h"
 #include "hub_discovery.h"
 #include "hub_onboarding_client.h"
+#include "hub_onboarding_protocol.h"
+#include "hub_trust_store.h"
+#include "authority_locator.h"
 #include "livekit_board.h"
 #include "system_info.h"
 
@@ -854,7 +857,7 @@ void EidolonVoiceController::SetState(VoiceSessionState state, const char* reaso
 esp_err_t EidolonVoiceController::LoadStoredConfig()
 {
     HubConfigStore store;
-    if (!store.Load(config_, &hub_descriptor_uri_)) {
+    if (!store.Load(config_) || LoadAuthorityRoutes() != ESP_OK) {
         ESP_LOGE(TAG, "No valid Hub config in NVS");
         SetState(VoiceSessionState::Error, "no_stored_config");
         return ESP_ERR_NOT_FOUND;
@@ -863,14 +866,38 @@ esp_err_t EidolonVoiceController::LoadStoredConfig()
     return ESP_OK;
 }
 
+esp_err_t EidolonVoiceController::LoadAuthorityRoutes()
+{
+    OwnerTrustBundle trust;
+    device_foundation::v1::OwnerDomainDescriptor descriptor;
+    std::string canonical;
+    if (!OwnerTrustStore().Load(trust) ||
+        !ParseOwnerDomainDescriptor(
+            trust.owner_domain_descriptor_json, descriptor, canonical) ||
+        VerifyOwnerDomainDescriptor(
+            descriptor, canonical, trust.owner_root_certificate_pem,
+            trust.authority_signing_certificate_pem) != ESP_OK) {
+        device_control_uri_.clear();
+        return ESP_ERR_NOT_ALLOWED;
+    }
+    const auto* endpoint = FindAuthorityEndpoint(
+        descriptor, device_foundation::v1::LogicalAuthority::DeviceControl);
+    if (endpoint == nullptr) {
+        device_control_uri_.clear();
+        return ESP_ERR_NOT_FOUND;
+    }
+    device_control_uri_ = endpoint->uri;
+    return ESP_OK;
+}
+
 esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist)
 {
-    if (hub_descriptor_uri_.empty()) {
+    if (device_control_uri_.empty()) {
         return ESP_ERR_INVALID_STATE;
     }
     HubOnboardingClient client;
     Esp32HubConfig fresh;
-    esp_err_t err = client.Resume(hub_descriptor_uri_, SystemInfo::GetMacAddress(), fresh);
+    esp_err_t err = client.Resume(SystemInfo::GetMacAddress(), fresh);
     if (err == ESP_ERR_NOT_ALLOWED) {
         // Hub rejected our signed identity (401/403). Stop bouncing on the same
         // rejected key; show "awaiting re-approval" (admin must re-approve / the
@@ -886,7 +913,7 @@ esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist)
         // Provider credentials may rotate on every approved handoff. The
         // per-JOIN refresh keeps fresh credentials in RAM to avoid NVS wear.
         HubConfigStore store;
-        err = store.SaveHubConfig(fresh, hub_descriptor_uri_);
+        err = store.SaveHubConfig(fresh);
         if (err != ESP_OK) {
             return err;
         }
@@ -905,15 +932,11 @@ esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist)
 esp_err_t EidolonVoiceController::RediscoverHub()
 {
     HubDiscovery discovery;
-    HubTxtRecord txt;
+    AuthorityCandidateRecord txt;
     esp_err_t err = discovery.Discover(txt);
-    if (err != ESP_OK || txt.descriptor_uri.empty()) {
+    if (err != ESP_OK || txt.owner_domain_descriptor_uri.empty()) {
         ESP_LOGW(TAG, "Hub rediscovery failed: %s", esp_err_to_name(err));
         return err != ESP_OK ? err : ESP_ERR_NOT_FOUND;
-    }
-    if (txt.descriptor_uri != hub_descriptor_uri_) {
-        ESP_LOGI(TAG, "Hub address changed: '%s' -> '%s'", hub_descriptor_uri_.c_str(),
-                 txt.descriptor_uri.c_str());
     }
     HubOnboardingClient client;
     Esp32HubConfig fresh;
@@ -921,10 +944,11 @@ esp_err_t EidolonVoiceController::RediscoverHub()
     if (err != ESP_OK) {
         return err;
     }
-    hub_descriptor_uri_ = txt.descriptor_uri;
+    err = LoadAuthorityRoutes();
+    if (err != ESP_OK) return err;
     config_ = std::move(fresh);
     HubConfigStore store;
-    if (store.SaveHubConfig(config_, hub_descriptor_uri_) != ESP_OK) {
+    if (store.SaveHubConfig(config_) != ESP_OK) {
         ESP_LOGW(TAG, "Failed to persist rediscovered Hub config");
     }
     SetState(StateForConfig(config_), "hub_rediscovered");
@@ -2323,7 +2347,7 @@ void EidolonVoiceController::HandleGuardOwnerFaceProfileSyncCommand(
     command.op = kControlOpGuardOwnerFaceProfileSync;
     OwnerFaceEngine* engine =
         guard_service_ != nullptr ? guard_service_->owner_face_engine() : nullptr;
-    if (engine == nullptr || hub_descriptor_uri_.empty()) {
+    if (engine == nullptr || device_control_uri_.empty()) {
         AckCommand(command, "failed", "OWNER_FACE_UNAVAILABLE");
         return;
     }
@@ -2381,7 +2405,7 @@ void EidolonVoiceController::HandleGuardOwnerFaceProfileSyncCommand(
     cJSON_Delete(root);
 
     const bool queued = engine->QueueSync(
-        request, hub_descriptor_uri_, SystemInfo::GetMacAddress(),
+        request, device_control_uri_, SystemInfo::GetMacAddress(),
         [this, command_id](const OwnerFaceApplyResult& result) {
             cJSON* completion = cJSON_CreateObject();
             if (completion == nullptr) {
@@ -3027,7 +3051,7 @@ void EidolonVoiceController::DoNetworkRestored()
         esp_timer_stop(reconnect_timer_);
     }
 
-    if (hub_descriptor_uri_.empty() && LoadStoredConfig() != ESP_OK) {
+    if (device_control_uri_.empty() && LoadStoredConfig() != ESP_OK) {
         ESP_LOGW(TAG, "Network restored but no stored Hub config is available");
         return;
     }
@@ -3228,13 +3252,13 @@ esp_err_t EidolonVoiceController::SyncGuardRuntime(const char* reason,
                                                     const std::string* expected_desired_state,
                                                     uint32_t* applied_runtime_revision)
 {
-    if (guard_service_ == nullptr || hub_descriptor_uri_.empty()) {
+    if (guard_service_ == nullptr || device_control_uri_.empty()) {
         return ESP_ERR_INVALID_STATE;
     }
     GuardRuntimeHubConfig runtime;
     HubConfigClient client;
     const esp_err_t err =
-        client.FetchGuardRuntime(hub_descriptor_uri_, SystemInfo::GetMacAddress(), runtime);
+        client.FetchGuardRuntime(device_control_uri_, SystemInfo::GetMacAddress(), runtime);
     if (err == ESP_ERR_NOT_FOUND) {
         ClearGuardPresenceRuntime();
         guard_service_->Stop("guard_binding_missing");

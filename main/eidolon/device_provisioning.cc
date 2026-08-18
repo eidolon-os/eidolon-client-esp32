@@ -2,6 +2,8 @@
 
 #include "device_identity.h"
 #include "device_provisioning_protocol.h"
+#include "authority_locator.h"
+#include "hub_onboarding_protocol.h"
 #include "hub_trust_store.h"
 #include "system_info.h"
 
@@ -205,14 +207,38 @@ esp_err_t DeviceProvisioningService::HandleTrust(uint32_t, const uint8_t* inbuf,
         ESP_LOGE(TAG, "Refused a trust handover this firmware does not understand");
         return Answer(BuildTrustRefusedJson("handover is not supported"), outbuf, outlen);
     }
-    const esp_err_t saved = HubTrustStore().Save(handover.hub_id, handover.certificate_pem);
-    if (saved != ESP_OK) {
-        ESP_LOGE(TAG, "Rejected commissioned certificate: %s", esp_err_to_name(saved));
-        return Answer(BuildTrustRefusedJson("certificate was not stored"), outbuf, outlen);
+    device_foundation::v1::OwnerDomainDescriptor descriptor;
+    std::string canonical;
+    if (!ParseOwnerDomainDescriptor(
+            handover.owner_domain_descriptor_json, descriptor, canonical) ||
+        descriptor.owner_domain_id != handover.owner_domain_id ||
+        VerifyOwnerDomainDescriptor(
+            descriptor,
+            canonical,
+            handover.owner_root_certificate_pem,
+            handover.authority_signing_certificate_pem) != ESP_OK) {
+        ESP_LOGE(TAG, "Rejected invalid Owner Domain trust bundle");
+        return Answer(BuildTrustRefusedJson("owner trust is invalid"), outbuf,
+                      outlen);
     }
-    ESP_LOGI(TAG, "Commissioned for Hub %s", handover.hub_id.c_str());
-    return Answer(BuildTrustAcceptedJson(SystemInfo::GetMacAddress(), handover.hub_id), outbuf,
-                  outlen);
+    OwnerTrustBundle bundle;
+    bundle.owner_domain_id = handover.owner_domain_id;
+    bundle.owner_domain_descriptor_json = handover.owner_domain_descriptor_json;
+    bundle.owner_root_certificate_pem = handover.owner_root_certificate_pem;
+    bundle.authority_signing_certificate_pem =
+        handover.authority_signing_certificate_pem;
+    const esp_err_t saved = OwnerTrustStore().Save(bundle);
+    if (saved != ESP_OK) {
+        ESP_LOGE(TAG, "Rejected commissioned Owner trust: %s",
+                 esp_err_to_name(saved));
+        return Answer(BuildTrustRefusedJson("owner trust was not stored"),
+                      outbuf, outlen);
+    }
+    ESP_LOGI(TAG, "Commissioned for Owner Domain %s",
+             handover.owner_domain_id.c_str());
+    return Answer(BuildTrustAcceptedJson(SystemInfo::GetMacAddress(),
+                                         handover.owner_domain_id),
+                  outbuf, outlen);
 }
 
 void DeviceProvisioningService::HandleProvisioningEvent(void*, const char*, int32_t event_id,

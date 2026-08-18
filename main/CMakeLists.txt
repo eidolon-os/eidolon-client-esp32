@@ -1082,6 +1082,7 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/hub_config_client.cc"
         "eidolon/hub_config_store.cc"
         "eidolon/hub_discovery.cc"
+        "eidolon/authority_locator.cc"
         "eidolon/hub_onboarding_client.cc"
         "eidolon/hub_pinned_http.cc"
         "eidolon/hub_onboarding_protocol.cc"

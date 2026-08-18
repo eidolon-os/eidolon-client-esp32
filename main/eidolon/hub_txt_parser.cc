@@ -13,14 +13,14 @@ bool HubTxtParser::HasUrlScheme(const std::string& url) {
     return url.rfind("https://", 0) == 0;
 }
 
-void HubTxtParser::ApplyKnownFields(HubTxtRecord& record) {
+void HubTxtParser::ApplyKnownFields(AuthorityCandidateRecord& record) {
     auto get = [&](const char* key) -> std::string {
         auto it = record.entries.find(key);
         return it != record.entries.end() ? it->second : std::string();
     };
 
-    record.descriptor_uri = get(kTxtDescriptorUri);
-    record.enrollment_uri = get(kTxtEnrollmentUri);
+    record.owner_domain_id = get(kTxtOwnerDomainId);
+    record.owner_domain_descriptor_uri = get(kTxtOwnerDomainDescriptorUri);
 
     auto tv = get(kTxtVers);
     if (!tv.empty()) {
@@ -28,7 +28,7 @@ void HubTxtParser::ApplyKnownFields(HubTxtRecord& record) {
     }
 }
 
-esp_err_t HubTxtParser::ValidateForTxtVers(const HubTxtRecord& record) {
+esp_err_t HubTxtParser::ValidateForTxtVers(const AuthorityCandidateRecord& record) {
     if (record.txtvers <= 0) {
         ESP_LOGE(TAG, "Missing or invalid txtvers");
         return ESP_ERR_INVALID_RESPONSE;
@@ -37,19 +37,21 @@ esp_err_t HubTxtParser::ValidateForTxtVers(const HubTxtRecord& record) {
         ESP_LOGE(TAG, "Unsupported txtvers=%d (supported %d)", record.txtvers, kSupportedTxtVers);
         return ESP_ERR_NOT_SUPPORTED;
     }
-    if (record.descriptor_uri.empty() || !HasUrlScheme(record.descriptor_uri)) {
-        ESP_LOGE(TAG, "Invalid or missing descriptor_uri");
+    if (record.owner_domain_id.empty() || record.owner_domain_id.size() > 128) {
+        ESP_LOGE(TAG, "Invalid or missing owner_domain_id");
         return ESP_ERR_INVALID_RESPONSE;
     }
-    if (record.enrollment_uri.empty() || !HasUrlScheme(record.enrollment_uri)) {
-        ESP_LOGE(TAG, "Invalid or missing enrollment_uri");
+    if (record.owner_domain_descriptor_uri.empty() ||
+        !HasUrlScheme(record.owner_domain_descriptor_uri)) {
+        ESP_LOGE(TAG, "Invalid or missing owner_domain_descriptor_uri");
         return ESP_ERR_INVALID_RESPONSE;
     }
     return ESP_OK;
 }
 
-esp_err_t HubTxtParser::Parse(const std::map<std::string, std::string>& entries, HubTxtRecord& out) {
-    out = HubTxtRecord{};
+esp_err_t HubTxtParser::Parse(const std::map<std::string, std::string>& entries,
+                              AuthorityCandidateRecord& out) {
+    out = AuthorityCandidateRecord{};
     out.entries = entries;
     ApplyKnownFields(out);
 

@@ -15,12 +15,12 @@ public:
 #if CONFIG_EIDOLON_GUARD_SERVICE
     // Fetch GuardBinding-local runtime config with the same signed device
     // identity as /api/config. It never fetches persona or policy config.
-    esp_err_t FetchGuardRuntime(const std::string& descriptor_uri, const std::string& device_id,
+    esp_err_t FetchGuardRuntime(const std::string& authority_base_uri, const std::string& device_id,
                                 GuardRuntimeHubConfig& out);
-    esp_err_t FetchOwnerFaceProfile(const std::string& descriptor_uri,
+    esp_err_t FetchOwnerFaceProfile(const std::string& authority_base_uri,
                                     const std::string& device_id,
                                     OwnerFaceProfileHubConfig& out);
-    esp_err_t FetchOwnerFaceReference(const std::string& descriptor_uri,
+    esp_err_t FetchOwnerFaceReference(const std::string& authority_base_uri,
                                       const std::string& device_id,
                                       const OwnerFaceReferenceHubConfig& reference,
                                       std::string& out);

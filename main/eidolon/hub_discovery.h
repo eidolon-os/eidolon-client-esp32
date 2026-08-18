@@ -11,11 +11,13 @@ namespace eidolon {
 
 class HubDiscovery {
 public:
-    esp_err_t Discover(HubTxtRecord& out, const std::string& preferred_instance_substr = "Eidolon Hub");
+    esp_err_t Discover(AuthorityCandidateRecord& out,
+                       const std::string& preferred_instance_substr = "Eidolon Owner");
 
 private:
     esp_err_t EnsureMdnsInit();
-    esp_err_t QueryOnce(HubTxtRecord& best, const std::string& preferred_instance_substr, bool* found);
+    esp_err_t QueryOnce(AuthorityCandidateRecord& best,
+                        const std::string& preferred_instance_substr, bool* found);
     static std::string NormalizeServiceType(const char* configured);
 };
 

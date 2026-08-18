@@ -19,10 +19,10 @@ static constexpr const char* kOnboardingKey = "onboarding";
 // and a device reading those back would connect to a pair that no longer exists
 // — the Provider issues one. Refusing the old record sends the device to
 // re-provision, which is the only way to be handed the new one.
-static constexpr int kConfigSchemaVersion = 4;
+static constexpr int kConfigSchemaVersion = 5;
 // Version 2 is the screen-independent manual-admission state. Version 1 held
 // abandoned screen-bound claim material and must start a fresh Enrollment intent.
-static constexpr int kOnboardingSchemaVersion = 2;
+static constexpr int kOnboardingSchemaVersion = 3;
 
 static std::string JsonStringField(cJSON* root, const char* key) {
     cJSON* item = cJSON_GetObjectItem(root, key);
@@ -34,14 +34,12 @@ static int JsonIntField(cJSON* root, const char* key, int fallback) {
     return cJSON_IsNumber(item) ? item->valueint : fallback;
 }
 
-esp_err_t HubConfigStore::SaveHubConfig(const Esp32HubConfig& config,
-                                        const std::string& descriptor_uri) {
+esp_err_t HubConfigStore::SaveHubConfig(const Esp32HubConfig& config) {
     cJSON* root = cJSON_CreateObject();
     if (!root) {
         return ESP_ERR_NO_MEM;
     }
     cJSON_AddNumberToObject(root, "schema_version", kConfigSchemaVersion);
-    cJSON_AddStringToObject(root, "descriptor_uri", descriptor_uri.c_str());
     cJSON_AddStringToObject(root, "status", HubConfigStatusToString(config.status));
     cJSON_AddStringToObject(root, "server_url", config.session.server_url.c_str());
     cJSON_AddStringToObject(root, "token", config.session.token.c_str());
@@ -76,10 +74,10 @@ esp_err_t HubConfigStore::SaveHubConfig(const Esp32HubConfig& config,
 
 bool HubConfigStore::HasValidConfig() const {
     Esp32HubConfig config;
-    return Load(config, nullptr);
+    return Load(config);
 }
 
-bool HubConfigStore::Load(Esp32HubConfig& config, std::string* descriptor_uri) const {
+bool HubConfigStore::Load(Esp32HubConfig& config) const {
     Settings settings(kNvsNamespace, false);
     std::string blob = settings.GetString(kConfigKey);
     if (blob.empty()) {
@@ -113,11 +111,8 @@ bool HubConfigStore::Load(Esp32HubConfig& config, std::string* descriptor_uri) c
 
     const bool valid =
         config.status != HubConfigStatus::Active || config.session.usable();
-    if (descriptor_uri) {
-        *descriptor_uri = JsonStringField(root, "descriptor_uri");
-    }
     cJSON_Delete(root);
-    return valid && (!descriptor_uri || !descriptor_uri->empty());
+    return valid;
 }
 
 esp_err_t HubConfigStore::SaveOnboardingState(const HubOnboardingState& state) {
@@ -126,9 +121,9 @@ esp_err_t HubConfigStore::SaveOnboardingState(const HubOnboardingState& state) {
         return ESP_ERR_NO_MEM;
     }
     cJSON_AddNumberToObject(root, "schema_version", kOnboardingSchemaVersion);
-    cJSON_AddStringToObject(root, "hub_id", state.hub_id.c_str());
-    cJSON_AddStringToObject(root, "descriptor_uri", state.descriptor_uri.c_str());
-    cJSON_AddStringToObject(root, "enrollment_uri", state.enrollment_uri.c_str());
+    cJSON_AddStringToObject(root, "owner_domain_id", state.owner_domain_id.c_str());
+    cJSON_AddNumberToObject(root, "directory_revision",
+                           static_cast<double>(state.directory_revision));
     cJSON_AddStringToObject(root, "device_id", state.device_id.c_str());
     cJSON_AddStringToObject(root, "request_id", state.request_id.c_str());
     cJSON_AddStringToObject(root, "retrieval_token", state.retrieval_token.c_str());
@@ -155,17 +150,17 @@ bool HubConfigStore::LoadOnboardingState(HubOnboardingState& state) const {
         return false;
     }
     state = HubOnboardingState{};
-    state.hub_id = JsonStringField(root, "hub_id");
-    state.descriptor_uri = JsonStringField(root, "descriptor_uri");
-    state.enrollment_uri = JsonStringField(root, "enrollment_uri");
+    state.owner_domain_id = JsonStringField(root, "owner_domain_id");
+    state.directory_revision = static_cast<uint64_t>(
+        JsonIntField(root, "directory_revision", 0));
     state.device_id = JsonStringField(root, "device_id");
     state.request_id = JsonStringField(root, "request_id");
     state.retrieval_token = JsonStringField(root, "retrieval_token");
     state.enrollment_id = JsonStringField(root, "enrollment_id");
     state.lifecycle_state = JsonStringField(root, "lifecycle_state");
     cJSON_Delete(root);
-    return !state.hub_id.empty() && !state.descriptor_uri.empty() &&
-           !state.enrollment_uri.empty() && !state.device_id.empty() &&
+    return !state.owner_domain_id.empty() && state.directory_revision > 0 &&
+           !state.device_id.empty() &&
            state.has_local_intent();
 }
 

@@ -1211,7 +1211,7 @@ menu "Eidolon Hub"
 
     config EIDOLON_MDNS_SERVICE_TYPE
         string "mDNS service type (without ._tcp suffix)"
-        default "_eidolon-hub"
+        default "_eidolon-owner"
         depends on EIDOLON_HUB_MODE
 
     config EIDOLON_MDNS_QUERY_TIMEOUT_MS

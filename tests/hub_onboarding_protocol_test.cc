@@ -9,26 +9,26 @@ namespace {
 
 using eidolon::HubConfigStatus;
 
-eidolon::HubTxtRecord Advertised()
+eidolon::AuthorityCandidateRecord Advertised()
 {
-    eidolon::HubTxtRecord value;
+    eidolon::AuthorityCandidateRecord value;
     value.txtvers = 1;
-    value.descriptor_uri =
+    value.owner_domain_id = "owner_01";
+    value.owner_domain_descriptor_uri =
         "https://eidolon-hub.local/api/device-onboarding/v1/descriptor";
-    value.enrollment_uri =
-        "https://eidolon-hub.local/api/device-onboarding/v1/enrollments";
     return value;
 }
 
 void TestMdnsConsumesOnlyDescriptorContract()
 {
-    eidolon::HubTxtRecord record;
+    eidolon::AuthorityCandidateRecord record;
     assert(eidolon::HubTxtParser::Parse(
                {{"txtvers", "1"},
-                {"descriptor_uri", Advertised().descriptor_uri},
-                {"enrollment_uri", Advertised().enrollment_uri}},
+                {"owner_domain_id", Advertised().owner_domain_id},
+                {"owner_domain_descriptor_uri",
+                 Advertised().owner_domain_descriptor_uri}},
                record) == ESP_OK);
-    assert(record.descriptor_uri == Advertised().descriptor_uri);
+    assert(record.owner_domain_id == Advertised().owner_domain_id);
     assert(eidolon::HubTxtParser::Parse(
                {{"txtvers", "1"},
                 {"api", "v1"},
@@ -36,30 +36,42 @@ void TestMdnsConsumesOnlyDescriptorContract()
                record) == ESP_ERR_INVALID_RESPONSE);
     assert(eidolon::HubTxtParser::Parse(
                {{"txtvers", "1"},
-                {"descriptor_uri", "http://eidolon-hub.local/descriptor"},
-                {"enrollment_uri", Advertised().enrollment_uri}},
+                {"owner_domain_id", "owner_01"},
+                {"owner_domain_descriptor_uri",
+                 "http://eidolon-hub.local/descriptor"}},
                record) == ESP_ERR_INVALID_RESPONSE);
 }
 
-void TestDescriptorIsPinnedToAdvertisedHttpsOrigin()
+void TestDescriptorParsesToCanonicalSignedDocument()
 {
-    const auto advertised = Advertised();
     const std::string descriptor =
-        "{\"schema_version\":1,\"hub_id\":\"hub-local\","
-        "\"descriptor_uri\":\"" + advertised.descriptor_uri + "\","
-        "\"device_onboarding_uri\":"
-        "\"https://eidolon-hub.local/api/device-onboarding/v1\","
-        "\"enrollment_uri\":\"" + advertised.enrollment_uri + "\","
-        "\"protocol_versions\":[1]}";
-    eidolon::HubDescriptor parsed;
-    assert(eidolon::ParseHubDescriptorResponse(descriptor, advertised, parsed));
-    assert(parsed.hub_id == "hub-local");
-
-    std::string diverted = descriptor;
-    const auto offset = diverted.find(advertised.enrollment_uri);
-    diverted.replace(offset, advertised.enrollment_uri.size(),
-                     "https://attacker.example/enrollments");
-    assert(!eidolon::ParseHubDescriptorResponse(diverted, advertised, parsed));
+        "{\"owner_domain_id\":\"owner_01\",\"directory_revision\":7,"
+        "\"trust_root_refs\":[\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"],"
+        "\"endpoints\":[{\"authority\":\"admission\","
+        "\"logical_audience\":\"eidolon-admission\","
+        "\"uri\":\"https://host-a.owner.test/api/device-onboarding/v1\","
+        "\"transport_profile\":\"https-json\",\"priority\":10}],"
+        "\"issued_at\":\"2026-08-18T00:00:00Z\","
+        "\"expires_at\":\"2026-08-19T00:00:00Z\","
+        "\"signing_key_id\":\"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\","
+        "\"signature\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"}";
+    eidolon::device_foundation::v1::OwnerDomainDescriptor parsed;
+    std::string canonical;
+    assert(eidolon::ParseOwnerDomainDescriptor(descriptor, parsed, canonical));
+    assert(parsed.owner_domain_id == "owner_01");
+    assert(canonical ==
+           "{\"directory_revision\":7,\"endpoints\":[{\"authority\":\"admission\","
+           "\"logical_audience\":\"eidolon-admission\",\"priority\":10,"
+           "\"transport_profile\":\"https-json\","
+           "\"uri\":\"https://host-a.owner.test/api/device-onboarding/v1\"}],"
+           "\"expires_at\":\"2026-08-19T00:00:00Z\","
+           "\"issued_at\":\"2026-08-18T00:00:00Z\","
+           "\"owner_domain_id\":\"owner_01\","
+           "\"signing_key_id\":\"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\","
+           "\"trust_root_refs\":[\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"]}");
+    assert(eidolon::FindAuthorityEndpoint(
+               parsed,
+               eidolon::device_foundation::v1::LogicalAuthority::Admission) != nullptr);
 }
 
 void TestCanonicalManifest()
@@ -81,9 +93,8 @@ void TestCanonicalManifest()
 eidolon::HubOnboardingState PendingState()
 {
     eidolon::HubOnboardingState state;
-    state.hub_id = "hub-local";
-    state.descriptor_uri = Advertised().descriptor_uri;
-    state.enrollment_uri = Advertised().enrollment_uri;
+    state.owner_domain_id = "owner_01";
+    state.directory_revision = 7;
     state.device_id = "aa:bb";
     state.request_id = "enroll-a";
     state.retrieval_token = "r";
@@ -157,7 +168,7 @@ void TestReceiptHandoffAndProviderBinding()
 int main()
 {
     TestMdnsConsumesOnlyDescriptorContract();
-    TestDescriptorIsPinnedToAdvertisedHttpsOrigin();
+    TestDescriptorParsesToCanonicalSignedDocument();
     TestCanonicalManifest();
     TestReceiptHandoffAndProviderBinding();
     return 0;

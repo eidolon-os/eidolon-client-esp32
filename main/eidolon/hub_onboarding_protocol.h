@@ -7,9 +7,14 @@
 
 namespace eidolon {
 
-bool ParseHubDescriptorResponse(const std::string& body,
-                                const HubTxtRecord& advertised,
-                                HubDescriptor& out);
+bool ParseOwnerDomainDescriptor(
+    const std::string& body,
+    device_foundation::v1::OwnerDomainDescriptor& out,
+    std::string& canonical_signing_bytes);
+
+const device_foundation::v1::AuthorityEndpoint* FindAuthorityEndpoint(
+    const device_foundation::v1::OwnerDomainDescriptor& descriptor,
+    device_foundation::v1::LogicalAuthority authority);
 
 std::string BuildDeviceManifestJson(const std::string& board_name, bool has_camera);
 

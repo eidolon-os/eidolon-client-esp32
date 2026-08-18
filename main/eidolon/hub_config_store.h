@@ -9,12 +9,12 @@ namespace eidolon {
 
 class HubConfigStore {
 public:
-    esp_err_t SaveHubConfig(const Esp32HubConfig& config, const std::string& descriptor_uri);
+    esp_err_t SaveHubConfig(const Esp32HubConfig& config);
     esp_err_t SaveOnboardingState(const HubOnboardingState& state);
     bool LoadOnboardingState(HubOnboardingState& state) const;
     void ClearOnboardingState();
     bool HasValidConfig() const;
-    bool Load(Esp32HubConfig& config, std::string* descriptor_uri = nullptr) const;
+    bool Load(Esp32HubConfig& config) const;
 };
 
 }  // namespace eidolon

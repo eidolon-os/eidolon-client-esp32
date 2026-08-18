@@ -13,12 +13,12 @@ constexpr const char* kContractVersion = "1";
 
 // A certificate plus a Host id. Anything larger is not a handover this firmware
 // understands.
-constexpr size_t kMaxPayloadBytes = 8 * 1024;
+constexpr size_t kMaxPayloadBytes = 16 * 1024;
 
 // A self-signed P-256 leaf is well under this.
 constexpr size_t kMaxCertificateBytes = 4 * 1024;
 
-constexpr size_t kMaxHubIdBytes = 128;
+constexpr size_t kMaxOwnerDomainIdBytes = 128;
 
 constexpr const char* kPemPrefix = "-----BEGIN CERTIFICATE-----";
 
@@ -80,10 +80,11 @@ bool IsCommissionableCertificate(const std::string& certificate_pem)
            certificate_pem.rfind(kPemPrefix, 0) == 0;
 }
 
-bool IsCommissionedHub(const std::string& commissioned_hub_id,
-                       const std::string& discovered_hub_id)
+bool IsCommissionedOwnerDomain(const std::string& commissioned_owner_domain_id,
+                               const std::string& discovered_owner_domain_id)
 {
-    return !commissioned_hub_id.empty() && commissioned_hub_id == discovered_hub_id;
+    return !commissioned_owner_domain_id.empty() &&
+           commissioned_owner_domain_id == discovered_owner_domain_id;
 }
 
 bool ParseTrustHandover(const std::string& body, TrustHandover& out)
@@ -102,17 +103,33 @@ bool ParseTrustHandover(const std::string& body, TrustHandover& out)
     // not read through a pointer into a deleted document.
     const std::string contract_version = JsonString(root, "contract_version");
     TrustHandover handover;
-    handover.hub_id = JsonString(root, "hub_id");
-    handover.certificate_pem = JsonString(root, "hub_certificate");
+    handover.owner_domain_id = JsonString(root, "owner_domain_id");
+    handover.owner_root_certificate_pem =
+        JsonString(root, "owner_root_certificate");
+    handover.authority_signing_certificate_pem =
+        JsonString(root, "authority_signing_certificate");
+    const cJSON* descriptor =
+        cJSON_GetObjectItemCaseSensitive(root, "owner_domain_descriptor");
+    char* descriptor_json = cJSON_IsObject(descriptor)
+                                ? cJSON_PrintUnformatted(descriptor)
+                                : nullptr;
+    handover.owner_domain_descriptor_json =
+        descriptor_json != nullptr ? descriptor_json : "";
+    if (descriptor_json != nullptr) {
+        cJSON_free(descriptor_json);
+    }
     cJSON_Delete(root);
 
     if (contract_version != kContractVersion) {
         return false;
     }
-    if (handover.hub_id.empty() || handover.hub_id.size() > kMaxHubIdBytes) {
+    if (handover.owner_domain_id.empty() ||
+        handover.owner_domain_id.size() > kMaxOwnerDomainIdBytes ||
+        handover.owner_domain_descriptor_json.empty()) {
         return false;
     }
-    if (!IsCommissionableCertificate(handover.certificate_pem)) {
+    if (!IsCommissionableCertificate(handover.owner_root_certificate_pem) ||
+        !IsCommissionableCertificate(handover.authority_signing_certificate_pem)) {
         return false;
     }
 
@@ -120,7 +137,8 @@ bool ParseTrustHandover(const std::string& body, TrustHandover& out)
     return true;
 }
 
-std::string BuildTrustAcceptedJson(const std::string& device_id, const std::string& hub_id)
+std::string BuildTrustAcceptedJson(const std::string& device_id,
+                                   const std::string& owner_domain_id)
 {
     cJSON* root = cJSON_CreateObject();
     if (root == nullptr) {
@@ -128,7 +146,7 @@ std::string BuildTrustAcceptedJson(const std::string& device_id, const std::stri
     }
     cJSON_AddStringToObject(root, "contract_version", kContractVersion);
     cJSON_AddStringToObject(root, "device_id", device_id.c_str());
-    cJSON_AddStringToObject(root, "hub_id", hub_id.c_str());
+    cJSON_AddStringToObject(root, "owner_domain_id", owner_domain_id.c_str());
     cJSON_AddBoolToObject(root, "accepted", true);
     return PrintAndDelete(root);
 }

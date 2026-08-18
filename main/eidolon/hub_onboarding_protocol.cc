@@ -5,6 +5,7 @@
 #include <cJSON.h>
 
 #include <cstdint>
+#include <set>
 
 namespace eidolon {
 
@@ -23,20 +24,82 @@ bool IsHttpsUrl(const std::string& value)
     return value.rfind("https://", 0) == 0 && value.size() > 8;
 }
 
-std::string Origin(const std::string& value)
+std::string Quote(const std::string& value)
 {
-    const size_t scheme_end = value.find("://");
-    if (scheme_end == std::string::npos) {
-        return "";
+    cJSON* string = cJSON_CreateString(value.c_str());
+    char* encoded = string ? cJSON_PrintUnformatted(string) : nullptr;
+    std::string result = encoded ? encoded : "";
+    if (encoded != nullptr) {
+        cJSON_free(encoded);
     }
-    const size_t path = value.find('/', scheme_end + 3);
-    return value.substr(0, path == std::string::npos ? value.size() : path);
+    cJSON_Delete(string);
+    return result;
 }
 
-bool SameOrigin(const std::string& left, const std::string& right)
+bool Digest(const std::string& value)
 {
-    const std::string left_origin = Origin(left);
-    return !left_origin.empty() && left_origin == Origin(right);
+    if (value.size() != 71 || value.rfind("sha256:", 0) != 0) {
+        return false;
+    }
+    return value.find_first_not_of("0123456789abcdef", 7) == std::string::npos;
+}
+
+bool Signature(const std::string& value)
+{
+    return value.size() == 86 &&
+           value.find_first_not_of(
+               "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_") ==
+               std::string::npos;
+}
+
+bool ExactObjectSize(const cJSON* object, int expected)
+{
+    return cJSON_IsObject(object) && cJSON_GetArraySize(object) == expected;
+}
+
+bool ReadInt64(const cJSON* object, const char* key, int64_t& out);
+
+bool ReadRevision(const cJSON* object, const char* key, uint64_t& out)
+{
+    int64_t value = 0;
+    if (!ReadInt64(object, key, value) || value < 1) {
+        return false;
+    }
+    out = static_cast<uint64_t>(value);
+    return true;
+}
+
+bool ParseAuthority(const std::string& value,
+                    device_foundation::v1::LogicalAuthority& out)
+{
+    using device_foundation::v1::LogicalAuthority;
+    if (value == "admission") out = LogicalAuthority::Admission;
+    else if (value == "device-control") out = LogicalAuthority::DeviceControl;
+    else if (value == "body-mesh") out = LogicalAuthority::BodyMesh;
+    else if (value == "companion") out = LogicalAuthority::Companion;
+    else return false;
+    return true;
+}
+
+const char* AuthorityWire(device_foundation::v1::LogicalAuthority value)
+{
+    using device_foundation::v1::LogicalAuthority;
+    switch (value) {
+    case LogicalAuthority::Admission: return "admission";
+    case LogicalAuthority::DeviceControl: return "device-control";
+    case LogicalAuthority::BodyMesh: return "body-mesh";
+    case LogicalAuthority::Companion: return "companion";
+    }
+    return "";
+}
+
+std::string CanonicalEndpoint(const device_foundation::v1::AuthorityEndpoint& value)
+{
+    return std::string("{\"authority\":") + Quote(AuthorityWire(value.authority)) +
+           ",\"logical_audience\":" + Quote(value.logical_audience) +
+           ",\"priority\":" + std::to_string(value.priority) +
+           ",\"transport_profile\":" + Quote(value.transport_profile) +
+           ",\"uri\":" + Quote(value.uri) + "}";
 }
 
 bool ReadInt64(const cJSON* object, const char* key, int64_t& out)
@@ -69,44 +132,118 @@ bool ReadRoom(const cJSON* root, const char* key, RoomConfig& out)
 
 }  // namespace
 
-bool ParseHubDescriptorResponse(const std::string& body,
-                                const HubTxtRecord& advertised,
-                                HubDescriptor& out)
+bool ParseOwnerDomainDescriptor(
+    const std::string& body,
+    device_foundation::v1::OwnerDomainDescriptor& out,
+    std::string& canonical_signing_bytes)
 {
-    out = HubDescriptor{};
+    using device_foundation::v1::AuthorityEndpoint;
+    using device_foundation::v1::OwnerDomainDescriptor;
+    out = OwnerDomainDescriptor{};
+    canonical_signing_bytes.clear();
+    if (body.empty() || body.size() > 32 * 1024) {
+        return false;
+    }
     cJSON* root = cJSON_ParseWithLength(body.data(), body.size());
-    if (!cJSON_IsObject(root)) {
+    if (!ExactObjectSize(root, 8)) {
         cJSON_Delete(root);
         return false;
     }
-    const cJSON* schema = cJSON_GetObjectItemCaseSensitive(root, "schema_version");
-    const cJSON* versions = cJSON_GetObjectItemCaseSensitive(root, "protocol_versions");
-    bool supports_protocol = false;
-    if (cJSON_IsArray(versions)) {
-        const cJSON* version = nullptr;
-        cJSON_ArrayForEach(version, versions) {
-            if (cJSON_IsNumber(version) &&
-                version->valueint == kSupportedOnboardingProtocol) {
-                supports_protocol = true;
-            }
+    out.owner_domain_id = JsonString(root, "owner_domain_id");
+    out.issued_at = JsonString(root, "issued_at");
+    out.expires_at = JsonString(root, "expires_at");
+    out.signing_key_id = JsonString(root, "signing_key_id");
+    out.signature = JsonString(root, "signature");
+    if (out.owner_domain_id.empty() || out.owner_domain_id.size() > 128 ||
+        !ReadRevision(root, "directory_revision", out.directory_revision) ||
+        out.issued_at.empty() || out.expires_at.empty() ||
+        !Digest(out.signing_key_id) || !Signature(out.signature)) {
+        cJSON_Delete(root);
+        return false;
+    }
+    const cJSON* roots = cJSON_GetObjectItemCaseSensitive(root, "trust_root_refs");
+    if (!cJSON_IsArray(roots) || cJSON_GetArraySize(roots) < 1 ||
+        cJSON_GetArraySize(roots) > 16) {
+        cJSON_Delete(root);
+        return false;
+    }
+    std::set<std::string> unique_roots;
+    const cJSON* item = nullptr;
+    cJSON_ArrayForEach(item, roots) {
+        if (!cJSON_IsString(item) || item->valuestring == nullptr ||
+            !Digest(item->valuestring) || !unique_roots.insert(item->valuestring).second) {
+            cJSON_Delete(root);
+            return false;
+        }
+        out.trust_root_refs.emplace_back(item->valuestring);
+    }
+    const cJSON* endpoints = cJSON_GetObjectItemCaseSensitive(root, "endpoints");
+    if (!cJSON_IsArray(endpoints) || cJSON_GetArraySize(endpoints) < 1 ||
+        cJSON_GetArraySize(endpoints) > 32) {
+        cJSON_Delete(root);
+        return false;
+    }
+    std::set<std::string> endpoint_ids;
+    cJSON_ArrayForEach(item, endpoints) {
+        AuthorityEndpoint endpoint;
+        int64_t priority = -1;
+        const std::string authority = JsonString(item, "authority");
+        endpoint.logical_audience = JsonString(item, "logical_audience");
+        endpoint.uri = JsonString(item, "uri");
+        endpoint.transport_profile = JsonString(item, "transport_profile");
+        if (!ExactObjectSize(item, 5) || !ParseAuthority(authority, endpoint.authority) ||
+            endpoint.logical_audience.empty() || endpoint.logical_audience.size() > 128 ||
+            !IsHttpsUrl(endpoint.uri) || endpoint.uri.size() > 2048 ||
+            endpoint.transport_profile != "https-json" ||
+            !ReadInt64(item, "priority", priority) || priority > 65535) {
+            cJSON_Delete(root);
+            return false;
+        }
+        endpoint.priority = static_cast<uint16_t>(priority);
+        const std::string identity = authority + "\0" + endpoint.logical_audience +
+                                     "\0" + endpoint.uri;
+        if (!endpoint_ids.insert(identity).second) {
+            cJSON_Delete(root);
+            return false;
+        }
+        out.endpoints.push_back(std::move(endpoint));
+    }
+    cJSON_Delete(root);
+    std::string canonical_endpoints = "[";
+    for (size_t index = 0; index < out.endpoints.size(); ++index) {
+        if (index != 0) canonical_endpoints += ',';
+        canonical_endpoints += CanonicalEndpoint(out.endpoints[index]);
+    }
+    canonical_endpoints += ']';
+    std::string canonical_roots = "[";
+    for (size_t index = 0; index < out.trust_root_refs.size(); ++index) {
+        if (index != 0) canonical_roots += ',';
+        canonical_roots += Quote(out.trust_root_refs[index]);
+    }
+    canonical_roots += ']';
+    canonical_signing_bytes =
+        std::string("{\"directory_revision\":") +
+        std::to_string(out.directory_revision) + ",\"endpoints\":" +
+        canonical_endpoints + ",\"expires_at\":" + Quote(out.expires_at) +
+        ",\"issued_at\":" + Quote(out.issued_at) +
+        ",\"owner_domain_id\":" + Quote(out.owner_domain_id) +
+        ",\"signing_key_id\":" + Quote(out.signing_key_id) +
+        ",\"trust_root_refs\":" + canonical_roots + "}";
+    return !canonical_signing_bytes.empty();
+}
+
+const device_foundation::v1::AuthorityEndpoint* FindAuthorityEndpoint(
+    const device_foundation::v1::OwnerDomainDescriptor& descriptor,
+    device_foundation::v1::LogicalAuthority authority)
+{
+    const device_foundation::v1::AuthorityEndpoint* selected = nullptr;
+    for (const auto& endpoint : descriptor.endpoints) {
+        if (endpoint.authority == authority &&
+            (selected == nullptr || endpoint.priority < selected->priority)) {
+            selected = &endpoint;
         }
     }
-    out.schema_version = cJSON_IsNumber(schema) ? schema->valueint : 0;
-    out.hub_id = JsonString(root, "hub_id");
-    out.descriptor_uri = JsonString(root, "descriptor_uri");
-    out.device_onboarding_uri = JsonString(root, "device_onboarding_uri");
-    out.enrollment_uri = JsonString(root, "enrollment_uri");
-    const bool valid = out.schema_version == 1 && supports_protocol &&
-                       !out.hub_id.empty() &&
-                       out.descriptor_uri == advertised.descriptor_uri &&
-                       out.enrollment_uri == advertised.enrollment_uri &&
-                       IsHttpsUrl(out.descriptor_uri) &&
-                       IsHttpsUrl(out.device_onboarding_uri) &&
-                       IsHttpsUrl(out.enrollment_uri) &&
-                       SameOrigin(out.descriptor_uri, out.device_onboarding_uri) &&
-                       SameOrigin(out.descriptor_uri, out.enrollment_uri);
-    cJSON_Delete(root);
-    return valid;
+    return selected;
 }
 
 std::string BuildDeviceManifestJson(const std::string& board_name, bool has_camera)

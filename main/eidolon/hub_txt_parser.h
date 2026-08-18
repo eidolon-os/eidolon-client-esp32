@@ -12,11 +12,12 @@ namespace eidolon {
 
 class HubTxtParser {
 public:
-    static esp_err_t Parse(const std::map<std::string, std::string>& entries, HubTxtRecord& out);
+    static esp_err_t Parse(const std::map<std::string, std::string>& entries,
+                           AuthorityCandidateRecord& out);
 
 private:
-    static esp_err_t ValidateForTxtVers(const HubTxtRecord& record);
-    static void ApplyKnownFields(HubTxtRecord& record);
+    static esp_err_t ValidateForTxtVers(const AuthorityCandidateRecord& record);
+    static void ApplyKnownFields(AuthorityCandidateRecord& record);
     static bool HasUrlScheme(const std::string& url);
 };
 

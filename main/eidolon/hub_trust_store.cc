@@ -6,65 +6,86 @@
 
 #include <esp_log.h>
 
-#define TAG "HubTrustStore"
+#define TAG "OwnerTrustStore"
 
 namespace eidolon {
 
 namespace {
 
-// One Host at a time. A device belongs to the Host it was commissioned for, and
-// switching Hosts is a commissioning decision, not something the device may
-// accumulate. Storing the Hub id alongside the certificate keeps a stale
-// certificate from being offered to a different Hub that happens to answer.
-constexpr const char* kCertificateKey = "hub_ca";
-constexpr const char* kCertificateHubKey = "hub_ca_id";
+constexpr const char* kOwnerDomainKey = "owner_domain";
+constexpr const char* kOwnerRootKey = "owner_root";
+constexpr const char* kAuthorityCertificateKey = "authority_cert";
+constexpr const char* kOwnerDescriptorKey = "owner_desc";
 
 }  // namespace
 
-esp_err_t HubTrustStore::Save(const std::string& hub_id,
-                              const std::string& certificate_pem)
+esp_err_t OwnerTrustStore::Save(const OwnerTrustBundle& bundle)
 {
-    if (hub_id.empty() || !IsCommissionableCertificate(certificate_pem)) {
+    if (bundle.owner_domain_id.empty() ||
+        bundle.owner_domain_descriptor_json.empty() ||
+        !IsCommissionableCertificate(bundle.owner_root_certificate_pem) ||
+        !IsCommissionableCertificate(bundle.authority_signing_certificate_pem)) {
         return ESP_ERR_INVALID_ARG;
     }
     Settings settings(kNvsNamespace, true);
-    esp_err_t err = settings.SetString(kCertificateKey, certificate_pem);
-    if (err != ESP_OK) {
-        return err;
-    }
-    err = settings.SetString(kCertificateHubKey, hub_id);
-    if (err != ESP_OK) {
-        return err;
-    }
-    err = settings.Commit();
+    esp_err_t err = settings.SetString(kOwnerDomainKey, bundle.owner_domain_id);
     if (err == ESP_OK) {
-        ESP_LOGI(TAG, "Trusting Hub %s by commissioned certificate (%u bytes)",
-                 hub_id.c_str(), static_cast<unsigned>(certificate_pem.size()));
+        err = settings.SetString(kOwnerRootKey,
+                                 bundle.owner_root_certificate_pem);
+    }
+    if (err == ESP_OK) {
+        err = settings.SetString(kAuthorityCertificateKey,
+                                 bundle.authority_signing_certificate_pem);
+    }
+    if (err == ESP_OK) {
+        err = settings.SetString(kOwnerDescriptorKey,
+                                 bundle.owner_domain_descriptor_json);
+    }
+    if (err == ESP_OK) err = settings.Commit();
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "Commissioned Owner Domain %s",
+                 bundle.owner_domain_id.c_str());
     }
     return err;
 }
 
-std::string HubTrustStore::Load(const std::string& hub_id) const
+bool OwnerTrustStore::Load(OwnerTrustBundle& bundle) const
 {
+    bundle = OwnerTrustBundle{};
     Settings settings(kNvsNamespace, false);
-    const std::string stored_hub = settings.GetString(kCertificateHubKey);
-    if (hub_id.empty() || stored_hub != hub_id) {
-        return "";
-    }
-    return settings.GetString(kCertificateKey);
+    bundle.owner_domain_id = settings.GetString(kOwnerDomainKey);
+    bundle.owner_root_certificate_pem = settings.GetString(kOwnerRootKey);
+    bundle.authority_signing_certificate_pem =
+        settings.GetString(kAuthorityCertificateKey);
+    bundle.owner_domain_descriptor_json = settings.GetString(kOwnerDescriptorKey);
+    return !bundle.owner_domain_id.empty() &&
+           !bundle.owner_root_certificate_pem.empty() &&
+           !bundle.authority_signing_certificate_pem.empty() &&
+           !bundle.owner_domain_descriptor_json.empty();
 }
 
-std::string HubTrustStore::CommissionedHubId() const
+std::string OwnerTrustStore::CommissionedOwnerDomainId() const
 {
     Settings settings(kNvsNamespace, false);
-    return settings.GetString(kCertificateHubKey);
+    return settings.GetString(kOwnerDomainKey);
 }
 
-void HubTrustStore::Clear()
+esp_err_t OwnerTrustStore::SaveAcceptedDescriptor(
+    const std::string& descriptor_json)
+{
+    if (descriptor_json.empty()) return ESP_ERR_INVALID_ARG;
+    Settings settings(kNvsNamespace, true);
+    esp_err_t err = settings.SetString(kOwnerDescriptorKey, descriptor_json);
+    return err == ESP_OK ? settings.Commit() : err;
+}
+
+void OwnerTrustStore::Clear()
 {
     Settings settings(kNvsNamespace, true);
-    settings.EraseKey(kCertificateKey);
-    settings.EraseKey(kCertificateHubKey);
+    settings.EraseKey(kOwnerDomainKey);
+    settings.EraseKey(kOwnerRootKey);
+    settings.EraseKey(kAuthorityCertificateKey);
+    settings.EraseKey(kOwnerDescriptorKey);
     settings.Commit();
 }
 

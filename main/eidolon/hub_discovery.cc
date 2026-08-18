@@ -14,7 +14,7 @@
 namespace eidolon {
 
 std::string HubDiscovery::NormalizeServiceType(const char* configured) {
-    std::string type = configured ? configured : "_eidolon-hub";
+    std::string type = configured ? configured : "_eidolon-owner";
     const std::string suffix = "._tcp";
     if (type.size() >= suffix.size() &&
         type.compare(type.size() - suffix.size(), suffix.size(), suffix) == 0) {
@@ -28,7 +28,7 @@ std::string HubDiscovery::NormalizeServiceType(const char* configured) {
     if (!type.empty() && type.front() == '_') {
         return type;
     }
-    return "_eidolon-hub";
+    return "_eidolon-owner";
 }
 
 esp_err_t HubDiscovery::EnsureMdnsInit() {
@@ -45,9 +45,11 @@ esp_err_t HubDiscovery::EnsureMdnsInit() {
     return err;
 }
 
-esp_err_t HubDiscovery::QueryOnce(HubTxtRecord& best, const std::string& preferred_instance_substr, bool* found) {
+esp_err_t HubDiscovery::QueryOnce(AuthorityCandidateRecord& best,
+                                  const std::string& preferred_instance_substr,
+                                  bool* found) {
     *found = false;
-    best = HubTxtRecord{};
+    best = AuthorityCandidateRecord{};
 
     std::string service = NormalizeServiceType(CONFIG_EIDOLON_MDNS_SERVICE_TYPE);
     mdns_result_t* results = nullptr;
@@ -58,9 +60,9 @@ esp_err_t HubDiscovery::QueryOnce(HubTxtRecord& best, const std::string& preferr
         return err;
     }
 
-    HubTxtRecord preferred;
+    AuthorityCandidateRecord preferred;
     bool has_preferred = false;
-    HubTxtRecord fallback;
+    AuthorityCandidateRecord fallback;
     bool has_fallback = false;
 
     for (mdns_result_t* r = results; r != nullptr; r = r->next) {
@@ -73,17 +75,16 @@ esp_err_t HubDiscovery::QueryOnce(HubTxtRecord& best, const std::string& preferr
             }
         }
 
-        HubTxtRecord parsed;
+        AuthorityCandidateRecord parsed;
         if (HubTxtParser::Parse(entries, parsed) != ESP_OK) {
             continue;
         }
 
         if (r->instance_name) {
-            ESP_LOGI(TAG, "Found Hub instance: %s port=%u descriptor_uri=%s",
-                     r->instance_name, r->port, parsed.descriptor_uri.c_str());
+            ESP_LOGI(TAG, "Found Owner candidate: %s port=%u",
+                     r->instance_name, r->port);
         } else {
-            ESP_LOGI(TAG, "Found Hub port=%u descriptor_uri=%s", r->port,
-                     parsed.descriptor_uri.c_str());
+            ESP_LOGI(TAG, "Found Owner candidate port=%u", r->port);
         }
 
         if (r->instance_name && strstr(r->instance_name, preferred_instance_substr.c_str()) != nullptr) {
@@ -110,7 +111,8 @@ esp_err_t HubDiscovery::QueryOnce(HubTxtRecord& best, const std::string& preferr
     return ESP_ERR_NOT_FOUND;
 }
 
-esp_err_t HubDiscovery::Discover(HubTxtRecord& out, const std::string& preferred_instance_substr) {
+esp_err_t HubDiscovery::Discover(AuthorityCandidateRecord& out,
+                                 const std::string& preferred_instance_substr) {
     esp_err_t err = EnsureMdnsInit();
     if (err != ESP_OK) {
         return err;

@@ -10,7 +10,7 @@ using eidolon::BuildProvisioningDescriptorJson;
 using eidolon::BuildTrustAcceptedJson;
 using eidolon::BuildTrustRefusedJson;
 using eidolon::IsCommissionableCertificate;
-using eidolon::IsCommissionedHub;
+using eidolon::IsCommissionedOwnerDomain;
 using eidolon::ParseTrustHandover;
 using eidolon::ProvisioningDescriptor;
 using eidolon::TrustHandover;
@@ -22,10 +22,12 @@ const char* kCertificateInJson =
 const char* kCertificate =
     "-----BEGIN CERTIFICATE-----\nMIIBdummy\n-----END CERTIFICATE-----\n";
 
-std::string Handover(const std::string& hub_id = "ehost-0123456789abcdef0123")
+std::string Handover(const std::string& owner_domain_id = "owner-0123456789abcdef0123")
 {
-    return std::string("{\"contract_version\":\"1\",\"hub_id\":\"") + hub_id +
-           "\",\"hub_certificate\":\"" + kCertificateInJson + "\"}";
+    return std::string("{\"contract_version\":\"1\",\"owner_domain_id\":\"") + owner_domain_id +
+           "\",\"owner_domain_descriptor\":{\"owner_domain_id\":\"owner_01\"},"
+           "\"owner_root_certificate\":\"" + kCertificateInJson +
+           "\",\"authority_signing_certificate\":\"" + kCertificateInJson + "\"}";
 }
 
 bool Contains(const std::string& haystack, const std::string& needle)
@@ -75,31 +77,31 @@ void DeclaresDevelopmentAndProductionTrustAsOneField()
     assert(Contains(BuildProvisioningDescriptorJson(production), "\"trust\":\"manufacturer-bound\""));
 }
 
-void AcceptsTheHostAControllerHandsOver()
+void AcceptsTheOwnerDomainAControllerHandsOver()
 {
     TrustHandover handover;
     assert(ParseTrustHandover(Handover(), handover));
-    assert(handover.hub_id == "ehost-0123456789abcdef0123");
-    assert(handover.certificate_pem == kCertificate);
+    assert(handover.owner_domain_id == "owner-0123456789abcdef0123");
+    assert(handover.owner_root_certificate_pem == kCertificate);
+    assert(handover.authority_signing_certificate_pem == kCertificate);
+    assert(Contains(handover.owner_domain_descriptor_json, "owner_domain_id"));
 }
 
-void RefusesAHandoverThatNamesNoHost()
+void RefusesAHandoverThatNamesNoOwnerDomain()
 {
     TrustHandover handover;
+    assert(!ParseTrustHandover("{\"contract_version\":\"1\"}", handover));
     assert(!ParseTrustHandover(
-        std::string("{\"contract_version\":\"1\",\"hub_certificate\":\"") + kCertificateInJson +
-            "\"}",
-        handover));
-    assert(!ParseTrustHandover(
-        "{\"contract_version\":\"1\",\"hub_id\":\"ehost-abc\"}", handover));
+        "{\"contract_version\":\"1\",\"owner_domain_id\":\"owner-abc\"}", handover));
 }
 
 void RefusesAnythingThatIsNotACertificate()
 {
     TrustHandover handover;
-    assert(!ParseTrustHandover(
-        "{\"contract_version\":\"1\",\"hub_id\":\"h\",\"hub_certificate\":\"not-a-pem\"}",
-        handover));
+    std::string invalid = Handover();
+    const auto start = invalid.find(kCertificateInJson);
+    invalid.replace(start, std::string(kCertificateInJson).size(), "not-a-pem");
+    assert(!ParseTrustHandover(invalid, handover));
     assert(!IsCommissionableCertificate(""));
     assert(!IsCommissionableCertificate("-----BEGIN PRIVATE KEY-----"));
     assert(!IsCommissionableCertificate(
@@ -107,7 +109,7 @@ void RefusesAnythingThatIsNotACertificate()
     assert(IsCommissionableCertificate(kCertificate));
 }
 
-void RefusesAnOversizedHostId()
+void RefusesAnOversizedOwnerDomainId()
 {
     TrustHandover handover;
     assert(!ParseTrustHandover(Handover(std::string(129, 'h')), handover));
@@ -120,14 +122,11 @@ void RefusesAForeignOrMalformedEnvelope()
     assert(!ParseTrustHandover("not json", handover));
     assert(!ParseTrustHandover("[]", handover));
     // A future contract version is not something this firmware may guess at.
-    assert(!ParseTrustHandover(
-        std::string("{\"contract_version\":\"2\",\"hub_id\":\"h\",\"hub_certificate\":\"") +
-            kCertificateInJson + "\"}",
-        handover));
+    std::string future = Handover();
+    future.replace(future.find("\"1\""), 3, "\"2\"");
+    assert(!ParseTrustHandover(future, handover));
     // Nor an unversioned one: every Eidolon contract carries its version.
-    assert(!ParseTrustHandover(
-        std::string("{\"hub_id\":\"h\",\"hub_certificate\":\"") + kCertificateInJson + "\"}",
-        handover));
+    assert(!ParseTrustHandover("{\"owner_domain_id\":\"h\"}", handover));
 }
 
 void LeavesTheHandoverUntouchedWhenItRefuses()
@@ -135,27 +134,28 @@ void LeavesTheHandoverUntouchedWhenItRefuses()
     TrustHandover handover;
     assert(ParseTrustHandover(Handover(), handover));
     assert(!ParseTrustHandover("garbage", handover));
-    // A refused payload must not leave the previous Host half-applied.
-    assert(handover.hub_id.empty());
-    assert(handover.certificate_pem.empty());
+    // A refused payload must not leave the previous Owner Domain half-applied.
+    assert(handover.owner_domain_id.empty());
+    assert(handover.owner_root_certificate_pem.empty());
+    assert(handover.authority_signing_certificate_pem.empty());
 }
 
-void OnlyTheCommissionedHubIsOurs()
+void OnlyTheCommissionedOwnerDomainIsOurs()
 {
-    assert(IsCommissionedHub("ehost-abc", "ehost-abc"));
-    assert(!IsCommissionedHub("ehost-abc", "ehost-other"));
+    assert(IsCommissionedOwnerDomain("owner-abc", "owner-abc"));
+    assert(!IsCommissionedOwnerDomain("owner-abc", "owner-other"));
     // A device that belongs to nobody matches nothing — including another
     // uncommissioned answer.
-    assert(!IsCommissionedHub("", "ehost-abc"));
-    assert(!IsCommissionedHub("", ""));
+    assert(!IsCommissionedOwnerDomain("", "owner-abc"));
+    assert(!IsCommissionedOwnerDomain("", ""));
 }
 
 void AnswersATrustHandoverWithoutClaimingMore()
 {
-    const std::string accepted = BuildTrustAcceptedJson("aa:bb", "ehost-abc");
+    const std::string accepted = BuildTrustAcceptedJson("aa:bb", "owner-abc");
     assert(Contains(accepted, "\"accepted\":true"));
-    assert(Contains(accepted, "\"hub_id\":\"ehost-abc\""));
-    // Accepting the Host is not joining a network and not being admitted by it.
+    assert(Contains(accepted, "\"owner_domain_id\":\"owner-abc\""));
+    // Accepting the Owner Domain is not joining a network or being admitted.
     assert(!Contains(accepted, "network"));
     assert(!Contains(accepted, "lifecycle"));
 
@@ -186,13 +186,13 @@ int main()
     DescribesThisDeviceToAController();
     SaysHowLongTheWindowLastsRatherThanWhenItEnds();
     DeclaresDevelopmentAndProductionTrustAsOneField();
-    AcceptsTheHostAControllerHandsOver();
-    RefusesAHandoverThatNamesNoHost();
+    AcceptsTheOwnerDomainAControllerHandsOver();
+    RefusesAHandoverThatNamesNoOwnerDomain();
     RefusesAnythingThatIsNotACertificate();
-    RefusesAnOversizedHostId();
+    RefusesAnOversizedOwnerDomainId();
     RefusesAForeignOrMalformedEnvelope();
     LeavesTheHandoverUntouchedWhenItRefuses();
-    OnlyTheCommissionedHubIsOurs();
+    OnlyTheCommissionedOwnerDomainIsOurs();
     AnswersATrustHandoverWithoutClaimingMore();
     ReportsAMissingEnrollmentAsAnAnswer();
     return 0;

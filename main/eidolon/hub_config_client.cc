@@ -30,24 +30,24 @@ namespace eidolon {
 namespace {
 
 #if CONFIG_EIDOLON_GUARD_SERVICE
-std::string GuardRuntimeUrl(const std::string& descriptor_uri)
+std::string GuardRuntimeUrl(const std::string& authority_base_uri)
 {
-    const std::string suffix = "/api/device-onboarding/v1/descriptor";
-    const size_t pos = descriptor_uri.find(suffix);
+    const std::string suffix = "/api/device-control/v1";
+    const size_t pos = authority_base_uri.find(suffix);
     if (pos == std::string::npos) {
         return "";
     }
-    return descriptor_uri.substr(0, pos) + "/api/guard/runtime-config";
+    return authority_base_uri.substr(0, pos) + "/api/guard/runtime-config";
 }
 
-std::string GuardOwnerFaceUrl(const std::string& descriptor_uri)
+std::string GuardOwnerFaceUrl(const std::string& authority_base_uri)
 {
-    const std::string suffix = "/api/device-onboarding/v1/descriptor";
-    const size_t pos = descriptor_uri.find(suffix);
+    const std::string suffix = "/api/device-control/v1";
+    const size_t pos = authority_base_uri.find(suffix);
     if (pos == std::string::npos) {
         return "";
     }
-    return descriptor_uri.substr(0, pos) + "/api/guard/owner-face-profile";
+    return authority_base_uri.substr(0, pos) + "/api/guard/owner-face-profile";
 }
 
 bool IsOpaqueReferenceId(const std::string& value)
@@ -63,10 +63,10 @@ bool IsOpaqueReferenceId(const std::string& value)
     return true;
 }
 
-std::string GuardOwnerFaceReferenceUrl(const std::string& descriptor_uri,
+std::string GuardOwnerFaceReferenceUrl(const std::string& authority_base_uri,
                                        const std::string& reference_id)
 {
-    std::string manifest = GuardOwnerFaceUrl(descriptor_uri);
+    std::string manifest = GuardOwnerFaceUrl(authority_base_uri);
     if (manifest.empty() || !IsOpaqueReferenceId(reference_id)) {
         return "";
     }
@@ -163,14 +163,14 @@ bool ReadRoomConfig(const cJSON* root, RoomConfig* out)
 }  // namespace
 
 #if CONFIG_EIDOLON_GUARD_SERVICE
-esp_err_t HubConfigClient::FetchGuardRuntime(const std::string& descriptor_uri,
+esp_err_t HubConfigClient::FetchGuardRuntime(const std::string& authority_base_uri,
                                              const std::string& device_id,
                                              GuardRuntimeHubConfig& out)
 {
     out = GuardRuntimeHubConfig{};
-    const std::string request_url = GuardRuntimeUrl(descriptor_uri);
+    const std::string request_url = GuardRuntimeUrl(authority_base_uri);
     if (request_url.empty()) {
-        ESP_LOGE(TAG, "Cannot derive Guard runtime URL from %s", descriptor_uri.c_str());
+        ESP_LOGE(TAG, "Cannot derive Guard runtime URL from %s", authority_base_uri.c_str());
         return ESP_ERR_INVALID_ARG;
     }
     auto network = Board::GetInstance().GetNetwork();

@@ -6,12 +6,15 @@
 #include <string>
 #include <vector>
 
+#include "device_foundation_v1_generated.h"
+
 namespace eidolon {
 
 // mDNS TXT record keys (eidolon_hub discovery contract).
 inline constexpr const char* kTxtVers = "txtvers";
-inline constexpr const char* kTxtDescriptorUri = "descriptor_uri";
-inline constexpr const char* kTxtEnrollmentUri = "enrollment_uri";
+inline constexpr const char* kTxtOwnerDomainId = "owner_domain_id";
+inline constexpr const char* kTxtOwnerDomainDescriptorUri =
+    "owner_domain_descriptor_uri";
 
 inline constexpr int kSupportedTxtVers = 1;
 inline constexpr int kSupportedOnboardingProtocol = 1;
@@ -56,27 +59,18 @@ inline HubConfigStatus ParseHubConfigStatus(const std::string& status) {
     return HubConfigStatus::PendingApproval;
 }
 
-struct HubTxtRecord {
+struct AuthorityCandidateRecord {
     int txtvers = 0;
     std::map<std::string, std::string> entries;
-    std::string descriptor_uri;
-    std::string enrollment_uri;
-};
-
-struct HubDescriptor {
-    int schema_version = 0;
-    std::string hub_id;
-    std::string descriptor_uri;
-    std::string device_onboarding_uri;
-    std::string enrollment_uri;
+    std::string owner_domain_id;
+    std::string owner_domain_descriptor_uri;
 };
 
 // Crash-safe, short-lived enrollment secrets. This state is deliberately
 // independent from Wi-Fi credentials and from the approved channel config.
 struct HubOnboardingState {
-    std::string hub_id;
-    std::string descriptor_uri;
-    std::string enrollment_uri;
+    std::string owner_domain_id;
+    uint64_t directory_revision = 0;
     std::string device_id;
     std::string request_id;
     std::string retrieval_token;

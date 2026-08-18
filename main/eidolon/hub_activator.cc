@@ -50,14 +50,14 @@ bool HubActivator::Run() {
     for (;;) {
         app.SetEidolonLifecycleUi(LifecyclePhase::HubDiscovering);
 
-        HubTxtRecord txt;
+        AuthorityCandidateRecord txt;
         esp_err_t err = discovery.Discover(txt);
         if (err == ESP_OK) {
             app.SetEidolonLifecycleUi(LifecyclePhase::HubRegistering);
             Esp32HubConfig config;
             err = client.Run(txt, device_id, config);
             if (err == ESP_OK) {
-                if (store.SaveHubConfig(config, txt.descriptor_uri) != ESP_OK) {
+                if (store.SaveHubConfig(config) != ESP_OK) {
                     // The Host already admitted this device and the credential is
                     // in hand; only the cache of it failed. Refusing to continue
                     // turned a full NVS partition into a device that could not be
