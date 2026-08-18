@@ -33,29 +33,7 @@ public:
 
     esp_err_t Connect(const Esp32HubConfig& config, uint32_t generation);
 
-    // Replace the transport session on this channel, keeping the channel — its
-    // credentials, its room, and the media board — exactly as it is.
-    //
-    // REMOVABLE. This exists for one reason: the LiveKit ESP client records the
-    // single remote audio track a connection is subscribed to, and releases
-    // that record only when the connection itself is torn down. Nothing clears
-    // it when the track goes away. So a connection that has carried one
-    // conversation believes forever that it is still subscribed to a track that
-    // no longer exists, and the next agent's audio is refused with
-    // ENGINE_ERR_MAX_SUB — the device sits in a conversation it cannot hear.
-    //
-    // The client is a stated developer preview; LiveKit's own model everywhere
-    // else is one long connection carrying tracks that come and go. When this
-    // client grows that half, delete this method and its caller: nothing else
-    // depends on the session being replaced.
-    //
-    // The two-room design that came before never met this, because switching
-    // rooms gave every conversation a new connection anyway. This keeps that
-    // one load-bearing property and drops what it used to cost — a second room,
-    // a second credential, and a media board rebuilt per conversation.
-    esp_err_t RenewSession(const Esp32HubConfig& config, uint32_t generation);
-
-    esp_err_t Disconnect(bool release_media = true);
+    esp_err_t Disconnect();
     bool HasRoom() const { return room_handle_ != nullptr; }
     bool IsConnected() const;
     livekit_failure_reason_t LastFailureReason() const { return last_failure_reason_; }

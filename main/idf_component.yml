@@ -77,8 +77,19 @@ dependencies:
   espressif/esp_new_jpeg: ^0.6.1
   espressif/mdns: "^1.4.0"
 
+  # Our fork of livekit/client-sdk-esp32, pinned to a commit: managed_components/
+  # is not tracked, so the fork is the only place a fix to this SDK survives.
+  # It is upstream v0.3.10 (the newest release) plus two fixes, both of which
+  # this firmware depends on:
+  #   - the engine releases a subscribed audio track when it goes away, so a
+  #     connection can carry more than one conversation;
+  #   - a data channel is only started on a connection that negotiates one, so
+  #     the subscriber can reach connected instead of retrying SCTP INIT forever.
+  # https over ssh so a build needs no SSH access to the fork.
   livekit/livekit:
-    version: "0.3.10"
+    git: https://github.com/eidolon-os/client-sdk-esp32.git
+    path: components/livekit
+    version: 502ce391bf01c47dea74e1dd651c5b8945ca8906
     rules:
     - if: target in [esp32s3, esp32p4]
 

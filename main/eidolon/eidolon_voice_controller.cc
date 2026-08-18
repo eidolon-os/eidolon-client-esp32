@@ -1268,7 +1268,7 @@ void EidolonVoiceController::DoConnectTimeout()
     switching_to_voice_ = false;
     control_recovery_.OnDisconnected();
     control_recovery_.FinishRetry();
-    session_.Disconnect(true);
+    session_.Disconnect();
     standby_ = false;
     // Supersede the hung attempt so any of its late callbacks are dropped rather
     // than accepted after we fall back (the next ConnectChannel bumps again).
@@ -2892,31 +2892,6 @@ void EidolonVoiceController::HandleSessionEnd(EndReason reason)
     CloseConversationAudio();
     standby_ = true;
     SetState(StateForConfig(config_), "session_end");
-    RenewSpentSession();
-}
-
-void EidolonVoiceController::RenewSpentSession()
-{
-    // Done here, on the way back to standby, rather than on the way into the
-    // next conversation: the connection is spent the moment a conversation ends
-    // (see LiveKitSession::RenewSession), and this is the quiet moment. Doing it
-    // when the next conversation is asked for would put a second and a half in
-    // front of someone waiting to be heard.
-    //
-    // Every way back to standby arrives here — the channel's session_end, the
-    // user leaving, and the idle fallback for when no session_end is seen at
-    // all — so the standby invariant holds however the conversation ended:
-    // a device in standby holds a session that has never carried audio.
-    if (!HasActiveConfig() || !session_.HasRoom()) {
-        // Nothing to replace. Whatever put the device here owns getting it back.
-        return;
-    }
-    const uint32_t generation = BeginSessionGeneration("voice");
-    const esp_err_t err = session_.RenewSession(config_, generation);
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "[lifecycle] session renew failed: %s", esp_err_to_name(err));
-        ScheduleControlReconnect("session_renew_failed");
-    }
 }
 
 // ============================ Lifecycle handlers ============================
@@ -3037,7 +3012,7 @@ void EidolonVoiceController::DoNetworkLost()
     }
 #endif
     standby_ = false;
-    session_.Disconnect(true);
+    session_.Disconnect();
     // Supersede so late callbacks from the dropped connection don't resurrect a
     // stale state once the network returns and we reconnect.
     MarkSessionSuperseded("network_lost");
@@ -3220,7 +3195,7 @@ esp_err_t EidolonVoiceController::ConnectChannel()
     // makes callbacks already in flight stale before the new attempt begins.
     if (session_.HasRoom()) {
         MarkSessionSuperseded("control_attempt_replace");
-        session_.Disconnect(true);
+        session_.Disconnect();
     }
     standby_ = true;
     const uint32_t control_generation = BeginSessionGeneration("control");

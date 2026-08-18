@@ -336,7 +336,7 @@ void LiveKitSession::ReleaseMediaBoard()
 esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generation)
 {
     if (room_handle_ != nullptr) {
-        Disconnect(true);
+        Disconnect();
     }
 
     identity_ = config.session.identity;
@@ -413,24 +413,13 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
     return ESP_OK;
 }
 
-esp_err_t LiveKitSession::RenewSession(const Esp32HubConfig& config, uint32_t generation)
-{
-    // release_media=false is the whole point: the board survives, so this costs
-    // a room handle rather than a codec, an AFE and a renderer. Connect() then
-    // finds no room to replace and a board already built.
-    Disconnect(/*release_media=*/false);
-    ESP_LOGI(TAG, "[lifecycle] renewing session on room=%s (board kept)",
-             config.session.room_name.c_str());
-    return Connect(config, generation);
-}
-
-esp_err_t LiveKitSession::Disconnect(bool release_media)
+esp_err_t LiveKitSession::Disconnect()
 {
     connected_ = false;
     if (room_handle_ == nullptr) {
         identity_.clear();
         last_failure_reason_ = LIVEKIT_FAILURE_REASON_NONE;
-        if (release_media && media_board_initialized_) {
+        if (media_board_initialized_) {
             ESP_LOGI(TAG, "Releasing LiveKit media board without active room");
             ReleaseMediaBoard();
             using_media_ = false;
@@ -439,7 +428,7 @@ esp_err_t LiveKitSession::Disconnect(bool release_media)
     }
 
     livekit_room_handle_t handle = room_handle_;
-    ESP_LOGI(TAG, "Disconnecting room (release_media=%d)", release_media ? 1 : 0);
+    ESP_LOGI(TAG, "Disconnecting room");
 
     UnregisterStreamHandlers();
 
@@ -466,7 +455,7 @@ esp_err_t LiveKitSession::Disconnect(bool release_media)
     room_handle_ = nullptr;
     identity_.clear();
     last_failure_reason_ = LIVEKIT_FAILURE_REASON_NONE;
-    if (release_media && media_board_initialized_) {
+    if (media_board_initialized_) {
         ReleaseMediaBoard();
         ESP_LOGI(TAG, "LiveKit media board released");
         using_media_ = false;
