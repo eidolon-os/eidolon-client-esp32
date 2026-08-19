@@ -179,6 +179,13 @@ private:
             app.ToggleChatState();
         });
 
+        // Setup must remain reachable after the short boot-only click window.
+        // The board adapter owns the gesture; the common Wi-Fi/Owner
+        // provisioning service continues to own the bounded setup act itself.
+        boot_button_.OnLongPress([this]() {
+            EnterWifiConfigMode();
+        });
+
 #if CONFIG_USE_DEVICE_AEC
         boot_button_.OnDoubleClick([this]() {
             auto& app = Application::GetInstance();
