@@ -6,7 +6,8 @@
 #include "settings.h"
 #include "assets/lang_config.h"
 #if CONFIG_EIDOLON_HUB_MODE
-#include "eidolon/device_provisioning.h"
+#include "eidolon/commissioning_runtime.h"
+#include "eidolon/commissioning_transaction.h"
 #include "eidolon/eidolon_ui_types.h"
 #endif
 
@@ -67,6 +68,12 @@ std::string WifiBoard::GetBoardType() {
 }
 
 void WifiBoard::StartNetwork() {
+#if CONFIG_EIDOLON_HUB_MODE
+    if (!eidolon::RecoverPendingCommissioningTransaction()) {
+        ESP_LOGE(TAG, "Commissioning transaction recovery is still pending; refusing Station start");
+        return;
+    }
+#endif
     auto& wifi_manager = WifiManager::GetInstance();
 
     // Initialize WiFi manager
@@ -171,24 +178,19 @@ void WifiBoard::OnWifiConnectTimeout(void* arg) {
 
 
 void WifiBoard::StartWifiConfigMode() {
-    in_config_mode_ = true;
-    // Transition to wifi configuring state
-    Application::GetInstance().SetDeviceState(kDeviceStateWifiConfiguring);
 #if CONFIG_EIDOLON_HUB_MODE
-    // One setup act hands this device both things it needs: the network to join
-    // and the Host to trust on it. What carries the act — BLE or SoftAP — is a
-    // per-board choice inside the provisioning service, and nothing here or
-    // above depends on which one it was. The station comes back when the act
-    // ends, because provisioning owns the radio only while it runs.
-    if (eidolon::DeviceProvisioningService::GetInstance().Start(
-            []() { WifiManager::GetInstance().StartStation(); }) != ESP_OK) {
-        ESP_LOGE(TAG, "Device provisioning is unavailable");
+    // This is an intent boundary. Identity, radio, transport, persistence and
+    // user-visible state are all owned by the commissioning actor.
+    if (!eidolon::CommissioningRuntime::GetInstance().RequestOpen()) {
+        ESP_LOGE(TAG, "Commissioning runtime did not accept the request");
         return;
     }
     Application::GetInstance().Schedule([]() {
-        ShowSetupHint("Open Eidolon on your phone to set this device up");
+        ShowSetupHint("Preparing secure device setup");
     });
 #elif defined(CONFIG_USE_HOTSPOT_WIFI_PROVISIONING)
+    in_config_mode_ = true;
+    Application::GetInstance().SetDeviceState(kDeviceStateWifiConfiguring);
     auto& wifi_manager = WifiManager::GetInstance();
 
     wifi_manager.StartConfigAp();
@@ -231,6 +233,9 @@ void WifiBoard::EnterWifiConfigMode() {
         // Reset protocol (close audio channel, reset protocol)
         Application::GetInstance().ResetProtocol();
 
+#if CONFIG_EIDOLON_HUB_MODE
+        StartWifiConfigMode();
+#else
         xTaskCreate([](void* arg) {
             auto* board = static_cast<WifiBoard*>(arg);
 
@@ -246,6 +251,7 @@ void WifiBoard::EnterWifiConfigMode() {
 
             vTaskDelete(NULL);
         }, "wifi_cfg_delay", 4096, this, 2, NULL);
+#endif
         return;
     }
 
@@ -259,18 +265,12 @@ void WifiBoard::EnterWifiConfigMode() {
         return;
     }
 
-    // Stop any ongoing connection attempt
-    esp_timer_stop(connect_timer_);
-    WifiManager::GetInstance().StopStation();
-
     StartWifiConfigMode();
 }
 
 bool WifiBoard::IsInWifiConfigMode() const {
 #if CONFIG_EIDOLON_HUB_MODE
-    // Setup runs on the provisioning service rather than on the vendor captive
-    // portal, so the Wi-Fi manager has no access point to report.
-    return in_config_mode_;
+    return eidolon::CommissioningRuntime::GetInstance().IsAdvertising();
 #else
     return WifiManager::GetInstance().IsConfigMode();
 #endif

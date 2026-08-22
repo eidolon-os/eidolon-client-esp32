@@ -12,6 +12,7 @@
 #   EIDOLON_IDF_PATH                   ESP-IDF root directory
 #   EIDOLON_OWNER_PRESENCE_VOICE_WAKE Enable owner-confirmed voice join: y/n (default y)
 #   EIDOLON_BOX3_RADAR_THRESHOLD_DELTA Radar threshold: 0-1023, larger is nearer (default 450)
+#   EIDOLON_RUNTIME_DIAGNOSTICS       Strong stack guards/watchpoint: y/n (default n)
 #   IDF_PATH                           ESP-IDF root directory
 
 set -euo pipefail
@@ -28,6 +29,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PORT="${EIDOLON_PORT:-}"
 OWNER_PRESENCE_VOICE_WAKE="${EIDOLON_OWNER_PRESENCE_VOICE_WAKE:-y}"
 RADAR_THRESHOLD_DELTA="${EIDOLON_BOX3_RADAR_THRESHOLD_DELTA:-450}"
+RUNTIME_DIAGNOSTICS="${EIDOLON_RUNTIME_DIAGNOSTICS:-n}"
 
 if [[ "${OWNER_PRESENCE_VOICE_WAKE}" != "y" &&
       "${OWNER_PRESENCE_VOICE_WAKE}" != "n" ]]; then
@@ -37,6 +39,11 @@ fi
 if [[ ! "${RADAR_THRESHOLD_DELTA}" =~ ^[0-9]+$ ]] ||
    ((RADAR_THRESHOLD_DELTA < 0 || RADAR_THRESHOLD_DELTA > 1023)); then
   echo "error: EIDOLON_BOX3_RADAR_THRESHOLD_DELTA must be an integer from 0 to 1023" >&2
+  exit 2
+fi
+if [[ "${RUNTIME_DIAGNOSTICS}" != "y" &&
+      "${RUNTIME_DIAGNOSTICS}" != "n" ]]; then
+  echo "error: EIDOLON_RUNTIME_DIAGNOSTICS must be y or n" >&2
   exit 2
 fi
 
@@ -261,6 +268,26 @@ ensure_box3_sdkconfig() {
   set_sdkconfig_value EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS 75000
   set_sdkconfig_value MMAP_FILE_NAME_LENGTH 32
   set_sdkconfig_value PARTITION_TABLE_CUSTOM_FILENAME '"partitions/v2/16m_eidolon_box3.csv"'
+
+  # Reproducible, opt-in crash diagnostics. Keep this out of normal firmware:
+  # the guards deliberately trade code size for exact evidence. Explicitly
+  # restoring every choice prevents a later normal build from silently
+  # inheriting a diagnostic sdkconfig.
+  if [[ "${RUNTIME_DIAGNOSTICS}" == "y" ]]; then
+    set_sdkconfig_bool COMPILER_STACK_CHECK_MODE_NONE n
+    set_sdkconfig_bool COMPILER_STACK_CHECK_MODE_NORM n
+    set_sdkconfig_bool COMPILER_STACK_CHECK_MODE_STRONG y
+    set_sdkconfig_bool COMPILER_STACK_CHECK_MODE_ALL n
+    set_sdkconfig_bool COMPILER_STACK_CHECK y
+    set_sdkconfig_bool FREERTOS_WATCHPOINT_END_OF_STACK y
+  else
+    set_sdkconfig_bool COMPILER_STACK_CHECK_MODE_NONE y
+    set_sdkconfig_bool COMPILER_STACK_CHECK_MODE_NORM n
+    set_sdkconfig_bool COMPILER_STACK_CHECK_MODE_STRONG n
+    set_sdkconfig_bool COMPILER_STACK_CHECK_MODE_ALL n
+    set_sdkconfig_bool COMPILER_STACK_CHECK n
+    set_sdkconfig_bool FREERTOS_WATCHPOINT_END_OF_STACK n
+  fi
 }
 
 idf_args() {
@@ -316,6 +343,8 @@ Environment:
                                Compile owner-confirmed automatic voice join (default y)
   EIDOLON_BOX3_RADAR_THRESHOLD_DELTA=450
                                Unitless AT581X threshold; larger is nearer
+  EIDOLON_RUNTIME_DIAGNOSTICS=n
+                               Enable reproducible strong stack diagnostics
 EOF
 }
 

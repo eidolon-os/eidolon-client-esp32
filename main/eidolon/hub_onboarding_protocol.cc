@@ -232,20 +232,6 @@ bool ParseOwnerDomainDescriptor(
     return !canonical_signing_bytes.empty();
 }
 
-const device_foundation::v1::AuthorityEndpoint* FindAuthorityEndpoint(
-    const device_foundation::v1::OwnerDomainDescriptor& descriptor,
-    device_foundation::v1::LogicalAuthority authority)
-{
-    const device_foundation::v1::AuthorityEndpoint* selected = nullptr;
-    for (const auto& endpoint : descriptor.endpoints) {
-        if (endpoint.authority == authority &&
-            (selected == nullptr || endpoint.priority < selected->priority)) {
-            selected = &endpoint;
-        }
-    }
-    return selected;
-}
-
 std::string BuildDeviceManifestJson(const std::string& board_name, bool has_camera)
 {
     cJSON* title = cJSON_CreateString(board_name.c_str());

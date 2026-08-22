@@ -1174,6 +1174,26 @@ menu "Eidolon Hub"
             duration and computes its own expiry, because a device being set up
             has no wall clock yet.
 
+    config EIDOLON_OWNER_TRUST_WORKER_STACK_BYTES
+        int "Owner trust commissioner worker stack (bytes)"
+        default 12288
+        range 8192 24576
+        depends on EIDOLON_HUB_MODE
+        help
+            Dedicated stack for descriptor parsing, X.509/ES256 verification and
+            crash-safe Owner trust persistence. This work must not execute on a
+            Protocomm callback stack. The worker is the sole Owner trust writer.
+
+    config EIDOLON_OWNER_TRUST_WORK_DEADLINE_MS
+        int "Owner trust commissioner commit deadline (ms)"
+        default 10000
+        range 3000 30000
+        depends on EIDOLON_HUB_MODE
+        help
+            Maximum time from enqueue until the inactive trust slot may become
+            active. The callback response waits two seconds longer, ensuring a
+            timeout cannot be followed by a late successful commissioning.
+
     config EIDOLON_PROVISIONING_SALT_HEX
         string "SRP6a salt for the provisioning session (hex)"
         default "2133af3845196306f61cb3bb2e18862c"

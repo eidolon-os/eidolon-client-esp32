@@ -14,6 +14,7 @@
 
 #if CONFIG_EIDOLON_HUB_MODE
 #include "eidolon/eidolon_audio_input.h"
+#include "eidolon/commissioning_runtime.h"
 #include "eidolon/eidolon_device_store.h"
 #include "eidolon/eidolon_ui_presenter.h"
 #if CONFIG_EIDOLON_GUARD_SERVICE
@@ -496,8 +497,10 @@ void Application::Initialize() {
             }
             case NetworkEvent::Disconnected:
 #if CONFIG_EIDOLON_HUB_MODE
-                SetEidolonLifecycleUi(eidolon::LifecyclePhase::Offline,
-                                      "Wi-Fi disconnected");
+                if (!eidolon::CommissioningRuntime::GetInstance().IsInProgress()) {
+                    SetEidolonLifecycleUi(eidolon::LifecyclePhase::Offline,
+                                          "Wi-Fi disconnected");
+                }
 #endif
                 xEventGroupSetBits(event_group_, MAIN_EVENT_NETWORK_DISCONNECTED);
                 break;
@@ -682,7 +685,8 @@ void Application::HandleNetworkDisconnectedEvent() {
     auto state = GetDeviceState();
     if (state != kDeviceStateStarting &&
         state != kDeviceStateWifiConfiguring &&
-        state != kDeviceStateActivating) {
+        state != kDeviceStateActivating &&
+        !eidolon::CommissioningRuntime::GetInstance().IsInProgress()) {
         SetEidolonLifecycleUi(eidolon::LifecyclePhase::Offline);
     }
     if (voice_transport_) {

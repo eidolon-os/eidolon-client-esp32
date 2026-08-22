@@ -7,7 +7,7 @@ namespace {
 
 using eidolon::BuildEnrollmentReceiptJson;
 using eidolon::BuildProvisioningDescriptorJson;
-using eidolon::BuildTrustAcceptedJson;
+using eidolon::BuildTrustStagedJson;
 using eidolon::BuildTrustRefusedJson;
 using eidolon::IsCommissionableCertificate;
 using eidolon::IsCommissionedOwnerDomain;
@@ -152,15 +152,16 @@ void OnlyTheCommissionedOwnerDomainIsOurs()
 
 void AnswersATrustHandoverWithoutClaimingMore()
 {
-    const std::string accepted = BuildTrustAcceptedJson("aa:bb", "owner-abc");
-    assert(Contains(accepted, "\"accepted\":true"));
-    assert(Contains(accepted, "\"owner_domain_id\":\"owner-abc\""));
-    // Accepting the Owner Domain is not joining a network or being admitted.
-    assert(!Contains(accepted, "network"));
-    assert(!Contains(accepted, "lifecycle"));
+    const std::string staged = BuildTrustStagedJson("aa:bb", "owner-abc");
+    assert(Contains(staged, "\"staged\":true"));
+    assert(!Contains(staged, "\"accepted\""));
+    assert(Contains(staged, "\"owner_domain_id\":\"owner-abc\""));
+    // Staging the Owner Domain is not joining a network or activating trust.
+    assert(!Contains(staged, "network"));
+    assert(!Contains(staged, "lifecycle"));
 
     const std::string refused = BuildTrustRefusedJson("payload is not supported");
-    assert(Contains(refused, "\"accepted\":false"));
+    assert(Contains(refused, "\"staged\":false"));
     assert(Contains(refused, "payload is not supported"));
 }
 
@@ -179,6 +180,40 @@ void ReportsAMissingEnrollmentAsAnAnswer()
     assert(Contains(ready, "\"lifecycle_state\":\"pending-approval\""));
 }
 
+void EmitsOnlyCompleteCanonicalCommissioningSuccess()
+{
+    using namespace eidolon::device_foundation::v1;
+    CommissioningStatusEvidence evidence;
+    evidence.session_id = "setup_session_01";
+    evidence.setup_generation = 7;
+    evidence.state_revision = 5;
+    evidence.state = CommissioningStatusState::Committed;
+    evidence.conditions = {true, true, true, true};
+    const std::string body = eidolon::BuildCommissioningStatusJson(evidence);
+    assert(Contains(body, "\"state\":\"committed\""));
+    assert(Contains(body, "\"owner_route_validated\":true"));
+    assert(Contains(body, "\"failure_code\":null"));
+
+    evidence.conditions.owner_route_validated = false;
+    assert(eidolon::BuildCommissioningStatusJson(evidence).empty());
+}
+
+void TerminalAckIsStrictAndGenerationBound()
+{
+    using namespace eidolon::device_foundation::v1;
+    const std::string body =
+        "{\"contract\":\"eidolon.device-foundation.commissioning-terminal-ack\","
+        "\"contract_version\":\"1.0\",\"session_id\":\"setup_session_01\","
+        "\"setup_generation\":7,\"observed_state_revision\":5}";
+    CommissioningTerminalAck ack;
+    assert(eidolon::ParseCommissioningTerminalAck(body, ack));
+    assert(ack.session_id == "setup_session_01");
+    assert(ack.setup_generation == 7);
+    assert(ack.observed_state_revision == 5);
+    assert(!eidolon::ParseCommissioningTerminalAck(
+        body.substr(0, body.size() - 1) + ",\"extra\":true}", ack));
+}
+
 }  // namespace
 
 int main()
@@ -195,5 +230,7 @@ int main()
     OnlyTheCommissionedOwnerDomainIsOurs();
     AnswersATrustHandoverWithoutClaimingMore();
     ReportsAMissingEnrollmentAsAnAnswer();
+    EmitsOnlyCompleteCanonicalCommissioningSuccess();
+    TerminalAckIsStrictAndGenerationBound();
     return 0;
 }

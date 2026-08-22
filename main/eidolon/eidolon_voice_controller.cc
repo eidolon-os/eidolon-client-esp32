@@ -868,25 +868,19 @@ esp_err_t EidolonVoiceController::LoadStoredConfig()
 
 esp_err_t EidolonVoiceController::LoadAuthorityRoutes()
 {
-    OwnerTrustBundle trust;
-    device_foundation::v1::OwnerDomainDescriptor descriptor;
-    std::string canonical;
-    if (!OwnerTrustStore().Load(trust) ||
-        !ParseOwnerDomainDescriptor(
-            trust.owner_domain_descriptor_json, descriptor, canonical) ||
-        VerifyOwnerDomainDescriptor(
-            descriptor, canonical, trust.owner_root_certificate_pem,
-            trust.authority_signing_certificate_pem) != ESP_OK) {
+    auto& locator = DeviceAuthorityLocator::GetInstance();
+    if (locator.ReloadCommissionedDirectory() != ESP_OK) {
         device_control_uri_.clear();
         return ESP_ERR_NOT_ALLOWED;
     }
-    const auto* endpoint = FindAuthorityEndpoint(
-        descriptor, device_foundation::v1::LogicalAuthority::DeviceControl);
-    if (endpoint == nullptr) {
+    device_foundation::v1::AuthorityEndpoint endpoint;
+    const esp_err_t err = locator.Resolve(
+        device_foundation::v1::LogicalAuthority::DeviceControl, endpoint);
+    if (err != ESP_OK) {
         device_control_uri_.clear();
-        return ESP_ERR_NOT_FOUND;
+        return err;
     }
-    device_control_uri_ = endpoint->uri;
+    device_control_uri_ = endpoint.uri;
     return ESP_OK;
 }
 

@@ -1,5 +1,8 @@
 #include "authority_locator.h"
 
+#include "authority_locator_core.h"
+#include "hub_onboarding_protocol.h"
+
 #include <mbedtls/base64.h>
 #include <mbedtls/ecdsa.h>
 #include <mbedtls/oid.h>
@@ -13,6 +16,10 @@
 #include <cstdint>
 #include <ctime>
 #include <limits>
+#include <memory>
+#include <mutex>
+#include <utility>
+#include <vector>
 
 namespace eidolon {
 namespace {
@@ -235,6 +242,166 @@ esp_err_t VerifyOwnerDomainDescriptor(
     mbedtls_x509_crt_free(&authority);
     mbedtls_x509_crt_free(&root);
     return result == 0 ? ESP_OK : ESP_ERR_NOT_ALLOWED;
+}
+
+namespace {
+
+esp_err_t LocatorError(AuthorityLocatorResult result)
+{
+    switch (result) {
+    case AuthorityLocatorResult::Accepted:
+    case AuthorityLocatorResult::Unchanged:
+        return ESP_OK;
+    case AuthorityLocatorResult::NotCommissioned:
+        return ESP_ERR_INVALID_STATE;
+    case AuthorityLocatorResult::WrongOwnerDomain:
+        return ESP_ERR_NOT_ALLOWED;
+    case AuthorityLocatorResult::DescriptorRejected:
+    case AuthorityLocatorResult::RevisionRollback:
+    case AuthorityLocatorResult::RevisionConflict:
+        return ESP_ERR_INVALID_RESPONSE;
+    case AuthorityLocatorResult::PersistenceFailed:
+        return ESP_FAIL;
+    case AuthorityLocatorResult::AuthorityDiscoveryRequired:
+    case AuthorityLocatorResult::AuthorityUnavailable:
+        return ESP_ERR_NOT_FOUND;
+    }
+    return ESP_FAIL;
+}
+
+}  // namespace
+
+struct DeviceAuthorityLocator::Impl {
+    class Verifier final : public AuthorityDescriptorVerifierPort {
+    public:
+        explicit Verifier(const OwnerTrustBundle& trust) : trust_(trust) {}
+
+        bool Verify(
+            const device_foundation::v1::OwnerDomainDescriptor& descriptor,
+            const std::string& canonical_signing_bytes) const override
+        {
+            return VerifyOwnerDomainDescriptor(
+                       descriptor, canonical_signing_bytes,
+                       trust_.owner_root_certificate_pem,
+                       trust_.authority_signing_certificate_pem) == ESP_OK;
+        }
+
+        bool IsUsableNow(
+            const device_foundation::v1::OwnerDomainDescriptor& descriptor)
+            const override
+        {
+            return DescriptorWindowValid(descriptor);
+        }
+
+    private:
+        const OwnerTrustBundle& trust_;
+    };
+
+    class Store final : public AuthorityDescriptorStorePort {
+    public:
+        bool SaveAcceptedDescriptor(
+            const std::string& descriptor_json) override
+        {
+            return OwnerTrustStore().SaveAcceptedDescriptor(descriptor_json) ==
+                   ESP_OK;
+        }
+    };
+
+    Impl() : verifier(trust), core(verifier, store) {}
+
+    mutable std::mutex mutex;
+    OwnerTrustBundle trust;
+    Verifier verifier;
+    Store store;
+    AuthorityLocatorCore core;
+};
+
+DeviceAuthorityLocator::DeviceAuthorityLocator()
+    : impl_(std::make_unique<Impl>())
+{
+}
+
+DeviceAuthorityLocator::~DeviceAuthorityLocator() = default;
+
+DeviceAuthorityLocator& DeviceAuthorityLocator::GetInstance()
+{
+    static DeviceAuthorityLocator instance;
+    return instance;
+}
+
+esp_err_t DeviceAuthorityLocator::ReloadCommissionedDirectory()
+{
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    OwnerTrustBundle trust;
+    device_foundation::v1::OwnerDomainDescriptor descriptor;
+    std::string canonical;
+    if (!OwnerTrustStore().Load(trust) ||
+        !ParseOwnerDomainDescriptor(
+            trust.owner_domain_descriptor_json, descriptor, canonical) ||
+        descriptor.owner_domain_id != trust.owner_domain_id) {
+        impl_->trust = OwnerTrustBundle{};
+        impl_->core.Commission("");
+        return ESP_ERR_NOT_ALLOWED;
+    }
+    impl_->trust = std::move(trust);
+    impl_->core.Commission(impl_->trust.owner_domain_id);
+    const AuthorityLocatorResult restored =
+        impl_->core.Restore(descriptor, canonical);
+    if (restored != AuthorityLocatorResult::Accepted) {
+        impl_->trust = OwnerTrustBundle{};
+        impl_->core.Commission("");
+    }
+    return LocatorError(restored);
+}
+
+esp_err_t DeviceAuthorityLocator::AcceptDescriptor(
+    const device_foundation::v1::OwnerDomainDescriptor& descriptor,
+    const std::string& canonical_signing_bytes,
+    const std::string& descriptor_json)
+{
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    return LocatorError(impl_->core.Accept(
+        descriptor, canonical_signing_bytes, descriptor_json));
+}
+
+esp_err_t DeviceAuthorityLocator::Resolve(
+    device_foundation::v1::LogicalAuthority authority,
+    device_foundation::v1::AuthorityEndpoint& out) const
+{
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    std::vector<const device_foundation::v1::AuthorityEndpoint*> endpoints;
+    const AuthorityLocatorResult result = impl_->core.Resolve(
+        impl_->trust.owner_domain_id, authority, endpoints);
+    if (result != AuthorityLocatorResult::Accepted) {
+        out = device_foundation::v1::AuthorityEndpoint{};
+        return LocatorError(result);
+    }
+    out = *endpoints.front();
+    return ESP_OK;
+}
+
+esp_err_t DeviceAuthorityLocator::AcceptedDescriptor(
+    device_foundation::v1::OwnerDomainDescriptor& out) const
+{
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    const auto* descriptor = impl_->core.accepted();
+    if (descriptor == nullptr) {
+        out = device_foundation::v1::OwnerDomainDescriptor{};
+        return ESP_ERR_NOT_FOUND;
+    }
+    out = *descriptor;
+    return ESP_OK;
+}
+
+esp_err_t DeviceAuthorityLocator::TrustBundle(OwnerTrustBundle& out) const
+{
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    if (impl_->trust.owner_domain_id.empty()) {
+        out = OwnerTrustBundle{};
+        return ESP_ERR_INVALID_STATE;
+    }
+    out = impl_->trust;
+    return ESP_OK;
 }
 
 }  // namespace eidolon

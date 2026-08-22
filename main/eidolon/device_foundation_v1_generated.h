@@ -35,6 +35,47 @@ struct OwnerDomainDescriptor {
     std::string signature;
 };
 
+enum class CommissioningStatusState {
+    ApplyingConfiguration,
+    Committed,
+    RolledBack,
+    Failed,
+};
+
+enum class CommissioningFailureCode {
+    None,
+    NetworkRejected,
+    OwnerRouteUnavailable,
+    OwnerIdentityMismatch,
+    StorageUnavailable,
+    WindowExpired,
+    Cancelled,
+    Internal,
+};
+
+struct CommissioningConditions {
+    bool wifi_connected = false;
+    bool owner_route_validated = false;
+    bool trust_committed = false;
+    bool network_committed = false;
+};
+
+struct CommissioningStatusEvidence {
+    std::string session_id;
+    uint32_t setup_generation = 0;
+    uint32_t state_revision = 0;
+    CommissioningStatusState state =
+        CommissioningStatusState::ApplyingConfiguration;
+    CommissioningConditions conditions;
+    CommissioningFailureCode failure_code = CommissioningFailureCode::None;
+};
+
+struct CommissioningTerminalAck {
+    std::string session_id;
+    uint32_t setup_generation = 0;
+    uint32_t observed_state_revision = 0;
+};
+
 }  // namespace eidolon::device_foundation::v1
 
 #endif  // EIDOLON_DEVICE_FOUNDATION_V1_GENERATED_H_

@@ -127,8 +127,7 @@ esp_err_t StatusError(int status)
 
 esp_err_t HubOnboardingClient::FetchDescriptor(
     const AuthorityCandidateRecord& candidate,
-    device_foundation::v1::OwnerDomainDescriptor& out,
-    std::string& raw)
+    device_foundation::v1::OwnerDomainDescriptor& out)
 {
     HubHttpResponse response;
     const esp_err_t err = HubHttpRequest(
@@ -142,23 +141,21 @@ esp_err_t HubOnboardingClient::FetchDescriptor(
         return StatusError(response.status);
     }
     std::string canonical;
-    if (!ParseOwnerDomainDescriptor(response.body, out, canonical) ||
-        out.owner_domain_id != trust_.owner_domain_id ||
-        VerifyOwnerDomainDescriptor(
-            out, canonical, trust_.owner_root_certificate_pem,
-            trust_.authority_signing_certificate_pem) != ESP_OK ||
-        out.directory_revision < accepted_descriptor_.directory_revision ||
-        (out.directory_revision == accepted_descriptor_.directory_revision &&
-         canonical != accepted_canonical_)) {
-        ESP_LOGE(TAG, "Owner Domain descriptor failed trust or revision checks");
+    if (!ParseOwnerDomainDescriptor(response.body, out, canonical)) {
+        ESP_LOGE(TAG, "Owner Domain descriptor is not a V1 contract document");
         return ESP_ERR_INVALID_RESPONSE;
     }
-    raw = response.body;
-    return ESP_OK;
+    const esp_err_t accepted =
+        DeviceAuthorityLocator::GetInstance().AcceptDescriptor(
+            out, canonical, response.body);
+    if (accepted != ESP_OK) {
+        ESP_LOGE(TAG, "Owner Domain descriptor failed trust or revision checks");
+        return accepted;
+    }
+    return DeviceAuthorityLocator::GetInstance().AcceptedDescriptor(out);
 }
 
 esp_err_t HubOnboardingClient::EnsureEnrollment(
-    const device_foundation::v1::OwnerDomainDescriptor& descriptor,
     HubOnboardingState& state)
 {
     if (state.enrolled()) {
@@ -169,11 +166,12 @@ esp_err_t HubOnboardingClient::EnsureEnrollment(
         return ESP_ERR_NO_MEM;
     }
     HubHttpResponse response;
-    const auto* admission = FindAuthorityEndpoint(
-        descriptor, device_foundation::v1::LogicalAuthority::Admission);
-    if (admission == nullptr) return ESP_ERR_NOT_FOUND;
-    const std::string enrollment_uri = admission->uri + "/enrollments";
-    const esp_err_t err = HubHttpRequest(
+    device_foundation::v1::AuthorityEndpoint admission;
+    esp_err_t err = DeviceAuthorityLocator::GetInstance().Resolve(
+        device_foundation::v1::LogicalAuthority::Admission, admission);
+    if (err != ESP_OK) return err;
+    const std::string enrollment_uri = admission.uri + "/enrollments";
+    err = HubHttpRequest(
         "POST", enrollment_uri, trust_.owner_root_certificate_pem, body, response);
     if (err != ESP_OK) {
         return err;
@@ -192,9 +190,8 @@ esp_err_t HubOnboardingClient::EnsureEnrollment(
 }
 
 esp_err_t HubOnboardingClient::Handoff(
-                                       const device_foundation::v1::OwnerDomainDescriptor& descriptor,
-                                       HubOnboardingState& state,
-                                       Esp32HubConfig& out)
+    HubOnboardingState& state,
+    Esp32HubConfig& out)
 {
     const std::string request_id = "handoff-" + Base64UrlRandom(16);
     cJSON* root = cJSON_CreateObject();
@@ -206,13 +203,14 @@ esp_err_t HubOnboardingClient::Handoff(
     if (request_id.size() <= std::strlen("handoff-") || body.empty()) {
         return ESP_ERR_NO_MEM;
     }
-    const auto* admission = FindAuthorityEndpoint(
-        descriptor, device_foundation::v1::LogicalAuthority::Admission);
-    if (admission == nullptr) return ESP_ERR_NOT_FOUND;
-    const std::string url = admission->uri + "/enrollments/" +
+    device_foundation::v1::AuthorityEndpoint admission;
+    esp_err_t err = DeviceAuthorityLocator::GetInstance().Resolve(
+        device_foundation::v1::LogicalAuthority::Admission, admission);
+    if (err != ESP_OK) return err;
+    const std::string url = admission.uri + "/enrollments/" +
                             state.enrollment_id + "/handoff";
     HubHttpResponse response;
-    const esp_err_t err = HubHttpRequest(
+    err = HubHttpRequest(
         "POST", url, trust_.owner_root_certificate_pem, body, response);
     if (err != ESP_OK) {
         return err;
@@ -246,15 +244,9 @@ esp_err_t HubOnboardingClient::Handoff(
 
 esp_err_t HubOnboardingClient::LoadCommissionedTrust()
 {
-    if (!OwnerTrustStore().Load(trust_) ||
-        !ParseOwnerDomainDescriptor(
-            trust_.owner_domain_descriptor_json,
-            accepted_descriptor_, accepted_canonical_) ||
-        accepted_descriptor_.owner_domain_id != trust_.owner_domain_id ||
-        VerifyOwnerDomainDescriptor(
-            accepted_descriptor_, accepted_canonical_,
-            trust_.owner_root_certificate_pem,
-            trust_.authority_signing_certificate_pem) != ESP_OK) {
+    auto& locator = DeviceAuthorityLocator::GetInstance();
+    if (locator.ReloadCommissionedDirectory() != ESP_OK ||
+        locator.TrustBundle(trust_) != ESP_OK) {
         ESP_LOGE(TAG, "This device has no valid commissioned Owner Domain");
         return ESP_ERR_NOT_ALLOWED;
     }
@@ -273,16 +265,8 @@ esp_err_t HubOnboardingClient::Run(const AuthorityCandidateRecord& candidate,
         return ESP_ERR_NOT_ALLOWED;
     }
     device_foundation::v1::OwnerDomainDescriptor descriptor;
-    std::string raw;
-    err = FetchDescriptor(candidate, descriptor, raw);
+    err = FetchDescriptor(candidate, descriptor);
     if (err != ESP_OK) return err;
-    if (descriptor.directory_revision > accepted_descriptor_.directory_revision) {
-        err = OwnerTrustStore().SaveAcceptedDescriptor(raw);
-        if (err != ESP_OK) return err;
-        trust_.owner_domain_descriptor_json = raw;
-        accepted_descriptor_ = descriptor;
-        ParseOwnerDomainDescriptor(raw, accepted_descriptor_, accepted_canonical_);
-    }
     return RunAccepted(descriptor, device_id, out);
 }
 
@@ -329,11 +313,11 @@ esp_err_t HubOnboardingClient::RunAccepted(
                 return err;
             }
         }
-        err = EnsureEnrollment(descriptor, state);
+        err = EnsureEnrollment(state);
         if (err != ESP_OK) {
             return err;
         }
-        err = Handoff(descriptor, state, out);
+        err = Handoff(state, out);
         if (err == ESP_OK && state.lifecycle_state == "revoked" &&
             !restarted_after_revocation) {
             // The Owner took this device off the Authority. Admission permits a revoked
@@ -365,8 +349,11 @@ esp_err_t HubOnboardingClient::RunAccepted(
 esp_err_t HubOnboardingClient::Resume(const std::string& device_id,
                                       Esp32HubConfig& out)
 {
-    const esp_err_t err = LoadCommissionedTrust();
-    return err == ESP_OK ? RunAccepted(accepted_descriptor_, device_id, out) : err;
+    esp_err_t err = LoadCommissionedTrust();
+    if (err != ESP_OK) return err;
+    device_foundation::v1::OwnerDomainDescriptor descriptor;
+    err = DeviceAuthorityLocator::GetInstance().AcceptedDescriptor(descriptor);
+    return err == ESP_OK ? RunAccepted(descriptor, device_id, out) : err;
 }
 
 }  // namespace eidolon

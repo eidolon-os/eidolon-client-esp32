@@ -19,26 +19,21 @@ public:
 
 private:
     // Loaded once per run from what commissioning left behind. Empty means this
-    // device belongs to no Host yet and must not speak to one.
+    // device has no commissioned Owner Domain and must not accept discovery.
     esp_err_t LoadCommissionedTrust();
 
     esp_err_t FetchDescriptor(
         const AuthorityCandidateRecord& candidate,
-        device_foundation::v1::OwnerDomainDescriptor& out,
-        std::string& raw);
+        device_foundation::v1::OwnerDomainDescriptor& out);
     esp_err_t EnsureEnrollment(
-                               const device_foundation::v1::OwnerDomainDescriptor& descriptor,
-                               HubOnboardingState& state);
-    esp_err_t Handoff(const device_foundation::v1::OwnerDomainDescriptor& descriptor,
-                      HubOnboardingState& state,
+        HubOnboardingState& state);
+    esp_err_t Handoff(HubOnboardingState& state,
                       Esp32HubConfig& out);
     esp_err_t RunAccepted(const device_foundation::v1::OwnerDomainDescriptor& descriptor,
                           const std::string& device_id,
                           Esp32HubConfig& out);
 
     OwnerTrustBundle trust_;
-    device_foundation::v1::OwnerDomainDescriptor accepted_descriptor_;
-    std::string accepted_canonical_;
 };
 
 }  // namespace eidolon

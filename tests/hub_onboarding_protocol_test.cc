@@ -69,9 +69,9 @@ void TestDescriptorParsesToCanonicalSignedDocument()
            "\"owner_domain_id\":\"owner_01\","
            "\"signing_key_id\":\"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\","
            "\"trust_root_refs\":[\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"]}");
-    assert(eidolon::FindAuthorityEndpoint(
-               parsed,
-               eidolon::device_foundation::v1::LogicalAuthority::Admission) != nullptr);
+    assert(parsed.endpoints.size() == 1);
+    assert(parsed.endpoints.front().authority ==
+           eidolon::device_foundation::v1::LogicalAuthority::Admission);
 }
 
 void TestCanonicalManifest()

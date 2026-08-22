@@ -1,7 +1,10 @@
 #ifndef EIDOLON_DEVICE_PROVISIONING_PROTOCOL_H_
 #define EIDOLON_DEVICE_PROVISIONING_PROTOCOL_H_
 
+#include <cstddef>
 #include <string>
+
+#include "device_foundation_v1_generated.h"
 
 namespace eidolon {
 
@@ -55,6 +58,11 @@ struct TrustHandover {
     std::string authority_signing_certificate_pem;
 };
 
+// Adapter callbacks use the same limit before allocating/copying input. Keep a
+// single value here so the wire parser cannot accept more than the runtime
+// boundary was prepared to own.
+inline constexpr size_t kMaxTrustHandoverPayloadBytes = 16 * 1024;
+
 // Read a trust handover, accepting only a complete and bounded one. Kept apart
 // from any transport so the rules that decide what this device will believe can
 // be exercised without a BLE stack or an HTTP server.
@@ -72,13 +80,22 @@ bool IsCommissionableCertificate(const std::string& certificate_pem);
 bool IsCommissionedOwnerDomain(const std::string& commissioned_owner_domain_id,
                                const std::string& discovered_owner_domain_id);
 
-// The answer to a trust handover. It reports that the payload was accepted and
-// stored — not that the network came up or that the Host admitted this device,
-// neither of which has been attempted when this is sent.
-std::string BuildTrustAcceptedJson(const std::string& device_id,
-                                   const std::string& owner_domain_id);
+// The answer to a trust handover. It reports that the payload was verified and
+// durably staged, but deliberately not yet activated. Activation is part of the
+// later trust+network transaction commit after Owner route validation.
+std::string BuildTrustStagedJson(const std::string& device_id,
+                                 const std::string& owner_domain_id);
 
 std::string BuildTrustRefusedJson(const char* reason);
+
+// Custom Protocomm status/ack endpoints use the canonical SDK DTOs. The
+// status is the only success evidence Mobile may project as network configured;
+// an IDF credential callback is intentionally not part of this contract.
+std::string BuildCommissioningStatusJson(
+    const device_foundation::v1::CommissioningStatusEvidence& evidence);
+bool ParseCommissioningTerminalAck(
+    const std::string& body,
+    device_foundation::v1::CommissioningTerminalAck& out);
 
 // What the controller collects while this device joins the network and enrolls.
 // An empty `lifecycle_state` says the enrollment has not happened yet, which is

@@ -2,27 +2,25 @@
 
 #include "device_identity.h"
 #include "device_provisioning_protocol.h"
-#include "authority_locator.h"
-#include "hub_onboarding_protocol.h"
-#include "hub_trust_store.h"
+#include "owner_trust_commissioning_worker.h"
 #include "system_info.h"
 
 #include "sdkconfig.h"
 
 #include <esp_event.h>
+#include <esp_http_server.h>
 #include <esp_log.h>
 #include <esp_netif.h>
 #include <esp_random.h>
 #include <esp_timer.h>
 #include <esp_wifi.h>
 #include <wifi_provisioning/manager.h>
+#include <protocomm_security.h>
 #if CONFIG_EIDOLON_PROVISIONING_TRANSPORT_BLE
 #include <wifi_provisioning/scheme_ble.h>
 #else
 #include <wifi_provisioning/scheme_softap.h>
 #endif
-
-#include <ssid_manager.h>
 
 #include <cstdlib>
 #include <cstring>
@@ -39,6 +37,8 @@ namespace {
 // and the controller walks all of them over one authenticated session.
 constexpr const char* kDescriptorEndpoint = "eidolon-descriptor";
 constexpr const char* kTrustEndpoint = "eidolon-trust";
+constexpr const char* kStatusEndpoint = "eidolon-status";
+constexpr const char* kTerminalAckEndpoint = "eidolon-terminal-ack";
 
 // How long this device offers to be set up. A window rather than a permanent
 // door: an uncommissioned device that never closed would let anything on the
@@ -122,17 +122,6 @@ bool DecodeHex(const char* hex, std::vector<uint8_t>& out)
     return true;
 }
 
-std::string RandomToken(size_t bytes)
-{
-    static const char* kAlphabet = "0123456789abcdefghijklmnopqrstuvwxyz";
-    std::string token;
-    token.reserve(bytes);
-    for (size_t i = 0; i < bytes; ++i) {
-        token.push_back(kAlphabet[esp_random() % 36]);
-    }
-    return token;
-}
-
 // What a controller sees while scanning. Board-derived rather than Host-derived:
 // a device that belongs to nobody has no Host to name, and the controller
 // confirms identity from the descriptor rather than from this string.
@@ -200,70 +189,88 @@ esp_err_t DeviceProvisioningService::HandleDescriptor(uint32_t, const uint8_t*, 
 esp_err_t DeviceProvisioningService::HandleTrust(uint32_t, const uint8_t* inbuf, ssize_t inlen,
                                                 uint8_t** outbuf, ssize_t* outlen, void*)
 {
-    const std::string body(reinterpret_cast<const char*>(inbuf != nullptr ? inbuf : nullptr),
-                           inlen > 0 ? static_cast<size_t>(inlen) : 0);
-    TrustHandover handover;
-    if (!ParseTrustHandover(body, handover)) {
-        ESP_LOGE(TAG, "Refused a trust handover this firmware does not understand");
-        return Answer(BuildTrustRefusedJson("handover is not supported"), outbuf, outlen);
+    auto& self = GetInstance();
+    std::string response;
+    bool staged = false;
+    const size_t payload_size =
+        inlen > 0 ? static_cast<size_t>(inlen) : 0;
+    const esp_err_t result = self.events_.stage_trust
+        ? self.events_.stage_trust(self.transport_generation_, inbuf,
+                                   payload_size, response, staged)
+        : ESP_ERR_INVALID_STATE;
+    if (result != ESP_OK) {
+        ESP_LOGW(TAG, "Owner trust request completed with %s",
+                 esp_err_to_name(result));
     }
-    device_foundation::v1::OwnerDomainDescriptor descriptor;
-    std::string canonical;
-    if (!ParseOwnerDomainDescriptor(
-            handover.owner_domain_descriptor_json, descriptor, canonical) ||
-        descriptor.owner_domain_id != handover.owner_domain_id ||
-        VerifyOwnerDomainDescriptor(
-            descriptor,
-            canonical,
-            handover.owner_root_certificate_pem,
-            handover.authority_signing_certificate_pem) != ESP_OK) {
-        ESP_LOGE(TAG, "Rejected invalid Owner Domain trust bundle");
-        return Answer(BuildTrustRefusedJson("owner trust is invalid"), outbuf,
-                      outlen);
+    if (response.empty()) {
+        response = BuildTrustRefusedJson("owner trust worker is unavailable");
     }
-    OwnerTrustBundle bundle;
-    bundle.owner_domain_id = handover.owner_domain_id;
-    bundle.owner_domain_descriptor_json = handover.owner_domain_descriptor_json;
-    bundle.owner_root_certificate_pem = handover.owner_root_certificate_pem;
-    bundle.authority_signing_certificate_pem =
-        handover.authority_signing_certificate_pem;
-    const esp_err_t saved = OwnerTrustStore().Save(bundle);
-    if (saved != ESP_OK) {
-        ESP_LOGE(TAG, "Rejected commissioned Owner trust: %s",
-                 esp_err_to_name(saved));
-        return Answer(BuildTrustRefusedJson("owner trust was not stored"),
-                      outbuf, outlen);
+    if (staged) {
+        ESP_LOGI(TAG, "Owner trust is durable staging, not active trust");
     }
-    ESP_LOGI(TAG, "Commissioned for Owner Domain %s",
-             handover.owner_domain_id.c_str());
-    return Answer(BuildTrustAcceptedJson(SystemInfo::GetMacAddress(),
-                                         handover.owner_domain_id),
+    return Answer(response, outbuf, outlen);
+}
+
+esp_err_t DeviceProvisioningService::HandleStatus(
+    uint32_t, const uint8_t*, ssize_t, uint8_t** outbuf, ssize_t* outlen, void*)
+{
+    auto& self = GetInstance();
+    if (!self.events_.commissioning_status) return ESP_ERR_INVALID_STATE;
+    return Answer(self.events_.commissioning_status(self.transport_generation_),
                   outbuf, outlen);
 }
 
-void DeviceProvisioningService::HandleProvisioningEvent(void*, const char*, int32_t event_id,
+esp_err_t DeviceProvisioningService::HandleTerminalAck(
+    uint32_t, const uint8_t* inbuf, ssize_t inlen,
+    uint8_t** outbuf, ssize_t* outlen, void*)
+{
+    auto& self = GetInstance();
+    if (inbuf == nullptr || inlen <= 0 || !self.events_.terminal_ack) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    const std::string payload(reinterpret_cast<const char*>(inbuf),
+                              static_cast<size_t>(inlen));
+    const bool accepted = self.events_.terminal_ack(
+        self.transport_generation_, payload);
+    return Answer(accepted ? "{\"acknowledged\":true}"
+                           : "{\"acknowledged\":false}",
+                  outbuf, outlen);
+}
+
+void DeviceProvisioningService::HandleProvisioningEvent(void*, const char* event_base, int32_t event_id,
                                                        void* event_data)
 {
     auto& self = GetInstance();
+    const uint32_t generation =
+        self.transport_generation_.load(std::memory_order_acquire);
+    if (generation == 0) return;
+    if (event_base == PROTOCOMM_SECURITY_SESSION_EVENT) {
+        if (event_id == PROTOCOMM_SECURITY_SESSION_SETUP_OK &&
+            self.events_.authenticated_session_started) {
+            self.events_.authenticated_session_started(generation);
+        }
+        return;
+    }
     switch (event_id) {
     case WIFI_PROV_START:
         ESP_LOGI(TAG, "Provisioning session open as %s", ServiceName().c_str());
+        self.manager_started_.store(true, std::memory_order_release);
+        self.MaybeReportReady();
         break;
     case WIFI_PROV_CRED_RECV: {
-        // The Wi-Fi driver is initialized with NVS persistence disabled, so the
-        // credentials the SDK just applied live only in RAM. SsidManager is this
-        // firmware's one credential store, and writing here is what makes the
-        // network survive a reboot.
+        // The vendor stack has applied this candidate only to the live Wi-Fi
+        // driver. This callback copies bounded evidence and returns; only the
+        // commissioning actor may decide whether it becomes durable.
         const auto* config = static_cast<const wifi_sta_config_t*>(event_data);
-        if (config != nullptr) {
+        if (config != nullptr && self.events_.network_candidate_received) {
             const std::string ssid(reinterpret_cast<const char*>(config->ssid),
                                    strnlen(reinterpret_cast<const char*>(config->ssid),
                                            sizeof(config->ssid)));
             const std::string password(reinterpret_cast<const char*>(config->password),
                                        strnlen(reinterpret_cast<const char*>(config->password),
                                                sizeof(config->password)));
-            ESP_LOGI(TAG, "Provisioned network %s", ssid.c_str());
-            SsidManager::GetInstance().AddSsid(ssid, password);
+            self.events_.network_candidate_received(
+                generation, ssid, password);
         }
         break;
     }
@@ -271,19 +278,89 @@ void DeviceProvisioningService::HandleProvisioningEvent(void*, const char*, int3
         // Unlike the endpoint this replaces, a wrong password is reported to the
         // controller while it is still connected, before anything is torn down.
         ESP_LOGW(TAG, "Provisioned network did not come up; controller was told");
+        if (self.events_.wifi_connection_failed) {
+            self.events_.wifi_connection_failed(generation);
+        }
         break;
     case WIFI_PROV_CRED_SUCCESS:
         ESP_LOGI(TAG, "Provisioned network came up");
+        if (self.events_.wifi_connected) {
+            self.events_.wifi_connected(generation);
+        }
         break;
     case WIFI_PROV_END:
-        // Provisioning owned the radio while it ran. Give it back.
-        self.Stop();
-        if (self.handover_) {
-            self.handover_();
+        self.manager_started_.store(false, std::memory_order_release);
+        // This callback never destroys resources. An unsolicited SDK end is
+        // evidence for the actor; an actor-initiated end is already converging
+        // through CleanupTransport().
+        if (!self.cleanup_in_progress_.load(std::memory_order_acquire) &&
+            self.events_.transport_ended_unexpectedly) {
+            self.events_.transport_ended_unexpectedly(generation);
         }
         break;
     default:
         break;
+    }
+}
+
+esp_err_t DeviceProvisioningService::RegisterEventHandlers()
+{
+    const uint32_t generation =
+        transport_generation_.load(std::memory_order_acquire);
+    esp_err_t err = esp_event_handler_instance_register(
+        WIFI_PROV_EVENT, ESP_EVENT_ANY_ID, &HandleProvisioningEvent, nullptr,
+        &provisioning_event_instance_);
+    if (err != ESP_OK) return err;
+    resources_.Own(generation, CommissioningTransportResource::EventHandlers);
+
+    err = esp_event_handler_instance_register(
+        PROTOCOMM_SECURITY_SESSION_EVENT, ESP_EVENT_ANY_ID,
+        &HandleProvisioningEvent, nullptr, &security_event_instance_);
+    return err;
+}
+
+esp_err_t DeviceProvisioningService::StartOwnedHttpServer()
+{
+#if CONFIG_EIDOLON_PROVISIONING_TRANSPORT_BLE
+    return ESP_OK;
+#else
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.max_uri_handlers =
+        CommissioningTransportEndpointBudget::kRequiredUriHandlers;
+    config.max_open_sockets = 1;
+    config.lru_purge_enable = true;
+    const esp_err_t err = httpd_start(
+        reinterpret_cast<httpd_handle_t*>(&httpd_handle_), &config);
+    if (err != ESP_OK) return err;
+
+    const uint32_t generation =
+        transport_generation_.load(std::memory_order_acquire);
+    resources_.Own(generation, CommissioningTransportResource::HttpServer);
+    // ESP-IDF's API is typed as void*, but protocomm expects the stable address
+    // of the handle and dereferences it while registering every endpoint.
+    wifi_prov_scheme_softap_set_httpd_handle(&httpd_handle_);
+    ESP_LOGI(TAG, "Owned commissioning HTTP server has %u URI slots",
+             static_cast<unsigned>(config.max_uri_handlers));
+    return ESP_OK;
+#endif
+}
+
+void DeviceProvisioningService::MaybeReportReady()
+{
+    if (!manager_started_.load(std::memory_order_acquire) ||
+        !endpoints_registered_.load(std::memory_order_acquire) ||
+        cleanup_in_progress_.load(std::memory_order_acquire)) {
+        return;
+    }
+    bool expected = false;
+    if (!ready_reported_.compare_exchange_strong(
+            expected, true, std::memory_order_acq_rel)) {
+        return;
+    }
+    const uint32_t generation =
+        transport_generation_.load(std::memory_order_acquire);
+    if (generation != 0 && events_.transport_ready) {
+        events_.transport_ready(generation, ServiceName());
     }
 }
 
@@ -302,8 +379,18 @@ esp_err_t DeviceProvisioningService::StartTransport()
     security_params_.verifier_len = static_cast<uint16_t>(verifier_.size());
 
     if (wifi_prov_mgr_endpoint_create(kDescriptorEndpoint) != ESP_OK ||
-        wifi_prov_mgr_endpoint_create(kTrustEndpoint) != ESP_OK) {
+        wifi_prov_mgr_endpoint_create(kTrustEndpoint) != ESP_OK ||
+        wifi_prov_mgr_endpoint_create(kStatusEndpoint) != ESP_OK ||
+        wifi_prov_mgr_endpoint_create(kTerminalAckEndpoint) != ESP_OK) {
         ESP_LOGE(TAG, "Could not create the Eidolon provisioning endpoints");
+        return ESP_FAIL;
+    }
+
+    // The SDK's default success path closes Protocomm before Eidolon can
+    // publish and receive its committed terminal ACK. The commissioning actor
+    // is the only component allowed to stop this generation.
+    if (wifi_prov_mgr_disable_auto_stop(1000) != ESP_OK) {
+        ESP_LOGE(TAG, "Could not transfer transport stop ownership to runtime");
         return ESP_FAIL;
     }
 
@@ -318,30 +405,44 @@ esp_err_t DeviceProvisioningService::StartTransport()
     // Endpoints are registered only once the service is up; the SDK requires
     // this order and unregisters them itself when provisioning stops.
     if (wifi_prov_mgr_endpoint_register(kDescriptorEndpoint, &HandleDescriptor, nullptr) != ESP_OK ||
-        wifi_prov_mgr_endpoint_register(kTrustEndpoint, &HandleTrust, nullptr) != ESP_OK) {
+        wifi_prov_mgr_endpoint_register(kTrustEndpoint, &HandleTrust, nullptr) != ESP_OK ||
+        wifi_prov_mgr_endpoint_register(kStatusEndpoint, &HandleStatus, nullptr) != ESP_OK ||
+        wifi_prov_mgr_endpoint_register(kTerminalAckEndpoint, &HandleTerminalAck, nullptr) != ESP_OK) {
         ESP_LOGE(TAG, "Could not register the Eidolon provisioning endpoints");
-        wifi_prov_mgr_stop_provisioning();
         return ESP_FAIL;
     }
+    endpoints_registered_.store(true, std::memory_order_release);
+    MaybeReportReady();
     return ESP_OK;
 }
 
-esp_err_t DeviceProvisioningService::Start(StationHandover handover)
+esp_err_t DeviceProvisioningService::Start(
+    uint32_t generation, std::string session_id, Events events)
 {
-    if (running_) {
+    if (generation == 0 || session_id.empty()) return ESP_ERR_INVALID_ARG;
+    if (running_.load(std::memory_order_acquire) &&
+        generation == transport_generation_.load(std::memory_order_acquire)) {
         return ESP_OK;
     }
-    handover_ = std::move(handover);
-    session_id_ = RandomToken(16);
+    if (!resources_.Begin(generation)) return ESP_ERR_INVALID_STATE;
+    events_ = std::move(events);
+    session_id_ = std::move(session_id);
+    transport_generation_.store(generation, std::memory_order_release);
+    cleanup_in_progress_.store(false, std::memory_order_release);
+    manager_started_.store(false, std::memory_order_release);
+    endpoints_registered_.store(false, std::memory_order_release);
+    ready_reported_.store(false, std::memory_order_release);
 
-    // The device identity has to exist before a controller reads the descriptor:
-    // its fingerprint is what the controller matches the later enrollment
-    // against, so producing it lazily would let setup start against a device
-    // that cannot yet prove who it is.
-    if (DeviceIdentity::GetInstance().EnsureKeypair() != ESP_OK) {
-        ESP_LOGE(TAG, "Cannot offer provisioning without a device identity");
-        return ESP_FAIL;
+    const esp_err_t worker_ready =
+        OwnerTrustCommissioningWorker::GetInstance().Activate(
+            transport_generation_);
+    if (worker_ready != ESP_OK) {
+        ESP_LOGE(TAG, "Owner trust worker did not start: %s",
+                 esp_err_to_name(worker_ready));
+        return worker_ready;
     }
+    resources_.Own(generation,
+                   CommissioningTransportResource::OwnerTrustWorker);
 
     // Provisioning owns the netifs while it runs and destroys them on the way
     // out, mirroring what the station does — so exactly one default Wi-Fi netif
@@ -351,12 +452,31 @@ esp_err_t DeviceProvisioningService::Start(StationHandover handover)
 #if !CONFIG_EIDOLON_PROVISIONING_TRANSPORT_BLE
     ap_netif_ = esp_netif_create_default_wifi_ap();
 #endif
+    // Record partial acquisition too. If one allocation succeeds and the next
+    // fails, the actor's single cleanup path must still release the first.
+    if (sta_netif_ != nullptr || ap_netif_ != nullptr) {
+        resources_.Own(generation,
+                       CommissioningTransportResource::NetworkInterfaces);
+    }
+    if (sta_netif_ == nullptr
+#if !CONFIG_EIDOLON_PROVISIONING_TRANSPORT_BLE
+        || ap_netif_ == nullptr
+#endif
+    ) {
+        ESP_LOGE(TAG, "Could not allocate commissioning network interfaces");
+        return ESP_ERR_NO_MEM;
+    }
 
-    esp_err_t err = esp_event_handler_register(WIFI_PROV_EVENT, ESP_EVENT_ANY_ID,
-                                              &HandleProvisioningEvent, nullptr);
-    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+    esp_err_t err = RegisterEventHandlers();
+    if (err != ESP_OK) {
         ESP_LOGE(TAG, "Could not observe provisioning events: %s", esp_err_to_name(err));
-        ReleaseNetifs();
+        return err;
+    }
+
+    err = StartOwnedHttpServer();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Could not start owned commissioning HTTP server: %s",
+                 esp_err_to_name(err));
         return err;
     }
 
@@ -371,18 +491,17 @@ esp_err_t DeviceProvisioningService::Start(StationHandover handover)
     err = wifi_prov_mgr_init(config);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Provisioning manager did not initialize: %s", esp_err_to_name(err));
-        ReleaseNetifs();
         return err;
     }
+    resources_.Own(generation,
+                   CommissioningTransportResource::ProvisioningManager);
 
     err = StartTransport();
     if (err != ESP_OK) {
-        wifi_prov_mgr_deinit();
-        ReleaseNetifs();
         return err;
     }
 
-    running_ = true;
+    running_.store(true, std::memory_order_release);
 
     // Arm the window this device is about to advertise. Started only once the
     // session is up, so a failed start does not leave a timer to fire into
@@ -403,6 +522,10 @@ esp_err_t DeviceProvisioningService::Start(StationHandover handover)
             timer = nullptr;
         }
         window_timer_ = timer;
+        if (timer != nullptr) {
+            resources_.Own(generation,
+                           CommissioningTransportResource::WindowTimer);
+        }
     }
     // Both results are checked and said out loud. An unreported failure here is
     // what let the window stay open for as long as the board stayed powered: the
@@ -415,11 +538,13 @@ esp_err_t DeviceProvisioningService::Start(StationHandover handover)
         if (armed != ESP_OK) {
             ESP_LOGE(TAG, "Setup window is not bounded: esp_timer_start_once said %s",
                      esp_err_to_name(armed));
+            return armed;
         } else {
             ESP_LOGI(TAG, "Awaiting setup for %d seconds", kWindowSeconds);
         }
     } else {
-        ESP_LOGE(TAG, "Setup window cannot be bounded; it will stay open until reset");
+        ESP_LOGE(TAG, "Setup window cannot be bounded");
+        return ESP_ERR_NO_MEM;
     }
     return ESP_OK;
 }
@@ -427,13 +552,13 @@ esp_err_t DeviceProvisioningService::Start(StationHandover handover)
 void DeviceProvisioningService::OnWindowElapsed(void*)
 {
     auto& self = GetInstance();
-    if (!self.running_) {
+    if (!self.running_.load(std::memory_order_acquire)) {
         return;
     }
     ESP_LOGI(TAG, "Setup window elapsed with nobody claiming this device");
-    self.Stop();
-    if (self.handover_) {
-        self.handover_();
+    if (self.events_.window_expired) {
+        self.events_.window_expired(
+            self.transport_generation_.load(std::memory_order_acquire));
     }
 }
 
@@ -449,19 +574,77 @@ void DeviceProvisioningService::ReleaseNetifs()
     }
 }
 
-void DeviceProvisioningService::Stop()
+void DeviceProvisioningService::CleanupTransport(uint32_t generation)
 {
-    if (!running_) {
+    if (!resources_.active() || resources_.generation() != generation ||
+        resources_.cleanup_claimed()) {
         return;
     }
-    running_ = false;
-    if (window_timer_ != nullptr) {
+    const CommissioningTransportCleanupPlan cleanup =
+        resources_.ClaimCleanup(generation);
+    cleanup_in_progress_.store(true, std::memory_order_release);
+    running_.store(false, std::memory_order_release);
+
+    // Reverse acquisition order. The manager owns all protocomm endpoints and
+    // must be completely deinitialized before the external HTTP server or
+    // netifs disappear underneath it.
+    if (cleanup.window_timer && window_timer_ != nullptr) {
         esp_timer_stop(static_cast<esp_timer_handle_t>(window_timer_));
+        esp_timer_delete(static_cast<esp_timer_handle_t>(window_timer_));
+        window_timer_ = nullptr;
     }
-    wifi_prov_mgr_stop_provisioning();
-    wifi_prov_mgr_deinit();
-    ReleaseNetifs();
-    ESP_LOGI(TAG, "Provisioning session closed");
+    if (cleanup.provisioning_manager) {
+        wifi_prov_mgr_deinit();
+    }
+    if (cleanup.event_handlers) {
+        if (security_event_instance_ != nullptr) {
+            esp_event_handler_instance_unregister(
+                PROTOCOMM_SECURITY_SESSION_EVENT, ESP_EVENT_ANY_ID,
+                security_event_instance_);
+            security_event_instance_ = nullptr;
+        }
+        if (provisioning_event_instance_ != nullptr) {
+            esp_event_handler_instance_unregister(
+                WIFI_PROV_EVENT, ESP_EVENT_ANY_ID,
+                provisioning_event_instance_);
+            provisioning_event_instance_ = nullptr;
+        }
+    }
+#if !CONFIG_EIDOLON_PROVISIONING_TRANSPORT_BLE
+    wifi_prov_scheme_softap_set_httpd_handle(nullptr);
+#endif
+    if (cleanup.http_server && httpd_handle_ != nullptr) {
+        const esp_err_t stopped =
+            httpd_stop(static_cast<httpd_handle_t>(httpd_handle_));
+        if (stopped != ESP_OK) {
+            ESP_LOGE(TAG, "Owned commissioning HTTP server did not stop: %s",
+                     esp_err_to_name(stopped));
+        }
+        httpd_handle_ = nullptr;
+    }
+    if (cleanup.network_interfaces) {
+        ReleaseNetifs();
+    }
+    if (cleanup.owner_trust_worker) {
+        OwnerTrustCommissioningWorker::GetInstance().Deactivate(generation);
+    }
+
+    manager_started_.store(false, std::memory_order_release);
+    endpoints_registered_.store(false, std::memory_order_release);
+    ready_reported_.store(false, std::memory_order_release);
+    transport_generation_.store(0, std::memory_order_release);
+    resources_.CompleteCleanup(generation);
+    cleanup_in_progress_.store(false, std::memory_order_release);
+    ESP_LOGI(TAG, "Provisioning generation %lu stopped and released",
+             static_cast<unsigned long>(generation));
+    if (events_.transport_stopped) {
+        events_.transport_stopped(generation);
+    }
+}
+
+void DeviceProvisioningService::Stop(uint32_t generation)
+{
+    CleanupTransport(generation);
 }
 
 }  // namespace eidolon
