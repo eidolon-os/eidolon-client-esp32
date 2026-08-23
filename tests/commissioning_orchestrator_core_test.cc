@@ -32,6 +32,8 @@ uint32_t OpenToSession(CommissioningOrchestratorCore& core)
     assert(Has(actions, CommissioningActionType::EnsureIdentity));
     const uint32_t generation = core.generation();
     core.Handle(Event(CommissioningEventType::IdentityReady, generation));
+    core.Handle(Event(CommissioningEventType::OperationalRuntimeQuiesced,
+                      generation));
     core.Handle(Event(CommissioningEventType::RadioAcquired, generation));
     auto ready = Event(CommissioningEventType::TransportReady, generation);
     ready.transport_ready = {"eidolon-a1b2c3", true, true};
@@ -56,6 +58,8 @@ void TestReadyRequiresEvidenceAndCallbacksAreGenerationFenced()
     core.Handle(Event(CommissioningEventType::OpenRequested, 0));
     const uint32_t generation = core.generation();
     core.Handle(Event(CommissioningEventType::IdentityReady, generation));
+    core.Handle(Event(CommissioningEventType::OperationalRuntimeQuiesced,
+                      generation));
     core.Handle(Event(CommissioningEventType::RadioAcquired, generation));
     auto incomplete = Event(CommissioningEventType::TransportReady, generation);
     incomplete.transport_ready = {"eidolon-a1b2c3", true, false};
@@ -180,6 +184,8 @@ void TestUnexpectedTransportEndUsesTheSingleStopPath()
     core.Handle(Event(CommissioningEventType::OpenRequested, 0));
     const uint32_t generation = core.generation();
     core.Handle(Event(CommissioningEventType::IdentityReady, generation));
+    core.Handle(Event(CommissioningEventType::OperationalRuntimeQuiesced,
+                      generation));
     core.Handle(Event(CommissioningEventType::RadioAcquired, generation));
 
     auto actions = core.Handle(Event(
@@ -204,11 +210,51 @@ void TestRepeatedOpenRetainsOneGenerationAndOneStartAction()
     assert(core.Handle(Event(CommissioningEventType::OpenRequested, 0)).empty());
     assert(core.generation() == generation);
     core.Handle(Event(CommissioningEventType::IdentityReady, generation));
+    core.Handle(Event(CommissioningEventType::OperationalRuntimeQuiesced,
+                      generation));
     actions = core.Handle(Event(CommissioningEventType::RadioAcquired,
                                 generation));
     assert(Has(actions, CommissioningActionType::StartTransport));
     assert(core.Handle(Event(CommissioningEventType::OpenRequested, 0)).empty());
     assert(core.generation() == generation);
+}
+
+void TestOperationalRuntimeMustQuiesceBeforeRadioLease()
+{
+    CommissioningOrchestratorCore core;
+    core.Handle(Event(CommissioningEventType::OpenRequested, 0));
+    const uint32_t generation = core.generation();
+
+    auto actions = core.Handle(
+        Event(CommissioningEventType::IdentityReady, generation));
+    assert(core.state() ==
+           CommissioningRuntimeState::QuiescingOperationalRuntime);
+    assert(Has(actions, CommissioningActionType::QuiesceOperationalRuntime));
+    assert(!Has(actions,
+                CommissioningActionType::AcquireCommissioningRadioLease));
+    assert(core.Handle(Event(CommissioningEventType::RadioAcquired,
+                             generation)).empty());
+
+    actions = core.Handle(Event(
+        CommissioningEventType::OperationalRuntimeQuiesced, generation));
+    assert(core.state() == CommissioningRuntimeState::AcquiringRadio);
+    assert(Has(actions,
+               CommissioningActionType::AcquireCommissioningRadioLease));
+}
+
+void TestOperationalRuntimeQuiesceFailureNeverTouchesRadio()
+{
+    CommissioningOrchestratorCore core;
+    core.Handle(Event(CommissioningEventType::OpenRequested, 0));
+    const uint32_t generation = core.generation();
+    core.Handle(Event(CommissioningEventType::IdentityReady, generation));
+
+    const auto actions = core.Handle(Event(
+        CommissioningEventType::OperationalRuntimeQuiesceFailed, generation));
+    assert(core.state() == CommissioningRuntimeState::Idle);
+    assert(!Has(actions,
+                CommissioningActionType::AcquireCommissioningRadioLease));
+    assert(!Has(actions, CommissioningActionType::StartTransport));
 }
 
 }  // namespace
@@ -223,5 +269,7 @@ int main()
     TestStagedTrustRollsBackEvenBeforeNetworkArrives();
     TestUnexpectedTransportEndUsesTheSingleStopPath();
     TestRepeatedOpenRetainsOneGenerationAndOneStartAction();
+    TestOperationalRuntimeMustQuiesceBeforeRadioLease();
+    TestOperationalRuntimeQuiesceFailureNeverTouchesRadio();
     return 0;
 }

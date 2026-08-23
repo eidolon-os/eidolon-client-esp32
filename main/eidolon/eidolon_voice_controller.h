@@ -58,6 +58,7 @@ public:
     void OnHubActivationSucceeded();
     void OnNetworkLost();
     void OnNetworkRestored();
+    void QuiesceForCommissioning(std::function<void(bool)> completion);
     void OnAmbientPresenceChanged(bool present);
 
     esp_err_t JoinRoom();
@@ -106,6 +107,7 @@ private:
         Activation,
         NetworkLost,
         NetworkRestored,
+        CommissioningQuiesce,
         Join,
         Leave,
         SetMic,
@@ -151,6 +153,7 @@ private:
         // Phase 1: dropped on mismatch).
         uint32_t generation = 0;
         std::string* payload = nullptr;  // owned; the loop deletes it after dispatch
+        std::function<void(bool)>* completion = nullptr;  // owned by the loop
     };
     static_assert(std::is_trivially_copyable_v<Event>,
                   "FreeRTOS queue events must be safe for raw byte copies");
@@ -163,6 +166,7 @@ private:
     void DoActivation();
     void DoNetworkLost();
     void DoNetworkRestored();
+    bool DoCommissioningQuiesce();
     esp_err_t DoJoinRoom();
     esp_err_t DoLeaveRoom();
     void DoSetMicEnabled(bool enabled);

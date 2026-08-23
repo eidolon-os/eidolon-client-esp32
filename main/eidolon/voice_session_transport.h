@@ -28,6 +28,8 @@ public:
     virtual void OnActivationComplete() = 0;
     virtual void OnNetworkLost() = 0;
     virtual void OnNetworkRestored() = 0;
+    virtual void QuiesceForCommissioning(
+        std::function<void(bool)> completion) = 0;
     virtual void OnAmbientPresenceChanged(bool present) = 0;
 
     virtual void ToggleSession() = 0;

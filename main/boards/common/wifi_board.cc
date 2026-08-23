@@ -231,14 +231,15 @@ void WifiBoard::StartWifiConfigMode() {
 
 void WifiBoard::EnterWifiConfigMode() {
     ESP_LOGI(TAG, "EnterWifiConfigMode called");
-    GetDisplay()->ShowNotification(Lang::Strings::ENTERING_WIFI_CONFIG_MODE);
 
     auto& app = Application::GetInstance();
     auto state = app.GetDeviceState();
 
     if (state == kDeviceStateSpeaking || state == kDeviceStateListening || state == kDeviceStateIdle) {
+#if !CONFIG_EIDOLON_HUB_MODE
         // Reset protocol (close audio channel, reset protocol)
         Application::GetInstance().ResetProtocol();
+#endif
 
 #if CONFIG_EIDOLON_HUB_MODE
         StartWifiConfigMode();

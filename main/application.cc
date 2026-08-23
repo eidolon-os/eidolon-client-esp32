@@ -68,6 +68,8 @@ Application::Application() {
 
 Application::~Application() {
 #if CONFIG_EIDOLON_HUB_MODE
+    eidolon::CommissioningRuntime::GetInstance()
+        .SetOperationalRuntimeQuiescer({});
 #if CONFIG_EIDOLON_WAKE_WORD_ENABLE
     if (eidolon_audio_input_service_) {
         eidolon_audio_input_service_->Stop();
@@ -350,6 +352,7 @@ void Application::Initialize() {
                 using State = eidolon::CommissioningRuntimeState;
                 switch (snapshot.state) {
                 case State::PreparingIdentity:
+                case State::QuiescingOperationalRuntime:
                 case State::AcquiringRadio:
                 case State::StartingTransport:
                     SetEidolonLifecycleUi(
@@ -418,7 +421,8 @@ void Application::Initialize() {
                      eidolon::EidolonVoiceController::VoiceStateName(state));
             ui_presenter_->Apply(state, voice_transport_->IsMicrophoneEnabled(),
                                  voice_transport_->LastEndReason());
-            if (network_connected_ && hub_activation_done_) {
+            if (network_connected_ && hub_activation_done_ &&
+                !eidolon::CommissioningRuntime::GetInstance().IsInProgress()) {
                 ui_presenter_->SetLifecyclePhase(eidolon::LifecyclePhase::Operational);
             }
 #if CONFIG_EIDOLON_WAKE_WORD_ENABLE
@@ -469,6 +473,16 @@ void Application::Initialize() {
 #else
     voice_transport_ = eidolon::CreateLiveKitVoiceTransport(std::move(callbacks));
 #endif
+    eidolon::CommissioningRuntime::GetInstance()
+        .SetOperationalRuntimeQuiescer(
+            [this](std::function<void(bool)> completion) {
+                if (!voice_transport_) {
+                    completion(true);
+                    return;
+                }
+                voice_transport_->QuiesceForCommissioning(
+                    std::move(completion));
+            });
 #else
     // Print board name/version info
     display->SetChatMessage("system", Lang::Strings::INITIALIZING);
@@ -739,18 +753,20 @@ void Application::HandleNetworkConnectedEvent() {
 void Application::HandleNetworkDisconnectedEvent() {
 #if CONFIG_EIDOLON_HUB_MODE
     network_connected_ = false;
+    const bool commissioning_in_progress =
+        eidolon::CommissioningRuntime::GetInstance().IsInProgress();
     auto state = GetDeviceState();
     if (state != kDeviceStateStarting &&
         state != kDeviceStateWifiConfiguring &&
         state != kDeviceStateActivating &&
-        !eidolon::CommissioningRuntime::GetInstance().IsInProgress()) {
+        !commissioning_in_progress) {
         SetEidolonLifecycleUi(eidolon::LifecyclePhase::Offline);
     }
-    if (voice_transport_) {
+    if (voice_transport_ && !commissioning_in_progress) {
         voice_transport_->OnNetworkLost();
     }
 #if CONFIG_EIDOLON_GUARD_SERVICE
-    if (guard_service_) {
+    if (guard_service_ && !commissioning_in_progress) {
         guard_service_->Stop("network_lost");
     }
 #endif

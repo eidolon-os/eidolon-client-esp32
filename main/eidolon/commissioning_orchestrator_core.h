@@ -10,6 +10,7 @@ namespace eidolon {
 enum class CommissioningRuntimeState {
     Idle,
     PreparingIdentity,
+    QuiescingOperationalRuntime,
     AcquiringRadio,
     StartingTransport,
     Advertising,
@@ -23,6 +24,8 @@ enum class CommissioningEventType {
     OpenRequested,
     IdentityReady,
     IdentityFailed,
+    OperationalRuntimeQuiesced,
+    OperationalRuntimeQuiesceFailed,
     RadioAcquired,
     RadioAcquisitionFailed,
     TransportReady,
@@ -62,6 +65,7 @@ struct CommissioningEvent {
 
 enum class CommissioningActionType {
     EnsureIdentity,
+    QuiesceOperationalRuntime,
     AcquireCommissioningRadioLease,
     StartTransport,
     StageNetworkCandidate,

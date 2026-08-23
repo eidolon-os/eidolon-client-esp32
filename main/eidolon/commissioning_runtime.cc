@@ -79,6 +79,7 @@ struct RuntimeState {
     device_foundation::v1::CommissioningStatusEvidence evidence;
     std::mutex observer_mutex;
     CommissioningRuntime::Observer observer;
+    CommissioningRuntime::OperationalRuntimeQuiescer operational_quiescer;
     std::string session_id;
     std::string candidate_ssid;
     std::string candidate_password;
@@ -165,6 +166,8 @@ const char* RuntimeStateName(CommissioningRuntimeState state)
     switch (state) {
     case CommissioningRuntimeState::Idle: return "idle";
     case CommissioningRuntimeState::PreparingIdentity: return "preparing-identity";
+    case CommissioningRuntimeState::QuiescingOperationalRuntime:
+        return "quiescing-operational-runtime";
     case CommissioningRuntimeState::AcquiringRadio: return "acquiring-radio";
     case CommissioningRuntimeState::StartingTransport: return "starting-transport";
     case CommissioningRuntimeState::Advertising: return "advertising";
@@ -265,6 +268,28 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
                               : CommissioningEventType::IdentityFailed;
         Apply(state, completion);
         break;
+    case CommissioningActionType::QuiesceOperationalRuntime: {
+        CommissioningRuntime::OperationalRuntimeQuiescer quiescer;
+        {
+            std::lock_guard<std::mutex> lock(state.observer_mutex);
+            quiescer = state.operational_quiescer;
+        }
+        if (!quiescer) {
+            // Composition must explicitly install either a real port or a
+            // NullOperationalRuntimePort. Absence is not release evidence.
+            completion.type =
+                CommissioningEventType::OperationalRuntimeQuiesceFailed;
+            Apply(state, completion);
+            break;
+        }
+        quiescer([generation = action.generation](bool quiesced) {
+            Enqueue(quiesced
+                        ? CommissioningEventType::OperationalRuntimeQuiesced
+                        : CommissioningEventType::OperationalRuntimeQuiesceFailed,
+                    generation);
+        });
+        break;
+    }
     case CommissioningActionType::AcquireCommissioningRadioLease:
         // The previous mode is an intent, not a momentary link condition. A
         // Station that is temporarily disconnected still has configured
@@ -565,6 +590,14 @@ void CommissioningRuntime::SetObserver(Observer observer)
     RuntimeState& state = State();
     std::lock_guard<std::mutex> lock(state.observer_mutex);
     state.observer = std::move(observer);
+}
+
+void CommissioningRuntime::SetOperationalRuntimeQuiescer(
+    OperationalRuntimeQuiescer quiescer)
+{
+    RuntimeState& state = State();
+    std::lock_guard<std::mutex> lock(state.observer_mutex);
+    state.operational_quiescer = std::move(quiescer);
 }
 
 bool CommissioningRuntime::IsAdvertising() const

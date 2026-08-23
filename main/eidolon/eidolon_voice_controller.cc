@@ -456,6 +456,10 @@ EidolonVoiceController::~EidolonVoiceController()
         Event ev;
         while (xQueueReceive(event_queue_, &ev, 0) == pdTRUE) {
             delete ev.payload;
+            if (ev.completion != nullptr) {
+                (*ev.completion)(false);
+                delete ev.completion;
+            }
         }
         vQueueDelete(event_queue_);
         event_queue_ = nullptr;
@@ -475,6 +479,7 @@ void EidolonVoiceController::ControllerLoop()
         if (xQueueReceive(event_queue_, &ev, portMAX_DELAY) == pdTRUE) {
             Dispatch(ev);
             delete ev.payload;
+            delete ev.completion;
         }
     }
 }
@@ -483,6 +488,10 @@ void EidolonVoiceController::Enqueue(Event ev)
 {
     if (event_queue_ == nullptr) {
         delete ev.payload;
+        if (ev.completion != nullptr) {
+            (*ev.completion)(false);
+            delete ev.completion;
+        }
         return;
     }
     // The queue copies the struct (including the payload pointer); on success the
@@ -490,6 +499,10 @@ void EidolonVoiceController::Enqueue(Event ev)
     if (xQueueSend(event_queue_, &ev, 0) != pdTRUE) {
         ESP_LOGW(TAG, "Event queue full; dropped event type=%d", static_cast<int>(ev.type));
         delete ev.payload;
+        if (ev.completion != nullptr) {
+            (*ev.completion)(false);
+            delete ev.completion;
+        }
     }
 }
 
@@ -504,6 +517,11 @@ void EidolonVoiceController::Dispatch(const Event& ev)
         break;
     case EventType::NetworkRestored:
         DoNetworkRestored();
+        break;
+    case EventType::CommissioningQuiesce:
+        if (ev.completion != nullptr) {
+            (*ev.completion)(DoCommissioningQuiesce());
+        }
         break;
     case EventType::Join:
         DoJoinRoom();
@@ -623,6 +641,21 @@ void EidolonVoiceController::OnNetworkRestored()
              static_cast<unsigned long>(session_generation_));
     Event ev;
     ev.type = EventType::NetworkRestored;
+    Enqueue(ev);
+}
+
+void EidolonVoiceController::QuiesceForCommissioning(
+    std::function<void(bool)> completion)
+{
+    auto* owned = new (std::nothrow) std::function<void(bool)>;
+    if (owned == nullptr) {
+        completion(false);
+        return;
+    }
+    *owned = std::move(completion);
+    Event ev;
+    ev.type = EventType::CommissioningQuiesce;
+    ev.completion = owned;
     Enqueue(ev);
 }
 
@@ -3035,6 +3068,17 @@ void EidolonVoiceController::DoNetworkLost()
     // stale state once the network returns and we reconnect.
     MarkSessionSuperseded("network_lost");
     SetState(StateForConfig(config_), "network_lost");
+}
+
+bool EidolonVoiceController::DoCommissioningQuiesce()
+{
+    ESP_LOGI(TAG,
+             "[commissioning] quiescing operational runtime before RadioLease");
+    DoNetworkLost();
+    const bool quiesced = !session_.HasRoom() && !session_.IsConnected();
+    ESP_LOGI(TAG, "[commissioning] operational runtime quiesced=%d",
+             quiesced ? 1 : 0);
+    return quiesced;
 }
 
 void EidolonVoiceController::DoNetworkRestored()

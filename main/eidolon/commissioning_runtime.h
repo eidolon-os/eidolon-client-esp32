@@ -22,6 +22,11 @@ struct CommissioningRuntimeSnapshot {
 class CommissioningRuntime {
 public:
     using Observer = std::function<void(const CommissioningRuntimeSnapshot&)>;
+    // The application-owned operational plane must release voice/media and
+    // other radio consumers before commissioning may acquire its RadioLease.
+    // Completion is evidence; issuing a disconnect command is not.
+    using OperationalRuntimeQuiescer =
+        std::function<void(std::function<void(bool)>)>;
 
     static CommissioningRuntime& GetInstance();
 
@@ -33,6 +38,7 @@ public:
     // released its generation.
     bool NotifyStationRouteReady();
     void SetObserver(Observer observer);
+    void SetOperationalRuntimeQuiescer(OperationalRuntimeQuiescer quiescer);
     bool IsAdvertising() const;
     // True for the whole physical commissioning lease, including identity
     // preparation, transport startup and restoration. Network callbacks use

@@ -82,6 +82,13 @@ std::vector<CommissioningAction> CommissioningOrchestratorCore::Handle(
     switch (event.type) {
     case CommissioningEventType::IdentityReady:
         if (state_ == CommissioningRuntimeState::PreparingIdentity) {
+            Transition(actions,
+                       CommissioningRuntimeState::QuiescingOperationalRuntime);
+            Act(actions, CommissioningActionType::QuiesceOperationalRuntime);
+        }
+        break;
+    case CommissioningEventType::OperationalRuntimeQuiesced:
+        if (state_ == CommissioningRuntimeState::QuiescingOperationalRuntime) {
             Transition(actions, CommissioningRuntimeState::AcquiringRadio);
             Act(actions, CommissioningActionType::AcquireCommissioningRadioLease);
         }
@@ -190,11 +197,11 @@ std::vector<CommissioningAction> CommissioningOrchestratorCore::Handle(
         else BeginRestore(actions);
         break;
     case CommissioningEventType::IdentityFailed:
+    case CommissioningEventType::OperationalRuntimeQuiesceFailed:
     case CommissioningEventType::RadioAcquisitionFailed:
-        // Neither failure acquired a transport or a radio lease. There is
-        // nothing to tear down and no callback that could truthfully confirm a
-        // transport stop, so converge directly instead of waiting forever for
-        // synthetic cleanup evidence.
+        // These failures are defined as fail-before-effect (or adapter recovery
+        // already confirmed). No transport or radio lease exists, so converge
+        // directly instead of waiting for synthetic cleanup evidence.
         ResetToIdle(actions);
         break;
     case CommissioningEventType::TransportStartFailed:

@@ -51,6 +51,12 @@ void LiveKitVoiceTransport::OnNetworkRestored()
     controller_->OnNetworkRestored();
 }
 
+void LiveKitVoiceTransport::QuiesceForCommissioning(
+    std::function<void(bool)> completion)
+{
+    controller_->QuiesceForCommissioning(std::move(completion));
+}
+
 void LiveKitVoiceTransport::OnAmbientPresenceChanged(bool present)
 {
     controller_->OnAmbientPresenceChanged(present);
