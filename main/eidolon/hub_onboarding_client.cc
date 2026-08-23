@@ -152,7 +152,14 @@ esp_err_t HubOnboardingClient::FetchDescriptor(
         ESP_LOGE(TAG, "Owner Domain descriptor failed trust or revision checks");
         return accepted;
     }
-    return DeviceAuthorityLocator::GetInstance().AcceptedDescriptor(out);
+    const esp_err_t loaded =
+        DeviceAuthorityLocator::GetInstance().AcceptedDescriptor(out);
+    if (loaded == ESP_OK) {
+        ESP_LOGI(TAG, "Accepted Owner directory owner=%s revision=%llu",
+                 out.owner_domain_id.c_str(),
+                 static_cast<unsigned long long>(out.directory_revision));
+    }
+    return loaded;
 }
 
 esp_err_t HubOnboardingClient::EnsureEnrollment(
