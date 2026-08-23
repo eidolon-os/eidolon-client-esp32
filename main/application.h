@@ -11,6 +11,7 @@
 #include <deque>
 #include <memory>
 #include <functional>
+#include <atomic>
 
 #include "protocol.h"
 #include "ota.h"
@@ -178,7 +179,12 @@ private:
     bool assets_applied_ = false;
     bool play_popup_on_listening_ = false;  // Flag to play popup sound after state changes to listening
     int clock_ticks_ = 0;
+    // Long-lived Platform Adapter actor: its external-memory stack is a stable
+    // control-plane budget and never races the real-time media stack for
+    // internal SRAM at activation completion.
     TaskHandle_t activation_task_handle_ = nullptr;
+    std::atomic_bool activation_in_progress_{false};
+    std::atomic_bool activation_succeeded_{false};
 
 #if CONFIG_EIDOLON_HUB_MODE
     std::unique_ptr<eidolon::IVoiceSessionTransport> voice_transport_;
@@ -209,8 +215,10 @@ private:
     void ContinueOpenAudioChannel(ListeningMode mode);
     void ContinueWakeWordInvoke(const std::string& wake_word);
 
-    // Activation task (runs in background)
-    void ActivationTask();
+    // Hub activation Platform Adapter actor (blocking work, serialized).
+    bool EnsureActivationWorker();
+    static void ActivationWorkerTrampoline(void* arg);
+    bool ActivationTask();
 
     // Helper methods
     void ApplyLocalAssets();

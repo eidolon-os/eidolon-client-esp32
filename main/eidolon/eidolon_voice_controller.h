@@ -51,6 +51,7 @@ enum class VoiceSessionState {
 class EidolonVoiceController {
 public:
     using StateCallback = std::function<void(VoiceSessionState)>;
+    using OperationalReadyCallback = std::function<void(bool)>;
 
     explicit EidolonVoiceController(GuardService* guard_service = nullptr);
     ~EidolonVoiceController();
@@ -88,6 +89,10 @@ public:
     // read is benign (recent value).
     EndReason LastEndReason() const { return last_end_reason_; }
     void SetOnStateChanged(StateCallback cb) { on_state_changed_ = std::move(cb); }
+    void SetOnOperationalReady(OperationalReadyCallback cb)
+    {
+        on_operational_ready_ = std::move(cb);
+    }
     void SetOnTranscription(std::function<void(const TranscriptionEvent&)> cb);
     void SetOnAgentPhase(std::function<void(AgentPhase)> cb);
     void SetOnPresenceWakePhase(std::function<void(PresenceWakePhase)> cb)
@@ -225,6 +230,7 @@ private:
     bool HasChannelConfig() const;
     VoiceSessionState StateForConfig(const Esp32HubConfig& config) const;
     void SetState(VoiceSessionState state, const char* reason = "unspecified");
+    void SetOperationalReady(bool ready, const char* reason);
     // Begin a new connection attempt: bump session_generation_, remember which
     // plane (control/voice) it is for, and log the transition. Every event from a
     // prior generation is, by definition, stale. Returns the new generation.
@@ -409,6 +415,8 @@ private:
     esp_timer_handle_t ambient_presence_timer_ = nullptr;
 
     StateCallback on_state_changed_;
+    OperationalReadyCallback on_operational_ready_;
+    bool operational_ready_ = false;
     std::function<void(const TranscriptionEvent&)> on_transcription_;
     std::function<void(AgentPhase)> on_agent_phase_;
     std::function<void(PresenceWakePhase)> on_presence_wake_phase_;

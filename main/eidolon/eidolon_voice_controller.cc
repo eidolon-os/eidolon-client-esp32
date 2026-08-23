@@ -887,6 +887,20 @@ void EidolonVoiceController::SetState(VoiceSessionState state, const char* reaso
     }
 }
 
+void EidolonVoiceController::SetOperationalReady(bool ready, const char* reason)
+{
+    if (operational_ready_ == ready) {
+        return;
+    }
+    operational_ready_ = ready;
+    ESP_LOGI(TAG, "[lifecycle] operational_ready=%d reason=%s room_kind=%s gen=%lu",
+             ready ? 1 : 0, reason ? reason : "unspecified", CurrentRoomKind(),
+             static_cast<unsigned long>(session_generation_));
+    if (on_operational_ready_) {
+        on_operational_ready_(ready);
+    }
+}
+
 esp_err_t EidolonVoiceController::LoadStoredConfig()
 {
     HubConfigStore store;
@@ -1027,11 +1041,13 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         CloseConversationAudio();
         switch (lk_state) {
         case LiveKitConnectionState::Connecting:
+            SetOperationalReady(false, "channel_connecting");
             channel_recovery_.OnConnecting();
             ArmConnectWatchdog();
             break;
         case LiveKitConnectionState::Connected:
             channel_recovery_.OnConnected();
+            SetOperationalReady(true, "channel_connected");
             if (reconnect_timer_ != nullptr) {
                 esp_timer_stop(reconnect_timer_);
             }
@@ -1055,12 +1071,14 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
             break;
         case LiveKitConnectionState::Failed:
             channel_recovery_.OnDisconnected();
+            SetOperationalReady(false, "channel_failed");
             DisarmConnectWatchdog();
             ESP_LOGW(TAG, "Channel connection failed");
             ScheduleChannelReconnect("channel_failed");
             break;
         case LiveKitConnectionState::Disconnected:
             channel_recovery_.OnDisconnected();
+            SetOperationalReady(false, "channel_disconnected");
             DisarmConnectWatchdog();
             ScheduleChannelReconnect("channel_disconnected");
             break;
@@ -1068,6 +1086,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
             // Let the SDK repair a transient ICE/DTLS interruption, but bound the
             // attempt: if it never reaches Connected/Failed/Disconnected, the
             // same watchdog forces the ordinary recovery loop.
+            SetOperationalReady(false, "channel_reconnecting");
             channel_recovery_.OnReconnecting();
             ArmConnectWatchdog();
             break;
@@ -1077,10 +1096,12 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
 
     switch (lk_state) {
     case LiveKitConnectionState::Connecting:
+        SetOperationalReady(false, "voice_connecting");
         SetState(VoiceSessionState::Connecting, "voice_connecting");
         break;
     case LiveKitConnectionState::Connected:
         channel_recovery_.OnConversationStarted();
+        SetOperationalReady(true, "voice_connected");
         SetState(VoiceSessionState::InRoom, "voice_connected");
         SetPresenceWakePhase(PresenceWakePhase::Idle);
         StartAudioStatePublisher();
@@ -1096,9 +1117,11 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         }
         break;
     case LiveKitConnectionState::Reconnecting:
+        SetOperationalReady(false, "voice_reconnecting");
         SetState(VoiceSessionState::Reconnecting, "voice_reconnecting");
         break;
     case LiveKitConnectionState::Failed:
+        SetOperationalReady(false, "voice_failed");
         SetPresenceWakePhase(PresenceWakePhase::Idle);
         CloseConversationAudio();
         agent_phase_ = AgentPhase::Silent;
@@ -1124,6 +1147,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         }
         break;
     case LiveKitConnectionState::Disconnected:
+        SetOperationalReady(false, "voice_disconnected");
         SetPresenceWakePhase(PresenceWakePhase::Idle);
         // A control-room teardown during a JOIN handoff is now dropped by the
         // generation gate above (it carries the pre-bump generation), so anything
@@ -3048,6 +3072,7 @@ void EidolonVoiceController::DoNetworkLost()
     }
     CloseConversationAudio();
     channel_recovery_.OnNetworkLost();
+    SetOperationalReady(false, "network_lost");
     if (reconnect_timer_ != nullptr) {
         esp_timer_stop(reconnect_timer_);
     }
@@ -3268,6 +3293,7 @@ esp_err_t EidolonVoiceController::ConnectChannel()
         // not connection health. Superseding drops any Connecting/Disconnected
         // callback queued before the synchronous failure was returned.
         channel_recovery_.OnDisconnected();
+        SetOperationalReady(false, "control_connect_sync_failed");
         MarkSessionSuperseded("control_connect_sync_failed");
         ESP_LOGW(TAG, "Connect channel failed: %s", esp_err_to_name(err));
     }

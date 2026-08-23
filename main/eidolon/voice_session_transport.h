@@ -14,6 +14,9 @@ class GuardService;
 
 struct VoiceSessionCallbacks {
     std::function<void(VoiceSessionState)> on_session_state;
+    // A Connected operational channel is an independent confirmed fact. It
+    // must still be projected when VoiceSessionState remains ConfigReady.
+    std::function<void(bool)> on_operational_ready;
     std::function<void(const TranscriptionEvent&)> on_transcription;
     std::function<void(AgentPhase)> on_agent_phase;
     std::function<void(PresenceWakePhase)> on_presence_wake_phase;

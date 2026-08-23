@@ -23,6 +23,7 @@
 #include "eidolon/hub_activator.h"
 #include "eidolon/hub_types.h"
 #include "eidolon/livekit_voice_transport.h"
+#include "eidolon/operational_readiness.h"
 #include <esp_app_desc.h>
 #include <esp_ota_ops.h>
 #if CONFIG_EIDOLON_WAKE_WORD_ENABLE
@@ -36,6 +37,8 @@
 #include <driver/gpio.h>
 #include <arpa/inet.h>
 #include <font_awesome.h>
+#include <esp_heap_caps.h>
+#include <freertos/idf_additions.h>
 
 #define TAG "Application"
 
@@ -68,6 +71,10 @@ Application::Application() {
 
 Application::~Application() {
 #if CONFIG_EIDOLON_HUB_MODE
+    if (activation_task_handle_ != nullptr) {
+        vTaskDeleteWithCaps(activation_task_handle_);
+        activation_task_handle_ = nullptr;
+    }
     eidolon::CommissioningRuntime::GetInstance()
         .SetOperationalRuntimeQuiescer({});
 #if CONFIG_EIDOLON_WAKE_WORD_ENABLE
@@ -421,13 +428,33 @@ void Application::Initialize() {
                      eidolon::EidolonVoiceController::VoiceStateName(state));
             ui_presenter_->Apply(state, voice_transport_->IsMicrophoneEnabled(),
                                  voice_transport_->LastEndReason());
-            if (network_connected_ && hub_activation_done_ &&
-                !eidolon::CommissioningRuntime::GetInstance().IsInProgress()) {
-                ui_presenter_->SetLifecyclePhase(eidolon::LifecyclePhase::Operational);
-            }
 #if CONFIG_EIDOLON_WAKE_WORD_ENABLE
             OnEidolonVoiceSessionState(state);
 #endif
+        });
+    };
+    callbacks.on_operational_ready = [this](bool ready) {
+        ESP_LOGI(TAG, "[EIDOLON_UI] queue operational_ready=%d", ready ? 1 : 0);
+        Schedule([this, ready]() {
+            if (!ui_presenter_) {
+                return;
+            }
+            const eidolon::OperationalReadinessSnapshot snapshot{
+                .owner_network_ready = network_connected_,
+                .hub_activation_ready = hub_activation_done_,
+                .transport_ready = ready,
+                .commissioning_in_progress =
+                    eidolon::CommissioningRuntime::GetInstance().IsInProgress(),
+            };
+            if (eidolon::IsOperationalConfirmed(snapshot)) {
+                ui_presenter_->SetLifecyclePhase(eidolon::LifecyclePhase::Operational);
+            } else if (!snapshot.commissioning_in_progress &&
+                       snapshot.owner_network_ready &&
+                       snapshot.hub_activation_ready) {
+                ui_presenter_->SetLifecyclePhase(
+                    eidolon::LifecyclePhase::HubDiscovering,
+                    "Restoring the operational channel...");
+            }
         });
     };
     callbacks.on_transcription = [this](const eidolon::TranscriptionEvent& event) {
@@ -723,24 +750,28 @@ void Application::HandleNetworkConnectedEvent() {
         SetEidolonLifecycleUi(eidolon::LifecyclePhase::HubDiscovering);
 #endif
         SetDeviceState(kDeviceStateActivating);
-        if (activation_task_handle_ != nullptr) {
+        bool expected = false;
+        if (!activation_in_progress_.compare_exchange_strong(expected, true)) {
             ESP_LOGW(TAG, "Activation task already running");
             return;
         }
-
-        xTaskCreate([](void* arg) {
-            Application* app = static_cast<Application*>(arg);
-            app->ActivationTask();
-            app->activation_task_handle_ = nullptr;
-            vTaskDelete(NULL);
-        }, "activation", 4096 * 2, this, 2, &activation_task_handle_);
+        if (!EnsureActivationWorker()) {
+            activation_in_progress_.store(false);
+            ESP_LOGE(TAG, "Unable to start Hub activation actor");
+            SetDeviceState(kDeviceStateWifiConfiguring);
+            SetEidolonLifecycleUi(eidolon::LifecyclePhase::Offline,
+                                  "Hub activation worker unavailable");
+            return;
+        }
+        xTaskNotifyGive(activation_task_handle_);
     } else {
 #if CONFIG_EIDOLON_HUB_MODE
         if (voice_transport_) {
             voice_transport_->OnNetworkRestored();
         }
         if (hub_activation_done_) {
-            SetEidolonLifecycleUi(eidolon::LifecyclePhase::Operational);
+            SetEidolonLifecycleUi(eidolon::LifecyclePhase::HubDiscovering,
+                                  "Restoring the operational channel...");
         }
 #endif
     }
@@ -785,7 +816,19 @@ void Application::HandleNetworkDisconnectedEvent() {
 }
 
 void Application::HandleActivationDoneEvent() {
-    ESP_LOGI(TAG, "Activation done");
+    const bool succeeded = activation_succeeded_.load();
+    activation_in_progress_.store(false);
+    ESP_LOGI(TAG, "Activation done succeeded=%d", succeeded ? 1 : 0);
+
+    if (!succeeded) {
+        SetDeviceState(kDeviceStateWifiConfiguring);
+#if CONFIG_EIDOLON_HUB_MODE
+        hub_activation_done_ = false;
+        SetEidolonLifecycleUi(eidolon::LifecyclePhase::Offline,
+                              "Hub activation failed; reconnect to retry");
+#endif
+        return;
+    }
 
     SystemInfo::PrintHeapStats();
     SetDeviceState(kDeviceStateIdle);
@@ -799,7 +842,17 @@ void Application::HandleActivationDoneEvent() {
     ESP_LOGI(TAG, "[EIDOLON_UI] firmware ready version=%s", app_desc->version);
     board.SetPowerSaveLevel(PowerSaveLevel::PERFORMANCE);
     if (voice_transport_) {
-        voice_transport_->OnActivationComplete();
+        // Activation completion and network availability are independent
+        // facts. A late worker result must not resurrect the operational
+        // transport after the network actor has already reported loss; the
+        // ordinary NetworkRestored edge will refresh the signed directory and
+        // start the transport when a route exists again.
+        if (network_connected_) {
+            voice_transport_->OnActivationComplete();
+        } else {
+            ESP_LOGW(TAG, "Activation completed while offline; deferring transport restore");
+            SetEidolonLifecycleUi(eidolon::LifecyclePhase::Offline);
+        }
         if (ui_presenter_) {
             ui_presenter_->Apply(voice_transport_->GetSessionState(),
                                  voice_transport_->IsMicrophoneEnabled(),
@@ -826,7 +879,34 @@ void Application::HandleActivationDoneEvent() {
 #endif
 }
 
-void Application::ActivationTask() {
+bool Application::EnsureActivationWorker() {
+#if CONFIG_EIDOLON_HUB_MODE
+    if (activation_task_handle_ != nullptr) {
+        return true;
+    }
+    // Discovery and registration are blocking control-plane operations; they
+    // do not require DMA-capable memory. A persistent actor with a PSRAM stack
+    // makes its resource budget invariant instead of relying on an ephemeral
+    // worker's self-delete/idle cleanup before media recovery begins.
+    const BaseType_t created = xTaskCreateWithCaps(
+        &Application::ActivationWorkerTrampoline, "hub_activation", 4096 * 2,
+        this, 2, &activation_task_handle_, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    return created == pdPASS;
+#else
+    return false;
+#endif
+}
+
+void Application::ActivationWorkerTrampoline(void* arg) {
+    auto* app = static_cast<Application*>(arg);
+    while (true) {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        app->activation_succeeded_.store(app->ActivationTask());
+        xEventGroupSetBits(app->event_group_, MAIN_EVENT_ACTIVATION_DONE);
+    }
+}
+
+bool Application::ActivationTask() {
 #if CONFIG_EIDOLON_HUB_MODE
     // HUB_MODE never runs the Xiaozhi version-check, so it never reaches the
     // mark-valid path inside CheckNewVersion(). Commit the running firmware here so an
@@ -850,9 +930,7 @@ void Application::ActivationTask() {
     eidolon::HubActivator activator;
     if (!activator.Run()) {
         ESP_LOGE(TAG, "Hub activation failed, staying in activating state");
-        activation_task_handle_ = nullptr;
-        vTaskDelete(NULL);
-        return;
+        return false;
     }
 #else
     ota_ = std::make_unique<Ota>();
@@ -861,8 +939,7 @@ void Application::ActivationTask() {
     CheckNewVersion();
     InitializeProtocol();
 #endif
-
-    xEventGroupSetBits(event_group_, MAIN_EVENT_ACTIVATION_DONE);
+    return true;
 }
 
 void Application::ApplyLocalAssets() {
@@ -1629,9 +1706,12 @@ bool Application::UpgradeFirmware(const std::string& url, const std::string& ver
 #endif
         vTaskDelay(pdMS_TO_TICKS(3000));
 #if CONFIG_EIDOLON_HUB_MODE
-        SetEidolonLifecycleUi(network_connected_ && hub_activation_done_
-                                  ? eidolon::LifecyclePhase::Operational
-                                  : eidolon::LifecyclePhase::Offline);
+        if (network_connected_ && hub_activation_done_) {
+            SetEidolonLifecycleUi(eidolon::LifecyclePhase::HubDiscovering,
+                                  "Restoring the operational channel...");
+        } else {
+            SetEidolonLifecycleUi(eidolon::LifecyclePhase::Offline);
+        }
 #endif
         return false;
     } else {

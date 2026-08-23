@@ -19,6 +19,9 @@ LiveKitVoiceTransport::LiveKitVoiceTransport(VoiceSessionCallbacks cb, GuardServ
     if (cb.on_session_state) {
         controller_->SetOnStateChanged(std::move(cb.on_session_state));
     }
+    if (cb.on_operational_ready) {
+        controller_->SetOnOperationalReady(std::move(cb.on_operational_ready));
+    }
     if (cb.on_transcription) {
         controller_->SetOnTranscription(std::move(cb.on_transcription));
     }
