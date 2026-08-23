@@ -244,7 +244,11 @@ bool EnsureLegacyTrustMigrated()
 
     OwnerTrustBundle dedicated_bundle;
     {
-        NvsHandle dedicated(NVS_READONLY);
+        // A freshly provisioned partition has no namespace yet; NVS_READONLY
+        // reports that normal state as ESP_ERR_NVS_NOT_FOUND. Opening the
+        // dedicated namespace read-write creates only its namespace entry and
+        // lets migration distinguish "empty" from an unavailable partition.
+        NvsHandle dedicated(NVS_READWRITE);
         if (!dedicated.valid()) return false;
         const int active_slot = ActiveSlot(dedicated.get());
         if (ReadSlot(dedicated.get(), active_slot, dedicated_bundle)) {
