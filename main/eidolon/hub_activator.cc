@@ -1,6 +1,7 @@
 #include "hub_activator.h"
 
 #include "application.h"
+#include "commissioning_runtime.h"
 #include "eidolon_ui_types.h"
 #include "hub_config_store.h"
 #include "hub_discovery.h"
@@ -48,6 +49,14 @@ bool HubActivator::Run() {
     const std::string device_id = SystemInfo::GetMacAddress();
 
     for (;;) {
+        // Admission consumes a confirmed Station route; it never competes with
+        // a commissioning generation for the radio or projects stale Hub state
+        // over the commissioning actor's UI. The network-connected handoff
+        // starts a new ActivationTask after StationRouteReady.
+        if (CommissioningRuntime::GetInstance().IsInProgress()) {
+            ESP_LOGI(TAG, "Commissioning owns the RadioLease; suspending Hub activation");
+            return false;
+        }
         app.SetEidolonLifecycleUi(LifecyclePhase::HubDiscovering);
 
         AuthorityCandidateRecord txt;
@@ -57,6 +66,10 @@ bool HubActivator::Run() {
             Esp32HubConfig config;
             err = client.Run(txt, device_id, config);
             if (err == ESP_OK) {
+                if (CommissioningRuntime::GetInstance().IsInProgress()) {
+                    ESP_LOGI(TAG, "Commissioning began during Hub handoff; deferring activation");
+                    return false;
+                }
                 if (store.SaveHubConfig(config) != ESP_OK) {
                     // The Host already admitted this device and the credential is
                     // in hand; only the cache of it failed. Refusing to continue
@@ -75,6 +88,11 @@ bool HubActivator::Run() {
             }
         }
 
+        if (CommissioningRuntime::GetInstance().IsInProgress()) {
+            ESP_LOGI(TAG, "Commissioning owns the RadioLease; suspending Hub activation");
+            return false;
+        }
+
         // Keep asking. A Host that is switched off, a network still coming back,
         // a device nobody has set up yet — none of those are permanent, and
         // giving up after ten tries turned every one of them into a device that
@@ -89,6 +107,10 @@ bool HubActivator::Run() {
 
         for (int i = 0; i < retry_delay; ++i) {
             vTaskDelay(pdMS_TO_TICKS(1000));
+            if (CommissioningRuntime::GetInstance().IsInProgress()) {
+                ESP_LOGI(TAG, "Commissioning owns the RadioLease; suspending Hub activation");
+                return false;
+            }
             if (app.GetDeviceState() == kDeviceStateIdle) {
                 return false;
             }

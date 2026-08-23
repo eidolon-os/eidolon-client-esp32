@@ -27,6 +27,11 @@ enum class CommissioningTransportResource {
     EventHandlers,
     HttpServer,
     ProvisioningManager,
+    // The provisioning SDK starts the shared ESP-IDF Wi-Fi driver. The
+    // commissioning transport therefore owns returning that driver to the
+    // stopped boundary before its netifs are destroyed and Station takes the
+    // RadioLease back.
+    WifiDriver,
     WindowTimer,
 };
 
@@ -36,12 +41,19 @@ struct CommissioningTransportCleanupPlan {
     bool event_handlers = false;
     bool http_server = false;
     bool provisioning_manager = false;
+    bool wifi_driver = false;
     bool window_timer = false;
 
     bool any() const
     {
         return owner_trust_worker || network_interfaces || event_handlers ||
-               http_server || provisioning_manager || window_timer;
+               http_server || provisioning_manager || wifi_driver ||
+               window_timer;
+    }
+
+    bool CanReleaseNetworkInterfaces(bool wifi_driver_stopped) const
+    {
+        return !network_interfaces || !wifi_driver || wifi_driver_stopped;
     }
 };
 

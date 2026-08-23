@@ -496,6 +496,12 @@ esp_err_t DeviceProvisioningService::Start(
     resources_.Own(generation,
                    CommissioningTransportResource::ProvisioningManager);
 
+    // From this point the provisioning manager may start the shared Wi-Fi
+    // driver even if a later endpoint step fails. Record teardown ownership
+    // before invoking it so partial start and normal stop share one path.
+    resources_.Own(generation,
+                   CommissioningTransportResource::WifiDriver);
+
     err = StartTransport();
     if (err != ESP_OK) {
         return err;
@@ -622,11 +628,39 @@ void DeviceProvisioningService::CleanupTransport(uint32_t generation)
         }
         httpd_handle_ = nullptr;
     }
-    if (cleanup.network_interfaces) {
+    bool wifi_driver_stopped = !cleanup.wifi_driver;
+    if (cleanup.wifi_driver) {
+        // wifi_prov_mgr_deinit() stops Protocomm and switches APSTA to STA, but
+        // deliberately leaves the driver started. Destroying its STA netif in
+        // that state and then calling WifiManager::StartStation() cannot emit a
+        // fresh WIFI_EVENT_STA_START, so the Station adapter never scans and
+        // no route-ready evidence can exist. This is the physical RadioLease
+        // handoff: the transport returns a stopped driver before releasing its
+        // netifs; the Station adapter is then the sole component that starts it.
+        const esp_err_t stopped = esp_wifi_stop();
+        wifi_driver_stopped =
+            stopped == ESP_OK || stopped == ESP_ERR_WIFI_NOT_INIT;
+        if (!wifi_driver_stopped) {
+            ESP_LOGE(TAG, "Owned commissioning Wi-Fi driver did not stop: %s",
+                     esp_err_to_name(stopped));
+        }
+    }
+    if (cleanup.network_interfaces &&
+        cleanup.CanReleaseNetworkInterfaces(wifi_driver_stopped)) {
         ReleaseNetifs();
     }
     if (cleanup.owner_trust_worker) {
         OwnerTrustCommissioningWorker::GetInstance().Deactivate(generation);
+    }
+
+    if (!cleanup.CanReleaseNetworkInterfaces(wifi_driver_stopped)) {
+        // Do not publish TransportStopped into the orchestrator: starting the
+        // Station while the previous driver/netif owner is still live would
+        // violate the RadioLease. Remaining here is an explicit fail-closed
+        // hardware cleanup failure, not a fabricated restore completion.
+        ESP_LOGE(TAG, "Provisioning generation %lu could not release its RadioLease",
+                 static_cast<unsigned long>(generation));
+        return;
     }
 
     manager_started_.store(false, std::memory_order_release);

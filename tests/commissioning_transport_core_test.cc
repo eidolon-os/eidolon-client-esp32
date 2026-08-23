@@ -24,6 +24,7 @@ void PartialStartFailureTransfersEveryOwnedResourceExactlyOnce()
     assert(resources.Own(17, CommissioningTransportResource::EventHandlers));
     assert(resources.Own(17, CommissioningTransportResource::HttpServer));
     assert(resources.Own(17, CommissioningTransportResource::ProvisioningManager));
+    assert(resources.Own(17, CommissioningTransportResource::WifiDriver));
 
     const auto cleanup = resources.ClaimCleanup(17);
     assert(cleanup.owner_trust_worker);
@@ -31,6 +32,7 @@ void PartialStartFailureTransfersEveryOwnedResourceExactlyOnce()
     assert(cleanup.event_handlers);
     assert(cleanup.http_server);
     assert(cleanup.provisioning_manager);
+    assert(cleanup.wifi_driver);
     assert(!cleanup.window_timer);
 
     assert(!resources.ClaimCleanup(17).any());
@@ -39,6 +41,19 @@ void PartialStartFailureTransfersEveryOwnedResourceExactlyOnce()
     assert(resources.CompleteCleanup(17));
     assert(!resources.active());
     assert(!resources.CompleteCleanup(17));
+}
+
+void CommissioningTransportReturnsStoppedWifiDriverBeforeStationRestore()
+{
+    CommissioningTransportResourceCore resources;
+    assert(resources.Begin(23));
+    assert(resources.Own(23, CommissioningTransportResource::NetworkInterfaces));
+    assert(resources.Own(23, CommissioningTransportResource::WifiDriver));
+
+    const auto cleanup = resources.ClaimCleanup(23);
+    assert(!cleanup.CanReleaseNetworkInterfaces(false));
+    assert(cleanup.CanReleaseNetworkInterfaces(true));
+    assert(resources.CompleteCleanup(23));
 }
 
 void ANewGenerationCannotStartUntilThePreviousCleanupCompletes()
@@ -57,6 +72,7 @@ int main()
 {
     EndpointBudgetRejectsTheVendorDefaultAndAcceptsTheOwnedServer();
     PartialStartFailureTransfersEveryOwnedResourceExactlyOnce();
+    CommissioningTransportReturnsStoppedWifiDriverBeforeStationRestore();
     ANewGenerationCannotStartUntilThePreviousCleanupCompletes();
     return 0;
 }
