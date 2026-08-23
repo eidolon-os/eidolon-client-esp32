@@ -54,6 +54,7 @@ public:
     }
 
     bool valid() const { return result_ == ESP_OK; }
+    esp_err_t result() const { return result_; }
     nvs_handle_t get() const { return handle_; }
 
 private:
@@ -179,6 +180,27 @@ int ActiveSlot(nvs_handle_t handle)
     return -1;
 }
 
+OwnerTrustSourceState ProbeActiveBundle(
+    nvs_handle_t handle, OwnerTrustBundle& bundle)
+{
+    bundle = OwnerTrustBundle{};
+    size_t length = 0;
+    esp_err_t result = nvs_get_str(handle, kActiveSlotKey, nullptr, &length);
+    if (result == ESP_ERR_NVS_NOT_FOUND) {
+        return OwnerTrustSourceState::Empty;
+    }
+    if (result != ESP_OK || length != 2) {
+        return OwnerTrustSourceState::Unavailable;
+    }
+    char marker[2] = {};
+    result = nvs_get_str(handle, kActiveSlotKey, marker, &length);
+    if (result != ESP_OK || (marker[0] != '0' && marker[0] != '1') ||
+        !ReadSlot(handle, marker[0] - '0', bundle)) {
+        return OwnerTrustSourceState::Unavailable;
+    }
+    return OwnerTrustSourceState::Valid;
+}
+
 int StagedSlot(nvs_handle_t handle)
 {
     const std::string staged = ReadString(handle, kStagedSlotKey);
@@ -243,6 +265,7 @@ bool EnsureLegacyTrustMigrated()
     std::lock_guard<std::mutex> lock(migration_mutex);
 
     OwnerTrustBundle dedicated_bundle;
+    OwnerTrustSourceState dedicated_state = OwnerTrustSourceState::Unavailable;
     {
         // A freshly provisioned partition has no namespace yet; NVS_READONLY
         // reports that normal state as ESP_ERR_NVS_NOT_FOUND. Opening the
@@ -250,22 +273,38 @@ bool EnsureLegacyTrustMigrated()
         // lets migration distinguish "empty" from an unavailable partition.
         NvsHandle dedicated(NVS_READWRITE);
         if (!dedicated.valid()) return false;
-        const int active_slot = ActiveSlot(dedicated.get());
-        if (ReadSlot(dedicated.get(), active_slot, dedicated_bundle)) {
+        dedicated_state = ProbeActiveBundle(dedicated.get(), dedicated_bundle);
+        if (dedicated_state == OwnerTrustSourceState::Valid) {
             ReclaimLegacyTrustKeys();
             return true;
+        }
+        if (dedicated_state == OwnerTrustSourceState::Unavailable) {
+            ESP_LOGE(TAG, "Dedicated Owner trust is corrupt or unreadable");
+            return false;
         }
     }
 
     OwnerTrustBundle legacy_bundle;
+    OwnerTrustSourceState legacy_state = OwnerTrustSourceState::Unavailable;
     {
         NvsHandle legacy(NVS_READONLY, true);
-        if (!legacy.valid()) return false;
-        const bool legacy_valid =
-            ReadSlot(legacy.get(), ActiveSlot(legacy.get()), legacy_bundle);
-        if (ChooseOwnerTrustMigration(false, legacy_valid) ==
-            OwnerTrustMigrationAction::StartEmpty) {
+        if (!legacy.valid()) {
+            // A factory-fresh default NVS has no Eidolon namespace. That is an
+            // empty migration source, not a storage outage.
+            legacy_state = legacy.result() == ESP_ERR_NVS_NOT_FOUND
+                               ? OwnerTrustSourceState::Empty
+                               : OwnerTrustSourceState::Unavailable;
+        } else {
+            legacy_state = ProbeActiveBundle(legacy.get(), legacy_bundle);
+        }
+        const OwnerTrustMigrationAction action = ChooseOwnerTrustMigration(
+            dedicated_state, legacy_state);
+        if (action == OwnerTrustMigrationAction::StartEmpty) {
             return true;
+        }
+        if (action != OwnerTrustMigrationAction::CopyLegacy) {
+            ESP_LOGE(TAG, "Legacy Owner trust is corrupt or unreadable");
+            return false;
         }
     }
 

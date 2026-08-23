@@ -11,17 +11,29 @@ enum class OwnerTrustMigrationAction {
     UseDedicated,
     CopyLegacy,
     StartEmpty,
+    RefuseUnavailable,
+};
+
+enum class OwnerTrustSourceState {
+    Valid,
+    Empty,
+    Unavailable,
 };
 
 constexpr OwnerTrustMigrationAction ChooseOwnerTrustMigration(
-    bool dedicated_bundle_valid,
-    bool legacy_bundle_valid)
+    OwnerTrustSourceState dedicated,
+    OwnerTrustSourceState legacy)
 {
-    if (dedicated_bundle_valid) {
+    if (dedicated == OwnerTrustSourceState::Valid) {
         return OwnerTrustMigrationAction::UseDedicated;
     }
-    return legacy_bundle_valid ? OwnerTrustMigrationAction::CopyLegacy
-                               : OwnerTrustMigrationAction::StartEmpty;
+    if (dedicated == OwnerTrustSourceState::Unavailable ||
+        legacy == OwnerTrustSourceState::Unavailable) {
+        return OwnerTrustMigrationAction::RefuseUnavailable;
+    }
+    return legacy == OwnerTrustSourceState::Valid
+               ? OwnerTrustMigrationAction::CopyLegacy
+               : OwnerTrustMigrationAction::StartEmpty;
 }
 
 }  // namespace eidolon

@@ -120,7 +120,12 @@ std::vector<CommissioningAction> CommissioningOrchestratorCore::Handle(
         break;
     case CommissioningEventType::TrustStageFailed:
         if (state_ == CommissioningRuntimeState::SessionActive) {
-            BeginRestore(actions);
+            // A domain refusal is an application response, not permission to
+            // destroy the transport carrying that response. No trust or
+            // network candidate became visible, so there is nothing to roll
+            // back. The controller may retry or close; cancel/window/link-end
+            // events remain the owners of transport teardown.
+            Act(actions, CommissioningActionType::PublishConfirmedState);
         }
         break;
     case CommissioningEventType::NetworkCandidateReceived:
