@@ -26,6 +26,7 @@ struct AuthorityEndpoint {
 
 struct OwnerDomainDescriptor {
     std::string owner_domain_id;
+    uint64_t owner_domain_generation = 0;
     uint64_t directory_revision = 0;
     std::vector<std::string> trust_root_refs;
     std::vector<AuthorityEndpoint> endpoints;
@@ -79,6 +80,7 @@ struct CommissioningTerminalAck {
 struct DeviceRef {
     std::string device_instance_id;
     std::string owner_domain_id;
+    uint64_t owner_domain_generation = 0;
     uint32_t claim_generation = 0;
     uint32_t trust_epoch = 0;
     std::string accepted_manifest_digest;

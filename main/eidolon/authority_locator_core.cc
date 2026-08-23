@@ -54,25 +54,37 @@ AuthorityLocatorResult AuthorityLocatorCore::Accept(
         return AuthorityLocatorResult::DescriptorRejected;
     }
     if (has_accepted_) {
-        if (candidate.directory_revision < accepted_.directory_revision) {
-            return AuthorityLocatorResult::RevisionRollback;
+        if (candidate.owner_domain_generation <
+            accepted_.owner_domain_generation) {
+            return AuthorityLocatorResult::OwnerGenerationRollback;
         }
-        if (candidate.directory_revision == accepted_.directory_revision) {
-            if (canonical_signing_bytes != accepted_canonical_ ||
-                candidate.signature != accepted_.signature) {
-                return AuthorityLocatorResult::RevisionConflict;
+        if (candidate.owner_domain_generation ==
+            accepted_.owner_domain_generation) {
+            if (candidate.directory_revision < accepted_.directory_revision) {
+                return AuthorityLocatorResult::RevisionRollback;
             }
-            return AuthorityLocatorResult::Unchanged;
+            if (candidate.directory_revision == accepted_.directory_revision) {
+                if (canonical_signing_bytes != accepted_canonical_ ||
+                    candidate.signature != accepted_.signature) {
+                    return AuthorityLocatorResult::RevisionConflict;
+                }
+                return AuthorityLocatorResult::Unchanged;
+            }
         }
     }
     if (descriptor_json.empty() ||
         !store_.SaveAcceptedDescriptor(descriptor_json)) {
         return AuthorityLocatorResult::PersistenceFailed;
     }
+    const bool generation_advanced =
+        has_accepted_ && candidate.owner_domain_generation >
+                             accepted_.owner_domain_generation;
     accepted_ = candidate;
     accepted_canonical_ = canonical_signing_bytes;
     has_accepted_ = true;
-    return AuthorityLocatorResult::Accepted;
+    return generation_advanced
+               ? AuthorityLocatorResult::OwnerGenerationAdvanced
+               : AuthorityLocatorResult::Accepted;
 }
 
 AuthorityLocatorResult AuthorityLocatorCore::Resolve(

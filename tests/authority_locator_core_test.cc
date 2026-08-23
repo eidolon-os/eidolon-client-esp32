@@ -15,6 +15,7 @@ using eidolon::device_foundation::v1::OwnerDomainDescriptor;
 std::string Canonical(const OwnerDomainDescriptor& descriptor)
 {
     std::string value = descriptor.owner_domain_id + "|" +
+                        std::to_string(descriptor.owner_domain_generation) + "|" +
                         std::to_string(descriptor.directory_revision);
     for (const auto& endpoint : descriptor.endpoints) {
         value += "|" + std::to_string(static_cast<int>(endpoint.authority)) +
@@ -58,10 +59,12 @@ public:
 };
 
 OwnerDomainDescriptor Descriptor(uint64_t revision, const std::string& host,
-                                 uint16_t priority = 10)
+                                 uint16_t priority = 10,
+                                 uint64_t owner_generation = 1)
 {
     OwnerDomainDescriptor value;
     value.owner_domain_id = "owner_01";
+    value.owner_domain_generation = owner_generation;
     value.directory_revision = revision;
     value.signature = "valid-signature";
     value.endpoints = {
@@ -185,6 +188,27 @@ void TestCommitFailureNeverChangesVisibleDirectory()
     assert(routes.front()->uri == "https://host-a.owner.test/admission");
 }
 
+void TestOwnerGenerationFencesRollbackAndRevisionReset()
+{
+    StrictVerifier verifier;
+    RecordingStore store;
+    AuthorityLocatorCore locator(verifier, store);
+    locator.Commission("owner_01");
+    const auto generation_two = Descriptor(9, "generation-two.owner.test", 10, 2);
+    Restore(locator, generation_two);
+
+    const auto retired = Descriptor(99, "retired.owner.test", 10, 1);
+    assert(locator.Accept(retired, Canonical(retired), "retired") ==
+           AuthorityLocatorResult::OwnerGenerationRollback);
+
+    const auto generation_three = Descriptor(1, "generation-three.owner.test", 10, 3);
+    assert(locator.Accept(generation_three, Canonical(generation_three),
+                          "generation-three") ==
+           AuthorityLocatorResult::OwnerGenerationAdvanced);
+    assert(locator.accepted()->owner_domain_generation == 3);
+    assert(locator.accepted()->directory_revision == 1);
+}
+
 void TestExpiredDirectoryRequiresDiscoveryWithoutClearingOwner()
 {
     StrictVerifier verifier;
@@ -209,6 +233,7 @@ int main()
     TestDfHost004TrustAndOwnerAreNotDiscoveryInputs();
     TestDfHost005SingleHostUsesLogicalAuthorityAndPriority();
     TestCommitFailureNeverChangesVisibleDirectory();
+    TestOwnerGenerationFencesRollbackAndRevisionReset();
     TestExpiredDirectoryRequiresDiscoveryWithoutClearingOwner();
     return 0;
 }

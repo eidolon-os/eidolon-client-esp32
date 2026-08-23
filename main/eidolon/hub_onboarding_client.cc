@@ -119,6 +119,45 @@ std::string OperationKeyProofDocument(const HubOnboardingState& state,
            ",\"public_key_spki\":" + Quote(public_key) + "}";
 }
 
+std::string DeviceRefCanonicalJson(
+    const device_foundation::v1::DeviceRef& ref)
+{
+    return std::string("{\"accepted_manifest_digest\":") +
+           Quote(ref.accepted_manifest_digest) +
+           ",\"claim_generation\":" + std::to_string(ref.claim_generation) +
+           ",\"device_instance_id\":" + Quote(ref.device_instance_id) +
+           ",\"owner_domain_generation\":" +
+           std::to_string(ref.owner_domain_generation) +
+           ",\"owner_domain_id\":" + Quote(ref.owner_domain_id) +
+           ",\"trust_epoch\":" + std::to_string(ref.trust_epoch) + "}";
+}
+
+std::string ConfigurationProofDocument(
+    const device_foundation::v1::DeviceRef& ref,
+    const std::string& nonce)
+{
+    return std::string("{\"device_ref\":") + DeviceRefCanonicalJson(ref) +
+           ",\"nonce\":" + Quote(nonce) +
+           ",\"operation_type\":\"device-control.configuration\"}";
+}
+
+cJSON* DeviceRefJson(const device_foundation::v1::DeviceRef& ref)
+{
+    cJSON* value = cJSON_CreateObject();
+    if (!value) return nullptr;
+    cJSON_AddStringToObject(value, "device_instance_id",
+                            ref.device_instance_id.c_str());
+    cJSON_AddStringToObject(value, "owner_domain_id",
+                            ref.owner_domain_id.c_str());
+    cJSON_AddNumberToObject(value, "owner_domain_generation",
+                            static_cast<double>(ref.owner_domain_generation));
+    cJSON_AddNumberToObject(value, "claim_generation", ref.claim_generation);
+    cJSON_AddNumberToObject(value, "trust_epoch", ref.trust_epoch);
+    cJSON_AddStringToObject(value, "accepted_manifest_digest",
+                            ref.accepted_manifest_digest.c_str());
+    return value;
+}
+
 std::string BuildEnrollmentBody(const HubOnboardingState& state)
 {
     // Ask the board itself rather than assuming: a build with no camera must
@@ -325,12 +364,18 @@ esp_err_t HubOnboardingClient::Handoff(
     }
     HubConfigStatus lifecycle = HubConfigStatus::PendingApproval;
     HubChannelAssignment assignment;
-    if (!ParseHandoffResponse(response.body, request_id, state, lifecycle, assignment)) {
+    device_foundation::v1::DeviceRef device_ref;
+    if (!ParseHandoffResponse(response.body, request_id, state, lifecycle,
+                              assignment, device_ref)) {
         return ESP_ERR_INVALID_RESPONSE;
     }
     out = Esp32HubConfig{};
     out.status = lifecycle;
-    state.lifecycle_state = HubConfigStatusToString(lifecycle);
+    state.lifecycle_state = lifecycle == HubConfigStatus::PendingApproval
+                                ? "pending-approval"
+                                : (lifecycle == HubConfigStatus::Revoked
+                                       ? "revoked"
+                                       : "approved");
     if (lifecycle == HubConfigStatus::Active) {
         std::string binding;
         if (!Base64Decode(assignment.opaque_binding, binding) ||
@@ -343,7 +388,90 @@ esp_err_t HubOnboardingClient::Handoff(
         // or persists it; the device config store atomically caches the parsed
         // credential for bounded offline recovery.
     }
-    return HubConfigStore().SaveOnboardingState(state);
+    HubConfigStore store;
+    if (lifecycle == HubConfigStatus::PendingApproval) {
+        const esp_err_t persisted = store.SaveOnboardingState(state);
+        if (persisted != ESP_OK) return persisted;
+    } else {
+        ActiveClaimState claim;
+        claim.device_ref = device_ref;
+        claim.lifecycle_state = state.lifecycle_state;
+        const esp_err_t persisted = store.SaveActiveClaim(claim);
+        if (persisted != ESP_OK) return persisted;
+        // ClaimActive is the terminal state of Enrollment. The retrieval token
+        // and enrollment id are erased only after the exact DeviceRef is durable.
+        store.ClearOnboardingState();
+    }
+    return lifecycle == HubConfigStatus::Revoked ? ESP_ERR_NOT_ALLOWED
+                                                 : ESP_OK;
+}
+
+esp_err_t HubOnboardingClient::PullActiveConfiguration(
+    const ActiveClaimState& claim,
+    Esp32HubConfig& out)
+{
+    if (!claim.valid()) return ESP_ERR_INVALID_STATE;
+    auto& identity = DeviceIdentity::GetInstance();
+    esp_err_t err = identity.EnsureKeypair();
+    if (err != ESP_OK) return err;
+    const std::string nonce = Base64UrlRandom(18);
+    const std::string public_key = identity.PublicKeySpki();
+    std::string signature;
+    err = identity.SignCanonical(
+        ConfigurationProofDocument(claim.device_ref, nonce), signature);
+    if (err != ESP_OK || nonce.empty() || public_key.empty() ||
+        signature.size() != 86) {
+        return ESP_FAIL;
+    }
+    cJSON* root = cJSON_CreateObject();
+    cJSON* device_ref = DeviceRefJson(claim.device_ref);
+    if (!root || !device_ref) {
+        cJSON_Delete(root);
+        cJSON_Delete(device_ref);
+        return ESP_ERR_NO_MEM;
+    }
+    cJSON_AddItemToObject(root, "device_ref", device_ref);
+    cJSON_AddStringToObject(root, "nonce", nonce.c_str());
+    cJSON_AddStringToObject(root, "public_key_spki", public_key.c_str());
+    cJSON_AddStringToObject(root, "device_signature", signature.c_str());
+    const std::string body = PrintJson(root);
+    cJSON_Delete(root);
+    if (body.empty()) return ESP_ERR_NO_MEM;
+
+    device_foundation::v1::AuthorityEndpoint control;
+    err = DeviceAuthorityLocator::GetInstance().Resolve(
+        device_foundation::v1::LogicalAuthority::DeviceControl, control);
+    if (err != ESP_OK) return err;
+    HubHttpResponse response;
+    err = HubHttpRequest(
+        "POST", control.uri + "/configuration:pull",
+        trust_.owner_root_certificate_pem, body, response);
+    if (err != ESP_OK) return err;
+    if (response.status != 200) return StatusError(response.status);
+    HubConfigStatus status = HubConfigStatus::PendingApproval;
+    HubChannelAssignment assignment;
+    if (!ParseDeviceConfigurationResponse(
+            response.body, nonce, claim, status, assignment)) {
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+    out = Esp32HubConfig{};
+    out.status = status;
+    if (status == HubConfigStatus::Active) {
+        std::string binding;
+        if (!Base64Decode(assignment.opaque_binding, binding) ||
+            !ParseLiveKitBinding(binding, out)) {
+            return ESP_ERR_INVALID_RESPONSE;
+        }
+        out.expires_at_ms = assignment.expires_at_ms;
+    }
+    if (status == HubConfigStatus::Revoked) {
+        ActiveClaimState revoked = claim;
+        revoked.lifecycle_state = "revoked";
+        err = HubConfigStore().SaveActiveClaim(revoked);
+        if (err != ESP_OK) return err;
+        return ESP_ERR_NOT_ALLOWED;
+    }
+    return ESP_OK;
 }
 
 esp_err_t HubOnboardingClient::LoadCommissionedTrust()
@@ -381,15 +509,27 @@ esp_err_t HubOnboardingClient::RunAccepted(
 {
     HubConfigStore store;
     esp_err_t err = ESP_OK;
+    ActiveClaimState active_claim;
+    if (store.LoadActiveClaim(active_claim)) {
+        if (active_claim.device_ref.device_instance_id != device_id ||
+            active_claim.device_ref.owner_domain_id != descriptor.owner_domain_id ||
+            active_claim.device_ref.owner_domain_generation !=
+                descriptor.owner_domain_generation) {
+            ESP_LOGE(TAG, "Recovery required: active Claim Authority changed");
+            return ESP_ERR_NOT_ALLOWED;
+        }
+        return PullActiveConfiguration(active_claim, out);
+    }
     bool restarted_expired_pending = false;
-    bool restarted_after_revocation = false;
     for (;;) {
         HubOnboardingState state;
         const bool has_saved_state = store.LoadOnboardingState(state);
         if (has_saved_state &&
             (state.owner_domain_id != descriptor.owner_domain_id ||
+             state.owner_domain_generation !=
+                 descriptor.owner_domain_generation ||
              state.device_id != device_id)) {
-            ESP_LOGE(TAG, "Refusing onboarding state switch to another Owner or device");
+            ESP_LOGE(TAG, "Recovery required: onboarding Authority generation, Owner, or device changed");
             return ESP_ERR_NOT_ALLOWED;
         }
         const bool reusable = has_saved_state && state.has_local_intent();
@@ -397,6 +537,8 @@ esp_err_t HubOnboardingClient::RunAccepted(
             store.ClearOnboardingState();
             state = HubOnboardingState{};
             state.owner_domain_id = descriptor.owner_domain_id;
+            state.owner_domain_generation =
+                descriptor.owner_domain_generation;
             state.directory_revision = descriptor.directory_revision;
             state.device_id = device_id;
             state.request_id = "enroll-" + Base64UrlRandom(16);
@@ -422,22 +564,6 @@ esp_err_t HubOnboardingClient::RunAccepted(
             return err;
         }
         err = Handoff(state, out);
-        if (err == ESP_OK && state.lifecycle_state == "revoked" &&
-            !restarted_after_revocation) {
-            // The Owner took this device off the Authority. Admission permits a revoked
-            // device to enrol from scratch, and says why: that is the only way one
-            // that was removed, or whose Host was reinstalled, ever comes back.
-            // Without asking again the device sat repeating "authorization
-            // required" while appearing in no list the Owner could approve from —
-            // the grant was gone and nothing was requesting a new one.
-            //
-            // Asking is not being granted. A fresh enrolment lands in
-            // pending-approval, where the Owner decides as they did the first time.
-            ESP_LOGW(TAG, "Owner revoked this device; asking to enrol again");
-            store.ClearOnboardingState();
-            restarted_after_revocation = true;
-            continue;
-        }
         if (err != ESP_ERR_TIMEOUT || state.lifecycle_state != "pending-approval" ||
             restarted_expired_pending) {
             return err;
@@ -457,7 +583,8 @@ esp_err_t HubOnboardingClient::Resume(const std::string& device_id,
     if (err != ESP_OK) return err;
     device_foundation::v1::OwnerDomainDescriptor descriptor;
     err = DeviceAuthorityLocator::GetInstance().AcceptedDescriptor(descriptor);
-    return err == ESP_OK ? RunAccepted(descriptor, device_id, out) : err;
+    if (err != ESP_OK) return err;
+    return RunAccepted(descriptor, device_id, out);
 }
 
 }  // namespace eidolon

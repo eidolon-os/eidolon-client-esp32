@@ -15,6 +15,7 @@ namespace eidolon {
 // (e.g. a fresh server_url paired with a stale token).
 static constexpr const char* kConfigKey = "config";
 static constexpr const char* kOnboardingKey = "onboarding";
+static constexpr const char* kActiveClaimKey = "active_claim";
 // Version 4 holds one channel. Version 3 held a voice room and a control room,
 // and a device reading those back would connect to a pair that no longer exists
 // — the Provider issues one. Refusing the old record sends the device to
@@ -22,7 +23,8 @@ static constexpr const char* kOnboardingKey = "onboarding";
 static constexpr int kConfigSchemaVersion = 5;
 // Version 2 is the screen-independent manual-admission state. Version 1 held
 // abandoned screen-bound claim material and must start a fresh Enrollment intent.
-static constexpr int kOnboardingSchemaVersion = 3;
+static constexpr int kOnboardingSchemaVersion = 4;
+static constexpr int kActiveClaimSchemaVersion = 1;
 
 static std::string JsonStringField(cJSON* root, const char* key) {
     cJSON* item = cJSON_GetObjectItem(root, key);
@@ -122,6 +124,8 @@ esp_err_t HubConfigStore::SaveOnboardingState(const HubOnboardingState& state) {
     }
     cJSON_AddNumberToObject(root, "schema_version", kOnboardingSchemaVersion);
     cJSON_AddStringToObject(root, "owner_domain_id", state.owner_domain_id.c_str());
+    cJSON_AddNumberToObject(root, "owner_domain_generation",
+                           static_cast<double>(state.owner_domain_generation));
     cJSON_AddNumberToObject(root, "directory_revision",
                            static_cast<double>(state.directory_revision));
     cJSON_AddStringToObject(root, "device_id", state.device_id.c_str());
@@ -144,13 +148,18 @@ bool HubConfigStore::LoadOnboardingState(HubOnboardingState& state) const {
     Settings settings(kNvsNamespace, false);
     const std::string blob = settings.GetString(kOnboardingKey);
     cJSON* root = blob.empty() ? nullptr : cJSON_Parse(blob.c_str());
-    if (!root || JsonIntField(root, "schema_version", 0) !=
-                     kOnboardingSchemaVersion) {
+    const int schema_version = JsonIntField(root, "schema_version", 0);
+    if (!root || (schema_version != kOnboardingSchemaVersion &&
+                  schema_version != 3)) {
         cJSON_Delete(root);
         return false;
     }
     state = HubOnboardingState{};
     state.owner_domain_id = JsonStringField(root, "owner_domain_id");
+    state.owner_domain_generation = static_cast<uint64_t>(
+        schema_version == 3
+            ? 1
+            : JsonIntField(root, "owner_domain_generation", 0));
     state.directory_revision = static_cast<uint64_t>(
         JsonIntField(root, "directory_revision", 0));
     state.device_id = JsonStringField(root, "device_id");
@@ -159,7 +168,8 @@ bool HubConfigStore::LoadOnboardingState(HubOnboardingState& state) const {
     state.enrollment_id = JsonStringField(root, "enrollment_id");
     state.lifecycle_state = JsonStringField(root, "lifecycle_state");
     cJSON_Delete(root);
-    return !state.owner_domain_id.empty() && state.directory_revision > 0 &&
+    return !state.owner_domain_id.empty() && state.owner_domain_generation > 0 &&
+           state.directory_revision > 0 &&
            !state.device_id.empty() &&
            state.has_local_intent();
 }
@@ -167,6 +177,67 @@ bool HubConfigStore::LoadOnboardingState(HubOnboardingState& state) const {
 void HubConfigStore::ClearOnboardingState() {
     Settings settings(kNvsNamespace, true);
     settings.EraseKey(kOnboardingKey);
+}
+
+esp_err_t HubConfigStore::SaveActiveClaim(const ActiveClaimState& state) {
+    if (!state.valid() ||
+        (state.lifecycle_state != "approved" &&
+         state.lifecycle_state != "revoked")) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    const auto& ref = state.device_ref;
+    cJSON* root = cJSON_CreateObject();
+    if (!root) return ESP_ERR_NO_MEM;
+    cJSON_AddNumberToObject(root, "schema_version", kActiveClaimSchemaVersion);
+    cJSON_AddStringToObject(root, "lifecycle_state", state.lifecycle_state.c_str());
+    cJSON_AddStringToObject(root, "device_instance_id", ref.device_instance_id.c_str());
+    cJSON_AddStringToObject(root, "owner_domain_id", ref.owner_domain_id.c_str());
+    cJSON_AddNumberToObject(root, "owner_domain_generation",
+                           static_cast<double>(ref.owner_domain_generation));
+    cJSON_AddNumberToObject(root, "claim_generation", ref.claim_generation);
+    cJSON_AddNumberToObject(root, "trust_epoch", ref.trust_epoch);
+    cJSON_AddStringToObject(root, "accepted_manifest_digest",
+                            ref.accepted_manifest_digest.c_str());
+    char* printed = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (!printed) return ESP_ERR_NO_MEM;
+    Settings settings(kNvsNamespace, true);
+    const esp_err_t write_err = settings.SetString(kActiveClaimKey, printed);
+    cJSON_free(printed);
+    return write_err == ESP_OK ? settings.Commit() : write_err;
+}
+
+bool HubConfigStore::LoadActiveClaim(ActiveClaimState& state) const {
+    Settings settings(kNvsNamespace, false);
+    const std::string blob = settings.GetString(kActiveClaimKey);
+    cJSON* root = blob.empty() ? nullptr : cJSON_Parse(blob.c_str());
+    if (!root ||
+        JsonIntField(root, "schema_version", 0) != kActiveClaimSchemaVersion) {
+        cJSON_Delete(root);
+        return false;
+    }
+    state = ActiveClaimState{};
+    state.lifecycle_state = JsonStringField(root, "lifecycle_state");
+    auto& ref = state.device_ref;
+    ref.device_instance_id = JsonStringField(root, "device_instance_id");
+    ref.owner_domain_id = JsonStringField(root, "owner_domain_id");
+    ref.owner_domain_generation = static_cast<uint64_t>(
+        JsonIntField(root, "owner_domain_generation", 0));
+    ref.claim_generation = static_cast<uint32_t>(
+        JsonIntField(root, "claim_generation", 0));
+    ref.trust_epoch = static_cast<uint32_t>(
+        JsonIntField(root, "trust_epoch", 0));
+    ref.accepted_manifest_digest =
+        JsonStringField(root, "accepted_manifest_digest");
+    cJSON_Delete(root);
+    return state.valid() &&
+           (state.lifecycle_state == "approved" ||
+            state.lifecycle_state == "revoked");
+}
+
+void HubConfigStore::ClearActiveClaim() {
+    Settings settings(kNvsNamespace, true);
+    settings.EraseKey(kActiveClaimKey);
 }
 
 }  // namespace eidolon

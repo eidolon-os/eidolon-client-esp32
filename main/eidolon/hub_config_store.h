@@ -13,6 +13,9 @@ public:
     esp_err_t SaveOnboardingState(const HubOnboardingState& state);
     bool LoadOnboardingState(HubOnboardingState& state) const;
     void ClearOnboardingState();
+    esp_err_t SaveActiveClaim(const ActiveClaimState& state);
+    bool LoadActiveClaim(ActiveClaimState& state) const;
+    void ClearActiveClaim();
     bool HasValidConfig() const;
     bool Load(Esp32HubConfig& config) const;
 };

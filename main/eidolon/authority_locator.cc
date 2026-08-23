@@ -256,7 +256,10 @@ esp_err_t LocatorError(AuthorityLocatorResult result)
         return ESP_ERR_INVALID_STATE;
     case AuthorityLocatorResult::WrongOwnerDomain:
         return ESP_ERR_NOT_ALLOWED;
+    case AuthorityLocatorResult::OwnerGenerationAdvanced:
+        return ESP_ERR_INVALID_STATE;
     case AuthorityLocatorResult::DescriptorRejected:
+    case AuthorityLocatorResult::OwnerGenerationRollback:
     case AuthorityLocatorResult::RevisionRollback:
     case AuthorityLocatorResult::RevisionConflict:
         return ESP_ERR_INVALID_RESPONSE;

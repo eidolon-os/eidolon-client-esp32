@@ -70,6 +70,7 @@ struct AuthorityCandidateRecord {
 // independent from Wi-Fi credentials and from the approved channel config.
 struct HubOnboardingState {
     std::string owner_domain_id;
+    uint64_t owner_domain_generation = 0;
     uint64_t directory_revision = 0;
     std::string device_id;
     std::string request_id;
@@ -81,6 +82,23 @@ struct HubOnboardingState {
         return !request_id.empty() && !retrieval_token.empty();
     }
     bool enrolled() const { return !enrollment_id.empty(); }
+};
+
+// Long-lived Claim identity. Enrollment intent and retrieval capability never
+// cross this boundary: once ClaimActive is observed, only the exact DeviceRef
+// and its device-held operation key authorize Device Control.
+struct ActiveClaimState {
+    device_foundation::v1::DeviceRef device_ref;
+    std::string lifecycle_state = "approved";
+
+    bool valid() const {
+        return !device_ref.device_instance_id.empty() &&
+               !device_ref.owner_domain_id.empty() &&
+               device_ref.owner_domain_generation > 0 &&
+               device_ref.claim_generation > 0 &&
+               device_ref.trust_epoch > 0 &&
+               !device_ref.accepted_manifest_digest.empty();
+    }
 };
 
 struct HubEnrollmentReceipt {

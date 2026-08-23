@@ -130,6 +130,68 @@ bool ReadRoom(const cJSON* root, const char* key, RoomConfig& out)
     return out.usable() && !out.identity.empty() && !out.room_name.empty();
 }
 
+bool ParseDeviceRef(const cJSON* item,
+                    device_foundation::v1::DeviceRef& out)
+{
+    using device_foundation::v1::DeviceRef;
+    out = DeviceRef{};
+    uint64_t claim_generation = 0;
+    uint64_t trust_epoch = 0;
+    if (!ExactObjectSize(item, 6)) return false;
+    out.device_instance_id = JsonString(item, "device_instance_id");
+    out.owner_domain_id = JsonString(item, "owner_domain_id");
+    out.accepted_manifest_digest =
+        JsonString(item, "accepted_manifest_digest");
+    if (out.device_instance_id.empty() || out.owner_domain_id.empty() ||
+        !ReadRevision(item, "owner_domain_generation",
+                      out.owner_domain_generation) ||
+        !ReadRevision(item, "claim_generation", claim_generation) ||
+        !ReadRevision(item, "trust_epoch", trust_epoch) ||
+        claim_generation > UINT32_MAX || trust_epoch > UINT32_MAX ||
+        !Digest(out.accepted_manifest_digest)) {
+        return false;
+    }
+    out.claim_generation = static_cast<uint32_t>(claim_generation);
+    out.trust_epoch = static_cast<uint32_t>(trust_epoch);
+    return true;
+}
+
+bool SameDeviceRef(const device_foundation::v1::DeviceRef& left,
+                   const device_foundation::v1::DeviceRef& right)
+{
+    return left.device_instance_id == right.device_instance_id &&
+           left.owner_domain_id == right.owner_domain_id &&
+           left.owner_domain_generation == right.owner_domain_generation &&
+           left.claim_generation == right.claim_generation &&
+           left.trust_epoch == right.trust_epoch &&
+           left.accepted_manifest_digest == right.accepted_manifest_digest;
+}
+
+bool ParseOneChannel(const cJSON* root, HubChannelAssignment& assignment)
+{
+    assignment = HubChannelAssignment{};
+    const cJSON* channels = cJSON_GetObjectItemCaseSensitive(root, "channels");
+    if (!cJSON_IsArray(channels)) return false;
+    const cJSON* item = nullptr;
+    cJSON_ArrayForEach(item, channels) {
+        if (!cJSON_IsObject(item) ||
+            JsonString(item, "binding_format") != kLiveKitBindingFormat) {
+            continue;
+        }
+        assignment.channel_id = JsonString(item, "channel_id");
+        assignment.binding_format = JsonString(item, "binding_format");
+        assignment.opaque_binding = JsonString(item, "opaque_binding");
+        if (!assignment.channel_id.empty() &&
+            !assignment.opaque_binding.empty() &&
+            ReadInt64(item, "expires_at_ms", assignment.expires_at_ms) &&
+            assignment.expires_at_ms > 0) {
+            return true;
+        }
+        assignment = HubChannelAssignment{};
+    }
+    return cJSON_GetArraySize(channels) == 0;
+}
+
 }  // namespace
 
 bool ParseOwnerDomainDescriptor(
@@ -145,7 +207,7 @@ bool ParseOwnerDomainDescriptor(
         return false;
     }
     cJSON* root = cJSON_ParseWithLength(body.data(), body.size());
-    if (!ExactObjectSize(root, 8)) {
+    if (!ExactObjectSize(root, 9)) {
         cJSON_Delete(root);
         return false;
     }
@@ -155,6 +217,8 @@ bool ParseOwnerDomainDescriptor(
     out.signing_key_id = JsonString(root, "signing_key_id");
     out.signature = JsonString(root, "signature");
     if (out.owner_domain_id.empty() || out.owner_domain_id.size() > 128 ||
+        !ReadRevision(root, "owner_domain_generation",
+                      out.owner_domain_generation) ||
         !ReadRevision(root, "directory_revision", out.directory_revision) ||
         out.issued_at.empty() || out.expires_at.empty() ||
         !Digest(out.signing_key_id) || !Signature(out.signature)) {
@@ -226,6 +290,8 @@ bool ParseOwnerDomainDescriptor(
         std::to_string(out.directory_revision) + ",\"endpoints\":" +
         canonical_endpoints + ",\"expires_at\":" + Quote(out.expires_at) +
         ",\"issued_at\":" + Quote(out.issued_at) +
+        ",\"owner_domain_generation\":" +
+        std::to_string(out.owner_domain_generation) +
         ",\"owner_domain_id\":" + Quote(out.owner_domain_id) +
         ",\"signing_key_id\":" + Quote(out.signing_key_id) +
         ",\"trust_root_refs\":" + canonical_roots + "}";
@@ -300,9 +366,11 @@ bool ParseHandoffResponse(const std::string& body,
                           const std::string& expected_request_id,
                           const HubOnboardingState& state,
                           HubConfigStatus& status,
-                          HubChannelAssignment& assignment)
+                          HubChannelAssignment& assignment,
+                          device_foundation::v1::DeviceRef& device_ref)
 {
     assignment = HubChannelAssignment{};
+    device_ref = device_foundation::v1::DeviceRef{};
     cJSON* root = cJSON_ParseWithLength(body.data(), body.size());
     if (!cJSON_IsObject(root)) {
         cJSON_Delete(root);
@@ -321,39 +389,66 @@ bool ParseHandoffResponse(const std::string& body,
         return false;
     }
     if (lifecycle == "pending-approval") {
+        const cJSON* ref = cJSON_GetObjectItemCaseSensitive(root, "device_ref");
         status = HubConfigStatus::PendingApproval;
-        const bool empty = cJSON_GetArraySize(channels) == 0;
+        const bool empty = cJSON_IsNull(ref) && cJSON_GetArraySize(channels) == 0;
         cJSON_Delete(root);
         return empty;
     }
+    const cJSON* ref = cJSON_GetObjectItemCaseSensitive(root, "device_ref");
+    if (!ParseDeviceRef(ref, device_ref) ||
+        device_ref.device_instance_id != state.device_id ||
+        device_ref.owner_domain_id != state.owner_domain_id ||
+        device_ref.owner_domain_generation != state.owner_domain_generation) {
+        cJSON_Delete(root);
+        return false;
+    }
     if (lifecycle == "revoked") {
         status = HubConfigStatus::Revoked;
+        const bool empty = cJSON_GetArraySize(channels) == 0;
         cJSON_Delete(root);
-        return true;
+        return empty;
     }
     if (lifecycle != "approved") {
         cJSON_Delete(root);
         return false;
     }
-    const cJSON* item = nullptr;
-    cJSON_ArrayForEach(item, channels) {
-        if (!cJSON_IsObject(item) ||
-            JsonString(item, "binding_format") != kLiveKitBindingFormat) {
-            continue;
-        }
-        assignment.channel_id = JsonString(item, "channel_id");
-        assignment.binding_format = JsonString(item, "binding_format");
-        assignment.opaque_binding = JsonString(item, "opaque_binding");
-        if (!assignment.channel_id.empty() && !assignment.opaque_binding.empty() &&
-            ReadInt64(item, "expires_at_ms", assignment.expires_at_ms) &&
-            assignment.expires_at_ms > 0) {
-            break;
-        }
-        assignment = HubChannelAssignment{};
+    if (!ParseOneChannel(root, assignment)) {
+        cJSON_Delete(root);
+        return false;
     }
     status = assignment.opaque_binding.empty()
                  ? HubConfigStatus::WaitingBinding
                  : HubConfigStatus::Active;
+    cJSON_Delete(root);
+    return true;
+}
+
+bool ParseDeviceConfigurationResponse(
+    const std::string& body,
+    const std::string& expected_nonce,
+    const ActiveClaimState& expected,
+    HubConfigStatus& status,
+    HubChannelAssignment& assignment)
+{
+    cJSON* root = cJSON_ParseWithLength(body.data(), body.size());
+    device_foundation::v1::DeviceRef ref;
+    const std::string lifecycle = JsonString(root, "lifecycle_state");
+    const bool valid = cJSON_IsObject(root) &&
+        JsonString(root, "operation") == "device-control.configuration" &&
+        JsonString(root, "nonce") == expected_nonce &&
+        ParseDeviceRef(cJSON_GetObjectItemCaseSensitive(root, "device_ref"), ref) &&
+        SameDeviceRef(ref, expected.device_ref) &&
+        ParseOneChannel(root, assignment);
+    if (!valid || (lifecycle != "approved" && lifecycle != "revoked")) {
+        cJSON_Delete(root);
+        return false;
+    }
+    status = lifecycle == "revoked"
+                 ? HubConfigStatus::Revoked
+                 : (assignment.opaque_binding.empty()
+                        ? HubConfigStatus::WaitingBinding
+                        : HubConfigStatus::Active);
     cJSON_Delete(root);
     return true;
 }

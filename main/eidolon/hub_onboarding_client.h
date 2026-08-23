@@ -30,6 +30,8 @@ private:
     esp_err_t BindDeviceOperationKey(const HubOnboardingState& state);
     esp_err_t Handoff(HubOnboardingState& state,
                       Esp32HubConfig& out);
+    esp_err_t PullActiveConfiguration(const ActiveClaimState& claim,
+                                      Esp32HubConfig& out);
     esp_err_t RunAccepted(const device_foundation::v1::OwnerDomainDescriptor& descriptor,
                           const std::string& device_id,
                           Esp32HubConfig& out);

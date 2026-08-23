@@ -22,7 +22,15 @@ bool ParseHandoffResponse(const std::string& body,
                           const std::string& expected_request_id,
                           const HubOnboardingState& state,
                           HubConfigStatus& status,
-                          HubChannelAssignment& assignment);
+                          HubChannelAssignment& assignment,
+                          device_foundation::v1::DeviceRef& device_ref);
+
+bool ParseDeviceConfigurationResponse(
+    const std::string& body,
+    const std::string& expected_nonce,
+    const ActiveClaimState& expected,
+    HubConfigStatus& status,
+    HubChannelAssignment& assignment);
 
 bool ParseLiveKitBinding(const std::string& body, Esp32HubConfig& out);
 

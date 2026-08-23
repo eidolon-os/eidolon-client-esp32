@@ -19,7 +19,7 @@ constexpr const char* kCertificateInJson =
 std::string Descriptor(const std::string& owner = "owner_01")
 {
     return std::string("{\"owner_domain_id\":\"") + owner +
-           "\",\"directory_revision\":7,"
+           "\",\"owner_domain_generation\":1,\"directory_revision\":7,"
            "\"trust_root_refs\":[\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"],"
            "\"endpoints\":[{\"authority\":\"admission\","
            "\"logical_audience\":\"eidolon-admission\","

@@ -36,6 +36,8 @@ std::string DeviceRefJson(const device_foundation::v1::DeviceRef& ref) {
            Quote(ref.accepted_manifest_digest) +
            ",\"claim_generation\":" + std::to_string(ref.claim_generation) +
            ",\"device_instance_id\":" + Quote(ref.device_instance_id) +
+           ",\"owner_domain_generation\":" +
+           std::to_string(ref.owner_domain_generation) +
            ",\"owner_domain_id\":" + Quote(ref.owner_domain_id) +
            ",\"trust_epoch\":" + std::to_string(ref.trust_epoch) + "}";
 }
@@ -65,6 +67,7 @@ bool DeviceLocalEraseCore::SameRef(
     const device_foundation::v1::DeviceRef& right) {
     return left.device_instance_id == right.device_instance_id &&
            left.owner_domain_id == right.owner_domain_id &&
+           left.owner_domain_generation == right.owner_domain_generation &&
            left.claim_generation == right.claim_generation &&
            left.trust_epoch == right.trust_epoch &&
            left.accepted_manifest_digest == right.accepted_manifest_digest;

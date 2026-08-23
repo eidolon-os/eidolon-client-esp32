@@ -32,6 +32,8 @@ enum class AuthorityLocatorResult {
     NotCommissioned,
     WrongOwnerDomain,
     DescriptorRejected,
+    OwnerGenerationRollback,
+    OwnerGenerationAdvanced,
     RevisionRollback,
     RevisionConflict,
     PersistenceFailed,
