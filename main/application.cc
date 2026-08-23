@@ -23,6 +23,7 @@
 #include "eidolon/hub_activator.h"
 #include "eidolon/hub_types.h"
 #include "eidolon/livekit_voice_transport.h"
+#include "eidolon/activation_worker_resources.h"
 #include "eidolon/operational_readiness.h"
 #include <esp_app_desc.h>
 #include <esp_ota_ops.h>
@@ -348,6 +349,14 @@ void Application::Initialize() {
     SetEidolonLifecycleUi(eidolon::LifecyclePhase::LoadingAssets);
     ApplyLocalAssets();
     SetEidolonLifecycleUi(eidolon::LifecyclePhase::Booting);
+
+    // Reserve the control-plane actor before the voice transport and other
+    // optional services consume internal RAM. EnsureActivationWorker() remains
+    // idempotent so the network edge can retry allocation after a transient
+    // initialization failure.
+    if (!EnsureActivationWorker()) {
+        ESP_LOGE(TAG, "Unable to reserve Hub activation actor during boot");
+    }
 
     // Commissioning is a separate actor. Application consumes its confirmed
     // projection; it never infers setup progress from SoftAP callbacks or from
@@ -884,13 +893,20 @@ bool Application::EnsureActivationWorker() {
     if (activation_task_handle_ != nullptr) {
         return true;
     }
-    // Discovery and registration are blocking control-plane operations; they
-    // do not require DMA-capable memory. A persistent actor with a PSRAM stack
-    // makes its resource budget invariant instead of relying on an ephemeral
-    // worker's self-delete/idle cleanup before media recovery begins.
+    // Discovery and registration are serialized blocking control-plane work.
+    // Reserve one persistent actor instead of racing an ephemeral task's
+    // self-delete against media recovery. Its stack is deliberately internal:
+    // ActivationTask reads OTA metadata, which may freeze the external-memory
+    // cache and therefore cannot execute safely from a PSRAM task stack.
     const BaseType_t created = xTaskCreateWithCaps(
-        &Application::ActivationWorkerTrampoline, "hub_activation", 4096 * 2,
-        this, 2, &activation_task_handle_, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        &Application::ActivationWorkerTrampoline, "hub_activation",
+        eidolon::kActivationWorkerStackBytes, this, 2,
+        &activation_task_handle_, eidolon::kActivationWorkerMemoryCaps);
+    ESP_LOGI(TAG,
+             "Hub activation actor created=%d stack=%u memory=internal free_internal=%u",
+             created == pdPASS ? 1 : 0,
+             static_cast<unsigned>(eidolon::kActivationWorkerStackBytes),
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)));
     return created == pdPASS;
 #else
     return false;
@@ -902,6 +918,8 @@ void Application::ActivationWorkerTrampoline(void* arg) {
     while (true) {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         app->activation_succeeded_.store(app->ActivationTask());
+        ESP_LOGI(TAG, "Hub activation actor stack high-water=%u bytes",
+                 static_cast<unsigned>(uxTaskGetStackHighWaterMark(nullptr)));
         xEventGroupSetBits(app->event_group_, MAIN_EVENT_ACTIVATION_DONE);
     }
 }

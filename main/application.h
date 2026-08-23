@@ -179,9 +179,9 @@ private:
     bool assets_applied_ = false;
     bool play_popup_on_listening_ = false;  // Flag to play popup sound after state changes to listening
     int clock_ticks_ = 0;
-    // Long-lived Platform Adapter actor: its external-memory stack is a stable
-    // control-plane budget and never races the real-time media stack for
-    // internal SRAM at activation completion.
+    // Long-lived Platform Adapter actor. Its internal-memory stack is reserved
+    // before media initialization because activation performs cache-freezing
+    // flash operations that cannot run from an external-memory stack.
     TaskHandle_t activation_task_handle_ = nullptr;
     std::atomic_bool activation_in_progress_{false};
     std::atomic_bool activation_succeeded_{false};
