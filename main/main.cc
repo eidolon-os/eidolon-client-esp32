@@ -4,10 +4,12 @@
 #include <nvs_flash.h>
 #include <driver/gpio.h>
 #include <esp_event.h>
+#include <esp_partition.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
 #include "application.h"
+#include "eidolon/owner_trust_storage_policy.h"
 
 #if CONFIG_EIDOLON_AEC_QUALIFICATION
 #include "aec_qualification.h"
@@ -25,6 +27,23 @@ extern "C" void app_main(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+
+#if CONFIG_EIDOLON_HUB_MODE
+    // Owner roots and signed directory checkpoints have a separate,
+    // capacity-bounded failure domain. Never erase it automatically: a storage
+    // fault must fail closed instead of silently destroying device ownership.
+    const esp_partition_t* owner_trust_partition = esp_partition_find_first(
+        ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_NVS,
+        eidolon::kOwnerTrustPartitionName);
+    if (owner_trust_partition != nullptr) {
+        const esp_err_t trust_result =
+            nvs_flash_init_partition(eidolon::kOwnerTrustPartitionName);
+        if (trust_result != ESP_OK) {
+            ESP_LOGE(TAG, "Owner trust partition unavailable: %s",
+                     esp_err_to_name(trust_result));
+        }
+    }
+#endif
 
 #if CONFIG_EIDOLON_AEC_QUALIFICATION
     RunAecQualification();

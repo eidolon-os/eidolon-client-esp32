@@ -2,13 +2,16 @@
 
 #include "device_provisioning_protocol.h"
 #include "hub_types.h"
+#include "owner_trust_storage_policy.h"
 
 #include <esp_log.h>
+#include <esp_partition.h>
 #include <mbedtls/sha256.h>
 #include <nvs.h>
 
 #include <array>
 #include <cstring>
+#include <mutex>
 
 #define TAG "OwnerTrustStore"
 
@@ -36,9 +39,14 @@ constexpr const char* kLegacyKeys[] = {
 
 class NvsHandle {
 public:
-    explicit NvsHandle(nvs_open_mode_t mode)
+    explicit NvsHandle(nvs_open_mode_t mode, bool force_default = false)
     {
-        result_ = nvs_open(kNvsNamespace, mode, &handle_);
+        if (!force_default && DedicatedPartitionExists()) {
+            result_ = nvs_open_from_partition(
+                kOwnerTrustPartitionName, kNvsNamespace, mode, &handle_);
+        } else {
+            result_ = nvs_open(kNvsNamespace, mode, &handle_);
+        }
     }
     ~NvsHandle()
     {
@@ -49,6 +57,13 @@ public:
     nvs_handle_t get() const { return handle_; }
 
 private:
+    static bool DedicatedPartitionExists()
+    {
+        return esp_partition_find_first(
+                   ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_NVS,
+                   kOwnerTrustPartitionName) != nullptr;
+    }
+
     nvs_handle_t handle_ = 0;
     esp_err_t result_ = ESP_FAIL;
 };
@@ -179,6 +194,108 @@ bool StagedGeneration(nvs_handle_t handle, uint32_t& generation)
            generation != 0;
 }
 
+bool DedicatedPartitionExists()
+{
+    return esp_partition_find_first(
+               ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_NVS,
+               kOwnerTrustPartitionName) != nullptr;
+}
+
+esp_err_t EraseTrustKeys(nvs_handle_t handle)
+{
+    const auto erase = [handle](const char* key) {
+        const esp_err_t result = nvs_erase_key(handle, key);
+        return result == ESP_ERR_NVS_NOT_FOUND ? ESP_OK : result;
+    };
+    esp_err_t result = erase(kActiveSlotKey);
+    if (result == ESP_OK) result = erase(kStagedSlotKey);
+    if (result == ESP_OK) result = erase(kStagedGenerationKey);
+    for (int slot = 0; result == ESP_OK && slot < 2; ++slot) {
+        result = erase(kOwnerKeys[slot]);
+        if (result == ESP_OK) result = erase(kRootKeys[slot]);
+        if (result == ESP_OK) result = erase(kAuthorityKeys[slot]);
+        if (result == ESP_OK) result = erase(kDescriptorKeys[slot]);
+        if (result == ESP_OK) result = erase(kDigestKeys[slot]);
+    }
+    for (const char* key : kLegacyKeys) {
+        if (result == ESP_OK) result = erase(key);
+    }
+    return result;
+}
+
+void ReclaimLegacyTrustKeys()
+{
+    NvsHandle legacy(NVS_READWRITE, true);
+    if (!legacy.valid()) return;
+    esp_err_t result = EraseTrustKeys(legacy.get());
+    if (result == ESP_OK) result = nvs_commit(legacy.get());
+    if (result != ESP_OK) {
+        ESP_LOGW(TAG, "Dedicated trust is active but legacy key cleanup failed: %s",
+                 esp_err_to_name(result));
+    }
+}
+
+bool EnsureLegacyTrustMigrated()
+{
+    if (!DedicatedPartitionExists()) return true;
+
+    static std::mutex migration_mutex;
+    std::lock_guard<std::mutex> lock(migration_mutex);
+
+    OwnerTrustBundle dedicated_bundle;
+    {
+        NvsHandle dedicated(NVS_READONLY);
+        if (!dedicated.valid()) return false;
+        const int active_slot = ActiveSlot(dedicated.get());
+        if (ReadSlot(dedicated.get(), active_slot, dedicated_bundle)) {
+            ReclaimLegacyTrustKeys();
+            return true;
+        }
+    }
+
+    OwnerTrustBundle legacy_bundle;
+    {
+        NvsHandle legacy(NVS_READONLY, true);
+        if (!legacy.valid()) return false;
+        const bool legacy_valid =
+            ReadSlot(legacy.get(), ActiveSlot(legacy.get()), legacy_bundle);
+        if (ChooseOwnerTrustMigration(false, legacy_valid) ==
+            OwnerTrustMigrationAction::StartEmpty) {
+            return true;
+        }
+    }
+
+    // Copy -> commit -> read/verify -> publish -> commit -> read/verify. Only
+    // after the dedicated copy is independently usable may the old keys be
+    // reclaimed from the shared NVS partition.
+    {
+        NvsHandle dedicated(NVS_READWRITE);
+        if (!dedicated.valid()) return false;
+        esp_err_t result = WriteSlot(dedicated.get(), 0, legacy_bundle);
+        if (result == ESP_OK) result = nvs_commit(dedicated.get());
+        OwnerTrustBundle verified;
+        if (result != ESP_OK || !ReadSlot(dedicated.get(), 0, verified) ||
+            BundleDigest(verified) != BundleDigest(legacy_bundle)) {
+            ESP_LOGE(TAG, "Could not verify copied Owner trust: %s",
+                     esp_err_to_name(result));
+            return false;
+        }
+        result = nvs_set_str(dedicated.get(), kActiveSlotKey, "0");
+        if (result == ESP_OK) result = nvs_commit(dedicated.get());
+        if (result != ESP_OK ||
+            !ReadSlot(dedicated.get(), ActiveSlot(dedicated.get()), verified)) {
+            ESP_LOGE(TAG, "Could not publish migrated Owner trust: %s",
+                     esp_err_to_name(result));
+            return false;
+        }
+    }
+
+    ReclaimLegacyTrustKeys();
+    ESP_LOGI(TAG, "Migrated Owner trust to dedicated partition owner=%s",
+             legacy_bundle.owner_domain_id.c_str());
+    return true;
+}
+
 }  // namespace
 
 OwnerTrustStoreResult OwnerTrustStore::Stage(
@@ -189,6 +306,9 @@ OwnerTrustStoreResult OwnerTrustStore::Stage(
     if (!ValidBundleShape(bundle)) return OwnerTrustStoreResult::Invalid;
     if (setup_generation == 0 || !commit_guard || !commit_guard()) {
         return OwnerTrustStoreResult::Stale;
+    }
+    if (!EnsureLegacyTrustMigrated()) {
+        return OwnerTrustStoreResult::Unavailable;
     }
 
     NvsHandle nvs(NVS_READWRITE);
@@ -238,6 +358,7 @@ bool OwnerTrustStore::LoadStaged(
     OwnerTrustBundle& bundle) const
 {
     bundle = OwnerTrustBundle{};
+    if (!EnsureLegacyTrustMigrated()) return false;
     NvsHandle nvs(NVS_READONLY);
     if (!nvs.valid()) return false;
     uint32_t stored_generation = 0;
@@ -252,6 +373,9 @@ OwnerTrustStoreResult OwnerTrustStore::CommitStaged(
 {
     if (setup_generation == 0 || !commit_guard || !commit_guard()) {
         return OwnerTrustStoreResult::Stale;
+    }
+    if (!EnsureLegacyTrustMigrated()) {
+        return OwnerTrustStoreResult::Unavailable;
     }
     NvsHandle nvs(NVS_READWRITE);
     if (!nvs.valid()) return OwnerTrustStoreResult::Unavailable;
@@ -281,6 +405,9 @@ OwnerTrustStoreResult OwnerTrustStore::CommitStaged(
 OwnerTrustStoreResult OwnerTrustStore::RollbackStaged(
     uint32_t setup_generation)
 {
+    if (!EnsureLegacyTrustMigrated()) {
+        return OwnerTrustStoreResult::Unavailable;
+    }
     NvsHandle nvs(NVS_READWRITE);
     if (!nvs.valid()) return OwnerTrustStoreResult::Unavailable;
     uint32_t stored_generation = 0;
@@ -305,6 +432,9 @@ OwnerTrustStoreResult OwnerTrustStore::ReplaceActive(
 {
     if (!ValidBundleShape(bundle)) return OwnerTrustStoreResult::Invalid;
     if (!commit_guard || !commit_guard()) return OwnerTrustStoreResult::Stale;
+    if (!EnsureLegacyTrustMigrated()) {
+        return OwnerTrustStoreResult::Unavailable;
+    }
 
     NvsHandle nvs(NVS_READWRITE);
     if (!nvs.valid()) return OwnerTrustStoreResult::Unavailable;
@@ -347,6 +477,7 @@ OwnerTrustStoreResult OwnerTrustStore::ReplaceActive(
 bool OwnerTrustStore::Load(OwnerTrustBundle& bundle) const
 {
     bundle = OwnerTrustBundle{};
+    if (!EnsureLegacyTrustMigrated()) return false;
     NvsHandle nvs(NVS_READONLY);
     if (!nvs.valid()) return false;
     return ReadSlot(nvs.get(), ActiveSlot(nvs.get()), bundle);
@@ -382,27 +513,16 @@ esp_err_t OwnerTrustStore::SaveAcceptedDescriptor(
 
 void OwnerTrustStore::Clear()
 {
+    if (!EnsureLegacyTrustMigrated()) return;
     NvsHandle nvs(NVS_READWRITE);
     if (!nvs.valid()) return;
-    const auto erase = [&](const char* key) {
-        const esp_err_t result = nvs_erase_key(nvs.get(), key);
-        if (result != ESP_OK && result != ESP_ERR_NVS_NOT_FOUND) {
-            ESP_LOGE(TAG, "Could not erase %s: %s", key,
-                     esp_err_to_name(result));
-        }
-    };
-    erase(kActiveSlotKey);
-    erase(kStagedSlotKey);
-    erase(kStagedGenerationKey);
-    for (int slot = 0; slot < 2; ++slot) {
-        erase(kOwnerKeys[slot]);
-        erase(kRootKeys[slot]);
-        erase(kAuthorityKeys[slot]);
-        erase(kDescriptorKeys[slot]);
-        erase(kDigestKeys[slot]);
+    esp_err_t result = EraseTrustKeys(nvs.get());
+    if (result == ESP_OK) result = nvs_commit(nvs.get());
+    if (result != ESP_OK) {
+        ESP_LOGE(TAG, "Could not clear Owner trust: %s",
+                 esp_err_to_name(result));
     }
-    for (const char* key : kLegacyKeys) erase(key);
-    nvs_commit(nvs.get());
+    if (DedicatedPartitionExists()) ReclaimLegacyTrustKeys();
 }
 
 }  // namespace eidolon
