@@ -11,7 +11,6 @@
 #include "hub_trust_store.h"
 #include "owner_trust_commissioning_worker.h"
 
-#include <application.h>
 #include <ssid_manager.h>
 #include <wifi_manager.h>
 
@@ -75,13 +74,17 @@ struct RuntimeState {
     std::atomic<uint32_t> visible_generation{0};
     std::atomic<bool> advertising{false};
     std::atomic<bool> active{false};
+    std::atomic<bool> awaiting_station_route{false};
     std::mutex evidence_mutex;
     device_foundation::v1::CommissioningStatusEvidence evidence;
+    std::mutex observer_mutex;
+    CommissioningRuntime::Observer observer;
     std::string session_id;
     std::string candidate_ssid;
     std::string candidate_password;
     std::string candidate_id;
     bool previous_station_mode = false;
+    bool committed_station_route_ready = false;
 };
 
 RuntimeState& State()
@@ -157,6 +160,22 @@ esp_err_t StageTrustOnActor(uint32_t generation, const uint8_t* payload,
     return completed == pdTRUE ? ESP_OK : ESP_ERR_TIMEOUT;
 }
 
+const char* RuntimeStateName(CommissioningRuntimeState state)
+{
+    switch (state) {
+    case CommissioningRuntimeState::Idle: return "idle";
+    case CommissioningRuntimeState::PreparingIdentity: return "preparing-identity";
+    case CommissioningRuntimeState::AcquiringRadio: return "acquiring-radio";
+    case CommissioningRuntimeState::StartingTransport: return "starting-transport";
+    case CommissioningRuntimeState::Advertising: return "advertising";
+    case CommissioningRuntimeState::SessionActive: return "session-active";
+    case CommissioningRuntimeState::ApplyingConfiguration: return "applying-configuration";
+    case CommissioningRuntimeState::ReturningToPreviousMode: return "returning-to-station";
+    case CommissioningRuntimeState::RestoringPreviousMode: return "restoring-previous-mode";
+    }
+    return "unknown";
+}
+
 void PublishEvidence(RuntimeState& state)
 {
     {
@@ -167,11 +186,26 @@ void PublishEvidence(RuntimeState& state)
         ++evidence.state_revision;
         if (evidence.state_revision == 0) ++evidence.state_revision;
     }
-    if (state.core.state() == CommissioningRuntimeState::Advertising) {
-        Application::GetInstance().Schedule([] {
-            Application::GetInstance().SetDeviceState(
-                kDeviceStateWifiConfiguring);
-        });
+    CommissioningRuntime::Observer observer;
+    {
+        std::lock_guard<std::mutex> lock(state.observer_mutex);
+        observer = state.observer;
+    }
+    const CommissioningRuntimeSnapshot snapshot{
+        state.core.state(),
+        state.core.generation(),
+        state.core.transaction_committed(),
+        state.committed_station_route_ready,
+        state.previous_station_mode,
+    };
+    ESP_LOGI(TAG,
+             "Confirmed state=%s generation=%lu committed=%d station_route_ready=%d",
+             RuntimeStateName(snapshot.state),
+             static_cast<unsigned long>(snapshot.generation),
+             snapshot.transaction_committed ? 1 : 0,
+             snapshot.station_route_ready ? 1 : 0);
+    if (observer) {
+        observer(snapshot);
     }
 }
 
@@ -350,7 +384,15 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
         // aborted act restores Station only if it was the mode we leased away.
         // Initial uncommissioned setup therefore does not silently invent a
         // Station mode on cancel/timeout.
-        if (state.core.transaction_committed() || state.previous_station_mode) {
+        if (state.core.transaction_committed()) {
+            // Starting a mode is a command, not evidence. Keep the generation
+            // alive until WifiBoard submits the fresh connected route emitted
+            // by the restored Station implementation.
+            state.awaiting_station_route.store(true, std::memory_order_release);
+            WifiManager::GetInstance().StartStation();
+            break;
+        }
+        if (state.previous_station_mode) {
             WifiManager::GetInstance().StartStation();
         }
         completion.type = CommissioningEventType::PreviousModeRestored;
@@ -364,6 +406,20 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
 
 void Apply(RuntimeState& state, const CommissioningEvent& event)
 {
+    if (event.type == CommissioningEventType::OpenRequested &&
+        state.core.state() == CommissioningRuntimeState::Idle) {
+        {
+            std::lock_guard<std::mutex> lock(state.evidence_mutex);
+            state.evidence = {};
+        }
+        state.session_id.clear();
+        state.candidate_ssid.clear();
+        state.candidate_password.clear();
+        state.candidate_id.clear();
+        state.previous_station_mode = false;
+        state.committed_station_route_ready = false;
+        state.awaiting_station_route.store(false, std::memory_order_release);
+    }
     CommissioningEvent resolved = event;
     if ((resolved.type == CommissioningEventType::WifiConnected ||
          resolved.type == CommissioningEventType::OwnerRouteValidationFailed) &&
@@ -395,7 +451,15 @@ void Apply(RuntimeState& state, const CommissioningEvent& event)
             break;
         }
     }
+    const bool completes_committed_route =
+        resolved.type == CommissioningEventType::StationRouteReady &&
+        state.core.transaction_committed();
     const auto actions = state.core.Handle(resolved);
+    if (completes_committed_route &&
+        state.core.state() == CommissioningRuntimeState::Idle) {
+        state.committed_station_route_ready = true;
+        state.awaiting_station_route.store(false, std::memory_order_release);
+    }
     state.visible_generation.store(state.core.generation(), std::memory_order_release);
     state.advertising.store(
         state.core.state() == CommissioningRuntimeState::Advertising,
@@ -477,6 +541,30 @@ bool CommissioningRuntime::RequestCancel()
         state.visible_generation.load(std::memory_order_acquire);
     return generation != 0 &&
            Enqueue(CommissioningEventType::CancelRequested, generation);
+}
+
+bool CommissioningRuntime::NotifyStationRouteReady()
+{
+    RuntimeState& state = State();
+    if (!state.awaiting_station_route.exchange(false,
+                                                std::memory_order_acq_rel)) {
+        return false;
+    }
+    const uint32_t generation =
+        state.visible_generation.load(std::memory_order_acquire);
+    if (generation == 0 ||
+        !Enqueue(CommissioningEventType::StationRouteReady, generation)) {
+        state.awaiting_station_route.store(true, std::memory_order_release);
+        return false;
+    }
+    return true;
+}
+
+void CommissioningRuntime::SetObserver(Observer observer)
+{
+    RuntimeState& state = State();
+    std::lock_guard<std::mutex> lock(state.observer_mutex);
+    state.observer = std::move(observer);
 }
 
 bool CommissioningRuntime::IsAdvertising() const

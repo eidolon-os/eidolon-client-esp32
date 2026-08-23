@@ -340,6 +340,63 @@ void Application::Initialize() {
     ApplyLocalAssets();
     SetEidolonLifecycleUi(eidolon::LifecyclePhase::Booting);
 
+    // Commissioning is a separate actor. Application consumes its confirmed
+    // projection; it never infers setup progress from SoftAP callbacks or from
+    // commands such as StartStation(). The committed handoff is the sole event
+    // that may begin Hub enrollment after setup.
+    eidolon::CommissioningRuntime::GetInstance().SetObserver(
+        [this](const eidolon::CommissioningRuntimeSnapshot& snapshot) {
+            Schedule([this, snapshot]() {
+                using State = eidolon::CommissioningRuntimeState;
+                switch (snapshot.state) {
+                case State::PreparingIdentity:
+                case State::AcquiringRadio:
+                case State::StartingTransport:
+                    SetEidolonLifecycleUi(
+                        eidolon::LifecyclePhase::WifiConnecting,
+                        "Preparing secure device setup...");
+                    break;
+                case State::Advertising:
+                case State::SessionActive:
+                    SetDeviceState(kDeviceStateWifiConfiguring);
+                    SetEidolonLifecycleUi(
+                        eidolon::LifecyclePhase::WifiSetup,
+                        "Ready for secure device setup");
+                    break;
+                case State::ApplyingConfiguration:
+                    SetEidolonLifecycleUi(
+                        eidolon::LifecyclePhase::WifiConnecting,
+                        snapshot.transaction_committed
+                            ? "Wi-Fi and Host confirmed"
+                            : "Validating Wi-Fi and Host...");
+                    break;
+                case State::ReturningToPreviousMode:
+                case State::RestoringPreviousMode:
+                    SetEidolonLifecycleUi(
+                        eidolon::LifecyclePhase::WifiConnecting,
+                        "Returning to the confirmed Wi-Fi route...");
+                    break;
+                case State::Idle:
+                    if (snapshot.station_route_ready) {
+                        SetEidolonLifecycleUi(
+                            eidolon::LifecyclePhase::HubDiscovering,
+                            "Wi-Fi route confirmed");
+                        xEventGroupSetBits(event_group_,
+                                           MAIN_EVENT_NETWORK_CONNECTED);
+                    } else if (snapshot.previous_station_mode) {
+                        SetEidolonLifecycleUi(
+                            eidolon::LifecyclePhase::WifiScanning,
+                            "Restoring the previous Wi-Fi route...");
+                    } else {
+                        SetEidolonLifecycleUi(
+                            eidolon::LifecyclePhase::Offline,
+                            "Secure setup window closed");
+                    }
+                    break;
+                }
+            });
+        });
+
     {
         eidolon::EidolonDeviceStore device_store;
         if (!device_store.LoadThemeApplied()) {

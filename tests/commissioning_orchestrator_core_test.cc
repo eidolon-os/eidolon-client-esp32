@@ -111,6 +111,27 @@ void TestTransportClosesOnlyAfterCommittedTerminalWasObserved()
     assert(Has(actions, CommissioningActionType::StopTransport));
     assert(core.Handle(Event(
         CommissioningEventType::ControllerObservedTerminal, generation)).empty());
+
+    actions = core.Handle(Event(CommissioningEventType::TransportStopped,
+                                generation));
+    assert(Has(actions, CommissioningActionType::RestorePreviousRadioMode));
+    core.Handle(Event(CommissioningEventType::PreviousModeRestored,
+                      generation));
+    assert(core.state() == CommissioningRuntimeState::ReturningToPreviousMode);
+    core.Handle(Event(CommissioningEventType::StationRouteReady, generation));
+    assert(core.state() == CommissioningRuntimeState::Idle);
+}
+
+void TestPreparationFailureDoesNotWaitForTransportThatNeverExisted()
+{
+    CommissioningOrchestratorCore core;
+    core.Handle(Event(CommissioningEventType::OpenRequested, 0));
+    const uint32_t generation = core.generation();
+    auto actions = core.Handle(
+        Event(CommissioningEventType::IdentityFailed, generation));
+    assert(core.state() == CommissioningRuntimeState::Idle);
+    assert(!Has(actions, CommissioningActionType::StopTransport));
+    assert(!Has(actions, CommissioningActionType::RestorePreviousRadioMode));
 }
 
 void TestValidationFailureRollsBackBeforeTransportAndRadioRelease()
@@ -197,6 +218,7 @@ int main()
     TestReadyRequiresEvidenceAndCallbacksAreGenerationFenced();
     TestCandidateCommitsOnlyAfterWifiAndOwnerValidation();
     TestTransportClosesOnlyAfterCommittedTerminalWasObserved();
+    TestPreparationFailureDoesNotWaitForTransportThatNeverExisted();
     TestValidationFailureRollsBackBeforeTransportAndRadioRelease();
     TestStagedTrustRollsBackEvenBeforeNetworkArrives();
     TestUnexpectedTransportEndUsesTheSingleStopPath();

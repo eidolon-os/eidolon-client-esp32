@@ -191,6 +191,12 @@ std::vector<CommissioningAction> CommissioningOrchestratorCore::Handle(
         break;
     case CommissioningEventType::IdentityFailed:
     case CommissioningEventType::RadioAcquisitionFailed:
+        // Neither failure acquired a transport or a radio lease. There is
+        // nothing to tear down and no callback that could truthfully confirm a
+        // transport stop, so converge directly instead of waiting forever for
+        // synthetic cleanup evidence.
+        ResetToIdle(actions);
+        break;
     case CommissioningEventType::TransportStartFailed:
         BeginRestore(actions);
         break;
@@ -212,6 +218,17 @@ std::vector<CommissioningAction> CommissioningOrchestratorCore::Handle(
     case CommissioningEventType::PreviousModeRestored:
         if (state_ == CommissioningRuntimeState::ReturningToPreviousMode ||
             state_ == CommissioningRuntimeState::RestoringPreviousMode) {
+            // A committed act does not merely restore a Wi-Fi mode: it must
+            // prove the new Station route is usable before commissioning may
+            // hand control to enrollment/admission.
+            if (transaction_committed_) break;
+            ResetToIdle(actions);
+        }
+        break;
+    case CommissioningEventType::StationRouteReady:
+        if ((state_ == CommissioningRuntimeState::ReturningToPreviousMode ||
+             state_ == CommissioningRuntimeState::RestoringPreviousMode) &&
+            transaction_committed_) {
             ResetToIdle(actions);
         }
         break;

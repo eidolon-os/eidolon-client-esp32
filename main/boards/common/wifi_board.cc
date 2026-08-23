@@ -8,7 +8,6 @@
 #if CONFIG_EIDOLON_HUB_MODE
 #include "eidolon/commissioning_runtime.h"
 #include "eidolon/commissioning_transaction.h"
-#include "eidolon/eidolon_ui_types.h"
 #endif
 
 #include <freertos/FreeRTOS.h>
@@ -27,22 +26,6 @@ static const char *TAG = "WifiBoard";
 
 // Connection timeout in seconds
 static constexpr int CONNECT_TIMEOUT_SEC = 60;
-
-#if CONFIG_EIDOLON_HUB_MODE
-namespace {
-
-// What this device says to the person standing in front of it during setup.
-void ShowSetupHint(const std::string& hint) {
-#if CONFIG_USE_EMOTE_MESSAGE_STYLE
-    Application::GetInstance().SetEidolonLifecycleUi(eidolon::LifecyclePhase::WifiSetup, hint);
-#else
-    Application::GetInstance().Alert(Lang::Strings::WIFI_CONFIG_MODE, hint.c_str(), "gear",
-                                     Lang::Sounds::OGG_WIFICONFIG);
-#endif
-}
-
-}  // namespace
-#endif
 
 WifiBoard::WifiBoard() {
     // Create connection timeout timer
@@ -128,6 +111,19 @@ void WifiBoard::TryWifiConnect() {
 }
 
 void WifiBoard::OnNetworkEvent(NetworkEvent event, const std::string& data) {
+#if CONFIG_EIDOLON_HUB_MODE
+    // While commissioning owns the radio lease, legacy network callbacks are
+    // observations only. In particular they cannot start activation or replace
+    // the actor's confirmed UI projection. The one restored Station route is
+    // transferred back through the actor before Application sees it.
+    bool commissioning_owns_event =
+        eidolon::CommissioningRuntime::GetInstance().IsInProgress();
+    if (event == NetworkEvent::Connected && commissioning_owns_event) {
+        commissioning_owns_event =
+            eidolon::CommissioningRuntime::GetInstance()
+                .NotifyStationRouteReady() || commissioning_owns_event;
+    }
+#endif
     switch (event) {
         case NetworkEvent::Connected:
             // Stop timeout timer
@@ -159,7 +155,11 @@ void WifiBoard::OnNetworkEvent(NetworkEvent event, const std::string& data) {
     }
 
     // Notify external callback if set
-    if (network_event_callback_) {
+    if (network_event_callback_
+#if CONFIG_EIDOLON_HUB_MODE
+        && !commissioning_owns_event
+#endif
+    ) {
         network_event_callback_(event, data);
     }
 }
@@ -172,8 +172,14 @@ void WifiBoard::OnWifiConnectTimeout(void* arg) {
     auto* board = static_cast<WifiBoard*>(arg);
     ESP_LOGW(TAG, "WiFi connection timeout, entering config mode");
 
+#if CONFIG_EIDOLON_HUB_MODE
+    // The timeout expresses intent only. StopStation belongs to the
+    // commissioning actor's AcquireCommissioningRadioLease action.
+    board->StartWifiConfigMode();
+#else
     WifiManager::GetInstance().StopStation();
     board->StartWifiConfigMode();
+#endif
 }
 
 
@@ -185,9 +191,10 @@ void WifiBoard::StartWifiConfigMode() {
         ESP_LOGE(TAG, "Commissioning runtime did not accept the request");
         return;
     }
-    Application::GetInstance().Schedule([]() {
-        ShowSetupHint("Preparing secure device setup");
-    });
+    // A manual setup request must revoke the legacy boot timeout immediately;
+    // otherwise it can fire in the middle of the actor-owned generation and
+    // become a second writer of the Wi-Fi driver.
+    esp_timer_stop(connect_timer_);
 #elif defined(CONFIG_USE_HOTSPOT_WIFI_PROVISIONING)
     in_config_mode_ = true;
     Application::GetInstance().SetDeviceState(kDeviceStateWifiConfiguring);
