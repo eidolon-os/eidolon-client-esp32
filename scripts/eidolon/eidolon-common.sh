@@ -46,9 +46,30 @@ eidolon_pinned_sdk() {
   ' "${manifest}"
 }
 
-# Version actually installed under managed_components (what got compiled in).
+# Version actually resolved by the component manager (what gets compiled in).
+#
+# Git dependencies carry the pinned commit in dependencies.lock while their
+# own idf_component.yml still contains the library's semantic release version.
+# Comparing that semantic version to a commit pin makes every build look stale
+# and causes flash to destroy the build it is supposed to install.
 eidolon_installed_sdk() {
-  local comp; comp="$(eidolon_lk_component "$1")/idf_component.yml"
+  local lock comp resolved
+  lock="$(eidolon_lock_file "$1")"
+  if [[ -f "${lock}" ]]; then
+    resolved="$(awk '
+      /^  livekit\/livekit:[[:space:]]*$/ { in_lk=1; next }
+      in_lk && /^    version:[[:space:]]*/ {
+        v=$0; sub(/.*version:[[:space:]]*/, "", v); gsub(/["'"'"' ]/, "", v);
+        print v; exit
+      }
+      in_lk && /^  [^[:space:]]/ { in_lk=0 }
+    ' "${lock}")"
+    if [[ -n "${resolved}" ]]; then
+      printf '%s\n' "${resolved}"
+      return 0
+    fi
+  fi
+  comp="$(eidolon_lk_component "$1")/idf_component.yml"
   [[ -f "${comp}" ]] || { echo ""; return 0; }
   awk -F': *' '/^version:/ { gsub(/["'"'"' ]/, "", $2); print $2; exit }' "${comp}"
 }
