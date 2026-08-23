@@ -36,6 +36,8 @@ set(SOURCES "audio/audio_codec.cc"
             "ota.cc"
             "settings.cc"
             "device_state_machine.cc"
+            "eidolon/device_local_erase_core.cc"
+            "eidolon/device_erase_identity_adapter.cc"
             "assets.cc"
             "main.cc"
             )

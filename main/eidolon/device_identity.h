@@ -24,6 +24,8 @@ public:
                           SignedRequestHeaders& out);
     esp_err_t SignGetRequest(const std::string& path_query, const std::string& device_id,
                              SignedRequestHeaders& out);
+    esp_err_t SignCanonical(const std::string& canonical, std::string& signature);
+    const std::string& PublicKeySpki() const { return public_key_b64_; }
     const std::string& Fingerprint() const { return fingerprint_; }
 
 private:
@@ -32,7 +34,6 @@ private:
     esp_err_t LoadOrCreateKey();
     esp_err_t CreateKeypair();
     esp_err_t LoadPublicKeyFromPrivateKey();
-    esp_err_t SignCanonical(const std::string& canonical, std::string& signature);
 
     std::string private_key_pem_;
     std::string public_key_b64_;

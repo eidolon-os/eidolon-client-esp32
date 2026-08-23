@@ -6,6 +6,7 @@
 #include <esp_random.h>
 #include <esp_timer.h>
 #include <mbedtls/base64.h>
+#include <mbedtls/asn1.h>
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/entropy.h>
 #include <mbedtls/esp_mbedtls_random.h>
@@ -94,6 +95,35 @@ esp_err_t SeedCtrDrbg(mbedtls_entropy_context& entropy, mbedtls_ctr_drbg_context
         return ESP_FAIL;
     }
     return ESP_OK;
+}
+
+bool DerEcdsaToRaw(const unsigned char* der, size_t der_len,
+                   unsigned char raw[64]) {
+    unsigned char* cursor = const_cast<unsigned char*>(der);
+    const unsigned char* end = der + der_len;
+    size_t sequence_len = 0;
+    if (mbedtls_asn1_get_tag(&cursor, end, &sequence_len,
+                             MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE) != 0 ||
+        cursor + sequence_len != end) {
+        return false;
+    }
+    for (size_t index = 0; index < 2; ++index) {
+        size_t integer_len = 0;
+        if (mbedtls_asn1_get_tag(&cursor, end, &integer_len,
+                                 MBEDTLS_ASN1_INTEGER) != 0 ||
+            integer_len == 0 || cursor + integer_len > end) {
+            return false;
+        }
+        while (integer_len > 32 && *cursor == 0) {
+            ++cursor;
+            --integer_len;
+        }
+        if (integer_len > 32) return false;
+        std::memset(raw + index * 32, 0, 32);
+        std::memcpy(raw + index * 32 + 32 - integer_len, cursor, integer_len);
+        cursor += integer_len;
+    }
+    return cursor == end;
 }
 
 }  // namespace
@@ -231,7 +261,15 @@ esp_err_t DeviceIdentity::SignCanonical(const std::string& canonical, std::strin
         return ESP_FAIL;
     }
 
-    signature = Base64Url(sig, sig_len);
+    unsigned char raw_signature[64];
+    if (!DerEcdsaToRaw(sig, sig_len, raw_signature)) {
+        ESP_LOGE(TAG, "ECDSA signature was not canonical DER");
+        mbedtls_pk_free(&pk);
+        mbedtls_ctr_drbg_free(&ctr_drbg);
+        mbedtls_entropy_free(&entropy);
+        return ESP_FAIL;
+    }
+    signature = Base64Url(raw_signature, sizeof(raw_signature));
     mbedtls_pk_free(&pk);
     mbedtls_ctr_drbg_free(&ctr_drbg);
     mbedtls_entropy_free(&entropy);

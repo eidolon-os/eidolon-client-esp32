@@ -3,6 +3,7 @@
 #include "board.h"
 #include "authority_locator.h"
 #include "device_provisioning_protocol.h"
+#include "device_identity.h"
 #include "hub_config_store.h"
 #include "hub_onboarding_protocol.h"
 #include "hub_pinned_http.h"
@@ -84,6 +85,38 @@ std::string PrintJson(cJSON* root)
         cJSON_free(encoded);
     }
     return out;
+}
+
+std::string JsonText(const cJSON* object, const char* key)
+{
+    const cJSON* item = cJSON_GetObjectItemCaseSensitive(object, key);
+    return cJSON_IsString(item) && item->valuestring != nullptr
+               ? item->valuestring
+               : "";
+}
+
+bool Sha256Digest(const std::string& value)
+{
+    return value.size() == 71 && value.rfind("sha256:", 0) == 0 &&
+           value.find_first_not_of("0123456789abcdef", 7) == std::string::npos;
+}
+
+std::string Quote(const std::string& value)
+{
+    cJSON* item = cJSON_CreateString(value.c_str());
+    const std::string encoded = PrintJson(item);
+    cJSON_Delete(item);
+    return encoded;
+}
+
+std::string OperationKeyProofDocument(const HubOnboardingState& state,
+                                      const std::string& public_key)
+{
+    // RFC 8785 order is lexical. The values are strings, so cJSON quoting is
+    // sufficient for this fixed-shape signing document.
+    return std::string("{\"device_instance_id\":") + Quote(state.device_id) +
+           ",\"enrollment_request_id\":" + Quote(state.request_id) +
+           ",\"public_key_spki\":" + Quote(public_key) + "}";
 }
 
 std::string BuildEnrollmentBody(const HubOnboardingState& state)
@@ -208,7 +241,56 @@ esp_err_t HubOnboardingClient::EnsureEnrollment(
     }
     state.enrollment_id = receipt.enrollment_id;
     state.lifecycle_state = receipt.lifecycle_state;
+    err = BindDeviceOperationKey(state);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Device Control operation ACK key binding failed");
+        return err;
+    }
     return HubConfigStore().SaveOnboardingState(state);
+}
+
+esp_err_t HubOnboardingClient::BindDeviceOperationKey(
+    const HubOnboardingState& state)
+{
+    auto& identity = DeviceIdentity::GetInstance();
+    esp_err_t err = identity.EnsureKeypair();
+    if (err != ESP_OK) return err;
+    const std::string public_key = identity.PublicKeySpki();
+    const std::string signing_document =
+        OperationKeyProofDocument(state, public_key);
+    std::string proof_signature;
+    err = identity.SignCanonical(signing_document, proof_signature);
+    if (err != ESP_OK || proof_signature.size() != 86) return ESP_FAIL;
+
+    cJSON* root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "enrollment_id", state.enrollment_id.c_str());
+    cJSON_AddStringToObject(root, "retrieval_token", state.retrieval_token.c_str());
+    cJSON* proof = cJSON_AddObjectToObject(root, "proof");
+    cJSON_AddStringToObject(proof, "device_instance_id", state.device_id.c_str());
+    cJSON_AddStringToObject(proof, "enrollment_request_id", state.request_id.c_str());
+    cJSON_AddStringToObject(proof, "public_key_spki", public_key.c_str());
+    cJSON_AddStringToObject(proof, "possession_signature", proof_signature.c_str());
+    const std::string body = PrintJson(root);
+    cJSON_Delete(root);
+    if (body.empty()) return ESP_ERR_NO_MEM;
+
+    device_foundation::v1::AuthorityEndpoint control;
+    err = DeviceAuthorityLocator::GetInstance().Resolve(
+        device_foundation::v1::LogicalAuthority::DeviceControl, control);
+    if (err != ESP_OK) return err;
+    HubHttpResponse response;
+    err = HubHttpRequest(
+        "POST", control.uri + "/operation-key-bindings",
+        trust_.owner_root_certificate_pem, body, response);
+    if (err != ESP_OK) return err;
+    if (response.status != 200) return StatusError(response.status);
+    cJSON* result = cJSON_ParseWithLength(response.body.data(), response.body.size());
+    const bool valid = cJSON_IsObject(result) &&
+                       JsonText(result, "operation") ==
+                           "device-control.operation-key-bound" &&
+                       Sha256Digest(JsonText(result, "key_id"));
+    cJSON_Delete(result);
+    return valid ? ESP_OK : ESP_ERR_INVALID_RESPONSE;
 }
 
 esp_err_t HubOnboardingClient::Handoff(

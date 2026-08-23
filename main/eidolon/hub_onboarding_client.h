@@ -27,6 +27,7 @@ private:
         device_foundation::v1::OwnerDomainDescriptor& out);
     esp_err_t EnsureEnrollment(
         HubOnboardingState& state);
+    esp_err_t BindDeviceOperationKey(const HubOnboardingState& state);
     esp_err_t Handoff(HubOnboardingState& state,
                       Esp32HubConfig& out);
     esp_err_t RunAccepted(const device_foundation::v1::OwnerDomainDescriptor& descriptor,

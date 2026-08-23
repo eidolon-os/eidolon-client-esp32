@@ -76,6 +76,36 @@ struct CommissioningTerminalAck {
     uint32_t observed_state_revision = 0;
 };
 
+struct DeviceRef {
+    std::string device_instance_id;
+    std::string owner_domain_id;
+    uint32_t claim_generation = 0;
+    uint32_t trust_epoch = 0;
+    std::string accepted_manifest_digest;
+};
+
+enum class DeviceLocalEraseResult {
+    Erased,
+    PermanentFailure,
+};
+
+struct DeviceLocalEraseCommand {
+    std::string operation_id;
+    DeviceRef device_ref;
+    std::string deadline;
+    std::vector<std::string> erase_scopes;
+};
+
+struct DeviceLocalEraseAck {
+    std::string operation_id;
+    DeviceRef device_ref;
+    uint32_t ack_sequence = 0;
+    DeviceLocalEraseResult result = DeviceLocalEraseResult::PermanentFailure;
+    std::string result_code;
+    uint64_t device_monotonic_time = 0;
+    std::string device_signature;
+};
+
 }  // namespace eidolon::device_foundation::v1
 
 #endif  // EIDOLON_DEVICE_FOUNDATION_V1_GENERATED_H_
