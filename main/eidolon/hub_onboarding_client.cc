@@ -16,6 +16,7 @@
 #include <esp_random.h>
 #include <mbedtls/base64.h>
 
+#include <cstdint>
 #include <cstring>
 #include <utility>
 
@@ -155,9 +156,23 @@ esp_err_t HubOnboardingClient::FetchDescriptor(
     const esp_err_t loaded =
         DeviceAuthorityLocator::GetInstance().AcceptedDescriptor(out);
     if (loaded == ESP_OK) {
-        ESP_LOGI(TAG, "Accepted Owner directory owner=%s revision=%llu",
-                 out.owner_domain_id.c_str(),
-                 static_cast<unsigned long long>(out.directory_revision));
+        const uint32_t revision_high =
+            static_cast<uint32_t>(out.directory_revision >> 32);
+        const uint32_t revision_low =
+            static_cast<uint32_t>(out.directory_revision);
+        if (revision_high == 0) {
+            ESP_LOGI(TAG, "Accepted Owner directory owner=%s revision=%lu",
+                     out.owner_domain_id.c_str(),
+                     static_cast<unsigned long>(revision_low));
+        } else {
+            // ESP-IDF's nano formatter does not support %llu. Two fixed-width
+            // halves preserve the exact 64-bit revision in device evidence.
+            ESP_LOGI(TAG,
+                     "Accepted Owner directory owner=%s revision=0x%08lx%08lx",
+                     out.owner_domain_id.c_str(),
+                     static_cast<unsigned long>(revision_high),
+                     static_cast<unsigned long>(revision_low));
+        }
     }
     return loaded;
 }
