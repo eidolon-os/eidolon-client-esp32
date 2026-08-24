@@ -28,6 +28,11 @@ private:
         device_foundation::v1::OwnerDomainDescriptor& out);
     esp_err_t PullActiveConfiguration(const ActiveClaimState& claim,
                                       Esp32HubConfig& out);
+    esp_err_t ContinueCanonicalClaim(
+        const device_foundation::v1::OwnerDomainDescriptor& descriptor,
+        const std::string& device_id,
+        ActiveClaimState& activated_claim,
+        bool& activated);
     esp_err_t RunAccepted(const device_foundation::v1::OwnerDomainDescriptor& descriptor,
                           const std::string& device_id,
                           Esp32HubConfig& out);

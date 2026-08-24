@@ -3,19 +3,25 @@
 #include "authority_locator.h"
 #include "device_identity.h"
 #include "device_control_delivery_client.h"
+#include "esp_idf_claim_grant_crypto.h"
 #include "device_provisioning_protocol.h"
 #include "hub_config_store.h"
 #include "hub_onboarding_protocol.h"
 #include "hub_pinned_http.h"
 #include "hub_trust_store.h"
+#include "rfc3339_utc.h"
 #include "system_info.h"
 
 #include <cJSON.h>
 #include <esp_log.h>
 #include <esp_random.h>
 #include <mbedtls/base64.h>
+#include <mbedtls/sha256.h>
 
+#include <ctime>
 #include <cstdint>
+#include <cstring>
+#include <limits>
 #include <utility>
 
 #define TAG "HubOnboarding"
@@ -143,6 +149,159 @@ esp_err_t StatusError(int status)
         return ESP_ERR_TIMEOUT;
     }
     return ESP_FAIL;
+}
+
+bool HasProblemCode(const std::string& body, const char* expected)
+{
+    cJSON* root = cJSON_ParseWithLength(body.data(), body.size());
+    if (root == nullptr || !cJSON_IsObject(root)) {
+        cJSON_Delete(root);
+        return false;
+    }
+    const cJSON* code = cJSON_GetObjectItemCaseSensitive(root, "code");
+    const bool matches = cJSON_IsString(code) && code->valuestring != nullptr &&
+                         std::strcmp(code->valuestring, expected) == 0;
+    cJSON_Delete(root);
+    return matches;
+}
+
+std::string Sha256Digest(const std::string& value)
+{
+    unsigned char digest[32] = {};
+    if (mbedtls_sha256(
+            reinterpret_cast<const unsigned char*>(value.data()), value.size(),
+            digest, 0) != 0) return {};
+    static constexpr char hex[] = "0123456789abcdef";
+    std::string out = "sha256:";
+    out.reserve(71);
+    for (const auto byte : digest) {
+        out.push_back(hex[byte >> 4]);
+        out.push_back(hex[byte & 0x0f]);
+    }
+    return out;
+}
+
+std::string StableToken(const std::string& material, size_t bytes)
+{
+    unsigned char digest[32] = {};
+    if (bytes > sizeof(digest) || mbedtls_sha256(
+            reinterpret_cast<const unsigned char*>(material.data()),
+            material.size(), digest, 0) != 0) return {};
+    size_t capacity = 4 * ((bytes + 2) / 3) + 1;
+    std::string encoded(capacity, '\0');
+    size_t written = 0;
+    if (mbedtls_base64_encode(
+            reinterpret_cast<unsigned char*>(encoded.data()), encoded.size(),
+            &written, digest, bytes) != 0) return {};
+    encoded.resize(written);
+    for (char& character : encoded) {
+        if (character == '+') character = '-';
+        else if (character == '/') character = '_';
+    }
+    while (!encoded.empty() && encoded.back() == '=') encoded.pop_back();
+    return encoded;
+}
+
+bool JsonUint(const cJSON* object, const char* key, uint64_t& out)
+{
+    const cJSON* value = cJSON_GetObjectItemCaseSensitive(object, key);
+    if (!cJSON_IsNumber(value) || value->valuedouble < 1 ||
+        value->valuedouble > 9007199254740991.0) return false;
+    out = static_cast<uint64_t>(value->valuedouble);
+    return static_cast<double>(out) == value->valuedouble;
+}
+
+std::string JsonText(const cJSON* object, const char* key)
+{
+    const cJSON* value = cJSON_GetObjectItemCaseSensitive(object, key);
+    return cJSON_IsString(value) && value->valuestring ? value->valuestring : "";
+}
+
+bool ParseManifestRefContract(
+    const cJSON* value, device_foundation::v1::ManifestRef& ref)
+{
+    ref = {};
+    ref.manifest_id = JsonText(value, "manifest_id");
+    ref.digest = JsonText(value, "digest");
+    return cJSON_IsObject(value) && cJSON_GetArraySize(value) == 3 &&
+        JsonUint(value, "revision", ref.revision);
+}
+
+bool ParseCollectResult(
+    const std::string& body,
+    device_foundation::v1::CollectClaimGrantResult& result)
+{
+    cJSON* root = cJSON_ParseWithLength(body.data(), body.size());
+    const cJSON* envelope =
+        cJSON_GetObjectItemCaseSensitive(root, "wire_envelope");
+    const cJSON* aad = cJSON_GetObjectItemCaseSensitive(envelope, "aad");
+    result = {};
+    bool valid = cJSON_IsObject(root) && cJSON_GetArraySize(root) == 4 &&
+        cJSON_IsObject(envelope) && cJSON_GetArraySize(envelope) == 9 &&
+        cJSON_IsObject(aad) && cJSON_GetArraySize(aad) == 12;
+    if (valid) {
+        result.grant_id = JsonText(root, "grant_id");
+        result.expires_at = JsonText(root, "expires_at");
+        result.approval_decision_id = JsonText(root, "approval_decision_id");
+        auto& wire = result.wire_envelope;
+        wire.contract = JsonText(envelope, "contract");
+        wire.profile_id = JsonText(envelope, "profile_id");
+        wire.kem = JsonText(envelope, "kem");
+        wire.kdf = JsonText(envelope, "kdf");
+        wire.aead = JsonText(envelope, "aead");
+        wire.recipient_handoff_key_id =
+            JsonText(envelope, "recipient_handoff_key_id");
+        wire.encapsulated_key = JsonText(envelope, "encapsulated_key");
+        wire.ciphertext = JsonText(envelope, "ciphertext");
+        auto& binding = wire.aad;
+        binding.contract = JsonText(aad, "contract");
+        binding.profile_id = JsonText(aad, "profile_id");
+        binding.enrollment_id = JsonText(aad, "enrollment_id");
+        binding.device_instance_id = JsonText(aad, "device_instance_id");
+        binding.hardware_evidence_digest =
+            JsonText(aad, "hardware_evidence_digest");
+        binding.owner_domain_id.value = JsonText(aad, "owner_domain_id");
+        binding.grant_id = JsonText(aad, "grant_id");
+        uint64_t claim_generation = 0;
+        uint64_t trust_epoch = 0;
+        valid = JsonUint(aad, "proposal_revision", binding.proposal_revision) &&
+            JsonUint(aad, "owner_domain_generation",
+                     binding.owner_domain_generation) &&
+            JsonUint(aad, "claim_generation", claim_generation) &&
+            JsonUint(aad, "trust_epoch", trust_epoch) &&
+            claim_generation <= std::numeric_limits<uint32_t>::max() &&
+            trust_epoch <= std::numeric_limits<uint32_t>::max() &&
+            ParseManifestRefContract(
+                cJSON_GetObjectItemCaseSensitive(aad, "manifest_ref"),
+                binding.manifest_ref);
+        if (valid) {
+            binding.claim_generation = static_cast<uint32_t>(claim_generation);
+            binding.trust_epoch = static_cast<uint32_t>(trust_epoch);
+        }
+    }
+    cJSON_Delete(root);
+    return valid;
+}
+
+esp_err_t AdmissionEndpoint(std::string& uri)
+{
+    device_foundation::v1::AuthorityEndpoint endpoint;
+    const esp_err_t result = DeviceAuthorityLocator::GetInstance().Resolve(
+        device_foundation::v1::LogicalAuthority::Admission, endpoint);
+    if (result == ESP_OK) uri = endpoint.uri;
+    return result;
+}
+
+std::string WithCommandEnvelope(const std::string& command_id,
+                                const std::string& correlation_id,
+                                const std::string& canonical_payload)
+{
+    if (canonical_payload.size() < 2 || canonical_payload.front() != '{') {
+        return {};
+    }
+    return std::string("{\"command_id\":") + Quote(command_id) +
+        ",\"correlation_id\":" + Quote(correlation_id) + "," +
+        canonical_payload.substr(1);
 }
 
 }  // namespace
@@ -332,15 +491,207 @@ esp_err_t HubOnboardingClient::RunAccepted(
         }
         return PullActiveConfiguration(active_claim, out);
     }
-    // PH2-B deliberately removes the legacy retrieval-token/handoff writer.
-    // Canonical Proposal/Grant/Ack state and the SDK ClaimGrantWireEnvelope/AAD
-    // boundary are implemented by DeviceClaimConsumerCore. A production HPKE
-    // ClaimGrantCryptoPort + HTTP adapter is still intentionally absent, so
-    // starting a new Claim remains a hard capability block, never a fallback
-    // to the stale protocol.
-    ESP_LOGE(TAG,
-             "Canonical Claim collection wire authentication is unavailable");
-    return ESP_ERR_NOT_SUPPORTED;
+    bool activated = false;
+    err = ContinueCanonicalClaim(descriptor, device_id, active_claim, activated);
+    if (err != ESP_OK) return err;
+    if (!activated) {
+        out = {};
+        out.status = HubConfigStatus::PendingApproval;
+        return ESP_OK;
+    }
+    return PullActiveConfiguration(active_claim, out);
+}
+
+esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
+    const device_foundation::v1::OwnerDomainDescriptor& descriptor,
+    const std::string& device_id, ActiveClaimState& activated_claim,
+    bool& activated)
+{
+    activated = false;
+    HubConfigStore store;
+    EspIdfClaimGrantCrypto crypto;
+    if (!crypto.EnsureEnrollmentMaterial()) {
+        ESP_LOGE(TAG,
+                 "Claim enrollment material is absent or unreadable; refusing Proposal");
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+    DeviceClaimConsumerCore core(store, store, crypto);
+    auto outcome = core.ResumePending();
+    std::string admission;
+    esp_err_t err = AdmissionEndpoint(admission);
+    if (err != ESP_OK) return err;
+
+    if (outcome.result == DeviceClaimConsumerResult::NoPendingEnrollment) {
+#ifdef CONFIG_EIDOLON_PROVISIONING_MANUFACTURER_BOUND
+        // A manufacturer-bound build must supply a real certificate-chain
+        // HardwareIdentityPort. A self assertion is never a production fallback.
+        return ESP_ERR_NOT_SUPPORTED;
+#else
+        const std::string handoff_public_key = crypto.HandoffPublicKey();
+        const std::string operational_public_key = crypto.OperationalPublicKey();
+        const std::string nonce = StableToken(
+            "commissioning|" + handoff_public_key + "|" +
+                descriptor.owner_domain_id,
+            18);
+        std::string commissioning_proof;
+        if (nonce.empty() || !crypto.BuildDevelopmentCommissioningProof(
+                device_id, descriptor.owner_domain_id, nonce,
+                commissioning_proof)) {
+            ESP_LOGE(TAG,
+                     "Development Admission setup secret is not provisioned");
+            return ESP_ERR_NOT_SUPPORTED;
+        }
+        const std::string evidence_document =
+            std::string("{\"device_instance_id\":") + Quote(device_id) +
+            ",\"operational_public_key\":" + Quote(operational_public_key) +
+            ",\"profile_id\":\"eidolon-trust-p256-hpke-v1\"}";
+        std::string evidence_signature;
+        if (DeviceIdentity::GetInstance().SignCanonical(
+                evidence_document, evidence_signature) != ESP_OK) {
+            return ESP_FAIL;
+        }
+        const std::string hardware_evidence =
+            evidence_document + "." + evidence_signature;
+        const std::string hardware_digest = Sha256Digest(hardware_evidence);
+        const std::string manifest_document = "{\"endpoints\":[]}";
+        const std::string manifest_digest = Sha256Digest(manifest_document);
+        const std::string canonical_create =
+            std::string("{\"profile_id\":\"eidolon-trust-p256-hpke-v1\"") +
+            ",\"device_instance_candidate_id\":" + Quote(device_id) +
+            ",\"requested_owner_domain_id\":" +
+                Quote(descriptor.owner_domain_id) +
+            ",\"hardware_identity_evidence\":{" +
+                std::string("\"scheme\":\"dev-self-signed-p256\",\"evidence\":") +
+                Quote(hardware_evidence) + ",\"evidence_digest\":" +
+                Quote(hardware_digest) + "}" +
+            ",\"commissioning_proof\":{" +
+                std::string("\"scheme\":\"protocomm-security2-srp6a-aes256gcm\",\"proof\":") +
+                Quote(commissioning_proof) + ",\"nonce\":" + Quote(nonce) + "}" +
+            ",\"manifest\":{" +
+                std::string("\"manifest_id\":\"box3-device-manifest\",\"revision\":1,\"digest\":") +
+                Quote(manifest_digest) + ",\"document\":" + manifest_document + "}" +
+            ",\"handoff_key\":{" +
+                std::string("\"scheme\":\"DHKEM-P256-HKDF-SHA256\",\"public_key\":") +
+                Quote(handoff_public_key) + "}" +
+            ",\"operational_key\":{" +
+                std::string("\"scheme\":\"ES256-P256\",\"public_key\":") +
+                Quote(operational_public_key) + "}}";
+        const std::string identity = StableToken(
+            "create|" + handoff_public_key + "|" +
+                descriptor.owner_domain_id,
+            18);
+        const std::string command_id = "create-" + identity;
+        const std::string correlation_id = "claim-" + identity;
+        const std::string wire = WithCommandEnvelope(
+            command_id, correlation_id, canonical_create);
+        HubHttpResponse response;
+        err = HubHttpRequest("POST", admission + "/enrollments",
+                             trust_.owner_root_certificate_pem, wire, response);
+        if (err != ESP_OK) return err;
+        if (response.status != 201) return StatusError(response.status);
+        outcome = core.RecordProposal(
+            canonical_create, response.body, descriptor.owner_domain_generation);
+        if (outcome.result != DeviceClaimConsumerResult::ProposalRecorded &&
+            outcome.result != DeviceClaimConsumerResult::Replayed) {
+            return outcome.result == DeviceClaimConsumerResult::StorageFailure
+                ? ESP_FAIL
+                : ESP_ERR_INVALID_RESPONSE;
+        }
+        ESP_LOGI(TAG, "Canonical EnrollmentProposal recorded; awaiting Decision");
+        return ESP_OK;
+#endif
+    }
+
+    if (outcome.result == DeviceClaimConsumerResult::CollectionReady) {
+        EnrollmentJournalEntry journal;
+        if (store.LoadEnrollment(journal) != ClaimStoreLoadResult::Loaded) {
+            return ESP_FAIL;
+        }
+        const std::string identity = StableToken(
+            "collect|" + journal.enrollment_id + "|" +
+                journal.collection_challenge,
+            18);
+        HubHttpResponse response;
+        err = HubHttpRequest(
+            "POST",
+            admission + "/enrollments/" + journal.enrollment_id +
+                "/claim-grants:collect",
+            trust_.owner_root_certificate_pem,
+            WithCommandEnvelope("collect-" + identity, "claim-" + identity,
+                                outcome.wire_payload),
+            response);
+        if (err != ESP_OK) return err;
+        if (response.status == 409 &&
+            HasProblemCode(response.body, "DECISION_REQUIRED")) {
+            // A Decision may arrive after this bounded poll. Only that explicit
+            // problem is retryable; revision/trust conflicts are terminal for
+            // this Proposal and must never be hidden as "still pending".
+            return ESP_OK;
+        }
+        if (response.status != 200) return StatusError(response.status);
+        device_foundation::v1::CollectClaimGrantResult collected;
+        if (!ParseCollectResult(response.body, collected) ||
+            IsRfc3339DeadlineExpired(
+                collected.expires_at,
+                static_cast<int64_t>(time(nullptr)) * 1000,
+                1704067200000LL)) {
+            return ESP_ERR_TIMEOUT;
+        }
+        outcome = core.AcceptCollectedGrant(collected);
+        if (outcome.result != DeviceClaimConsumerResult::GrantStaged &&
+            outcome.result != DeviceClaimConsumerResult::Replayed) {
+            return outcome.result == DeviceClaimConsumerResult::StorageFailure
+                ? ESP_FAIL
+                : ESP_ERR_INVALID_RESPONSE;
+        }
+        outcome = core.BuildGrantAck();
+    }
+
+    if (outcome.result == DeviceClaimConsumerResult::AckReady) {
+        EnrollmentJournalEntry journal;
+        if (store.LoadEnrollment(journal) != ClaimStoreLoadResult::Loaded) {
+            return ESP_FAIL;
+        }
+        const std::string identity = StableToken(
+            "ack|" + journal.enrollment_id + "|" + journal.grant_id, 18);
+        HubHttpResponse response;
+        err = HubHttpRequest(
+            "POST",
+            admission + "/enrollments/" + journal.enrollment_id +
+                "/claim-grants/" + journal.grant_id + ":ack",
+            trust_.owner_root_certificate_pem,
+            WithCommandEnvelope("ack-" + identity, "claim-" + identity,
+                                outcome.wire_payload),
+            response);
+        if (err != ESP_OK) return err;
+        if (response.status != 200) return StatusError(response.status);
+        outcome = core.AcceptGrantAck(response.body);
+        if (outcome.result != DeviceClaimConsumerResult::ClaimActivated &&
+            outcome.result != DeviceClaimConsumerResult::Replayed) {
+            return outcome.result == DeviceClaimConsumerResult::StorageFailure
+                ? ESP_FAIL
+                : ESP_ERR_INVALID_RESPONSE;
+        }
+        if (store.LoadActiveClaim(activated_claim) !=
+                ClaimStoreLoadResult::Loaded ||
+            !activated_claim.valid()) {
+            return ESP_FAIL;
+        }
+        activated = true;
+        ESP_LOGI(TAG, "Canonical ClaimGrant acknowledged and Claim activated");
+        return ESP_OK;
+    }
+
+    if (outcome.result == DeviceClaimConsumerResult::Replayed) {
+        if (store.LoadActiveClaim(activated_claim) == ClaimStoreLoadResult::Loaded &&
+            activated_claim.valid()) {
+            activated = true;
+            return ESP_OK;
+        }
+    }
+    return outcome.result == DeviceClaimConsumerResult::StorageFailure
+        ? ESP_FAIL
+        : ESP_ERR_INVALID_STATE;
 }
 
 esp_err_t HubOnboardingClient::Resume(const std::string& device_id,

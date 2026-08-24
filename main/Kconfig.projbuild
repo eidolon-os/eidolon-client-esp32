@@ -1229,6 +1229,21 @@ menu "Eidolon Hub"
             silently treat a development device as a production one. Leave off for
             development builds carrying the shared salt and verifier above.
 
+    config EIDOLON_ADMISSION_SETUP_SECRET_HEX
+        string "Per-device development Admission setup secret (hex)"
+        default ""
+        depends on EIDOLON_HUB_MODE && !EIDOLON_PROVISIONING_MANUFACTURER_BOUND
+        help
+            Development-only per-device secret used to authenticate the
+            canonical CreateEnrollment request after the Protocomm session has
+            ended. It is a separate manufacturing/deployment credential: the
+            SRP6a verifier above is not this secret and must never be reused as
+            one. Empty fails closed before creating a Proposal.
+
+            Inject this value through the private per-device release config and
+            stage the same bytes in the Hub's root-owned development registry.
+            Never commit a real device value to sdkconfig or source control.
+
     config EIDOLON_MDNS_SERVICE_TYPE
         string "mDNS service type (without ._tcp suffix)"
         default "_eidolon-owner"

@@ -40,7 +40,7 @@ std::string CreateEnrollment() {
 
 std::string CreateResult() {
     return std::string("{\"enrollment_id\":\"enrollment_01\",") +
-        "\"proposal_revision\":2,\"state\":\"pending_review\"," +
+        "\"proposal_revision\":1,\"state\":\"pending_review\"," +
         "\"expires_at\":\"2026-08-18T00:15:00Z\"," +
         "\"reviewed_manifest_digest\":\"" + kManifestDigest + "\"," +
         "\"collection_challenge\":\"Y29sbGVjdGlvbi1jaGFsbGVuZ2U\"}";
@@ -59,7 +59,10 @@ DeviceRef Ref(uint32_t claim_generation = 2) {
 ClaimGrantAAD Aad() {
     ClaimGrantAAD aad;
     aad.enrollment_id = "enrollment_01";
-    aad.proposal_revision = 2;
+    // This is the immutable Proposal content revision returned to the device
+    // by CreateEnrollment. A later Controller Decision advances the Hub's
+    // aggregate/source revision, not this proof/AAD precondition.
+    aad.proposal_revision = 1;
     aad.device_instance_id = "device_01";
     aad.hardware_evidence_digest = kHardwareDigest;
     aad.manifest_ref = {"manifest_01", 2, kManifestDigest};
@@ -240,7 +243,7 @@ void GoldenAadAndFiveFieldDeviceRefAreExact() {
         "\",\"manifest_id\":\"manifest_01\",\"revision\":2}," +
         "\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\"," +
         "\"profile_id\":\"eidolon-trust-p256-hpke-v1\"," +
-        "\"proposal_revision\":2,\"trust_epoch\":1}";
+        "\"proposal_revision\":1,\"trust_epoch\":1}";
     assert(crypto.expected_aad == expected);
     const std::string ref = DeviceClaimConsumerCore::DeviceRefJson(Ref());
     assert(ref ==
@@ -279,6 +282,8 @@ void ProposalCollectionGrantAckAndActivationResumeForwardOnly() {
     const auto collection = core.BuildCollectionRequest();
     assert(collection.result == DeviceClaimConsumerResult::CollectionReady);
     assert(collection.wire_payload.find("collection_challenge") !=
+           std::string::npos);
+    assert(collection.wire_payload.find("\"proposal_revision\":1") !=
            std::string::npos);
     assert(core.AcceptCollectedGrant(CollectResult()).result ==
            DeviceClaimConsumerResult::GrantStaged);
