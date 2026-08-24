@@ -1,0 +1,43 @@
+{
+  "vector_id": "DF-PH2B0-CLAIM-GRANT-WIRE-001",
+  "envelope": {
+    "contract": "eidolon.device-foundation.claim-grant-envelope",
+    "profile_id": "eidolon-trust-p256-hpke-v1",
+    "kem": "DHKEM-P256-HKDF-SHA256",
+    "kdf": "HKDF-SHA256",
+    "aead": "AES-128-GCM",
+    "recipient_handoff_key_id": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "encapsulated_key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "ciphertext": "AAAAAAAAAAAAAAAAAAAAAA",
+    "aad": {
+      "contract": "eidolon.device-foundation.claim-grant-aad",
+      "profile_id": "eidolon-trust-p256-hpke-v1",
+      "enrollment_id": "enrollment_01",
+      "proposal_revision": 2,
+      "device_instance_id": "device_01",
+      "hardware_evidence_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "manifest_ref": {
+        "manifest_id": "manifest_01",
+        "revision": 2,
+        "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "owner_domain_id": "owner-domain_01",
+      "owner_domain_generation": 3,
+      "claim_generation": 2,
+      "trust_epoch": 1,
+      "grant_id": "grant_01"
+    }
+  },
+  "aad_canonical_utf8": "{\"claim_generation\":2,\"contract\":\"eidolon.device-foundation.claim-grant-aad\",\"device_instance_id\":\"device_01\",\"enrollment_id\":\"enrollment_01\",\"grant_id\":\"grant_01\",\"hardware_evidence_digest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\",\"manifest_ref\":{\"digest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\",\"manifest_id\":\"manifest_01\",\"revision\":2},\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"profile_id\":\"eidolon-trust-p256-hpke-v1\",\"proposal_revision\":2,\"trust_epoch\":1}",
+  "aad_sha256": "sha256:0f18b352607ca4ddb616aff0196d0db953499a5db7dff5c18e2a09d95e6fe7dc",
+  "pre_open_mutations_must_fail": [
+    "profile_id",
+    "kem",
+    "kdf",
+    "aead",
+    "recipient_handoff_key_id",
+    "encapsulated_key",
+    "ciphertext",
+    "aad"
+  ]
+}

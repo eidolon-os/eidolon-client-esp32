@@ -1,30 +1,35 @@
 {
-  "sdk_commit": "88a74ca33051a578d28fc1f6dc8627eb92dd071a",
+  "sdk_commit": "d88196757e8c054befd2c17f7cb9c7a9eb6f5253",
   "files": [
     {
       "source": "contracts/device_foundation/v1/generated/cpp/device_foundation_v1_generated.h",
       "target": "main/eidolon/device_foundation_v1_generated.h",
-      "sha256": "3d55b78a2506502728bf4b15e4c4d93492d91db55dfaa158851128fb7bf36c7b"
+      "sha256": "4f304f0981ed4250e1a6d1d9b7bc9df10992965e3db92c64877893fd745ed968"
     },
     {
       "source": "contracts/device_foundation/v1/common/schemas.schema.json",
       "target": "tests/fixtures/device_foundation_v1/common.schemas.schema.json",
-      "sha256": "99d6906f42358de0c46159473c810e9e063aa7f363adc59ed16af75794e21590"
+      "sha256": "7c8d45ce6b79ff97aa2abf60b6da33964cb5ad13e463e0509ccf19674f89f71f"
     },
     {
       "source": "contracts/device_foundation/v1/admission/schemas.schema.json",
       "target": "tests/fixtures/device_foundation_v1/admission.schemas.schema.json",
-      "sha256": "184cacabe3f13c90043f679f96d0003ee730f58ca5dbbcd8725e37a5c8efdca2"
+      "sha256": "7d336f03c733f7f0cc97f4a33efcb3a21a39bda00c286b077c238e77137dc9e1"
     },
     {
       "source": "contracts/device_foundation/v1/examples/valid/admission.json",
       "target": "tests/fixtures/device_foundation_v1/admission.valid.json",
-      "sha256": "9102dedc421a874489814bef1f878bf099dd7be259f36b7e4258b5c8d0bf1fdf"
+      "sha256": "2dc79d638b9ec8d185bfaf8be6870c0b3a556f9fea77f454c5333f7d5eb80f61"
     },
     {
       "source": "contracts/device_foundation/v1/golden/claim-grant-aad.json",
       "target": "tests/fixtures/device_foundation_v1/claim-grant-aad.json",
-      "sha256": "3a547e41429bab66bfdab684bcdde936b591cd9aa57a1d4b0fa94631d3764d8c"
+      "sha256": "c4f5af27e1b0c286be3da07a568d7e4329a14dbc2057ed0d980c3489f8abe67b"
+    },
+    {
+      "source": "contracts/device_foundation/v1/golden/claim-grant-wire-envelope.json",
+      "target": "tests/fixtures/device_foundation_v1/claim-grant-wire-envelope.json",
+      "sha256": "b109748c5d8338f194257ddd95ab58ae54a472dad4e70f940a65c5d28dbaa891"
     },
     {
       "source": "contracts/device_foundation/v1/golden/device-local-erase.json",

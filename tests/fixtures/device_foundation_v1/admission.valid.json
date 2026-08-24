@@ -114,7 +114,30 @@
       "definition": "CollectClaimGrantResult",
       "value": {
         "grant_id": "grant_01",
-        "sealed_grant": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "wire_envelope": {
+          "contract": "eidolon.device-foundation.claim-grant-envelope",
+          "profile_id": "eidolon-trust-p256-hpke-v1",
+          "kem": "DHKEM-P256-HKDF-SHA256",
+          "kdf": "HKDF-SHA256",
+          "aead": "AES-128-GCM",
+          "recipient_handoff_key_id": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+          "encapsulated_key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "ciphertext": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "aad": {
+            "contract": "eidolon.device-foundation.claim-grant-aad",
+            "profile_id": "eidolon-trust-p256-hpke-v1",
+            "enrollment_id": "enrollment_01",
+            "proposal_revision": 2,
+            "device_instance_id": "device_01",
+            "hardware_evidence_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+            "manifest_ref": {"manifest_id": "manifest_01", "revision": 2, "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"},
+            "owner_domain_id": "owner-domain_01",
+            "owner_domain_generation": 3,
+            "claim_generation": 2,
+            "trust_epoch": 1,
+            "grant_id": "grant_01"
+          }
+        },
         "expires_at": "2026-08-18T00:10:00Z",
         "approval_decision_id": "decision_01"
       }

@@ -26,6 +26,12 @@ def main() -> None:
     ]
     assert "struct OwnerDomainId" in header
     assert "struct BusinessOwnerId" in header
+    assert "struct ClaimGrantAAD" in header
+    assert "struct ClaimGrantWireEnvelope" in header
+    assert (
+        "struct CollectClaimGrantResult { std::string grant_id; "
+        "ClaimGrantWireEnvelope wire_envelope;" in header
+    )
 
     admission = json.loads((FIXTURES / "admission.valid.json").read_text())
     decide = next(
@@ -50,6 +56,26 @@ def main() -> None:
         mutated = dict(aad["aad"])
         mutated[field] = f"mutated-{mutated[field]}"
         assert canonical(mutated) != canonical(aad["aad"])
+
+    wire = json.loads(
+        (FIXTURES / "claim-grant-wire-envelope.json").read_text()
+    )
+    assert canonical(wire["envelope"]["aad"]) == wire["aad_canonical_utf8"]
+    assert "sha256:" + hashlib.sha256(
+        wire["aad_canonical_utf8"].encode()
+    ).hexdigest() == wire["aad_sha256"]
+    assert set(wire["pre_open_mutations_must_fail"]) == {
+        "profile_id",
+        "kem",
+        "kdf",
+        "aead",
+        "recipient_handoff_key_id",
+        "encapsulated_key",
+        "ciphertext",
+        "aad",
+    }
+    assert wire["envelope"]["aad"]["owner_domain_id"] == "owner-domain_01"
+    assert "business_owner_id" not in canonical(wire["envelope"])
 
     erase = json.loads((FIXTURES / "device-local-erase.json").read_text())
     assert canonical(erase["operation"]) == erase["operation_canonical_utf8"]

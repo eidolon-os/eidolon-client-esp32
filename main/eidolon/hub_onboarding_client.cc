@@ -323,11 +323,11 @@ esp_err_t HubOnboardingClient::RunAccepted(
         return PullActiveConfiguration(active_claim, out);
     }
     // PH2-B deliberately removes the legacy retrieval-token/handoff writer.
-    // Canonical Proposal/Grant/Ack state is implemented by
-    // DeviceClaimConsumerCore, but the SDK has not frozen the outer HPKE wire
-    // envelope needed to derive all AAD inputs before unsealing. Until a real
-    // ClaimGrantCryptoPort + HTTP adapter exists, starting a new Claim is a hard
-    // capability block, never a fallback to the stale protocol.
+    // Canonical Proposal/Grant/Ack state and the SDK ClaimGrantWireEnvelope/AAD
+    // boundary are implemented by DeviceClaimConsumerCore. A production HPKE
+    // ClaimGrantCryptoPort + HTTP adapter is still intentionally absent, so
+    // starting a new Claim remains a hard capability block, never a fallback
+    // to the stale protocol.
     ESP_LOGE(TAG,
              "Canonical Claim collection wire authentication is unavailable");
     return ESP_ERR_NOT_SUPPORTED;

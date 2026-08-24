@@ -4,14 +4,17 @@
 #include <string>
 
 using namespace eidolon;
+using eidolon::device_foundation::v1::ClaimGrant;
+using eidolon::device_foundation::v1::ClaimGrantAAD;
+using eidolon::device_foundation::v1::CollectClaimGrantResult;
 using eidolon::device_foundation::v1::DeviceRef;
 
 namespace {
 
 constexpr const char* kHardwareDigest =
-    "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+    "sha256:1111111111111111111111111111111111111111111111111111111111111111";
 constexpr const char* kManifestDigest =
-    "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+    "sha256:2222222222222222222222222222222222222222222222222222222222222222";
 constexpr const char* kHandoffKeyId =
     "sha256:3333333333333333333333333333333333333333333333333333333333333333";
 constexpr const char* kOperationalKeyId =
@@ -37,7 +40,7 @@ std::string CreateEnrollment() {
 
 std::string CreateResult() {
     return std::string("{\"enrollment_id\":\"enrollment_01\",") +
-        "\"proposal_revision\":3,\"state\":\"pending_review\"," +
+        "\"proposal_revision\":2,\"state\":\"pending_review\"," +
         "\"expires_at\":\"2026-08-18T00:15:00Z\"," +
         "\"reviewed_manifest_digest\":\"" + kManifestDigest + "\"," +
         "\"collection_challenge\":\"Y29sbGVjdGlvbi1jaGFsbGVuZ2U\"}";
@@ -49,33 +52,56 @@ DeviceRef Ref(uint32_t claim_generation = 2) {
     ref.owner_domain_id.value = "owner-domain_01";
     ref.owner_domain_generation = 3;
     ref.claim_generation = claim_generation;
-    ref.trust_epoch = 4;
+    ref.trust_epoch = 1;
     return ref;
 }
 
-std::string Grant(const std::string& owner_domain = "owner-domain_01",
-                  const std::string& manifest_digest = kManifestDigest,
-                  uint32_t claim_generation = 2) {
-    return std::string("{\"grant_id\":\"grant_01\",\"enrollment_id\":\"enrollment_01\",") +
-        "\"device_ref\":{\"device_instance_id\":\"device_01\"," +
-        "\"owner_domain_id\":\"" + owner_domain +
-        "\",\"owner_domain_generation\":3,\"claim_generation\":" +
-        std::to_string(claim_generation) + ",\"trust_epoch\":4}," +
-        "\"manifest_ref\":{\"manifest_id\":\"manifest_01\",\"revision\":2," +
-        "\"digest\":\"" + manifest_digest + "\"}," +
-        "\"approval_decision_id\":\"decision_01\"," +
-        "\"handoff_key_id\":\"" + kHandoffKeyId + "\"," +
-        "\"operational_key_id\":\"" + kOperationalKeyId + "\"," +
-        "\"issued_at\":\"2026-08-18T00:02:00Z\"," +
-        "\"expires_at\":\"2026-08-18T00:12:00Z\"}";
+ClaimGrantAAD Aad() {
+    ClaimGrantAAD aad;
+    aad.enrollment_id = "enrollment_01";
+    aad.proposal_revision = 2;
+    aad.device_instance_id = "device_01";
+    aad.hardware_evidence_digest = kHardwareDigest;
+    aad.manifest_ref = {"manifest_01", 2, kManifestDigest};
+    aad.owner_domain_id.value = "owner-domain_01";
+    aad.owner_domain_generation = 3;
+    aad.claim_generation = 2;
+    aad.trust_epoch = 1;
+    aad.grant_id = "grant_01";
+    return aad;
 }
 
-std::string CollectResult(const std::string& grant = "grant_01",
-                          const std::string& decision = "decision_01") {
-    return std::string("{\"grant_id\":\"") + grant +
-        "\",\"sealed_grant\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"," +
-        "\"expires_at\":\"2026-08-18T00:10:00Z\"," +
-        "\"approval_decision_id\":\"" + decision + "\"}";
+ClaimGrant Grant(const std::string& owner_domain = "owner-domain_01",
+                 const std::string& manifest_digest = kManifestDigest,
+                 uint32_t claim_generation = 2) {
+    ClaimGrant grant;
+    grant.grant_id = "grant_01";
+    grant.enrollment_id = "enrollment_01";
+    grant.device_ref = Ref(claim_generation);
+    grant.device_ref.owner_domain_id.value = owner_domain;
+    grant.manifest_ref = {"manifest_01", 2, manifest_digest};
+    grant.approval_decision_id = "decision_01";
+    grant.handoff_key_id = kHandoffKeyId;
+    grant.operational_key_id = kOperationalKeyId;
+    grant.issued_at = "2026-08-18T00:02:00Z";
+    grant.expires_at = "2026-08-18T00:10:00Z";
+    return grant;
+}
+
+CollectClaimGrantResult CollectResult(
+    const std::string& grant = "grant_01",
+    const std::string& decision = "decision_01") {
+    CollectClaimGrantResult result;
+    result.grant_id = grant;
+    result.expires_at = "2026-08-18T00:10:00Z";
+    result.approval_decision_id = decision;
+    result.wire_envelope.recipient_handoff_key_id = kHandoffKeyId;
+    result.wire_envelope.encapsulated_key =
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    result.wire_envelope.ciphertext = "AAAAAAAAAAAAAAAAAAAAAA";
+    result.wire_envelope.aad = Aad();
+    result.wire_envelope.aad.grant_id = grant;
+    return result;
 }
 
 std::string AckResult(const DeviceRef& ref = Ref()) {
@@ -148,13 +174,20 @@ public:
         proof = "aGFuZG9mZi1rZXktcHJvb2Y";
         return true;
     }
-    ClaimGrantUnsealResult UnsealClaimGrant(
-        const std::string&, std::string& out,
-        std::string& authenticated) override {
+    ClaimGrantUnsealResult OpenClaimGrant(
+        const device_foundation::v1::ClaimGrantWireEnvelope& envelope,
+        const std::string& canonical_aad, ClaimGrant& out) override {
+        ++open_calls;
         if (!available) return ClaimGrantUnsealResult::WireAuthUnavailable;
         if (reject) return ClaimGrantUnsealResult::AuthenticationRejected;
+        if (envelope.recipient_handoff_key_id != kHandoffKeyId ||
+            envelope.encapsulated_key !=
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" ||
+            envelope.ciphertext != "AAAAAAAAAAAAAAAAAAAAAA" ||
+            canonical_aad != expected_aad) {
+            return ClaimGrantUnsealResult::AuthenticationRejected;
+        }
         out = plaintext;
-        authenticated = aad;
         return ClaimGrantUnsealResult::Authenticated;
     }
     bool BuildOperationalKeyProof(const std::string&, const std::string&,
@@ -171,18 +204,19 @@ public:
         return !fail_destroy;
     }
 
-    void SetValidGrant(const EnrollmentJournalEntry& entry,
-                       const std::string& grant = Grant()) {
+    void SetValidGrant(const EnrollmentJournalEntry&,
+                       const ClaimGrant& grant = Grant()) {
         plaintext = grant;
-        aad = DeviceClaimConsumerCore::ClaimGrantAad(entry, "grant_01", Ref());
+        expected_aad = DeviceClaimConsumerCore::ClaimGrantAad(Aad());
     }
 
     bool available = true;
     bool reject = false;
     bool fail_destroy = false;
     int destroy_calls = 0;
-    std::string plaintext;
-    std::string aad;
+    int open_calls = 0;
+    ClaimGrant plaintext;
+    std::string expected_aad;
 };
 
 void Record(Stores& stores, Crypto& crypto, DeviceClaimConsumerCore& core) {
@@ -199,18 +233,20 @@ void GoldenAadAndFiveFieldDeviceRefAreExact() {
     const std::string expected =
         std::string("{\"claim_generation\":2,") +
         "\"contract\":\"eidolon.device-foundation.claim-grant-aad\"," +
+        "\"device_instance_id\":\"device_01\"," +
         "\"enrollment_id\":\"enrollment_01\",\"grant_id\":\"grant_01\"," +
         "\"hardware_evidence_digest\":\"" + kHardwareDigest + "\"," +
-        "\"manifest_digest\":\"" + kManifestDigest + "\"," +
+        "\"manifest_ref\":{\"digest\":\"" + kManifestDigest +
+        "\",\"manifest_id\":\"manifest_01\",\"revision\":2}," +
         "\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\"," +
         "\"profile_id\":\"eidolon-trust-p256-hpke-v1\"," +
-        "\"proposal_revision\":3,\"trust_epoch\":4}";
-    assert(crypto.aad == expected);
+        "\"proposal_revision\":2,\"trust_epoch\":1}";
+    assert(crypto.expected_aad == expected);
     const std::string ref = DeviceClaimConsumerCore::DeviceRefJson(Ref());
     assert(ref ==
            "{\"claim_generation\":2,\"device_instance_id\":\"device_01\","
            "\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\","
-           "\"trust_epoch\":4}");
+           "\"trust_epoch\":1}");
 }
 
 void CanonicalProposalParsingFailsClosed() {
@@ -330,10 +366,141 @@ void WireAuthAbsenceAndAadMutationNeverStageOrActivate() {
            DeviceClaimConsumerResult::WireAuthUnavailable);
     assert(stores.enrollment.phase == EnrollmentJournalPhase::ProposalCreated);
     crypto.available = true;
-    crypto.aad += " ";
+    crypto.expected_aad += " ";
     assert(core.AcceptCollectedGrant(CollectResult()).result ==
            DeviceClaimConsumerResult::AuthenticationRejected);
     assert(!stores.has_active);
+}
+
+void EveryEnvelopeAndAadMutationFailsClosedBeforeStaging() {
+    const auto run = [](auto mutate, DeviceClaimConsumerResult expected,
+                        int expected_open_calls) {
+        Stores stores;
+        Crypto crypto;
+        DeviceClaimConsumerCore core(stores, stores, crypto);
+        Record(stores, crypto, core);
+        auto collected = CollectResult();
+        mutate(collected);
+        assert(core.AcceptCollectedGrant(collected).result == expected);
+        assert(crypto.open_calls == expected_open_calls);
+        assert(stores.enrollment.phase ==
+               EnrollmentJournalPhase::ProposalCreated);
+        assert(!stores.has_active);
+    };
+
+    run([](auto& value) { value.wire_envelope.contract = "other"; },
+        DeviceClaimConsumerResult::InvalidContract, 0);
+    run([](auto& value) { value.wire_envelope.profile_id = "other"; },
+        DeviceClaimConsumerResult::InvalidContract, 0);
+    run([](auto& value) { value.wire_envelope.kem = "other"; },
+        DeviceClaimConsumerResult::InvalidContract, 0);
+    run([](auto& value) { value.wire_envelope.kdf = "other"; },
+        DeviceClaimConsumerResult::InvalidContract, 0);
+    run([](auto& value) { value.wire_envelope.aead = "other"; },
+        DeviceClaimConsumerResult::InvalidContract, 0);
+    run([](auto& value) {
+            value.wire_envelope.recipient_handoff_key_id =
+                "sha256:5555555555555555555555555555555555555555555555555555555555555555";
+        },
+        DeviceClaimConsumerResult::AuthenticationRejected, 0);
+    run([](auto& value) { value.wire_envelope.encapsulated_key[0] = 'B'; },
+        DeviceClaimConsumerResult::AuthenticationRejected, 1);
+    run([](auto& value) { value.wire_envelope.ciphertext[0] = 'B'; },
+        DeviceClaimConsumerResult::AuthenticationRejected, 1);
+    run([](auto& value) {
+            value.wire_envelope.aad.owner_domain_id.value = "owner-domain_02";
+        },
+        DeviceClaimConsumerResult::OwnerDomainMismatch, 0);
+    run([](auto& value) { value.wire_envelope.aad.contract = "other"; },
+        DeviceClaimConsumerResult::InvalidContract, 0);
+    run([](auto& value) { value.wire_envelope.aad.profile_id = "other"; },
+        DeviceClaimConsumerResult::InvalidContract, 0);
+    run([](auto& value) {
+            value.wire_envelope.aad.enrollment_id = "enrollment_02";
+        },
+        DeviceClaimConsumerResult::AuthenticationRejected, 0);
+    run([](auto& value) {
+            value.wire_envelope.aad.owner_domain_generation = 4;
+        },
+        DeviceClaimConsumerResult::OwnerDomainMismatch, 0);
+    run([](auto& value) {
+            value.wire_envelope.aad.device_instance_id = "device_02";
+        },
+        DeviceClaimConsumerResult::OwnerDomainMismatch, 0);
+    run([](auto& value) { value.wire_envelope.aad.proposal_revision = 3; },
+        DeviceClaimConsumerResult::StaleGeneration, 0);
+    run([](auto& value) {
+            value.wire_envelope.aad.hardware_evidence_digest =
+                "sha256:9999999999999999999999999999999999999999999999999999999999999999";
+        },
+        DeviceClaimConsumerResult::AuthenticationRejected, 0);
+    run([](auto& value) {
+            value.wire_envelope.aad.manifest_ref.digest =
+                "sha256:9999999999999999999999999999999999999999999999999999999999999999";
+        },
+        DeviceClaimConsumerResult::ManifestMismatch, 0);
+    run([](auto& value) {
+            value.wire_envelope.aad.manifest_ref.manifest_id = "manifest_02";
+        },
+        DeviceClaimConsumerResult::ManifestMismatch, 0);
+    run([](auto& value) { value.wire_envelope.aad.manifest_ref.revision = 3; },
+        DeviceClaimConsumerResult::ManifestMismatch, 0);
+    run([](auto& value) { value.wire_envelope.aad.claim_generation = 3; },
+        DeviceClaimConsumerResult::AuthenticationRejected, 1);
+    run([](auto& value) { value.wire_envelope.aad.trust_epoch = 2; },
+        DeviceClaimConsumerResult::AuthenticationRejected, 1);
+    run([](auto& value) {
+            value.grant_id = "grant_02";
+            value.wire_envelope.aad.grant_id = "grant_02";
+        },
+        DeviceClaimConsumerResult::AuthenticationRejected, 1);
+}
+
+void PlaintextGrantMustMatchEnvelopeAadAndLocalPreconditions() {
+    const auto run = [](auto mutate, DeviceClaimConsumerResult expected) {
+        Stores stores;
+        Crypto crypto;
+        DeviceClaimConsumerCore core(stores, stores, crypto);
+        Record(stores, crypto, core);
+        mutate(crypto.plaintext);
+        assert(core.AcceptCollectedGrant(CollectResult()).result == expected);
+        assert(crypto.open_calls == 1);
+        assert(stores.enrollment.phase ==
+               EnrollmentJournalPhase::ProposalCreated);
+        assert(!stores.has_active);
+    };
+
+    run([](auto& grant) { grant.grant_id = "grant_02"; },
+        DeviceClaimConsumerResult::AuthenticationRejected);
+    run([](auto& grant) { grant.enrollment_id = "enrollment_02"; },
+        DeviceClaimConsumerResult::AuthenticationRejected);
+    run([](auto& grant) {
+            grant.device_ref.owner_domain_id.value = "owner-domain_02";
+        },
+        DeviceClaimConsumerResult::OwnerDomainMismatch);
+    run([](auto& grant) { grant.device_ref.claim_generation = 3; },
+        DeviceClaimConsumerResult::StaleGeneration);
+    run([](auto& grant) {
+            grant.manifest_ref.digest =
+                "sha256:9999999999999999999999999999999999999999999999999999999999999999";
+        },
+        DeviceClaimConsumerResult::ManifestMismatch);
+    run([](auto& grant) { grant.approval_decision_id = "decision_02"; },
+        DeviceClaimConsumerResult::AuthenticationRejected);
+    run([](auto& grant) {
+            grant.handoff_key_id =
+                "sha256:5555555555555555555555555555555555555555555555555555555555555555";
+        },
+        DeviceClaimConsumerResult::AuthenticationRejected);
+    run([](auto& grant) {
+            grant.operational_key_id =
+                "sha256:5555555555555555555555555555555555555555555555555555555555555555";
+        },
+        DeviceClaimConsumerResult::AuthenticationRejected);
+    run([](auto& grant) { grant.issued_at = "not-a-date"; },
+        DeviceClaimConsumerResult::InvalidContract);
+    run([](auto& grant) { grant.expires_at = "2026-08-18T00:11:00Z"; },
+        DeviceClaimConsumerResult::AuthenticationRejected);
 }
 
 void OwnerDomainBusinessOwnerManifestAndGenerationCannotBeInterchanged() {
@@ -342,8 +509,6 @@ void OwnerDomainBusinessOwnerManifestAndGenerationCannotBeInterchanged() {
     DeviceClaimConsumerCore core(stores, stores, crypto);
     Record(stores, crypto, core);
     crypto.plaintext = Grant("owner_01");  // business Owner, not Owner Domain
-    crypto.aad = DeviceClaimConsumerCore::ClaimGrantAad(
-        stores.enrollment, "grant_01", Ref());
     assert(core.AcceptCollectedGrant(CollectResult()).result ==
            DeviceClaimConsumerResult::InvalidContract);
 
@@ -411,6 +576,8 @@ int main() {
     ActiveClaimCommitWinsPowerLossBeforeMaterialDestruction();
     ActiveClaimCannotClearAnUnrelatedEnrollmentGeneration();
     WireAuthAbsenceAndAadMutationNeverStageOrActivate();
+    EveryEnvelopeAndAadMutationFailsClosedBeforeStaging();
+    PlaintextGrantMustMatchEnvelopeAadAndLocalPreconditions();
     OwnerDomainBusinessOwnerManifestAndGenerationCannotBeInterchanged();
     DuplicateGrantAndRevokedTerminalFenceOldGeneration();
     PreActiveRevokeCannotFabricateAClaim();

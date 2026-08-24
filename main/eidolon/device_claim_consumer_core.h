@@ -83,15 +83,14 @@ public:
                                       uint64_t proposal_revision,
                                       const std::string& collection_challenge,
                                       std::string& proof) = 0;
-    // The SDK has not frozen an outer HPKE envelope that exposes all AAD inputs
-    // before decryption. A production adapter therefore must remain unavailable
-    // until that wire shape is canonical. It must return both authenticated
-    // plaintext and the exact AAD bytes used by HPKE; Core reconstructs and
-    // compares those bytes field-for-field before staging a Grant.
-    virtual ClaimGrantUnsealResult UnsealClaimGrant(
-        const std::string& sealed_grant,
-        std::string& plaintext,
-        std::string& authenticated_aad) = 0;
+    // The adapter MUST authenticate envelope.ciphertext with exactly
+    // canonical_aad, parse the authenticated plaintext into the generated
+    // ClaimGrant binding, and return no plaintext on authentication failure.
+    // No production HPKE adapter is implied by this Port.
+    virtual ClaimGrantUnsealResult OpenClaimGrant(
+        const device_foundation::v1::ClaimGrantWireEnvelope& envelope,
+        const std::string& canonical_aad,
+        device_foundation::v1::ClaimGrant& plaintext) = 0;
     virtual bool BuildOperationalKeyProof(
         const std::string& enrollment_id,
         const std::string& grant_id,
@@ -144,7 +143,7 @@ public:
         uint64_t owner_domain_generation);
     DeviceClaimConsumerOutcome BuildCollectionRequest();
     DeviceClaimConsumerOutcome AcceptCollectedGrant(
-        const std::string& canonical_collect_result);
+        const device_foundation::v1::CollectClaimGrantResult& collect_result);
     DeviceClaimConsumerOutcome BuildGrantAck();
     DeviceClaimConsumerOutcome AcceptGrantAck(
         const std::string& canonical_ack_result);
@@ -153,9 +152,7 @@ public:
     DeviceClaimConsumerOutcome ResumePending();
 
     static std::string ClaimGrantAad(
-        const EnrollmentJournalEntry& enrollment,
-        const std::string& grant_id,
-        const device_foundation::v1::DeviceRef& device_ref);
+        const device_foundation::v1::ClaimGrantAAD& aad);
     static std::string DeviceRefJson(
         const device_foundation::v1::DeviceRef& device_ref);
 
