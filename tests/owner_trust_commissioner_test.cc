@@ -23,7 +23,7 @@ std::string Descriptor(const std::string& owner = "owner-domain_01")
            "\"trust_root_refs\":[\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"],"
            "\"endpoints\":[{\"authority\":\"admission\","
            "\"logical_audience\":\"eidolon-admission\","
-           "\"uri\":\"https://host-a.owner.test/api/device-onboarding/v1\","
+           "\"uri\":\"https://host-a.owner.test/api/admission/v1\","
            "\"transport_profile\":\"https-json\",\"priority\":10}],"
            "\"issued_at\":\"2026-08-18T00:00:00Z\","
            "\"expires_at\":\"2027-08-19T00:00:00Z\","
