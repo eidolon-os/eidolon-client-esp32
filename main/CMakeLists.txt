@@ -38,6 +38,8 @@ set(SOURCES "audio/audio_codec.cc"
             "device_state_machine.cc"
             "eidolon/device_local_erase_core.cc"
             "eidolon/device_erase_identity_adapter.cc"
+            "eidolon/esp_idf_device_local_erase_adapter.cc"
+            "eidolon/esp_idf_owner_data_erase_storage.cc"
             "assets.cc"
             "main.cc"
             )

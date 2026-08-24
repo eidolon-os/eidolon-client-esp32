@@ -3,28 +3,52 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "device_foundation_v1_generated.h"
 
 namespace eidolon {
 
+enum class DeviceEraseJournalPhase : uint8_t {
+    Accepted = 1,
+    Staging = 2,
+    Erasing = 3,
+    DurableTerminal = 4,
+};
+
 struct DeviceEraseJournalEntry {
     std::string operation_id;
     std::string request_fingerprint;
     device_foundation::v1::DeviceRef device_ref;
-    bool terminal = false;
-    device_foundation::v1::DeviceLocalEraseAck terminal_ack;
+    std::string deadline;
+    std::vector<std::string> erase_scopes;
+    DeviceEraseJournalPhase phase = DeviceEraseJournalPhase::Accepted;
+    // The erased ACK must be signed and durable before the adapter removes the
+    // operational signing credential. It is not externally visible until the
+    // adapter confirms finalization and phase becomes DurableTerminal.
+    bool has_staged_ack = false;
+    device_foundation::v1::DeviceLocalEraseAck staged_ack;
+};
+
+enum class DeviceEraseJournalLoadResult {
+    NotFound,
+    Loaded,
+    StorageFailure,
 };
 
 class DeviceEraseJournalPort {
 public:
     virtual ~DeviceEraseJournalPort() = default;
-    virtual bool Load(DeviceEraseJournalEntry& out) = 0;
+    virtual DeviceEraseJournalLoadResult Load(DeviceEraseJournalEntry& out) = 0;
     virtual bool Store(const DeviceEraseJournalEntry& value) = 0;
 };
 
 enum class DeviceEraseAdapterResult {
+    PreparedForFinalization,
     Erased,
+    RetryableStorageFailure,
+    PermanentProtectedScopeRefusal,
+    PhysicalResetRequired,
     PermanentFailure,
 };
 
@@ -38,7 +62,14 @@ public:
     virtual ~DeviceLocalEraseAdapterPort() = default;
     // The production implementation belongs to a platform adapter. This Core
     // never calls NVS, Flash, a board singleton or an ESP-IDF erase API.
-    virtual DeviceEraseAdapterOutcome EraseOwnerState(
+    // Erases and verifies Owner state except the operational credential used
+    // to sign the terminal ACK. Calls are idempotent across power loss.
+    virtual DeviceEraseAdapterOutcome PrepareOwnerState(
+        const device_foundation::v1::DeviceLocalEraseCommand& command) = 0;
+    // Called only after the signed ACK is durable in the RemovalJournal. This
+    // removes the retained operational credential and verifies the complete
+    // allowlist. Calls are idempotent across power loss.
+    virtual DeviceEraseAdapterOutcome FinalizeOwnerState(
         const device_foundation::v1::DeviceLocalEraseCommand& command) = 0;
 };
 
@@ -62,8 +93,11 @@ enum class DeviceEraseCoreResult {
     IdempotencyConflict,
     StaleGeneration,
     Expired,
+    RetryableStorageFailure,
+    OperationConflict,
     StorageFailure,
     SignatureFailure,
+    NoPendingOperation,
 };
 
 struct DeviceEraseCoreOutcome {
@@ -83,6 +117,9 @@ public:
     DeviceEraseCoreOutcome Handle(
         const device_foundation::v1::DeviceLocalEraseCommand& command,
         const std::string& request_fingerprint);
+    // Boot-time resume uses only the durable RemovalJournal. Delivery does not
+    // need to redeliver an operation whose destructive phase already started.
+    DeviceEraseCoreOutcome ResumePending();
 
     static std::string AckSigningDocument(
         const device_foundation::v1::DeviceLocalEraseAck& ack);
