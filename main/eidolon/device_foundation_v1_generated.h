@@ -211,7 +211,7 @@ struct EnrollmentProposalPage { OwnerDomainId owner_domain_id; std::vector<Enrol
 struct ClaimQuery { OwnerDomainId owner_domain_id; std::vector<ClaimState> states; std::optional<AdmissionListCursor> cursor; uint16_t limit = 0; };
 struct ClaimPage { OwnerDomainId owner_domain_id; std::vector<ClaimRecord> items; std::optional<AdmissionListCursor> next_cursor; std::string observed_at; };
 
-struct ClaimActivatedData { DeviceRef device_ref; ManifestRef manifest_ref; std::string approval_decision_id; std::string activated_at; };
+struct ClaimActivatedData { DeviceRef device_ref; BusinessOwnerId business_owner_id; ManifestRef manifest_ref; std::string approval_decision_id; std::string activated_at; };
 struct ClaimRevokedData { DeviceRef device_ref; std::string reason; std::string revoked_at; };
 template <typename Data> struct ClaimCloudEvent { std::string specversion = "1.0"; std::string id; std::string source = "urn:eidolon:authority:admission"; std::string type; std::string subject; std::string time; std::string datacontenttype = "application/json"; std::string dataschema; std::string audience = "eidolon-claim-consumers"; OwnerDomainId ownerdomainid; uint64_t aggregaterev = 0; std::string correlationid; std::string causationid; Data data; };
 using ClaimActivatedEvent = ClaimCloudEvent<ClaimActivatedData>;

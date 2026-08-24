@@ -1,10 +1,10 @@
 {
-  "sdk_commit": "ae8ab26f6a0e8afccd7e03024baa4e340754874e",
+  "sdk_commit": "dc83e8885f5cca97ef78f0d1012c8d0a4fe06195",
   "files": [
     {
       "source": "contracts/device_foundation/v1/generated/cpp/device_foundation_v1_generated.h",
       "target": "main/eidolon/device_foundation_v1_generated.h",
-      "sha256": "cbf986cc77d7816f1e273cbf5369c4b80b47cff612f8d7a42c8e79c4e6abdcbd"
+      "sha256": "c777db340de6a5713196dc596f1574be9d481346a11fd8bca1c60501990e150d"
     },
     {
       "source": "contracts/device_foundation/v1/common/schemas.schema.json",
