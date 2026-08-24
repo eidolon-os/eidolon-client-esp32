@@ -669,15 +669,24 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
         if (!ParseCollectResult(response.body, collected)) {
             return ESP_ERR_INVALID_RESPONSE;
         }
-        if (IsRfc3339DeadlineExpired(
-                collected.expires_at,
-                static_cast<int64_t>(time(nullptr)) * 1000,
-                1704067200000LL)) {
-            // The Grant this Proposal produced is already past its deadline, so
-            // no ack can land. Only a new Decision produces a usable Grant.
+        // Only a deadline this device can actually read decides anything. A
+        // clock it cannot trust is the absence of an answer, and treating that
+        // as expiry is how a device with no time source could collect a Grant
+        // and then refuse to finish claiming, forever. The Authority refuses a
+        // genuinely expired Grant on the ack, and that answer is authoritative.
+        const Rfc3339DeadlineState deadline = EvaluateRfc3339Deadline(
+            collected.expires_at,
+            static_cast<int64_t>(time(nullptr)) * 1000,
+            1704067200000LL);
+        if (deadline == Rfc3339DeadlineState::Expired) {
             return AbandonAndRepropose(core, descriptor, device_id,
                                        activated_claim, activated,
                                        allow_reproposal, "grant deadline");
+        }
+        if (deadline == Rfc3339DeadlineState::Unknown) {
+            ESP_LOGW(TAG,
+                     "Grant deadline is unreadable here; letting the Authority "
+                     "judge it on ack");
         }
         outcome = core.AcceptCollectedGrant(collected);
         if (outcome.result != DeviceClaimConsumerResult::GrantStaged &&

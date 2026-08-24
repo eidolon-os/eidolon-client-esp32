@@ -3,7 +3,9 @@
 #include <cassert>
 #include <cstdint>
 
+using eidolon::EvaluateRfc3339Deadline;
 using eidolon::IsRfc3339DeadlineExpired;
+using eidolon::Rfc3339DeadlineState;
 using eidolon::ParseRfc3339UtcMillis;
 
 namespace {
@@ -62,6 +64,23 @@ void DeadlineComparisonAndUntrustedClockFailClosed() {
         "2026-08-30T00:00:00.500Z", 1000, 2000));
 }
 
+void AnUnreadableDeadlineIsNotAnExpiredOne() {
+    // Two callers need different answers from the same comparison. Erasing a
+    // device on an untrusted clock must fail closed. Refusing to finish a Claim
+    // on one must not: it leaves a device that collected its Grant unable to
+    // ever use it, and the Authority is right there to judge the deadline.
+    const int64_t due = Parse("2026-08-30T00:00:00.500Z");
+
+    assert(EvaluateRfc3339Deadline("2026-08-30T00:00:00.500Z", due - 1, 0) ==
+           Rfc3339DeadlineState::Live);
+    assert(EvaluateRfc3339Deadline("2026-08-30T00:00:00.500Z", due, 0) ==
+           Rfc3339DeadlineState::Expired);
+    assert(EvaluateRfc3339Deadline("2026-08-30T00:00:00.500Z", 1000, 2000) ==
+           Rfc3339DeadlineState::Unknown);
+    assert(EvaluateRfc3339Deadline("invalid", due - 1, 0) ==
+           Rfc3339DeadlineState::Unknown);
+}
+
 }  // namespace
 
 int main() {
@@ -69,5 +88,6 @@ int main() {
     LeapYearAndCenturyRulesAreCorrect();
     InvalidDatesZonesAndTrailingDataFailClosed();
     DeadlineComparisonAndUntrustedClockFailClosed();
+    AnUnreadableDeadlineIsNotAnExpiredOne();
     return 0;
 }
