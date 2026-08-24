@@ -5,6 +5,7 @@
 
 #include <string>
 
+#include "device_claim_consumer_core.h"
 #include "hub_types.h"
 #include "hub_trust_store.h"
 
@@ -25,11 +26,6 @@ private:
     esp_err_t FetchDescriptor(
         const AuthorityCandidateRecord& candidate,
         device_foundation::v1::OwnerDomainDescriptor& out);
-    esp_err_t EnsureEnrollment(
-        HubOnboardingState& state);
-    esp_err_t BindDeviceOperationKey(const HubOnboardingState& state);
-    esp_err_t Handoff(HubOnboardingState& state,
-                      Esp32HubConfig& out);
     esp_err_t PullActiveConfiguration(const ActiveClaimState& claim,
                                       Esp32HubConfig& out);
     esp_err_t RunAccepted(const device_foundation::v1::OwnerDomainDescriptor& descriptor,

@@ -3,21 +3,24 @@
 
 #include <esp_err.h>
 
+#include "device_claim_consumer_core.h"
 #include "hub_types.h"
 
 namespace eidolon {
 
-class HubConfigStore {
+class HubConfigStore final : public EnrollmentJournalPort,
+                             public ActiveClaimStorePort {
 public:
     esp_err_t SaveHubConfig(const Esp32HubConfig& config);
-    esp_err_t SaveOnboardingState(const HubOnboardingState& state);
-    bool LoadOnboardingState(HubOnboardingState& state) const;
-    void ClearOnboardingState();
-    esp_err_t SaveActiveClaim(const ActiveClaimState& state);
-    bool LoadActiveClaim(ActiveClaimState& state) const;
-    void ClearActiveClaim();
     bool HasValidConfig() const;
     bool Load(Esp32HubConfig& config) const;
+
+    ClaimStoreLoadResult LoadEnrollment(
+        EnrollmentJournalEntry& out) override;
+    bool StoreEnrollment(const EnrollmentJournalEntry& value) override;
+    bool ClearEnrollment() override;
+    ClaimStoreLoadResult LoadActiveClaim(ActiveClaimState& out) override;
+    bool StoreActiveClaim(const ActiveClaimState& value) override;
 };
 
 }  // namespace eidolon

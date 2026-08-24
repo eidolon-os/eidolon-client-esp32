@@ -9,6 +9,9 @@
 
 namespace eidolon::device_foundation::v1 {
 
+struct OwnerDomainId { std::string value; };
+struct BusinessOwnerId { std::string value; };
+
 enum class LogicalAuthority {
     Admission,
     DeviceControl,
@@ -79,11 +82,16 @@ struct CommissioningTerminalAck {
 
 struct DeviceRef {
     std::string device_instance_id;
-    std::string owner_domain_id;
+    OwnerDomainId owner_domain_id;
     uint64_t owner_domain_generation = 0;
     uint32_t claim_generation = 0;
     uint32_t trust_epoch = 0;
-    std::string accepted_manifest_digest;
+};
+
+struct ManifestRef {
+    std::string manifest_id;
+    uint64_t revision = 0;
+    std::string digest;
 };
 
 enum class DeviceLocalEraseResult {

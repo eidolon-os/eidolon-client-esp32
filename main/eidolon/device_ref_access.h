@@ -3,57 +3,27 @@
 
 #include <string>
 
+#include "device_foundation_v1_generated.h"
+
 namespace eidolon {
 
-// Transitional accessors keep Core/adapter code independent from the generated
-// OwnerDomainId wrapper landing in PH2-B. They do not define or copy a wire
-// binding; the generated DeviceRef remains the sole canonical type.
-template <typename Ref>
-const std::string& DeviceRefOwnerDomainId(const Ref& ref) {
-    if constexpr (requires { ref.owner_domain_id.value; }) {
-        return ref.owner_domain_id.value;
-    } else {
-        return ref.owner_domain_id;
-    }
+inline const std::string& DeviceRefOwnerDomainId(
+    const device_foundation::v1::DeviceRef& ref) {
+    return ref.owner_domain_id.value;
 }
 
-template <typename Ref>
-void SetDeviceRefOwnerDomainId(Ref& ref, const std::string& value) {
-    if constexpr (requires { ref.owner_domain_id.value; }) {
-        ref.owner_domain_id.value = value;
-    } else {
-        ref.owner_domain_id = value;
-    }
+inline void SetDeviceRefOwnerDomainId(
+    device_foundation::v1::DeviceRef& ref, const std::string& value) {
+    ref.owner_domain_id.value = value;
 }
 
-template <typename Ref>
-std::string DeviceRefLegacyManifestDigest(const Ref& ref) {
-    if constexpr (requires { ref.accepted_manifest_digest; }) {
-        return ref.accepted_manifest_digest;
-    } else {
-        return {};
-    }
-}
-
-template <typename Ref>
-void SetDeviceRefLegacyManifestDigest(Ref& ref, const std::string& value) {
-    if constexpr (requires { ref.accepted_manifest_digest; }) {
-        ref.accepted_manifest_digest = value;
-    } else {
-        (void)ref;
-        (void)value;
-    }
-}
-
-template <typename Ref>
-bool SameDeviceRef(const Ref& left, const Ref& right) {
+inline bool SameDeviceRef(const device_foundation::v1::DeviceRef& left,
+                          const device_foundation::v1::DeviceRef& right) {
     return left.device_instance_id == right.device_instance_id &&
            DeviceRefOwnerDomainId(left) == DeviceRefOwnerDomainId(right) &&
            left.owner_domain_generation == right.owner_domain_generation &&
            left.claim_generation == right.claim_generation &&
-           left.trust_epoch == right.trust_epoch &&
-           DeviceRefLegacyManifestDigest(left) ==
-               DeviceRefLegacyManifestDigest(right);
+           left.trust_epoch == right.trust_epoch;
 }
 
 }  // namespace eidolon

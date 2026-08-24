@@ -1,0 +1,316 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.eidolon.live/device-foundation/v1/admission/schemas.schema.json",
+  "title": "Eidolon Device Foundation V1 Admission schemas",
+  "$defs": {
+    "EnrollmentProposalState": {
+      "enum": [
+        "pending_review",
+        "approved_awaiting_handoff",
+        "grant_delivered",
+        "grant_acknowledged",
+        "rejected",
+        "expired",
+        "canceled",
+        "claim_revoked"
+      ]
+    },
+    "ClaimState": {
+      "enum": ["active", "suspended", "revoked"]
+    },
+    "EnrollmentProposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enrollment_id", "proposal_revision", "state",
+        "device_instance_candidate_id", "requested_owner_domain_id",
+        "hardware_evidence_digest", "manifest_ref", "handoff_key_id",
+        "created_at", "expires_at"
+      ],
+      "properties": {
+        "enrollment_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "proposal_revision": { "type": "integer", "minimum": 1 },
+        "state": { "$ref": "#/$defs/EnrollmentProposalState" },
+        "device_instance_candidate_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "requested_owner_domain_id": { "$ref": "../common/schemas.schema.json#/$defs/OwnerDomainId" },
+        "hardware_evidence_digest": { "$ref": "../common/schemas.schema.json#/$defs/Sha256Digest" },
+        "manifest_ref": { "$ref": "../common/schemas.schema.json#/$defs/ManifestRef" },
+        "handoff_key_id": { "$ref": "../common/schemas.schema.json#/$defs/Sha256Digest" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "expires_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "ApprovalDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_id", "enrollment_id", "decision", "actor",
+        "target_owner_domain_id", "target_business_owner_id",
+        "reviewed_manifest_ref", "expected_proposal_revision", "decided_at"
+      ],
+      "properties": {
+        "decision_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "enrollment_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "decision": { "enum": ["approve", "reject"] },
+        "actor": { "$ref": "../common/schemas.schema.json#/$defs/ControllerActorRef" },
+        "target_owner_domain_id": { "$ref": "../common/schemas.schema.json#/$defs/OwnerDomainId" },
+        "target_business_owner_id": { "$ref": "../common/schemas.schema.json#/$defs/BusinessOwnerId" },
+        "reviewed_manifest_ref": { "$ref": "../common/schemas.schema.json#/$defs/ManifestRef" },
+        "expected_proposal_revision": { "type": "integer", "minimum": 1 },
+        "decided_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "ClaimGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grant_id", "enrollment_id", "device_ref", "manifest_ref",
+        "approval_decision_id", "handoff_key_id", "operational_key_id",
+        "issued_at", "expires_at"
+      ],
+      "properties": {
+        "grant_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "enrollment_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "device_ref": { "$ref": "../common/schemas.schema.json#/$defs/DeviceRef" },
+        "manifest_ref": { "$ref": "../common/schemas.schema.json#/$defs/ManifestRef" },
+        "approval_decision_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "handoff_key_id": { "$ref": "../common/schemas.schema.json#/$defs/Sha256Digest" },
+        "operational_key_id": { "$ref": "../common/schemas.schema.json#/$defs/Sha256Digest" },
+        "issued_at": { "type": "string", "format": "date-time" },
+        "expires_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "GrantAck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enrollment_id", "grant_id", "device_ref", "acknowledged_at"],
+      "properties": {
+        "enrollment_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "grant_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "device_ref": { "$ref": "../common/schemas.schema.json#/$defs/DeviceRef" },
+        "acknowledged_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "ClaimRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["device_ref", "business_owner_id", "manifest_ref", "state", "revision", "updated_at"],
+      "properties": {
+        "device_ref": { "$ref": "../common/schemas.schema.json#/$defs/DeviceRef" },
+        "business_owner_id": { "$ref": "../common/schemas.schema.json#/$defs/BusinessOwnerId" },
+        "manifest_ref": { "$ref": "../common/schemas.schema.json#/$defs/ManifestRef" },
+        "state": { "$ref": "#/$defs/ClaimState" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "updated_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "CreateEnrollment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "device_instance_candidate_id",
+        "requested_owner_domain_id",
+        "hardware_identity_evidence",
+        "commissioning_proof",
+        "manifest",
+        "handoff_key",
+        "operational_key"
+      ],
+      "properties": {
+        "profile_id": { "const": "eidolon-trust-p256-hpke-v1" },
+        "device_instance_candidate_id": {
+          "$ref": "../common/schemas.schema.json#/$defs/Identifier"
+        },
+        "requested_owner_domain_id": {
+          "$ref": "../common/schemas.schema.json#/$defs/OwnerDomainId"
+        },
+        "hardware_identity_evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scheme", "evidence", "evidence_digest"],
+          "properties": {
+            "scheme": { "enum": ["manufacturer-p256", "dev-self-signed-p256"] },
+            "evidence": { "type": "string", "minLength": 16, "maxLength": 65536 },
+            "evidence_digest": {
+              "$ref": "../common/schemas.schema.json#/$defs/Sha256Digest"
+            }
+          }
+        },
+        "commissioning_proof": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scheme", "proof", "nonce"],
+          "properties": {
+            "scheme": { "const": "protocomm-security2-srp6a-aes256gcm" },
+            "proof": { "type": "string", "minLength": 16, "maxLength": 4096 },
+            "nonce": { "type": "string", "minLength": 16, "maxLength": 256 }
+          }
+        },
+        "manifest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["manifest_id", "revision", "digest", "document"],
+          "properties": {
+            "manifest_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+            "revision": { "type": "integer", "minimum": 1 },
+            "digest": { "$ref": "../common/schemas.schema.json#/$defs/Sha256Digest" },
+            "document": { "type": "object" }
+          }
+        },
+        "handoff_key": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scheme", "public_key"],
+          "properties": {
+            "scheme": { "const": "DHKEM-P256-HKDF-SHA256" },
+            "public_key": { "type": "string", "pattern": "^p256-spki:[A-Za-z0-9_-]+$" }
+          }
+        },
+        "operational_key": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scheme", "public_key"],
+          "properties": {
+            "scheme": { "const": "ES256-P256" },
+            "public_key": { "type": "string", "pattern": "^p256-spki:[A-Za-z0-9_-]+$" }
+          }
+        }
+      }
+    },
+    "CreateEnrollmentResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enrollment_id",
+        "proposal_revision",
+        "state",
+        "expires_at",
+        "reviewed_manifest_digest",
+        "collection_challenge"
+      ],
+      "properties": {
+        "enrollment_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "proposal_revision": { "type": "integer", "minimum": 1 },
+        "state": { "const": "pending_review" },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "reviewed_manifest_digest": {
+          "$ref": "../common/schemas.schema.json#/$defs/Sha256Digest"
+        },
+        "collection_challenge": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{22,128}$"
+        }
+      }
+    },
+    "DecideEnrollment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enrollment_id",
+        "expected_proposal_revision",
+        "decision",
+        "target_owner_domain_id",
+        "target_business_owner_id",
+        "target_space_id",
+        "reviewed_manifest_ref",
+        "initial_assignment_intent",
+        "initial_capability_policy_refs"
+      ],
+      "properties": {
+        "enrollment_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "expected_proposal_revision": { "type": "integer", "minimum": 1 },
+        "decision": { "enum": ["approve", "reject"] },
+        "target_owner_domain_id": {
+          "$ref": "../common/schemas.schema.json#/$defs/OwnerDomainId"
+        },
+        "target_business_owner_id": {
+          "$ref": "../common/schemas.schema.json#/$defs/BusinessOwnerId"
+        },
+        "target_space_id": {
+          "oneOf": [
+            { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+            { "type": "null" }
+          ]
+        },
+        "reviewed_manifest_ref": {
+          "$ref": "../common/schemas.schema.json#/$defs/ManifestRef"
+        },
+        "initial_assignment_intent": {
+          "oneOf": [{ "type": "object" }, { "type": "null" }]
+        },
+        "initial_capability_policy_refs": {
+          "type": "array",
+          "items": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "DecideEnrollmentResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision_id", "decision", "decided_by", "decided_at", "proposal_revision"],
+      "properties": {
+        "decision_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "decision": { "enum": ["approve", "reject"] },
+        "decided_by": { "$ref": "../common/schemas.schema.json#/$defs/ControllerActorRef" },
+        "decided_at": { "type": "string", "format": "date-time" },
+        "proposal_revision": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "CollectClaimGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enrollment_id", "proposal_revision", "collection_challenge", "handoff_key_proof"],
+      "properties": {
+        "enrollment_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "proposal_revision": { "type": "integer", "minimum": 1 },
+        "collection_challenge": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{22,128}$"
+        },
+        "handoff_key_proof": { "type": "string", "minLength": 16, "maxLength": 4096 }
+      }
+    },
+    "CollectClaimGrantResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["grant_id", "sealed_grant", "expires_at", "approval_decision_id"],
+      "properties": {
+        "grant_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "sealed_grant": { "type": "string", "minLength": 64, "maxLength": 131072 },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "approval_decision_id": {
+          "$ref": "../common/schemas.schema.json#/$defs/Identifier"
+        }
+      }
+    },
+    "AckClaimGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enrollment_id",
+        "grant_id",
+        "operational_key_proof",
+        "stored_claim_generation",
+        "stored_trust_epoch"
+      ],
+      "properties": {
+        "enrollment_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "grant_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "operational_key_proof": { "type": "string", "minLength": 16, "maxLength": 4096 },
+        "stored_claim_generation": { "type": "integer", "minimum": 1 },
+        "stored_trust_epoch": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "AckClaimGrantResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["device_ref", "claim_state"],
+      "properties": {
+        "device_ref": { "$ref": "../common/schemas.schema.json#/$defs/DeviceRef" },
+        "claim_state": { "const": "active" }
+      }
+    }
+  }
+}

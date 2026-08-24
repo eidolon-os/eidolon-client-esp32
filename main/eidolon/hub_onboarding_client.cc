@@ -1,16 +1,13 @@
 #include "hub_onboarding_client.h"
 
-#include "board.h"
 #include "authority_locator.h"
-#include "device_provisioning_protocol.h"
 #include "device_identity.h"
+#include "device_provisioning_protocol.h"
 #include "hub_config_store.h"
 #include "hub_onboarding_protocol.h"
 #include "hub_pinned_http.h"
 #include "hub_trust_store.h"
 #include "system_info.h"
-
-#include "sdkconfig.h"
 
 #include <cJSON.h>
 #include <esp_log.h>
@@ -18,7 +15,6 @@
 #include <mbedtls/base64.h>
 
 #include <cstdint>
-#include <cstring>
 #include <utility>
 
 #define TAG "HubOnboarding"
@@ -87,20 +83,6 @@ std::string PrintJson(cJSON* root)
     return out;
 }
 
-std::string JsonText(const cJSON* object, const char* key)
-{
-    const cJSON* item = cJSON_GetObjectItemCaseSensitive(object, key);
-    return cJSON_IsString(item) && item->valuestring != nullptr
-               ? item->valuestring
-               : "";
-}
-
-bool Sha256Digest(const std::string& value)
-{
-    return value.size() == 71 && value.rfind("sha256:", 0) == 0 &&
-           value.find_first_not_of("0123456789abcdef", 7) == std::string::npos;
-}
-
 std::string Quote(const std::string& value)
 {
     cJSON* item = cJSON_CreateString(value.c_str());
@@ -109,26 +91,15 @@ std::string Quote(const std::string& value)
     return encoded;
 }
 
-std::string OperationKeyProofDocument(const HubOnboardingState& state,
-                                      const std::string& public_key)
-{
-    // RFC 8785 order is lexical. The values are strings, so cJSON quoting is
-    // sufficient for this fixed-shape signing document.
-    return std::string("{\"device_instance_id\":") + Quote(state.device_id) +
-           ",\"enrollment_request_id\":" + Quote(state.request_id) +
-           ",\"public_key_spki\":" + Quote(public_key) + "}";
-}
-
 std::string DeviceRefCanonicalJson(
     const device_foundation::v1::DeviceRef& ref)
 {
-    return std::string("{\"accepted_manifest_digest\":") +
-           Quote(ref.accepted_manifest_digest) +
-           ",\"claim_generation\":" + std::to_string(ref.claim_generation) +
+    return std::string("{\"claim_generation\":") +
+           std::to_string(ref.claim_generation) +
            ",\"device_instance_id\":" + Quote(ref.device_instance_id) +
            ",\"owner_domain_generation\":" +
            std::to_string(ref.owner_domain_generation) +
-           ",\"owner_domain_id\":" + Quote(ref.owner_domain_id) +
+           ",\"owner_domain_id\":" + Quote(ref.owner_domain_id.value) +
            ",\"trust_epoch\":" + std::to_string(ref.trust_epoch) + "}";
 }
 
@@ -148,35 +119,12 @@ cJSON* DeviceRefJson(const device_foundation::v1::DeviceRef& ref)
     cJSON_AddStringToObject(value, "device_instance_id",
                             ref.device_instance_id.c_str());
     cJSON_AddStringToObject(value, "owner_domain_id",
-                            ref.owner_domain_id.c_str());
+                            ref.owner_domain_id.value.c_str());
     cJSON_AddNumberToObject(value, "owner_domain_generation",
                             static_cast<double>(ref.owner_domain_generation));
     cJSON_AddNumberToObject(value, "claim_generation", ref.claim_generation);
     cJSON_AddNumberToObject(value, "trust_epoch", ref.trust_epoch);
-    cJSON_AddStringToObject(value, "accepted_manifest_digest",
-                            ref.accepted_manifest_digest.c_str());
     return value;
-}
-
-std::string BuildEnrollmentBody(const HubOnboardingState& state)
-{
-    // Ask the board itself rather than assuming: a build with no camera must
-    // not offer one, or the Host provisions a video channel nobody publishes to.
-    const bool has_camera = Board::GetInstance().GetCamera() != nullptr;
-    const std::string manifest_json = BuildDeviceManifestJson(BOARD_NAME, has_camera);
-    cJSON* root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "operation", "device.enrollment");
-    cJSON_AddStringToObject(root, "request_id", state.request_id.c_str());
-    cJSON_AddStringToObject(root, "retrieval_token", state.retrieval_token.c_str());
-    cJSON* identity = cJSON_AddObjectToObject(root, "identity");
-    cJSON_AddStringToObject(identity, "device_id", state.device_id.c_str());
-    cJSON_AddItemToObject(root, "manifest",
-                         cJSON_ParseWithLength(manifest_json.data(), manifest_json.size()));
-    cJSON_AddStringToObject(root, "display_name", BOARD_NAME);
-    cJSON_AddStringToObject(root, "device_kind", BOARD_TYPE);
-    const std::string body = PrintJson(root);
-    cJSON_Delete(root);
-    return body;
 }
 
 esp_err_t StatusError(int status)
@@ -249,163 +197,6 @@ esp_err_t HubOnboardingClient::FetchDescriptor(
     return loaded;
 }
 
-esp_err_t HubOnboardingClient::EnsureEnrollment(
-    HubOnboardingState& state)
-{
-    if (state.enrolled()) {
-        return ESP_OK;
-    }
-    const std::string body = BuildEnrollmentBody(state);
-    if (body.empty()) {
-        return ESP_ERR_NO_MEM;
-    }
-    HubHttpResponse response;
-    device_foundation::v1::AuthorityEndpoint admission;
-    esp_err_t err = DeviceAuthorityLocator::GetInstance().Resolve(
-        device_foundation::v1::LogicalAuthority::Admission, admission);
-    if (err != ESP_OK) return err;
-    const std::string enrollment_uri = admission.uri + "/enrollments";
-    err = HubHttpRequest(
-        "POST", enrollment_uri, trust_.owner_root_certificate_pem, body, response);
-    if (err != ESP_OK) {
-        return err;
-    }
-    if (response.status != 200) {
-        ESP_LOGW(TAG, "Enrollment HTTP status %d", response.status);
-        return StatusError(response.status);
-    }
-    HubEnrollmentReceipt receipt;
-    if (!ParseEnrollmentReceiptResponse(response.body, state, receipt)) {
-        return ESP_ERR_INVALID_RESPONSE;
-    }
-    state.enrollment_id = receipt.enrollment_id;
-    state.lifecycle_state = receipt.lifecycle_state;
-    err = BindDeviceOperationKey(state);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Device Control operation ACK key binding failed");
-        return err;
-    }
-    return HubConfigStore().SaveOnboardingState(state);
-}
-
-esp_err_t HubOnboardingClient::BindDeviceOperationKey(
-    const HubOnboardingState& state)
-{
-    auto& identity = DeviceIdentity::GetInstance();
-    esp_err_t err = identity.EnsureKeypair();
-    if (err != ESP_OK) return err;
-    const std::string public_key = identity.PublicKeySpki();
-    const std::string signing_document =
-        OperationKeyProofDocument(state, public_key);
-    std::string proof_signature;
-    err = identity.SignCanonical(signing_document, proof_signature);
-    if (err != ESP_OK || proof_signature.size() != 86) return ESP_FAIL;
-
-    cJSON* root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "enrollment_id", state.enrollment_id.c_str());
-    cJSON_AddStringToObject(root, "retrieval_token", state.retrieval_token.c_str());
-    cJSON* proof = cJSON_AddObjectToObject(root, "proof");
-    cJSON_AddStringToObject(proof, "device_instance_id", state.device_id.c_str());
-    cJSON_AddStringToObject(proof, "enrollment_request_id", state.request_id.c_str());
-    cJSON_AddStringToObject(proof, "public_key_spki", public_key.c_str());
-    cJSON_AddStringToObject(proof, "possession_signature", proof_signature.c_str());
-    const std::string body = PrintJson(root);
-    cJSON_Delete(root);
-    if (body.empty()) return ESP_ERR_NO_MEM;
-
-    device_foundation::v1::AuthorityEndpoint control;
-    err = DeviceAuthorityLocator::GetInstance().Resolve(
-        device_foundation::v1::LogicalAuthority::DeviceControl, control);
-    if (err != ESP_OK) return err;
-    HubHttpResponse response;
-    err = HubHttpRequest(
-        "POST", control.uri + "/operation-key-bindings",
-        trust_.owner_root_certificate_pem, body, response);
-    if (err != ESP_OK) return err;
-    if (response.status != 200) return StatusError(response.status);
-    cJSON* result = cJSON_ParseWithLength(response.body.data(), response.body.size());
-    const bool valid = cJSON_IsObject(result) &&
-                       JsonText(result, "operation") ==
-                           "device-control.operation-key-bound" &&
-                       Sha256Digest(JsonText(result, "key_id"));
-    cJSON_Delete(result);
-    return valid ? ESP_OK : ESP_ERR_INVALID_RESPONSE;
-}
-
-esp_err_t HubOnboardingClient::Handoff(
-    HubOnboardingState& state,
-    Esp32HubConfig& out)
-{
-    const std::string request_id = "handoff-" + Base64UrlRandom(16);
-    cJSON* root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "operation", "device.handoff");
-    cJSON_AddStringToObject(root, "request_id", request_id.c_str());
-    cJSON_AddStringToObject(root, "retrieval_token", state.retrieval_token.c_str());
-    std::string body = PrintJson(root);
-    cJSON_Delete(root);
-    if (request_id.size() <= std::strlen("handoff-") || body.empty()) {
-        return ESP_ERR_NO_MEM;
-    }
-    device_foundation::v1::AuthorityEndpoint admission;
-    esp_err_t err = DeviceAuthorityLocator::GetInstance().Resolve(
-        device_foundation::v1::LogicalAuthority::Admission, admission);
-    if (err != ESP_OK) return err;
-    const std::string url = admission.uri + "/enrollments/" +
-                            state.enrollment_id + "/handoff";
-    HubHttpResponse response;
-    err = HubHttpRequest(
-        "POST", url, trust_.owner_root_certificate_pem, body, response);
-    if (err != ESP_OK) {
-        return err;
-    }
-    if (response.status != 200 && response.status != 202) {
-        ESP_LOGW(TAG, "Handoff HTTP status %d", response.status);
-        return StatusError(response.status);
-    }
-    HubConfigStatus lifecycle = HubConfigStatus::PendingApproval;
-    HubChannelAssignment assignment;
-    device_foundation::v1::DeviceRef device_ref;
-    if (!ParseHandoffResponse(response.body, request_id, state, lifecycle,
-                              assignment, device_ref)) {
-        return ESP_ERR_INVALID_RESPONSE;
-    }
-    out = Esp32HubConfig{};
-    out.status = lifecycle;
-    state.lifecycle_state = lifecycle == HubConfigStatus::PendingApproval
-                                ? "pending-approval"
-                                : (lifecycle == HubConfigStatus::Revoked
-                                       ? "revoked"
-                                       : "approved");
-    if (lifecycle == HubConfigStatus::Active) {
-        std::string binding;
-        if (!Base64Decode(assignment.opaque_binding, binding) ||
-            !ParseLiveKitBinding(binding, out)) {
-            ESP_LOGE(TAG, "Provider returned an invalid %s binding", kLiveKitBindingFormat);
-            return ESP_ERR_INVALID_RESPONSE;
-        }
-        out.expires_at_ms = assignment.expires_at_ms;
-        // The opaque provider credential is consumed in RAM only. Hub never logs
-        // or persists it; the device config store atomically caches the parsed
-        // credential for bounded offline recovery.
-    }
-    HubConfigStore store;
-    if (lifecycle == HubConfigStatus::PendingApproval) {
-        const esp_err_t persisted = store.SaveOnboardingState(state);
-        if (persisted != ESP_OK) return persisted;
-    } else {
-        ActiveClaimState claim;
-        claim.device_ref = device_ref;
-        claim.lifecycle_state = state.lifecycle_state;
-        const esp_err_t persisted = store.SaveActiveClaim(claim);
-        if (persisted != ESP_OK) return persisted;
-        // ClaimActive is the terminal state of Enrollment. The retrieval token
-        // and enrollment id are erased only after the exact DeviceRef is durable.
-        store.ClearOnboardingState();
-    }
-    return lifecycle == HubConfigStatus::Revoked ? ESP_ERR_NOT_ALLOWED
-                                                 : ESP_OK;
-}
-
 esp_err_t HubOnboardingClient::PullActiveConfiguration(
     const ActiveClaimState& claim,
     Esp32HubConfig& out)
@@ -466,9 +257,10 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
     }
     if (status == HubConfigStatus::Revoked) {
         ActiveClaimState revoked = claim;
-        revoked.lifecycle_state = "revoked";
-        err = HubConfigStore().SaveActiveClaim(revoked);
-        if (err != ESP_OK) return err;
+        revoked.state = ActiveClaimLocalState::Revoked;
+        if (!HubConfigStore().StoreActiveClaim(revoked)) {
+            return ESP_FAIL;
+        }
         return ESP_ERR_NOT_ALLOWED;
     }
     return ESP_OK;
@@ -508,11 +300,21 @@ esp_err_t HubOnboardingClient::RunAccepted(
     Esp32HubConfig& out)
 {
     HubConfigStore store;
-    esp_err_t err = ESP_OK;
     ActiveClaimState active_claim;
-    if (store.LoadActiveClaim(active_claim)) {
+    const ClaimStoreLoadResult claim_load =
+        store.LoadActiveClaim(active_claim);
+    if (claim_load == ClaimStoreLoadResult::StorageFailure) {
+        ESP_LOGE(TAG, "ActiveClaimStore is unreadable; refusing runtime");
+        return ESP_FAIL;
+    }
+    if (claim_load == ClaimStoreLoadResult::Loaded) {
+        if (active_claim.state == ActiveClaimLocalState::Revoked) {
+            ESP_LOGW(TAG, "Claim is terminal revoked; physical recovery required");
+            return ESP_ERR_NOT_ALLOWED;
+        }
         if (active_claim.device_ref.device_instance_id != device_id ||
-            active_claim.device_ref.owner_domain_id != descriptor.owner_domain_id ||
+            active_claim.device_ref.owner_domain_id.value !=
+                descriptor.owner_domain_id ||
             active_claim.device_ref.owner_domain_generation !=
                 descriptor.owner_domain_generation) {
             ESP_LOGE(TAG, "Recovery required: active Claim Authority changed");
@@ -520,60 +322,15 @@ esp_err_t HubOnboardingClient::RunAccepted(
         }
         return PullActiveConfiguration(active_claim, out);
     }
-    bool restarted_expired_pending = false;
-    for (;;) {
-        HubOnboardingState state;
-        const bool has_saved_state = store.LoadOnboardingState(state);
-        if (has_saved_state &&
-            (state.owner_domain_id != descriptor.owner_domain_id ||
-             state.owner_domain_generation !=
-                 descriptor.owner_domain_generation ||
-             state.device_id != device_id)) {
-            ESP_LOGE(TAG, "Recovery required: onboarding Authority generation, Owner, or device changed");
-            return ESP_ERR_NOT_ALLOWED;
-        }
-        const bool reusable = has_saved_state && state.has_local_intent();
-        if (!reusable) {
-            store.ClearOnboardingState();
-            state = HubOnboardingState{};
-            state.owner_domain_id = descriptor.owner_domain_id;
-            state.owner_domain_generation =
-                descriptor.owner_domain_generation;
-            state.directory_revision = descriptor.directory_revision;
-            state.device_id = device_id;
-            state.request_id = "enroll-" + Base64UrlRandom(16);
-            state.retrieval_token = Base64UrlRandom(32);
-            if (!state.has_local_intent()) {
-                return ESP_ERR_NO_MEM;
-            }
-            err = store.SaveOnboardingState(state);
-            if (err != ESP_OK) {
-                return err;
-            }
-        } else if (state.directory_revision != descriptor.directory_revision) {
-            // Endpoint relocation keeps the original enrollment idempotency
-            // and retrieval material; only the accepted directory advances.
-            state.directory_revision = descriptor.directory_revision;
-            err = store.SaveOnboardingState(state);
-            if (err != ESP_OK) {
-                return err;
-            }
-        }
-        err = EnsureEnrollment(state);
-        if (err != ESP_OK) {
-            return err;
-        }
-        err = Handoff(state, out);
-        if (err != ESP_ERR_TIMEOUT || state.lifecycle_state != "pending-approval" ||
-            restarted_expired_pending) {
-            return err;
-        }
-        // A pending intent may be recreated exactly once after Hub reports that
-        // its retrieval window expired. Never recurse or re-enroll an approved
-        // device: Owner admission remains authoritative.
-        store.ClearOnboardingState();
-        restarted_expired_pending = true;
-    }
+    // PH2-B deliberately removes the legacy retrieval-token/handoff writer.
+    // Canonical Proposal/Grant/Ack state is implemented by
+    // DeviceClaimConsumerCore, but the SDK has not frozen the outer HPKE wire
+    // envelope needed to derive all AAD inputs before unsealing. Until a real
+    // ClaimGrantCryptoPort + HTTP adapter exists, starting a new Claim is a hard
+    // capability block, never a fallback to the stale protocol.
+    ESP_LOGE(TAG,
+             "Canonical Claim collection wire authentication is unavailable");
+    return ESP_ERR_NOT_SUPPORTED;
 }
 
 esp_err_t HubOnboardingClient::Resume(const std::string& device_id,

@@ -1,0 +1,35 @@
+{
+  "vector_id": "DF-CLAIM-GRANT-AAD-001",
+  "aad": {
+    "contract": "eidolon.device-foundation.claim-grant-aad",
+    "profile_id": "eidolon-trust-p256-hpke-v1",
+    "enrollment_id": "enrollment_01",
+    "proposal_revision": 3,
+    "hardware_evidence_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "manifest_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "owner_domain_id": "owner-domain_01",
+    "owner_domain_generation": 3,
+    "claim_generation": 2,
+    "trust_epoch": 4,
+    "grant_id": "grant_01"
+  },
+  "canonical_aad_sha256": "081741096befe76ad2af8a2ec8011f9ae29a967c3d4a22ca251191ca8c53fce3",
+  "test_aead": "AES-128-GCM",
+  "test_key": "000102030405060708090a0b0c0d0e0f",
+  "test_nonce": "101112131415161718191a1b",
+  "plaintext": "636c61696d2d6772616e742d666978747572652d7631",
+  "ciphertext": "a74262c66262d19d76b329d8a14e934a4fce11aa40c50e22372ead82784522e560fb0ad7838f",
+  "mutate_each_field_must_fail": [
+    "contract",
+    "profile_id",
+    "enrollment_id",
+    "proposal_revision",
+    "hardware_evidence_digest",
+    "manifest_digest",
+    "owner_domain_id",
+    "owner_domain_generation",
+    "claim_generation",
+    "trust_epoch",
+    "grant_id"
+  ]
+}

@@ -22,11 +22,10 @@ namespace {
 DeviceRef Ref(uint32_t generation = 7) {
     return DeviceRef{
         "device_erase_01",
-        "owner_01",
-        1,
+        {"owner-domain_01"},
+        3,
         generation,
         4,
-        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     };
 }
 

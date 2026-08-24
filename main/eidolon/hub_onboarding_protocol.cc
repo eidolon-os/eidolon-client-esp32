@@ -24,6 +24,35 @@ bool IsHttpsUrl(const std::string& value)
     return value.rfind("https://", 0) == 0 && value.size() > 8;
 }
 
+bool AsciiAlphaNumeric(unsigned char value)
+{
+    return (value >= '0' && value <= '9') ||
+           (value >= 'A' && value <= 'Z') ||
+           (value >= 'a' && value <= 'z');
+}
+
+bool Identifier(const std::string& value)
+{
+    if (value.size() < 3 || value.size() > 128 ||
+        !AsciiAlphaNumeric(static_cast<unsigned char>(value.front()))) {
+        return false;
+    }
+    for (const unsigned char character : value) {
+        if (!AsciiAlphaNumeric(character) && character != '.' &&
+            character != '_' && character != ':' && character != '-') {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool OwnerDomainId(const std::string& value)
+{
+    return value.rfind("owner-", 0) == 0 && value.size() > 6 &&
+           AsciiAlphaNumeric(static_cast<unsigned char>(value[6])) &&
+           Identifier(value);
+}
+
 std::string Quote(const std::string& value)
 {
     cJSON* string = cJSON_CreateString(value.c_str());
@@ -137,18 +166,16 @@ bool ParseDeviceRef(const cJSON* item,
     out = DeviceRef{};
     uint64_t claim_generation = 0;
     uint64_t trust_epoch = 0;
-    if (!ExactObjectSize(item, 6)) return false;
+    if (!ExactObjectSize(item, 5)) return false;
     out.device_instance_id = JsonString(item, "device_instance_id");
-    out.owner_domain_id = JsonString(item, "owner_domain_id");
-    out.accepted_manifest_digest =
-        JsonString(item, "accepted_manifest_digest");
-    if (out.device_instance_id.empty() || out.owner_domain_id.empty() ||
+    out.owner_domain_id.value = JsonString(item, "owner_domain_id");
+    if (!Identifier(out.device_instance_id) ||
+        !OwnerDomainId(out.owner_domain_id.value) ||
         !ReadRevision(item, "owner_domain_generation",
                       out.owner_domain_generation) ||
         !ReadRevision(item, "claim_generation", claim_generation) ||
         !ReadRevision(item, "trust_epoch", trust_epoch) ||
-        claim_generation > UINT32_MAX || trust_epoch > UINT32_MAX ||
-        !Digest(out.accepted_manifest_digest)) {
+        claim_generation > UINT32_MAX || trust_epoch > UINT32_MAX) {
         return false;
     }
     out.claim_generation = static_cast<uint32_t>(claim_generation);
@@ -160,11 +187,10 @@ bool SameDeviceRef(const device_foundation::v1::DeviceRef& left,
                    const device_foundation::v1::DeviceRef& right)
 {
     return left.device_instance_id == right.device_instance_id &&
-           left.owner_domain_id == right.owner_domain_id &&
+           left.owner_domain_id.value == right.owner_domain_id.value &&
            left.owner_domain_generation == right.owner_domain_generation &&
            left.claim_generation == right.claim_generation &&
-           left.trust_epoch == right.trust_epoch &&
-           left.accepted_manifest_digest == right.accepted_manifest_digest;
+           left.trust_epoch == right.trust_epoch;
 }
 
 bool ParseOneChannel(const cJSON* root, HubChannelAssignment& assignment)
@@ -216,7 +242,7 @@ bool ParseOwnerDomainDescriptor(
     out.expires_at = JsonString(root, "expires_at");
     out.signing_key_id = JsonString(root, "signing_key_id");
     out.signature = JsonString(root, "signature");
-    if (out.owner_domain_id.empty() || out.owner_domain_id.size() > 128 ||
+    if (!OwnerDomainId(out.owner_domain_id) ||
         !ReadRevision(root, "owner_domain_generation",
                       out.owner_domain_generation) ||
         !ReadRevision(root, "directory_revision", out.directory_revision) ||
@@ -335,93 +361,6 @@ std::string BuildDeviceManifestJson(const std::string& board_name, bool has_came
     return "{\"actions\":[],\"events\":[],\"media\":[" + media +
            "],\"properties\":[" + properties +
            "],\"schema_version\":1,\"title\":" + escaped + "}";
-}
-
-bool ParseEnrollmentReceiptResponse(const std::string& body,
-                                    const HubOnboardingState& expected,
-                                    HubEnrollmentReceipt& out)
-{
-    out = HubEnrollmentReceipt{};
-    cJSON* root = cJSON_ParseWithLength(body.data(), body.size());
-    if (!cJSON_IsObject(root)) {
-        cJSON_Delete(root);
-        return false;
-    }
-    out.request_id = JsonString(root, "request_id");
-    out.enrollment_id = JsonString(root, "enrollment_id");
-    out.device_id = JsonString(root, "device_id");
-    out.lifecycle_state = JsonString(root, "lifecycle_state");
-    const bool valid = JsonString(root, "operation") == "device.enrollment-received" &&
-                       out.request_id == expected.request_id &&
-                       out.device_id == expected.device_id &&
-                       !out.enrollment_id.empty() &&
-                       out.lifecycle_state == "pending-approval" &&
-                       ReadInt64(root, "retrieval_expires_at_ms",
-                                 out.retrieval_expires_at_ms);
-    cJSON_Delete(root);
-    return valid;
-}
-
-bool ParseHandoffResponse(const std::string& body,
-                          const std::string& expected_request_id,
-                          const HubOnboardingState& state,
-                          HubConfigStatus& status,
-                          HubChannelAssignment& assignment,
-                          device_foundation::v1::DeviceRef& device_ref)
-{
-    assignment = HubChannelAssignment{};
-    device_ref = device_foundation::v1::DeviceRef{};
-    cJSON* root = cJSON_ParseWithLength(body.data(), body.size());
-    if (!cJSON_IsObject(root)) {
-        cJSON_Delete(root);
-        return false;
-    }
-    const std::string lifecycle = JsonString(root, "lifecycle_state");
-    const bool envelope_valid =
-        JsonString(root, "operation") == "device.handoff-outcome" &&
-        JsonString(root, "request_id") == expected_request_id &&
-        JsonString(root, "enrollment_id") == state.enrollment_id &&
-        JsonString(root, "device_id") == state.device_id &&
-        !JsonString(root, "manifest_revision").empty();
-    const cJSON* channels = cJSON_GetObjectItemCaseSensitive(root, "channels");
-    if (!envelope_valid || !cJSON_IsArray(channels)) {
-        cJSON_Delete(root);
-        return false;
-    }
-    if (lifecycle == "pending-approval") {
-        const cJSON* ref = cJSON_GetObjectItemCaseSensitive(root, "device_ref");
-        status = HubConfigStatus::PendingApproval;
-        const bool empty = cJSON_IsNull(ref) && cJSON_GetArraySize(channels) == 0;
-        cJSON_Delete(root);
-        return empty;
-    }
-    const cJSON* ref = cJSON_GetObjectItemCaseSensitive(root, "device_ref");
-    if (!ParseDeviceRef(ref, device_ref) ||
-        device_ref.device_instance_id != state.device_id ||
-        device_ref.owner_domain_id != state.owner_domain_id ||
-        device_ref.owner_domain_generation != state.owner_domain_generation) {
-        cJSON_Delete(root);
-        return false;
-    }
-    if (lifecycle == "revoked") {
-        status = HubConfigStatus::Revoked;
-        const bool empty = cJSON_GetArraySize(channels) == 0;
-        cJSON_Delete(root);
-        return empty;
-    }
-    if (lifecycle != "approved") {
-        cJSON_Delete(root);
-        return false;
-    }
-    if (!ParseOneChannel(root, assignment)) {
-        cJSON_Delete(root);
-        return false;
-    }
-    status = assignment.opaque_binding.empty()
-                 ? HubConfigStatus::WaitingBinding
-                 : HubConfigStatus::Active;
-    cJSON_Delete(root);
-    return true;
 }
 
 bool ParseDeviceConfigurationResponse(

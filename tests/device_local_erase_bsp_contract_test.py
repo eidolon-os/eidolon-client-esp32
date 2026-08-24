@@ -13,6 +13,8 @@ def main() -> None:
         ROOT / "main/eidolon/esp_idf_device_local_erase_adapter.cc"
     ).read_text()
     cmake_text = (ROOT / "main/CMakeLists.txt").read_text()
+    boot_text = (ROOT / "main/eidolon/hub_activator.cc").read_text()
+    claim_store_text = (ROOT / "main/eidolon/hub_config_store.cc").read_text()
 
     assert "owner_trust,data, nvs" in partition_text
     for preserved in ("phy_init", "otadata", "ota_0", "ota_1", "assets"):
@@ -30,6 +32,14 @@ def main() -> None:
     assert '"eid_erase"' in policy_text
     assert '"eidolon/esp_idf_device_local_erase_adapter.cc"' in cmake_text
     assert '"eidolon/esp_idf_owner_data_erase_storage.cc"' in cmake_text
+    assert '"eidolon/device_boot_recovery.cc"' in cmake_text
+    resume = boot_text.index("DeviceBootRecovery::ResumePendingRemoval()")
+    discovery = boot_text.index("HubDiscovery discovery")
+    assert resume < discovery
+    assert "AllowsClaimOrRuntime" in boot_text
+    assert 'kEnrollmentJournalKey = "enrollment"' in claim_store_text
+    assert 'kActiveClaimKey = "active_claim"' in claim_store_text
+    assert '"onboarding"' not in claim_store_text
 
 
 if __name__ == "__main__":

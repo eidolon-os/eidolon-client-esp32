@@ -17,7 +17,7 @@ namespace eidolon {
 namespace {
 
 constexpr uint8_t kProgressSchema = 1;
-constexpr uint8_t kCoreJournalSchema = 1;
+constexpr uint8_t kCoreJournalSchema = 2;
 constexpr uint32_t kProgressMagic = 0x45504150;  // EPAP
 constexpr uint32_t kCoreJournalMagic = 0x45434a52;  // ECJR
 constexpr size_t kMaxJournalBlobSize = 16 * 1024;
@@ -277,9 +277,6 @@ bool EncodeCoreJournal(const DeviceEraseJournalEntry& value, uint64_t sequence,
     AppendU64(blob, value.device_ref.owner_domain_generation);
     AppendU32(blob, value.device_ref.claim_generation);
     AppendU32(blob, value.device_ref.trust_epoch);
-    if (!AppendString(blob, DeviceRefLegacyManifestDigest(value.device_ref))) {
-        return false;
-    }
     AppendU8(blob, static_cast<uint8_t>(value.phase));
     AppendU8(blob, value.has_staged_ack ? 1 : 0);
     if (value.has_staged_ack) {
@@ -307,7 +304,6 @@ bool DecodeCoreJournal(const std::vector<uint8_t>& blob,
     DeviceEraseJournalEntry decoded;
     uint32_t scope_count = 0;
     std::string owner_domain_id;
-    std::string legacy_manifest;
     uint8_t phase = 0;
     uint8_t has_ack = 0;
     if (!reader.String(decoded.operation_id) ||
@@ -327,14 +323,13 @@ bool DecodeCoreJournal(const std::vector<uint8_t>& blob,
         !reader.U64(decoded.device_ref.owner_domain_generation) ||
         !reader.U32(decoded.device_ref.claim_generation) ||
         !reader.U32(decoded.device_ref.trust_epoch) ||
-        !reader.String(legacy_manifest) || !reader.U8(phase) ||
+        !reader.U8(phase) ||
         !reader.U8(has_ack) || has_ack > 1 || !ValidCorePhase(phase)) {
         return false;
     }
     decoded.phase = static_cast<DeviceEraseJournalPhase>(phase);
     decoded.has_staged_ack = has_ack != 0;
     SetDeviceRefOwnerDomainId(decoded.device_ref, owner_domain_id);
-    SetDeviceRefLegacyManifestDigest(decoded.device_ref, legacy_manifest);
     if (decoded.has_staged_ack) {
         uint8_t ack_result = 0;
         decoded.staged_ack.operation_id = decoded.operation_id;

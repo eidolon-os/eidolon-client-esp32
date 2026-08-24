@@ -23,11 +23,10 @@ namespace {
 DeviceRef Ref(uint32_t generation = 7) {
     return DeviceRef{
         "device_erase_01",
-        "owner_01",
-        1,
+        {"owner-domain_01"},
+        3,
         generation,
         4,
-        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     };
 }
 
@@ -129,7 +128,7 @@ void OnlineAckUsesCanonicalGenerationBoundDocument() {
     assert(journal.stores == 5);
     assert(journal.value.phase == DeviceEraseJournalPhase::DurableTerminal);
     assert(signer.last_document ==
-           "{\"ack_sequence\":1,\"contract\":\"eidolon.device-foundation.device-operation-ack\",\"contract_version\":\"1.0\",\"device_monotonic_time\":1234,\"device_ref\":{\"accepted_manifest_digest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"claim_generation\":7,\"device_instance_id\":\"device_erase_01\",\"owner_domain_generation\":1,\"owner_domain_id\":\"owner_01\",\"trust_epoch\":4},\"operation_id\":\"erase_operation_01\",\"operation_type\":\"device-local.erase\",\"result\":\"erased\",\"result_code\":\"ERASED\"}");
+           "{\"ack_sequence\":1,\"contract\":\"eidolon.device-foundation.device-operation-ack\",\"contract_version\":\"1.0\",\"device_monotonic_time\":1234,\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device_erase_01\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"operation_id\":\"erase_operation_01\",\"operation_type\":\"device-local.erase\",\"result\":\"erased\",\"result_code\":\"ERASED\"}");
 }
 
 void DuplicateAndRestartReplayOneAckWithoutSecondErase() {

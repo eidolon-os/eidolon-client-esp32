@@ -2,6 +2,7 @@
 
 #include "application.h"
 #include "commissioning_runtime.h"
+#include "device_boot_recovery.h"
 #include "eidolon_ui_types.h"
 #include "hub_config_store.h"
 #include "hub_discovery.h"
@@ -42,6 +43,18 @@ const char* ActivationMessageForStatus(HubConfigStatus status)
 bool HubActivator::Run() {
     auto& app = Application::GetInstance();
     int retry_delay = 10;
+
+    const DeviceEraseCoreOutcome removal_recovery =
+        DeviceBootRecovery::ResumePendingRemoval();
+    if (!DeviceBootRecovery::AllowsClaimOrRuntime(removal_recovery)) {
+        ESP_LOGE(TAG,
+                 "RemovalJournal blocks Claim/runtime until recovery is terminal result=%d",
+                 static_cast<int>(removal_recovery.result));
+        app.SetEidolonLifecycleUi(
+            LifecyclePhase::HubRegistering,
+            "Device removal recovery required");
+        return false;
+    }
 
     HubDiscovery discovery;
     HubOnboardingClient client;

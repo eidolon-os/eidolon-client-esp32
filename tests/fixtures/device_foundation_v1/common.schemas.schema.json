@@ -1,0 +1,528 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.eidolon.live/device-foundation/v1/common/schemas.schema.json",
+  "title": "Eidolon Device Foundation V1 common schemas",
+  "$defs": {
+    "Identifier": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "OwnerDomainId": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128,
+      "pattern": "^owner-[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "BusinessOwnerId": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128,
+      "pattern": "^owner_[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "Sha256Digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "P256RawSignature": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{86}$"
+    },
+    "DeviceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "device_instance_id",
+        "owner_domain_id",
+        "owner_domain_generation",
+        "claim_generation",
+        "trust_epoch"
+      ],
+      "properties": {
+        "device_instance_id": { "$ref": "#/$defs/Identifier" },
+        "owner_domain_id": { "$ref": "#/$defs/OwnerDomainId" },
+        "owner_domain_generation": { "type": "integer", "minimum": 1 },
+        "claim_generation": { "type": "integer", "minimum": 1 },
+        "trust_epoch": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "ManifestRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifest_id", "revision", "digest"],
+      "properties": {
+        "manifest_id": { "$ref": "#/$defs/Identifier" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "digest": { "$ref": "#/$defs/Sha256Digest" }
+      }
+    },
+    "BodyTargetRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mount_id", "body_endpoint_id", "assignment_generation"],
+      "properties": {
+        "mount_id": { "$ref": "#/$defs/Identifier" },
+        "body_endpoint_id": { "$ref": "#/$defs/Identifier" },
+        "assignment_generation": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "ActorRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "principal_id",
+        "principal_type",
+        "owner_domain_id",
+        "granted_scopes",
+        "authentication_strength"
+      ],
+      "properties": {
+        "principal_id": { "$ref": "#/$defs/Identifier" },
+        "principal_type": {
+          "enum": ["controller", "device", "service", "operator"]
+        },
+        "owner_domain_id": {
+          "oneOf": [{ "$ref": "#/$defs/OwnerDomainId" }, { "type": "null" }]
+        },
+        "granted_scopes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "uniqueItems": true
+        },
+        "authentication_strength": {
+          "enum": ["software", "hardware-backed", "physical-presence"]
+        }
+      }
+    },
+    "ControllerActorRef": {
+      "allOf": [
+        { "$ref": "#/$defs/ActorRef" },
+        {
+          "properties": {
+            "principal_type": { "const": "controller" },
+            "owner_domain_id": { "$ref": "#/$defs/OwnerDomainId" }
+          }
+        }
+      ]
+    },
+    "CommandEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "contract_version",
+        "command_type",
+        "command_id",
+        "correlation_id",
+        "causation_id",
+        "issued_at",
+        "deadline",
+        "payload",
+        "extensions"
+      ],
+      "properties": {
+        "contract": { "const": "eidolon.device-foundation.command" },
+        "contract_version": { "const": "1.0" },
+        "command_type": { "$ref": "#/$defs/Identifier" },
+        "command_id": { "$ref": "#/$defs/Identifier" },
+        "correlation_id": { "$ref": "#/$defs/Identifier" },
+        "causation_id": {
+          "oneOf": [{ "$ref": "#/$defs/Identifier" }, { "type": "null" }]
+        },
+        "issued_at": { "type": "string", "format": "date-time" },
+        "deadline": {
+          "oneOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }]
+        },
+        "payload": { "type": "object" },
+        "extensions": { "type": "object" }
+      }
+    },
+    "CommandResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command_id",
+        "outcome",
+        "resource_ref",
+        "resource_revision",
+        "occurred_at",
+        "extensions"
+      ],
+      "properties": {
+        "command_id": { "$ref": "#/$defs/Identifier" },
+        "outcome": { "enum": ["committed", "replayed", "accepted"] },
+        "resource_ref": { "type": "object" },
+        "resource_revision": {
+          "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }]
+        },
+        "occurred_at": { "type": "string", "format": "date-time" },
+        "extensions": { "type": "object" }
+      }
+    },
+    "DeviceProblem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "category",
+        "retryable",
+        "authority",
+        "command_id",
+        "resource_ref",
+        "current_revision",
+        "current_generation",
+        "retry_after_ms",
+        "detail",
+        "incident_id"
+      ],
+      "properties": {
+        "code": {
+          "enum": [
+            "INVALID_ARGUMENT",
+            "CONTRACT_UNSUPPORTED",
+            "UNAUTHENTICATED",
+            "FORBIDDEN",
+            "NOT_FOUND",
+            "IDEMPOTENCY_CONFLICT",
+            "REVISION_CONFLICT",
+            "GENERATION_CONFLICT",
+            "CLAIM_REVOKED",
+            "TRUST_EPOCH_STALE",
+            "OWNER_DOMAIN_MISMATCH",
+            "BUSINESS_OWNER_MISMATCH",
+            "DECISION_REQUIRED",
+            "HANDOFF_PROOF_INVALID",
+            "GRANT_EXPIRED",
+            "PROPOSAL_TERMINAL",
+            "PROPOSAL_EXPIRED",
+            "OPERATION_EXPIRED",
+            "RATE_LIMITED",
+            "AUTHORITY_UNAVAILABLE",
+            "DELIVERY_UNAVAILABLE",
+            "INTERNAL"
+          ]
+        },
+        "category": {
+          "enum": [
+            "invalid",
+            "auth",
+            "forbidden",
+            "missing",
+            "conflict",
+            "expired",
+            "unavailable",
+            "internal"
+          ]
+        },
+        "retryable": { "type": "boolean" },
+        "authority": {
+          "enum": ["admission", "device-control", "body-mesh", "companion", "delivery"]
+        },
+        "command_id": {
+          "oneOf": [{ "$ref": "#/$defs/Identifier" }, { "type": "null" }]
+        },
+        "resource_ref": { "oneOf": [{ "type": "object" }, { "type": "null" }] },
+        "current_revision": {
+          "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }]
+        },
+        "current_generation": {
+          "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }]
+        },
+        "retry_after_ms": {
+          "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }]
+        },
+        "detail": { "type": "string", "maxLength": 1024 },
+        "incident_id": { "$ref": "#/$defs/Identifier" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "retryable": { "const": false } }, "required": ["retryable"] },
+          "then": { "properties": { "retry_after_ms": { "type": "null" } } }
+        },
+        {
+          "if": { "properties": { "code": { "const": "RATE_LIMITED" } }, "required": ["code"] },
+          "then": {
+            "properties": {
+              "retryable": { "const": true },
+              "retry_after_ms": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      ]
+    },
+    "OwnerDomainDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner_domain_id",
+        "owner_domain_generation",
+        "directory_revision",
+        "trust_root_refs",
+        "endpoints",
+        "issued_at",
+        "expires_at",
+        "signing_key_id",
+        "signature"
+      ],
+      "properties": {
+        "owner_domain_id": { "$ref": "#/$defs/OwnerDomainId" },
+        "owner_domain_generation": { "type": "integer", "minimum": 1 },
+        "directory_revision": { "type": "integer", "minimum": 1 },
+        "trust_root_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/Sha256Digest" }
+        },
+        "endpoints": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "authority",
+              "logical_audience",
+              "uri",
+              "transport_profile",
+              "priority"
+            ],
+            "properties": {
+              "authority": {
+                "enum": ["admission", "device-control", "body-mesh", "companion"]
+              },
+              "logical_audience": { "$ref": "#/$defs/Identifier" },
+              "uri": { "type": "string", "format": "uri", "pattern": "^https://" },
+              "transport_profile": { "enum": ["https-json", "mqtt-tls", "nats-tls"] },
+              "priority": { "type": "integer", "minimum": 0, "maximum": 65535 }
+            }
+          }
+        },
+        "issued_at": { "type": "string", "format": "date-time" },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "signing_key_id": { "$ref": "#/$defs/Sha256Digest" },
+        "signature": { "$ref": "#/$defs/P256RawSignature" }
+      }
+    },
+    "ClaimGrantAAD": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "profile_id",
+        "enrollment_id",
+        "proposal_revision",
+        "hardware_evidence_digest",
+        "manifest_digest",
+        "owner_domain_id",
+        "owner_domain_generation",
+        "claim_generation",
+        "trust_epoch",
+        "grant_id"
+      ],
+      "properties": {
+        "contract": { "const": "eidolon.device-foundation.claim-grant-aad" },
+        "profile_id": { "const": "eidolon-trust-p256-hpke-v1" },
+        "enrollment_id": { "$ref": "#/$defs/Identifier" },
+        "proposal_revision": { "type": "integer", "minimum": 1 },
+        "hardware_evidence_digest": { "$ref": "#/$defs/Sha256Digest" },
+        "manifest_digest": { "$ref": "#/$defs/Sha256Digest" },
+        "owner_domain_id": { "$ref": "#/$defs/Identifier" },
+        "owner_domain_generation": { "type": "integer", "minimum": 1 },
+        "claim_generation": { "type": "integer", "minimum": 1 },
+        "trust_epoch": { "type": "integer", "minimum": 1 },
+        "grant_id": { "$ref": "#/$defs/Identifier" }
+      }
+    },
+    "CommissioningProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "schema_version",
+        "eid_pair_versions",
+        "methods",
+        "network_bearers",
+        "physical_presence",
+        "attestation_schemes",
+        "secure_storage_level",
+        "monotonic_counter",
+        "candidate_network",
+        "rollback_guarantee",
+        "max_message_size",
+        "trusted_clock",
+        "reset_modes"
+      ],
+      "properties": {
+        "profile_id": { "const": "eidolon-trust-p256-hpke-v1" },
+        "schema_version": { "const": "1.0" },
+        "eid_pair_versions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "const": "1.0" },
+          "uniqueItems": true
+        },
+        "methods": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "enum": ["ble", "softap", "usb", "nfc", "lan_authenticated"] },
+          "uniqueItems": true
+        },
+        "network_bearers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "enum": ["wifi", "ethernet", "thread", "cellular", "none"] },
+          "uniqueItems": true
+        },
+        "physical_presence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "enum": ["button", "qr_secret", "nfc", "trusted_display"] },
+          "uniqueItems": true
+        },
+        "attestation_schemes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "enum": ["manufacturer-p256", "dev-self-signed-p256"] },
+          "uniqueItems": true
+        },
+        "secure_storage_level": { "enum": ["secure-element", "hardware-backed", "encrypted-flash"] },
+        "monotonic_counter": { "type": "boolean" },
+        "candidate_network": { "type": "boolean" },
+        "rollback_guarantee": { "enum": ["crash-safe", "best-effort", "unsupported"] },
+        "max_message_size": { "type": "integer", "minimum": 2, "maximum": 1048576 },
+        "trusted_clock": { "type": "boolean" },
+        "reset_modes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "enum": ["network", "owner", "factory"] },
+          "uniqueItems": true
+        }
+      }
+    },
+    "CommissioningStatusEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "contract_version",
+        "profile_id",
+        "session_id",
+        "setup_generation",
+        "state_revision",
+        "state",
+        "conditions",
+        "failure_code"
+      ],
+      "properties": {
+        "contract": { "const": "eidolon.device-foundation.commissioning-status" },
+        "contract_version": { "const": "1.0" },
+        "profile_id": { "const": "eidolon-trust-p256-hpke-v1" },
+        "session_id": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "setup_generation": { "type": "integer", "minimum": 1 },
+        "state_revision": { "type": "integer", "minimum": 1 },
+        "state": {
+          "enum": ["applying-configuration", "committed", "rolled-back", "failed"]
+        },
+        "conditions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "wifi_connected",
+            "owner_route_validated",
+            "trust_committed",
+            "network_committed"
+          ],
+          "properties": {
+            "wifi_connected": { "type": "boolean" },
+            "owner_route_validated": { "type": "boolean" },
+            "trust_committed": { "type": "boolean" },
+            "network_committed": { "type": "boolean" }
+          }
+        },
+        "failure_code": {
+          "oneOf": [
+            {
+              "enum": [
+                "NETWORK_REJECTED",
+                "OWNER_ROUTE_UNAVAILABLE",
+                "OWNER_IDENTITY_MISMATCH",
+                "STORAGE_UNAVAILABLE",
+                "WINDOW_EXPIRED",
+                "CANCELLED",
+                "INTERNAL"
+              ]
+            },
+            { "type": "null" }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "state": { "const": "committed" } } },
+          "then": {
+            "properties": {
+              "conditions": {
+                "properties": {
+                  "wifi_connected": { "const": true },
+                  "owner_route_validated": { "const": true },
+                  "trust_committed": { "const": true },
+                  "network_committed": { "const": true }
+                }
+              },
+              "failure_code": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": { "enum": ["rolled-back", "failed"] }
+            }
+          },
+          "then": {
+            "properties": {
+              "failure_code": { "type": "string" },
+              "conditions": {
+                "properties": {
+                  "trust_committed": { "const": false },
+                  "network_committed": { "const": false }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "CommissioningTerminalAck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "contract_version",
+        "session_id",
+        "setup_generation",
+        "observed_state_revision"
+      ],
+      "properties": {
+        "contract": { "const": "eidolon.device-foundation.commissioning-terminal-ack" },
+        "contract_version": { "const": "1.0" },
+        "session_id": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "setup_generation": { "type": "integer", "minimum": 1 },
+        "observed_state_revision": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

@@ -125,7 +125,7 @@ OwnerDataErasePlan EspIdfDeviceLocalEraseAdapter::BuildErasePlan(
     if (owner_data) {
         plan.targets.push_back(NvsKeys(
             "active-claim-and-onboarding", kOwnerData, "", "eidolon",
-            {"onboarding", "active_claim", "ctx_gen", "ctx_phase",
+            {"enrollment", "active_claim", "ctx_gen", "ctx_phase",
              "ctx_owner", "ctx_ssid", "ctx_digest"}, true));
         plan.targets.push_back(NvsKeys(
             "device-user-preferences", kOwnerData, "", "eidolon_device",

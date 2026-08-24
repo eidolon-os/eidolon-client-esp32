@@ -34,18 +34,13 @@ std::string Quote(const std::string& value) {
 }
 
 std::string DeviceRefJson(const device_foundation::v1::DeviceRef& ref) {
-    std::string json = "{";
-    const std::string legacy_manifest = DeviceRefLegacyManifestDigest(ref);
-    if (!legacy_manifest.empty()) {
-        json += "\"accepted_manifest_digest\":" + Quote(legacy_manifest) + ",";
-    }
-    json += "\"claim_generation\":" + std::to_string(ref.claim_generation) +
+    return std::string("{\"claim_generation\":") +
+           std::to_string(ref.claim_generation) +
            ",\"device_instance_id\":" + Quote(ref.device_instance_id) +
            ",\"owner_domain_generation\":" +
            std::to_string(ref.owner_domain_generation) +
            ",\"owner_domain_id\":" + Quote(DeviceRefOwnerDomainId(ref)) +
            ",\"trust_epoch\":" + std::to_string(ref.trust_epoch) + "}";
-    return json;
 }
 
 const char* ResultWire(device_foundation::v1::DeviceLocalEraseResult result) {

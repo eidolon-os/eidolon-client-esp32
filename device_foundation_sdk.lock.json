@@ -1,0 +1,35 @@
+{
+  "sdk_commit": "88a74ca33051a578d28fc1f6dc8627eb92dd071a",
+  "files": [
+    {
+      "source": "contracts/device_foundation/v1/generated/cpp/device_foundation_v1_generated.h",
+      "target": "main/eidolon/device_foundation_v1_generated.h",
+      "sha256": "3d55b78a2506502728bf4b15e4c4d93492d91db55dfaa158851128fb7bf36c7b"
+    },
+    {
+      "source": "contracts/device_foundation/v1/common/schemas.schema.json",
+      "target": "tests/fixtures/device_foundation_v1/common.schemas.schema.json",
+      "sha256": "99d6906f42358de0c46159473c810e9e063aa7f363adc59ed16af75794e21590"
+    },
+    {
+      "source": "contracts/device_foundation/v1/admission/schemas.schema.json",
+      "target": "tests/fixtures/device_foundation_v1/admission.schemas.schema.json",
+      "sha256": "184cacabe3f13c90043f679f96d0003ee730f58ca5dbbcd8725e37a5c8efdca2"
+    },
+    {
+      "source": "contracts/device_foundation/v1/examples/valid/admission.json",
+      "target": "tests/fixtures/device_foundation_v1/admission.valid.json",
+      "sha256": "9102dedc421a874489814bef1f878bf099dd7be259f36b7e4258b5c8d0bf1fdf"
+    },
+    {
+      "source": "contracts/device_foundation/v1/golden/claim-grant-aad.json",
+      "target": "tests/fixtures/device_foundation_v1/claim-grant-aad.json",
+      "sha256": "3a547e41429bab66bfdab684bcdde936b591cd9aa57a1d4b0fa94631d3764d8c"
+    },
+    {
+      "source": "contracts/device_foundation/v1/golden/device-local-erase.json",
+      "target": "tests/fixtures/device_foundation_v1/device-local-erase.json",
+      "sha256": "15dd168af610eb7731c49411b2593198a63c8d2eac633fd5d9121040dfe947b5"
+    }
+  ]
+}

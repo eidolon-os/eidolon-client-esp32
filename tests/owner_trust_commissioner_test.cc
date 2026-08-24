@@ -16,7 +16,7 @@ using eidolon::OwnerTrustVerifierPort;
 constexpr const char* kCertificateInJson =
     "-----BEGIN CERTIFICATE-----\\nMIIBdummy\\n-----END CERTIFICATE-----\\n";
 
-std::string Descriptor(const std::string& owner = "owner_01")
+std::string Descriptor(const std::string& owner = "owner-domain_01")
 {
     return std::string("{\"owner_domain_id\":\"") + owner +
            "\",\"owner_domain_generation\":1,\"directory_revision\":7,"
@@ -31,8 +31,9 @@ std::string Descriptor(const std::string& owner = "owner_01")
            "\"signature\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"}";
 }
 
-std::string Handover(const std::string& envelope_owner = "owner_01",
-                     const std::string& descriptor_owner = "owner_01")
+std::string Handover(
+    const std::string& envelope_owner = "owner-domain_01",
+    const std::string& descriptor_owner = "owner-domain_01")
 {
     return std::string("{\"contract_version\":\"1\",\"owner_domain_id\":\"") +
            envelope_owner + "\",\"owner_domain_descriptor\":" +
@@ -87,10 +88,10 @@ void AcceptsOnlyAfterVerifyAndDurableStore()
     OwnerTrustCommissioner commissioner(verifier, store);
     const auto result = commissioner.Commission(Handover(), 7, [] { return true; });
     assert(result.code == OwnerTrustCommissioningCode::Staged);
-    assert(result.owner_domain_id == "owner_01");
+    assert(result.owner_domain_id == "owner-domain_01");
     assert(verifier.calls == 1);
     assert(store.calls == 1);
-    assert(store.stored.owner_domain_id == "owner_01");
+    assert(store.stored.owner_domain_id == "owner-domain_01");
     assert(store.staged_generation == 7);
     assert(store.stored.owner_domain_descriptor_json == Descriptor());
 }
@@ -103,7 +104,8 @@ void RejectsMalformedAndCrossOwnerBundlesBeforeCrypto()
     assert(commissioner.Commission("{}", 7, [] { return true; }).code ==
            OwnerTrustCommissioningCode::Unsupported);
     assert(commissioner.Commission(
-               Handover("owner_01", "owner_other"), 7, [] { return true; }).code ==
+               Handover("owner-domain_01", "owner-other"), 7,
+               [] { return true; }).code ==
            OwnerTrustCommissioningCode::Invalid);
     assert(verifier.calls == 0);
     assert(store.calls == 0);

@@ -13,7 +13,7 @@ eidolon::AuthorityCandidateRecord Advertised()
 {
     eidolon::AuthorityCandidateRecord value;
     value.txtvers = 1;
-    value.owner_domain_id = "owner_01";
+    value.owner_domain_id = "owner-domain_01";
     value.owner_domain_descriptor_uri =
         "https://eidolon-hub.local/api/device-onboarding/v1/descriptor";
     return value;
@@ -36,7 +36,7 @@ void TestMdnsConsumesOnlyDescriptorContract()
                record) == ESP_ERR_INVALID_RESPONSE);
     assert(eidolon::HubTxtParser::Parse(
                {{"txtvers", "1"},
-                {"owner_domain_id", "owner_01"},
+                {"owner_domain_id", "owner-domain_01"},
                 {"owner_domain_descriptor_uri",
                  "http://eidolon-hub.local/descriptor"}},
                record) == ESP_ERR_INVALID_RESPONSE);
@@ -45,7 +45,7 @@ void TestMdnsConsumesOnlyDescriptorContract()
 void TestDescriptorParsesToCanonicalSignedDocument()
 {
     const std::string descriptor =
-        "{\"owner_domain_id\":\"owner_01\",\"owner_domain_generation\":3,\"directory_revision\":7,"
+        "{\"owner_domain_id\":\"owner-domain_01\",\"owner_domain_generation\":3,\"directory_revision\":7,"
         "\"trust_root_refs\":[\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"],"
         "\"endpoints\":[{\"authority\":\"admission\","
         "\"logical_audience\":\"eidolon-admission\","
@@ -58,7 +58,7 @@ void TestDescriptorParsesToCanonicalSignedDocument()
     eidolon::device_foundation::v1::OwnerDomainDescriptor parsed;
     std::string canonical;
     assert(eidolon::ParseOwnerDomainDescriptor(descriptor, parsed, canonical));
-    assert(parsed.owner_domain_id == "owner_01");
+    assert(parsed.owner_domain_id == "owner-domain_01");
     assert(parsed.owner_domain_generation == 3);
     assert(canonical ==
            "{\"directory_revision\":7,\"endpoints\":[{\"authority\":\"admission\","
@@ -68,7 +68,7 @@ void TestDescriptorParsesToCanonicalSignedDocument()
            "\"expires_at\":\"2026-08-19T00:00:00Z\","
            "\"issued_at\":\"2026-08-18T00:00:00Z\","
            "\"owner_domain_generation\":3,"
-           "\"owner_domain_id\":\"owner_01\","
+           "\"owner_domain_id\":\"owner-domain_01\","
            "\"signing_key_id\":\"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\","
            "\"trust_root_refs\":[\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"]}");
     assert(parsed.endpoints.size() == 1);
@@ -92,75 +92,28 @@ void TestCanonicalManifest()
            "\"schema_version\":1,\"title\":\"esp32-s3-touch-amoled-2.06\"}");
 }
 
-eidolon::HubOnboardingState PendingState()
+void TestActiveClaimConfigurationAndProviderBinding()
 {
-    eidolon::HubOnboardingState state;
-    state.owner_domain_id = "owner_01";
-    state.owner_domain_generation = 3;
-    state.directory_revision = 7;
-    state.device_id = "aa:bb";
-    state.request_id = "enroll-a";
-    state.retrieval_token = "r";
-    assert(state.has_local_intent());
-    return state;
-}
-
-void TestReceiptHandoffAndProviderBinding()
-{
-    auto state = PendingState();
-    const std::string receipt =
-        "{\"operation\":\"device.enrollment-received\","
-        "\"request_id\":\"enroll-a\",\"enrollment_id\":\"enrollment-1\","
-        "\"device_id\":\"aa:bb\",\"lifecycle_state\":\"pending-approval\","
-        "\"retrieval_expires_at_ms\":1786000000000}";
-    eidolon::HubEnrollmentReceipt parsed;
-    assert(eidolon::ParseEnrollmentReceiptResponse(receipt, state, parsed));
-    state.enrollment_id = parsed.enrollment_id;
-
-    const std::string pending =
-        "{\"operation\":\"device.handoff-outcome\","
-        "\"request_id\":\"handoff-a\",\"enrollment_id\":\"enrollment-1\","
-        "\"device_id\":\"aa:bb\",\"manifest_revision\":\"sha256:m\","
-        "\"lifecycle_state\":\"pending-approval\",\"device_ref\":null,"
-        "\"channels\":[]}";
     HubConfigStatus status = HubConfigStatus::Active;
     eidolon::HubChannelAssignment assignment;
     eidolon::device_foundation::v1::DeviceRef device_ref;
-    assert(eidolon::ParseHandoffResponse(pending, "handoff-a", state, status,
-                                         assignment, device_ref));
-    assert(status == HubConfigStatus::PendingApproval);
-
-    const std::string approved =
-        "{\"operation\":\"device.handoff-outcome\","
-        "\"request_id\":\"handoff-a\",\"enrollment_id\":\"enrollment-1\","
-        "\"device_id\":\"aa:bb\",\"manifest_revision\":\"sha256:m\","
-        "\"lifecycle_state\":\"approved\",\"device_ref\":{"
-        "\"device_instance_id\":\"aa:bb\",\"owner_domain_id\":\"owner_01\","
-        "\"owner_domain_generation\":3,\"claim_generation\":1,"
-        "\"trust_epoch\":1,\"accepted_manifest_digest\":"
-        "\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},"
-        "\"channels\":[{"
-        "\"channel_id\":\"livekit-1\",\"purpose\":\"voice\","
-        "\"kinds\":[\"audio\"],\"binding_format\":"
-        "\"application/vnd.eidolon.livekit-session+json;v=2\","
-        "\"issued_at_ms\":1,\"expires_at_ms\":1786000000000,"
-        "\"opaque_binding\":\"e30=\"}]}";
-    assert(eidolon::ParseHandoffResponse(approved, "handoff-a", state, status,
-                                         assignment, device_ref));
-    assert(status == HubConfigStatus::Active);
-    assert(assignment.channel_id == "livekit-1");
-    assert(assignment.expires_at_ms == 1786000000000);
-    assert(device_ref.owner_domain_generation == 3);
-
+    device_ref.device_instance_id = "aa:bb";
+    device_ref.owner_domain_id.value = "owner-domain_01";
+    device_ref.owner_domain_generation = 3;
+    device_ref.claim_generation = 1;
+    device_ref.trust_epoch = 1;
     eidolon::ActiveClaimState active_claim;
     active_claim.device_ref = device_ref;
+    active_claim.manifest_ref = {
+        "manifest_01", 1,
+        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"};
+    active_claim.grant_id = "grant_01";
     const std::string configuration =
         "{\"operation\":\"device-control.configuration\","
         "\"nonce\":\"configuration-nonce\",\"device_ref\":{"
-        "\"device_instance_id\":\"aa:bb\",\"owner_domain_id\":\"owner_01\","
+        "\"device_instance_id\":\"aa:bb\",\"owner_domain_id\":\"owner-domain_01\","
         "\"owner_domain_generation\":3,\"claim_generation\":1,"
-        "\"trust_epoch\":1,\"accepted_manifest_digest\":"
-        "\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},"
+        "\"trust_epoch\":1},"
         "\"lifecycle_state\":\"approved\",\"channels\":[{"
         "\"channel_id\":\"livekit-1\",\"purpose\":\"voice\","
         "\"kinds\":[\"audio\"],\"binding_format\":"
@@ -200,6 +153,6 @@ int main()
     TestMdnsConsumesOnlyDescriptorContract();
     TestDescriptorParsesToCanonicalSignedDocument();
     TestCanonicalManifest();
-    TestReceiptHandoffAndProviderBinding();
+    TestActiveClaimConfigurationAndProviderBinding();
     return 0;
 }
