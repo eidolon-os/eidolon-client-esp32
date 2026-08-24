@@ -264,6 +264,41 @@ struct DeviceLocalEraseAck {
     std::string device_signature;
 };
 
+enum class DeliveryKind {
+    TwinDelta,
+    Operation,
+    StopGeneration,
+};
+
+struct DeliverEnvelope {
+    std::string delivery_attempt_id;
+    std::string message_id;
+    DeliveryKind kind = DeliveryKind::Operation;
+    DeviceRef device_ref;
+    std::string deadline;
+    std::string payload_schema;
+    std::string payload_json;
+};
+
+enum class DeliveryAcceptanceState {
+    Accepted,
+    Rejected,
+};
+
+struct DeliveryAcceptance {
+    std::string delivery_attempt_id;
+    DeliveryAcceptanceState state = DeliveryAcceptanceState::Rejected;
+    std::string adapter_code;
+};
+
+struct DeviceEvidenceEnvelope {
+    std::string delivery_attempt_id;
+    std::string message_id;
+    DeviceRef device_ref;
+    std::string payload_schema;
+    std::string payload_json;
+};
+
 }  // namespace eidolon::device_foundation::v1
 
 #endif  // EIDOLON_DEVICE_FOUNDATION_V1_GENERATED_H_

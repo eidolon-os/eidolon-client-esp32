@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.eidolon.live/device-foundation/v1/delivery-port/schemas.schema.json",
+  "title": "Eidolon Device Foundation V1 Delivery Port schemas",
+  "$defs": {
+    "DeliverEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "delivery_attempt_id",
+        "message_id",
+        "kind",
+        "device_ref",
+        "deadline",
+        "payload_schema",
+        "payload"
+      ],
+      "properties": {
+        "delivery_attempt_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "message_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "kind": { "enum": ["twin_delta", "operation", "stop_generation"] },
+        "device_ref": { "$ref": "../common/schemas.schema.json#/$defs/DeviceRef" },
+        "deadline": { "type": "string", "format": "date-time" },
+        "payload_schema": { "type": "string", "format": "uri" },
+        "payload": { "type": "object" }
+      }
+    },
+    "DeliveryAcceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["delivery_attempt_id", "state", "adapter_code"],
+      "properties": {
+        "delivery_attempt_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "state": { "enum": ["accepted", "rejected"] },
+        "adapter_code": {
+          "oneOf": [{ "type": "string", "minLength": 1, "maxLength": 128 }, { "type": "null" }]
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "state": { "const": "accepted" } }, "required": ["state"] },
+          "then": { "properties": { "adapter_code": { "type": "null" } } }
+        },
+        {
+          "if": { "properties": { "state": { "const": "rejected" } }, "required": ["state"] },
+          "then": { "properties": { "adapter_code": { "type": "string", "minLength": 1 } } }
+        }
+      ]
+    },
+    "DeviceEvidenceEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "delivery_attempt_id",
+        "message_id",
+        "kind",
+        "device_ref",
+        "payload_schema",
+        "payload"
+      ],
+      "properties": {
+        "delivery_attempt_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "message_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "kind": { "const": "operation_ack" },
+        "device_ref": { "$ref": "../common/schemas.schema.json#/$defs/DeviceRef" },
+        "payload_schema": { "type": "string", "format": "uri" },
+        "payload": { "type": "object" }
+      }
+    }
+  }
+}

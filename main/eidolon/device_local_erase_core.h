@@ -123,6 +123,8 @@ public:
 
     static std::string AckSigningDocument(
         const device_foundation::v1::DeviceLocalEraseAck& ack);
+    static std::string CommandDocument(
+        const device_foundation::v1::DeviceLocalEraseCommand& command);
 
 private:
     static bool SameRef(const device_foundation::v1::DeviceRef& left,

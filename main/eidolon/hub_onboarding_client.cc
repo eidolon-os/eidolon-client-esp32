@@ -2,6 +2,7 @@
 
 #include "authority_locator.h"
 #include "device_identity.h"
+#include "device_control_delivery_client.h"
 #include "device_provisioning_protocol.h"
 #include "hub_config_store.h"
 #include "hub_onboarding_protocol.h"
@@ -303,6 +304,7 @@ esp_err_t HubOnboardingClient::RunAccepted(
     ActiveClaimState active_claim;
     const ClaimStoreLoadResult claim_load =
         store.LoadActiveClaim(active_claim);
+    esp_err_t err = ESP_OK;
     if (claim_load == ClaimStoreLoadResult::StorageFailure) {
         ESP_LOGE(TAG, "ActiveClaimStore is unreadable; refusing runtime");
         return ESP_FAIL;
@@ -318,6 +320,14 @@ esp_err_t HubOnboardingClient::RunAccepted(
             active_claim.device_ref.owner_domain_generation !=
                 descriptor.owner_domain_generation) {
             ESP_LOGE(TAG, "Recovery required: active Claim Authority changed");
+            return ESP_ERR_NOT_ALLOWED;
+        }
+        bool removal_completed = false;
+        err = DeviceControlDeliveryClient().PollAndExecute(
+            active_claim, trust_, removal_completed);
+        if (err != ESP_OK) return err;
+        if (removal_completed) {
+            ESP_LOGW(TAG, "Device removal completed; operational runtime is fenced");
             return ESP_ERR_NOT_ALLOWED;
         }
         return PullActiveConfiguration(active_claim, out);

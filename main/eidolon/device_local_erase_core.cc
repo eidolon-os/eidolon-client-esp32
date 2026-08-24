@@ -84,6 +84,23 @@ std::string DeviceLocalEraseCore::AckSigningDocument(
            ",\"result_code\":" + Quote(ack.result_code) + "}";
 }
 
+std::string DeviceLocalEraseCore::CommandDocument(
+    const device_foundation::v1::DeviceLocalEraseCommand& command) {
+    std::string scopes = "[";
+    for (size_t index = 0; index < command.erase_scopes.size(); ++index) {
+        if (index != 0) scopes += ',';
+        scopes += Quote(command.erase_scopes[index]);
+    }
+    scopes += ']';
+    return std::string("{\"contract\":\"eidolon.device-foundation.device-operation\"") +
+           ",\"contract_version\":\"1.0\"" +
+           ",\"deadline\":" + Quote(command.deadline) +
+           ",\"device_ref\":" + DeviceRefJson(command.device_ref) +
+           ",\"operation_id\":" + Quote(command.operation_id) +
+           ",\"operation_type\":\"device-local.erase\"" +
+           ",\"payload\":{\"erase_scopes\":" + scopes + "}}";
+}
+
 DeviceEraseCoreOutcome DeviceLocalEraseCore::Handle(
     const device_foundation::v1::DeviceLocalEraseCommand& command,
     const std::string& request_fingerprint) {
