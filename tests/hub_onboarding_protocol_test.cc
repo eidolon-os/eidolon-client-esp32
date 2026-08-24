@@ -146,6 +146,39 @@ void TestActiveClaimConfigurationAndProviderBinding()
     assert(!eidolon::ParseLiveKitBinding(two_rooms, stale));
 }
 
+void TestFinishedProposalIsRecognizedOnlyFromTheAuthoritysOwnWords()
+{
+    const auto problem = [](const char* code, const char* authority) {
+        return std::string("{\"code\":\"") + code +
+               "\",\"category\":\"expired\",\"retryable\":false," +
+               "\"authority\":\"" + authority + "\",\"detail\":\"gone\"," +
+               "\"incident_id\":\"incident_01\"}";
+    };
+
+    // These three, and only from Admission, end a Proposal.
+    assert(eidolon::IsFinishedProposalProblem(
+        410, problem("PROPOSAL_EXPIRED", "admission")));
+    assert(eidolon::IsFinishedProposalProblem(
+        410, problem("GRANT_EXPIRED", "admission")));
+    assert(eidolon::IsFinishedProposalProblem(
+        404, problem("NOT_FOUND", "admission")));
+
+    // A route that does not exist is not a Proposal that does not exist. This
+    // is the distinction a real Add lost: a 404 from an origin that never owned
+    // the path read as authoritative state.
+    assert(!eidolon::IsFinishedProposalProblem(404, "Not Found"));
+    assert(!eidolon::IsFinishedProposalProblem(404, "{\"detail\":\"Not Found\"}"));
+    assert(!eidolon::IsFinishedProposalProblem(404, ""));
+
+    // Nor is a Decision still pending, a refusal, or another Authority's answer.
+    assert(!eidolon::IsFinishedProposalProblem(
+        409, problem("DECISION_REQUIRED", "admission")));
+    assert(!eidolon::IsFinishedProposalProblem(
+        403, problem("FORBIDDEN", "admission")));
+    assert(!eidolon::IsFinishedProposalProblem(
+        410, problem("PROPOSAL_EXPIRED", "device-control")));
+}
+
 }  // namespace
 
 int main()
@@ -154,5 +187,6 @@ int main()
     TestDescriptorParsesToCanonicalSignedDocument();
     TestCanonicalManifest();
     TestActiveClaimConfigurationAndProviderBinding();
+    TestFinishedProposalIsRecognizedOnlyFromTheAuthoritysOwnWords();
     return 0;
 }

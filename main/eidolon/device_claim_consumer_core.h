@@ -112,6 +112,7 @@ enum class DeviceClaimConsumerResult {
     ClaimRevoked,
     Replayed,
     PendingReview,
+    ProposalAbandoned,
     TerminalRevoked,
     NoPendingEnrollment,
     WireAuthUnavailable,
@@ -150,6 +151,18 @@ public:
     DeviceClaimConsumerOutcome ApplyClaimRevoked(
         const device_foundation::v1::DeviceRef& revoked_ref);
     DeviceClaimConsumerOutcome ResumePending();
+
+    // The Authority says this Proposal can never produce a Claim: it expired,
+    // its Grant expired, or the Authority no longer holds it. Keeping the
+    // checkpoint then means asking forever about a Proposal that will never
+    // exist again, and never proposing a new one — which is what a device
+    // whose Proposal timed out before anyone approved it actually did.
+    //
+    // Abandoning grants nothing: the next Proposal starts at PendingReview with
+    // fresh handoff material, and the Owner still has to approve it. It is
+    // refused while a Claim is active, because an answer about a Proposal is
+    // never authority over a Claim.
+    DeviceClaimConsumerOutcome AbandonPendingProposal();
 
     static std::string ClaimGrantAad(
         const device_foundation::v1::ClaimGrantAAD& aad);

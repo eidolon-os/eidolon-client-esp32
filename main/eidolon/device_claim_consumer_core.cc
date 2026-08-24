@@ -650,6 +650,40 @@ DeviceClaimConsumerOutcome DeviceClaimConsumerCore::ApplyClaimRevoked(
     return Result(DeviceClaimConsumerResult::NoPendingEnrollment);
 }
 
+DeviceClaimConsumerOutcome DeviceClaimConsumerCore::AbandonPendingProposal() {
+    ActiveClaimState active;
+    const auto active_load = active_claim_.LoadActiveClaim(active);
+    if (active_load == ClaimStoreLoadResult::StorageFailure) {
+        return Result(DeviceClaimConsumerResult::StorageFailure);
+    }
+    if (active_load == ClaimStoreLoadResult::Loaded) {
+        return Result(DeviceClaimConsumerResult::InvalidContract);
+    }
+    EnrollmentJournalEntry entry;
+    const auto enrollment_load = enrollment_.LoadEnrollment(entry);
+    if (enrollment_load == ClaimStoreLoadResult::StorageFailure) {
+        return Result(DeviceClaimConsumerResult::StorageFailure);
+    }
+    if (enrollment_load == ClaimStoreLoadResult::NotFound) {
+        return Result(DeviceClaimConsumerResult::NoPendingEnrollment);
+    }
+    // Only destroy material that still belongs to this Proposal. If the handoff
+    // key has already rotated, the material this entry named is gone and the
+    // entry is the only thing left to clear.
+    const bool material_is_this_proposal =
+        !entry.handoff_key_id.empty() &&
+        entry.handoff_key_id == crypto_.HandoffKeyId();
+    if (material_is_this_proposal &&
+        !crypto_.DestroyEnrollmentMaterial(entry.enrollment_id,
+                                           entry.handoff_key_id)) {
+        return Result(DeviceClaimConsumerResult::StorageFailure);
+    }
+    if (!enrollment_.ClearEnrollment()) {
+        return Result(DeviceClaimConsumerResult::StorageFailure);
+    }
+    return Result(DeviceClaimConsumerResult::ProposalAbandoned);
+}
+
 DeviceClaimConsumerOutcome DeviceClaimConsumerCore::ResumePending() {
     ActiveClaimState active;
     const auto active_load = active_claim_.LoadActiveClaim(active);

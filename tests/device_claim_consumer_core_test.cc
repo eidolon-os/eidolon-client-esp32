@@ -571,6 +571,87 @@ void PreActiveRevokeCannotFabricateAClaim() {
     assert(!stores.has_active && stores.has_enrollment);
 }
 
+void AFinishedProposalIsAbandonedSoAnotherCanBeMade() {
+    // A Proposal expired before anyone approved it. The Authority answers that
+    // it is gone, forever, so keeping the checkpoint means asking about it
+    // forever and never proposing again — which is what a real BOX-3 did for a
+    // day, retrying one dead Enrollment every 120 seconds.
+    Stores stores;
+    Crypto crypto;
+    DeviceClaimConsumerCore core(stores, stores, crypto);
+    Record(stores, crypto, core);
+    assert(stores.has_enrollment);
+
+    const auto abandoned = core.AbandonPendingProposal();
+    assert(abandoned.result == DeviceClaimConsumerResult::ProposalAbandoned);
+    assert(!stores.has_enrollment);
+    // The handoff material went with it: the next Proposal is a new Proposal,
+    // not a replay of the dead one under a reused idempotency key.
+    assert(crypto.destroy_calls == 1);
+    assert(core.ResumePending().result ==
+           DeviceClaimConsumerResult::NoPendingEnrollment);
+
+    // Idempotent, so a reboot between clearing and the next attempt is not a
+    // second failure mode.
+    assert(core.AbandonPendingProposal().result ==
+           DeviceClaimConsumerResult::NoPendingEnrollment);
+}
+
+void AbandoningIsRefusedWhileAClaimIsActive() {
+    // An answer about a Proposal is never authority over a Claim. Removal and
+    // revocation are their own paths, with their own proofs.
+    Stores stores;
+    Crypto crypto;
+    DeviceClaimConsumerCore core(stores, stores, crypto);
+    Record(stores, crypto, core);
+    assert(core.AcceptCollectedGrant(CollectResult()).result ==
+           DeviceClaimConsumerResult::GrantStaged);
+    assert(core.BuildGrantAck().result == DeviceClaimConsumerResult::AckReady);
+    assert(core.AcceptGrantAck(AckResult()).result ==
+           DeviceClaimConsumerResult::ClaimActivated);
+    assert(stores.has_active);
+
+    const int destroyed = crypto.destroy_calls;
+    assert(core.AbandonPendingProposal().result ==
+           DeviceClaimConsumerResult::InvalidContract);
+    assert(stores.has_active);
+    assert(crypto.destroy_calls == destroyed);
+}
+
+void AbandoningSurvivesMaterialThatAlreadyRotated() {
+    // The material named by the checkpoint is already gone — destroyed, or
+    // rotated by a new instance. Refusing to clear the entry would leave the
+    // device asking about a Proposal it can no longer prove anything for.
+    Stores stores;
+    Crypto crypto;
+    DeviceClaimConsumerCore core(stores, stores, crypto);
+    Record(stores, crypto, core);
+    stores.enrollment.handoff_key_id =
+        "sha256:9999999999999999999999999999999999999999999999999999999999999999";
+
+    assert(core.AbandonPendingProposal().result ==
+           DeviceClaimConsumerResult::ProposalAbandoned);
+    assert(!stores.has_enrollment);
+    assert(crypto.destroy_calls == 0);
+}
+
+void StorageThatCannotForgetIsNotReportedAsProgress() {
+    Stores stores;
+    Crypto crypto;
+    DeviceClaimConsumerCore core(stores, stores, crypto);
+    Record(stores, crypto, core);
+    stores.fail_clear = true;
+    assert(core.AbandonPendingProposal().result ==
+           DeviceClaimConsumerResult::StorageFailure);
+    assert(stores.has_enrollment);
+
+    stores.fail_clear = false;
+    crypto.fail_destroy = true;
+    assert(core.AbandonPendingProposal().result ==
+           DeviceClaimConsumerResult::StorageFailure);
+    assert(stores.has_enrollment);
+}
+
 }  // namespace
 
 int main() {
@@ -586,5 +667,9 @@ int main() {
     OwnerDomainBusinessOwnerManifestAndGenerationCannotBeInterchanged();
     DuplicateGrantAndRevokedTerminalFenceOldGeneration();
     PreActiveRevokeCannotFabricateAClaim();
+    AFinishedProposalIsAbandonedSoAnotherCanBeMade();
+    AbandoningIsRefusedWhileAClaimIsActive();
+    AbandoningSurvivesMaterialThatAlreadyRotated();
+    StorageThatCannotForgetIsNotReportedAsProgress();
     return 0;
 }

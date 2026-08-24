@@ -420,4 +420,20 @@ bool ParseLiveKitBinding(const std::string& body, Esp32HubConfig& out)
     return valid;
 }
 
+bool IsFinishedProposalProblem(int status, const std::string& body)
+{
+    if (status != 404 && status != 410) return false;
+    cJSON* root = cJSON_ParseWithLength(body.data(), body.size());
+    if (root == nullptr || !cJSON_IsObject(root)) {
+        cJSON_Delete(root);
+        return false;
+    }
+    const std::string code = JsonString(root, "code");
+    const std::string authority = JsonString(root, "authority");
+    cJSON_Delete(root);
+    if (authority != "admission") return false;
+    return code == "PROPOSAL_EXPIRED" || code == "GRANT_EXPIRED" ||
+           code == "NOT_FOUND";
+}
+
 }  // namespace eidolon

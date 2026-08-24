@@ -146,7 +146,10 @@ esp_err_t StatusError(int status)
         return ESP_ERR_INVALID_STATE;
     }
     if (status == 410) {
-        return ESP_ERR_TIMEOUT;
+        // Gone, not slow. Reporting a resource the Authority has finished with
+        // as a timeout is how a Proposal that expired read as a network fault
+        // in device logs for a whole debugging session.
+        return ESP_ERR_NOT_FOUND;
     }
     return ESP_FAIL;
 }
@@ -502,10 +505,36 @@ esp_err_t HubOnboardingClient::RunAccepted(
     return PullActiveConfiguration(active_claim, out);
 }
 
+esp_err_t HubOnboardingClient::AbandonAndRepropose(
+    DeviceClaimConsumerCore& core,
+    const device_foundation::v1::OwnerDomainDescriptor& descriptor,
+    const std::string& device_id, ActiveClaimState& activated_claim,
+    bool& activated, bool allow_reproposal, const char* reason)
+{
+    if (!allow_reproposal) {
+        ESP_LOGW(TAG, "Proposal is finished (%s) and one was already abandoned",
+                 reason);
+        return ESP_ERR_INVALID_STATE;
+    }
+    const auto outcome = core.AbandonPendingProposal();
+    if (outcome.result != DeviceClaimConsumerResult::ProposalAbandoned &&
+        outcome.result != DeviceClaimConsumerResult::NoPendingEnrollment) {
+        ESP_LOGE(TAG, "Could not abandon the finished Proposal (%s), result=%d",
+                 reason, static_cast<int>(outcome.result));
+        return outcome.result == DeviceClaimConsumerResult::StorageFailure
+                   ? ESP_FAIL
+                   : ESP_ERR_INVALID_STATE;
+    }
+    ESP_LOGW(TAG, "Proposal is finished (%s); proposing again for review",
+             reason);
+    return ContinueCanonicalClaim(descriptor, device_id, activated_claim,
+                                  activated, false);
+}
+
 esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
     const device_foundation::v1::OwnerDomainDescriptor& descriptor,
     const std::string& device_id, ActiveClaimState& activated_claim,
-    bool& activated)
+    bool& activated, bool allow_reproposal)
 {
     activated = false;
     HubConfigStore store;
@@ -630,14 +659,25 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
             // this Proposal and must never be hidden as "still pending".
             return ESP_OK;
         }
+        if (IsFinishedProposalProblem(response.status, response.body)) {
+            return AbandonAndRepropose(core, descriptor, device_id,
+                                       activated_claim, activated,
+                                       allow_reproposal, "collect");
+        }
         if (response.status != 200) return StatusError(response.status);
         device_foundation::v1::CollectClaimGrantResult collected;
-        if (!ParseCollectResult(response.body, collected) ||
-            IsRfc3339DeadlineExpired(
+        if (!ParseCollectResult(response.body, collected)) {
+            return ESP_ERR_INVALID_RESPONSE;
+        }
+        if (IsRfc3339DeadlineExpired(
                 collected.expires_at,
                 static_cast<int64_t>(time(nullptr)) * 1000,
                 1704067200000LL)) {
-            return ESP_ERR_TIMEOUT;
+            // The Grant this Proposal produced is already past its deadline, so
+            // no ack can land. Only a new Decision produces a usable Grant.
+            return AbandonAndRepropose(core, descriptor, device_id,
+                                       activated_claim, activated,
+                                       allow_reproposal, "grant deadline");
         }
         outcome = core.AcceptCollectedGrant(collected);
         if (outcome.result != DeviceClaimConsumerResult::GrantStaged &&
@@ -666,6 +706,11 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
                                 outcome.wire_payload),
             response);
         if (err != ESP_OK) return err;
+        if (IsFinishedProposalProblem(response.status, response.body)) {
+            return AbandonAndRepropose(core, descriptor, device_id,
+                                       activated_claim, activated,
+                                       allow_reproposal, "ack");
+        }
         if (response.status != 200) return StatusError(response.status);
         outcome = core.AcceptGrantAck(response.body);
         if (outcome.result != DeviceClaimConsumerResult::ClaimActivated &&
