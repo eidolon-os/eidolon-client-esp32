@@ -1,5 +1,7 @@
 #include "eidolon_voice_controller.h"
 
+#include "controller_worker_resources.h"
+
 #include "board.h"
 #include "control_protocol.h"
 #include "device_event_builder.h"
@@ -92,9 +94,6 @@ constexpr uint64_t kPttReleaseTailUs =
 constexpr uint64_t kFullDuplexIdleFallbackUs =
     static_cast<uint64_t>(CONFIG_EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS) * 1000ULL;
 // Single controller task: drains the event queue, serializing all state mutation.
-// Stack sized for the heaviest handler (rediscover = mDNS + HTTPS config fetch +
-// mbedtls signing + connect), which the old reconnect task ran on 8192.
-constexpr int kControllerTaskStack = 8192;
 constexpr UBaseType_t kControllerTaskPriority = 5;
 constexpr UBaseType_t kEventQueueLen = 24;
 // Let the control-room ack flush before switching to the voice room.
@@ -402,7 +401,8 @@ EidolonVoiceController::EidolonVoiceController(GuardService* guard_service)
         return;
     }
     if (xTaskCreate(&EidolonVoiceController::TaskTrampoline, "eidolon_ctrl",
-                    kControllerTaskStack, this, kControllerTaskPriority, &task_) != pdPASS) {
+                    kControllerWorkerStackBytes, this, kControllerTaskPriority,
+                    &task_) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create controller task");
         vQueueDelete(event_queue_);
         event_queue_ = nullptr;

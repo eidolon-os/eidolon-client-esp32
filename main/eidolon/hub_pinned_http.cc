@@ -54,6 +54,12 @@ esp_err_t HubHttpRequest(const std::string& method,
     config.cert_pem = certificate_pem.c_str();
     config.cert_len = certificate_pem.size() + 1;
     config.disable_auto_redirect = true;
+    // The current Host LAN ingress is an IPv4 transport adapter and App-ready
+    // proves its IPv4 address/listener. AF_UNSPEC can retain or select an mDNS
+    // IPv6 answer that the ingress does not serve, preventing retry recovery
+    // until the device is rebooted. Keep the logical URI/Host/SNI unchanged and
+    // bind only this transport adapter to the address family it actually serves.
+    config.addr_type = HTTP_ADDR_TYPE_INET;
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
     if (client == nullptr) {
