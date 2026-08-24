@@ -133,6 +133,13 @@ DeviceIdentity& DeviceIdentity::GetInstance() {
     return instance;
 }
 
+void DeviceIdentity::ForgetCachedKeyAfterPhysicalRecovery() {
+    private_key_pem_.clear();
+    public_key_b64_.clear();
+    fingerprint_.clear();
+    device_instance_id_.clear();
+}
+
 esp_err_t DeviceIdentity::EnsureKeypair() {
     if (!private_key_pem_.empty() && !public_key_b64_.empty()) {
         return ESP_OK;
@@ -219,9 +226,13 @@ esp_err_t DeviceIdentity::LoadPublicKeyFromPrivateKey() {
 
     unsigned char hash[32];
     mbedtls_sha256(public_der, ret, hash, 0);
-    fingerprint_ = "p256:" + Hex(hash, sizeof(hash));
+    const std::string digest = Hex(hash, sizeof(hash));
+    fingerprint_ = "p256:" + digest;
+    device_instance_id_ = DeviceInstanceIdFromSpkiSha256Hex(digest);
     mbedtls_pk_free(&pk);
-    return public_key_b64_.empty() ? ESP_FAIL : ESP_OK;
+    return public_key_b64_.empty() || device_instance_id_.empty()
+               ? ESP_FAIL
+               : ESP_OK;
 }
 
 esp_err_t DeviceIdentity::SignCanonical(const std::string& canonical, std::string& signature) {

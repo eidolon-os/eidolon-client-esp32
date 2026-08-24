@@ -1,6 +1,7 @@
 #include "device_boot_recovery.h"
 
 #include "device_erase_identity_adapter.h"
+#include "device_physical_recovery.h"
 #include "esp_idf_device_local_erase_adapter.h"
 #include "esp_idf_owner_data_erase_storage.h"
 
@@ -32,6 +33,11 @@ DeviceEraseCoreOutcome DeviceBootRecovery::ResumePendingRemoval() {
     }
     if (loaded == DeviceEraseJournalLoadResult::StorageFailure) {
         return {DeviceEraseCoreResult::StorageFailure, false, {}};
+    }
+    if ((entry.phase == DeviceEraseJournalPhase::DurableTerminal ||
+         entry.phase == DeviceEraseJournalPhase::ArchivedTerminal) &&
+        DevicePhysicalRecovery::ResumeAuthorizedTerminal(entry)) {
+        return {DeviceEraseCoreResult::NoPendingOperation, false, {}};
     }
 
     EspIdfOwnerDataEraseStorage storage;

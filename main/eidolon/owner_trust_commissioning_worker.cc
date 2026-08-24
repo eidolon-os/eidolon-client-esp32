@@ -2,6 +2,7 @@
 
 #include "authority_locator.h"
 #include "device_provisioning_protocol.h"
+#include "device_identity.h"
 #include "hub_trust_store.h"
 #include "owner_trust_commissioner.h"
 #include "system_info.h"
@@ -130,8 +131,16 @@ void ProcessRequests(void*)
                 request->payload, request->transport_generation, is_current);
         if (outcome.code == OwnerTrustCommissioningCode::Staged) {
             request->trust_staged = true;
-            request->response = BuildTrustStagedJson(
-                SystemInfo::GetMacAddress(), outcome.owner_domain_id);
+            auto& identity = DeviceIdentity::GetInstance();
+            if (identity.EnsureKeypair() != ESP_OK ||
+                identity.DeviceInstanceId().empty()) {
+                request->trust_staged = false;
+                request->response = BuildTrustRefusedJson(
+                    "operational identity is unavailable");
+            } else {
+                request->response = BuildTrustStagedJson(
+                    identity.DeviceInstanceId(), outcome.owner_domain_id);
+            }
             ESP_LOGI(TAG, "Staged Owner Domain %s",
                      outcome.owner_domain_id.c_str());
         } else {

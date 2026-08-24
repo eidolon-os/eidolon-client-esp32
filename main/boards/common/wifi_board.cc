@@ -8,6 +8,7 @@
 #if CONFIG_EIDOLON_HUB_MODE
 #include "eidolon/commissioning_runtime.h"
 #include "eidolon/commissioning_transaction.h"
+#include "eidolon/device_physical_recovery.h"
 #endif
 
 #include <freertos/FreeRTOS.h>
@@ -234,6 +235,16 @@ void WifiBoard::EnterWifiConfigMode() {
 
     auto& app = Application::GetInstance();
     auto state = app.GetDeviceState();
+
+#if CONFIG_EIDOLON_HUB_MODE
+    // This entry point is the physical-presence boundary. Automated no-profile
+    // setup and connect timeouts call StartWifiConfigMode directly and cannot
+    // consume a signed removal terminal.
+    if (!eidolon::DevicePhysicalRecovery::AuthorizeFromPhysicalPresence()) {
+        ESP_LOGE(TAG, "Physical recovery transaction did not converge");
+        return;
+    }
+#endif
 
     if (state == kDeviceStateSpeaking || state == kDeviceStateListening || state == kDeviceStateIdle) {
 #if !CONFIG_EIDOLON_HUB_MODE

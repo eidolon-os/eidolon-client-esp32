@@ -371,7 +371,7 @@ void EveryCoreJournalCheckpointFailsClosedAndResumes() {
     }
 }
 
-void NewClaimCanUseFreshOperationAfterPriorDurableTerminal() {
+void NewClaimCannotOverwritePriorDurableTerminal() {
     Journal journal;
     Adapter adapter;
     Clock clock;
@@ -386,9 +386,18 @@ void NewClaimCanUseFreshOperationAfterPriorDurableTerminal() {
     DeviceLocalEraseCore new_core(Ref(8), journal, adapter, clock, signer);
     const auto next = new_core.Handle(
         new_command, "sha256:" + std::string(64, '0'));
-    assert(next.result == DeviceEraseCoreResult::Acknowledged);
-    assert(next.has_ack);
-    assert(next.ack.operation_id == "erase_operation_02");
+    assert(next.result == DeviceEraseCoreResult::OperationConflict);
+    assert(!next.has_ack);
+    assert(journal.value.operation_id == old_command.operation_id);
+
+    journal.value.phase = DeviceEraseJournalPhase::ArchivedTerminal;
+    const auto old_replay = old_core.Handle(
+        old_command, "sha256:" + std::string(64, 'f'));
+    assert(old_replay.result == DeviceEraseCoreResult::OperationConflict);
+    const auto after_physical_recovery = new_core.Handle(
+        new_command, "sha256:" + std::string(64, '0'));
+    assert(after_physical_recovery.result == DeviceEraseCoreResult::Acknowledged);
+    assert(after_physical_recovery.ack.operation_id == "erase_operation_02");
 }
 
 void HostRelocationDoesNotEnterCoreIdentityOrOperationId() {
@@ -421,7 +430,7 @@ int main() {
     StagedAckIsDurableBeforeOperationalCredentialFinalization();
     NewClaimCannotResumeOldDestructiveOperation();
     EveryCoreJournalCheckpointFailsClosedAndResumes();
-    NewClaimCanUseFreshOperationAfterPriorDurableTerminal();
+    NewClaimCannotOverwritePriorDurableTerminal();
     HostRelocationDoesNotEnterCoreIdentityOrOperationId();
     return 0;
 }

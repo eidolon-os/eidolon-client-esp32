@@ -3,11 +3,11 @@
 #include "application.h"
 #include "commissioning_runtime.h"
 #include "device_boot_recovery.h"
+#include "device_identity.h"
 #include "eidolon_ui_types.h"
 #include "hub_config_store.h"
 #include "hub_discovery.h"
 #include "hub_onboarding_client.h"
-#include "system_info.h"
 
 #include "sdkconfig.h"
 
@@ -59,7 +59,12 @@ bool HubActivator::Run() {
     HubDiscovery discovery;
     HubOnboardingClient client;
     HubConfigStore store;
-    const std::string device_id = SystemInfo::GetMacAddress();
+    auto& identity = DeviceIdentity::GetInstance();
+    if (identity.EnsureKeypair() != ESP_OK) {
+        ESP_LOGE(TAG, "Operational identity is unavailable; refusing activation");
+        return false;
+    }
+    const std::string device_id = identity.DeviceInstanceId();
 
     for (;;) {
         // Admission consumes a confirmed Station route; it never competes with

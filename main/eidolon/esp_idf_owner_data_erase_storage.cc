@@ -186,7 +186,7 @@ bool ValidProgressPhase(uint8_t phase) {
 
 bool ValidCorePhase(uint8_t phase) {
     return phase >= static_cast<uint8_t>(DeviceEraseJournalPhase::Accepted) &&
-           phase <= static_cast<uint8_t>(DeviceEraseJournalPhase::DurableTerminal);
+           phase <= static_cast<uint8_t>(DeviceEraseJournalPhase::ArchivedTerminal);
 }
 
 bool EncodeProgress(const OwnerDataEraseProgress& value, uint64_t sequence,
@@ -239,11 +239,13 @@ bool ValidCoreJournal(const DeviceEraseJournalEntry& value) {
         value.device_ref.device_instance_id.empty() ||
         DeviceRefOwnerDomainId(value.device_ref).empty() ||
         !ValidCorePhase(static_cast<uint8_t>(value.phase)) ||
-        (value.phase == DeviceEraseJournalPhase::DurableTerminal &&
+        ((value.phase == DeviceEraseJournalPhase::DurableTerminal ||
+          value.phase == DeviceEraseJournalPhase::ArchivedTerminal) &&
          !value.has_staged_ack) ||
         (value.has_staged_ack &&
          value.phase != DeviceEraseJournalPhase::Erasing &&
-         value.phase != DeviceEraseJournalPhase::DurableTerminal)) {
+         value.phase != DeviceEraseJournalPhase::DurableTerminal &&
+         value.phase != DeviceEraseJournalPhase::ArchivedTerminal)) {
         return false;
     }
     if (!value.has_staged_ack) return true;

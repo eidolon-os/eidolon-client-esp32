@@ -116,11 +116,13 @@ DeviceEraseCoreOutcome DeviceLocalEraseCore::Handle(
             stored.phase == DeviceEraseJournalPhase::Accepted ||
             stored.phase == DeviceEraseJournalPhase::Staging ||
             stored.phase == DeviceEraseJournalPhase::Erasing ||
-            stored.phase == DeviceEraseJournalPhase::DurableTerminal;
+            stored.phase == DeviceEraseJournalPhase::DurableTerminal ||
+            stored.phase == DeviceEraseJournalPhase::ArchivedTerminal;
         const bool ack_phase_valid =
             !stored.has_staged_ack ||
             stored.phase == DeviceEraseJournalPhase::Erasing ||
-            stored.phase == DeviceEraseJournalPhase::DurableTerminal;
+            stored.phase == DeviceEraseJournalPhase::DurableTerminal ||
+            stored.phase == DeviceEraseJournalPhase::ArchivedTerminal;
         const bool ack_valid =
             !stored.has_staged_ack ||
             (stored.staged_ack.operation_id == stored.operation_id &&
@@ -129,7 +131,8 @@ DeviceEraseCoreOutcome DeviceLocalEraseCore::Handle(
              !stored.staged_ack.result_code.empty() &&
              !stored.staged_ack.device_signature.empty());
         if (!valid_phase || !ack_phase_valid || !ack_valid ||
-            (stored.phase == DeviceEraseJournalPhase::DurableTerminal &&
+            ((stored.phase == DeviceEraseJournalPhase::DurableTerminal ||
+              stored.phase == DeviceEraseJournalPhase::ArchivedTerminal) &&
              !stored.has_staged_ack)) {
             return {DeviceEraseCoreResult::StorageFailure, false, {}};
         }
@@ -144,17 +147,18 @@ DeviceEraseCoreOutcome DeviceLocalEraseCore::Handle(
         if (stored.phase == DeviceEraseJournalPhase::DurableTerminal) {
             return {DeviceEraseCoreResult::Replayed, true, stored.staged_ack};
         }
+        if (stored.phase == DeviceEraseJournalPhase::ArchivedTerminal) {
+            return {DeviceEraseCoreResult::OperationConflict, false, {}};
+        }
     } else if (journal_present &&
-               stored.phase == DeviceEraseJournalPhase::DurableTerminal &&
+               stored.phase == DeviceEraseJournalPhase::ArchivedTerminal &&
                !SameRef(stored.device_ref, command.device_ref)) {
-        // A later Claim/instance may own a fresh removal operation after the
-        // previous local result is durable. current_ref_ validation below keeps
-        // a delayed old or forged DeviceRef from using this rotation point.
         journal_present = false;
         stored = {};
     } else if (journal_present) {
-        // A single durable RemovalJournal owns the destructive local workflow.
-        // Never overwrite another operation, including its replay evidence.
+        // A terminal can be consumed only by the physical recovery transaction.
+        // Delivery, a forged new DeviceRef, or an ordinary reboot may never
+        // overwrite the only signed erase evidence.
         return {DeviceEraseCoreResult::OperationConflict, false, {}};
     }
     if (!SameRef(current_ref_, command.device_ref)) {

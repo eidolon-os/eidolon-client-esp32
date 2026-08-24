@@ -14,6 +14,10 @@ enum class DeviceEraseJournalPhase : uint8_t {
     Staging = 2,
     Erasing = 3,
     DurableTerminal = 4,
+    // Physical recovery copied the signed terminal into its own journal and
+    // consumed this slot. Old commands remain fenced; a fresh operational
+    // instance may now own a new removal workflow.
+    ArchivedTerminal = 5,
 };
 
 struct DeviceEraseJournalEntry {

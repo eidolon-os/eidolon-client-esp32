@@ -527,6 +527,7 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
         // HardwareIdentityPort. A self assertion is never a production fallback.
         return ESP_ERR_NOT_SUPPORTED;
 #else
+        const std::string hardware_lookup_id = SystemInfo::GetMacAddress();
         const std::string handoff_public_key = crypto.HandoffPublicKey();
         const std::string operational_public_key = crypto.OperationalPublicKey();
         const std::string nonce = StableToken(
@@ -534,19 +535,20 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
                 descriptor.owner_domain_id,
             18);
         std::string commissioning_proof;
-        if (nonce.empty() || !crypto.BuildDevelopmentCommissioningProof(
-                device_id, descriptor.owner_domain_id, nonce,
+        if (nonce.empty() || hardware_lookup_id.empty() ||
+            !crypto.BuildDevelopmentCommissioningProof(
+                hardware_lookup_id, device_id, descriptor.owner_domain_id, nonce,
                 commissioning_proof)) {
             ESP_LOGE(TAG,
                      "Development Admission setup secret is not provisioned");
             return ESP_ERR_NOT_SUPPORTED;
         }
         const std::string evidence_document =
-            std::string("{\"device_instance_id\":") + Quote(device_id) +
-            ",\"operational_public_key\":" + Quote(operational_public_key) +
-            ",\"profile_id\":\"eidolon-trust-p256-hpke-v1\"}";
+            DevelopmentHardwareEvidenceDocument(
+                hardware_lookup_id, device_id, operational_public_key);
         std::string evidence_signature;
-        if (DeviceIdentity::GetInstance().SignCanonical(
+        if (evidence_document.empty() ||
+            DeviceIdentity::GetInstance().SignCanonical(
                 evidence_document, evidence_signature) != ESP_OK) {
             return ESP_FAIL;
         }

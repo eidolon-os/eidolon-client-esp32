@@ -3,6 +3,7 @@
 #include "board.h"
 #include "control_protocol.h"
 #include "device_event_builder.h"
+#include "device_identity.h"
 #include "eidolon_topics.h"
 #include "eidolon_local_feedback.h"
 #if CONFIG_EIDOLON_GUARD_SERVICE
@@ -52,6 +53,14 @@
 #define TAG "EidolonVoice"
 
 namespace {
+std::string OperationalDeviceInstanceId()
+{
+    auto& identity = eidolon::DeviceIdentity::GetInstance();
+    return identity.EnsureKeypair() == ESP_OK
+        ? identity.DeviceInstanceId()
+        : std::string{};
+}
+
 constexpr int64_t kPlaybackActiveWindowUs = 1200 * 1000;
 // Poll the audio state fast so a barge-in (near-end speech) edge reaches the
 // channel within ~one poll, but only emit an unchanged heartbeat every
@@ -938,7 +947,7 @@ esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist)
     }
     HubOnboardingClient client;
     Esp32HubConfig fresh;
-    esp_err_t err = client.Resume(SystemInfo::GetMacAddress(), fresh);
+    esp_err_t err = client.Resume(OperationalDeviceInstanceId(), fresh);
     if (err == ESP_ERR_NOT_ALLOWED) {
         // Hub rejected our signed identity (401/403). Stop bouncing on the same
         // rejected key; show "awaiting re-approval" (admin must re-approve / the
@@ -981,7 +990,7 @@ esp_err_t EidolonVoiceController::RediscoverHub()
     }
     HubOnboardingClient client;
     Esp32HubConfig fresh;
-    err = client.Run(txt, SystemInfo::GetMacAddress(), fresh);
+    err = client.Run(txt, OperationalDeviceInstanceId(), fresh);
     if (err != ESP_OK) {
         return err;
     }
@@ -1501,7 +1510,7 @@ esp_err_t EidolonVoiceController::AckCommand(const ControlCommand& command, cons
 {
     const esp_err_t err = session_.PublishData(
         kControlTopic,
-        BuildControlAck(command, SystemInfo::GetMacAddress(), status, code, detail, result));
+        BuildControlAck(command, OperationalDeviceInstanceId(), status, code, detail, result));
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Control ACK publish failed op=%s id=%s status=%s code=%s err=%s",
                  command.op.c_str(), command.id.c_str(), status, code, esp_err_to_name(err));
@@ -1808,7 +1817,7 @@ void EidolonVoiceController::PublishRadarPresenceState(
         .flow_id = radar_presence_flow_id_,
         .causation_id = "",
         .type = kAmbientPresenceStateType,
-        .source_device_id = SystemInfo::GetMacAddress(),
+        .source_device_id = OperationalDeviceInstanceId(),
         .source_component = "radar",
         .occurred_at_ms = static_cast<uint64_t>(epoch_now),
         .expires_at_ms =
@@ -1872,7 +1881,7 @@ void EidolonVoiceController::HandleOwnerPresenceConfirmedEvent(
             &presence_sequence) ||
         event.flow_id != radar_presence_flow_id_ ||
         event.causation_id.empty() ||
-        ambient_source_device_id != SystemInfo::GetMacAddress() ||
+        ambient_source_device_id != OperationalDeviceInstanceId() ||
         ambient_presence_epoch != radar_presence_epoch_) {
         return;
     }
@@ -2046,7 +2055,7 @@ void EidolonVoiceController::PublishFlowNode(
         .flow_id = flow_id,
         .causation_id = causation_id,
         .type = kCompanionFlowNodeType,
-        .source_device_id = SystemInfo::GetMacAddress(),
+        .source_device_id = OperationalDeviceInstanceId(),
         .source_component = "companion_lifecycle",
         .occurred_at_ms = static_cast<uint64_t>(epoch_now),
         .expires_at_ms = static_cast<uint64_t>(epoch_now) +
@@ -2265,7 +2274,7 @@ bool EidolonVoiceController::PublishOwnerConfirmation(
         .flow_id = assertion.flow_id,
         .causation_id = assertion.root_event_id,
         .type = kIdentityOwnerPresenceConfirmedType,
-        .source_device_id = SystemInfo::GetMacAddress(),
+        .source_device_id = OperationalDeviceInstanceId(),
         .source_component = "owner_face",
         .occurred_at_ms = static_cast<uint64_t>(epoch_now),
         .expires_at_ms =
@@ -2456,7 +2465,7 @@ void EidolonVoiceController::HandleGuardOwnerFaceProfileSyncCommand(
     cJSON_Delete(root);
 
     const bool queued = engine->QueueSync(
-        request, device_control_uri_, SystemInfo::GetMacAddress(),
+        request, device_control_uri_, OperationalDeviceInstanceId(),
         [this, command_id](const OwnerFaceApplyResult& result) {
             cJSON* completion = cJSON_CreateObject();
             if (completion == nullptr) {
@@ -3322,7 +3331,7 @@ esp_err_t EidolonVoiceController::SyncGuardRuntime(const char* reason,
     GuardRuntimeHubConfig runtime;
     HubConfigClient client;
     const esp_err_t err =
-        client.FetchGuardRuntime(device_control_uri_, SystemInfo::GetMacAddress(), runtime);
+        client.FetchGuardRuntime(device_control_uri_, OperationalDeviceInstanceId(), runtime);
     if (err == ESP_ERR_NOT_FOUND) {
         ClearGuardPresenceRuntime();
         guard_service_->Stop("guard_binding_missing");
@@ -3376,14 +3385,14 @@ void EidolonVoiceController::ConfigureGuardPresenceRuntime(const GuardRuntimeHub
     const uint32_t boot_nonce = esp_random();
     guard_presence_adapter_.Configure({
         .guard_companion_id = runtime.guard_companion_id,
-        .device_id = SystemInfo::GetMacAddress(),
+        .device_id = OperationalDeviceInstanceId(),
         .runtime_revision = runtime.runtime_revision,
         .candidate_debounce_ms = runtime.candidate_debounce_ms,
         .boot_nonce = boot_nonce,
     });
     owner_presence_adapter_.Configure({
         .guard_companion_id = runtime.guard_companion_id,
-        .device_id = SystemInfo::GetMacAddress(),
+        .device_id = OperationalDeviceInstanceId(),
         .boot_nonce = boot_nonce,
     });
     const uint32_t generation = guard_runtime_generation_;
@@ -3503,14 +3512,14 @@ void EidolonVoiceController::DoOwnerPresence(
     const uint64_t monotonic_ms =
         static_cast<uint64_t>(esp_timer_get_time() / 1000);
     const std::string flow_id =
-        std::string("owner-presence-") + SystemInfo::GetMacAddress() + "-" +
+        std::string("owner-presence-") + OperationalDeviceInstanceId() + "-" +
         std::to_string(observation.epoch);
     const std::string event_json = BuildDeviceEventJson({
         .event_id = MakeDeviceEventId("evt-owner-life", monotonic_ms, esp_random()),
         .flow_id = flow_id,
         .causation_id = "",
         .type = kIdentityOwnerPresenceChangedType,
-        .source_device_id = SystemInfo::GetMacAddress(),
+        .source_device_id = OperationalDeviceInstanceId(),
         .source_component = "owner_presence",
         .occurred_at_ms = static_cast<uint64_t>(epoch_now),
         .expires_at_ms = static_cast<uint64_t>(epoch_now) +

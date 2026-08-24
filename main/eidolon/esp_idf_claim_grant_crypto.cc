@@ -315,9 +315,11 @@ std::string EspIdfClaimGrantCrypto::OperationalKeyId() const {
 }
 
 bool EspIdfClaimGrantCrypto::BuildDevelopmentCommissioningProof(
+    const std::string& hardware_lookup_id,
     const std::string& device_instance_id, const std::string& owner_domain_id,
     const std::string& nonce, std::string& proof) const {
 #ifdef CONFIG_EIDOLON_PROVISIONING_MANUFACTURER_BOUND
+    (void)hardware_lookup_id;
     (void)device_instance_id;
     (void)owner_domain_id;
     (void)nonce;
@@ -326,11 +328,8 @@ bool EspIdfClaimGrantCrypto::BuildDevelopmentCommissioningProof(
 #else
     std::vector<unsigned char> secret;
     if (!DecodeHex(CONFIG_EIDOLON_ADMISSION_SETUP_SECRET_HEX, secret)) return false;
-    std::string message = device_instance_id;
-    message.push_back('\0');
-    message += owner_domain_id;
-    message.push_back('\0');
-    message += nonce;
+    const std::string message = DevelopmentCommissioningHmacInput(
+        hardware_lookup_id, device_instance_id, owner_domain_id, nonce);
     std::array<unsigned char, 32> digest{};
     if (!HmacSha256(secret, Bytes(message), digest)) return false;
     proof = Base64Url(digest.data(), digest.size());

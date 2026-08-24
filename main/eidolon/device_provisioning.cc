@@ -170,7 +170,11 @@ esp_err_t DeviceProvisioningService::HandleDescriptor(uint32_t, const uint8_t*, 
 {
     auto& self = GetInstance();
     ProvisioningDescriptor descriptor;
-    descriptor.device_id = SystemInfo::GetMacAddress();
+    auto& identity = DeviceIdentity::GetInstance();
+    if (identity.EnsureKeypair() != ESP_OK || identity.DeviceInstanceId().empty()) {
+        return ESP_FAIL;
+    }
+    descriptor.device_id = identity.DeviceInstanceId();
     descriptor.device_kind = BOARD_TYPE;
     descriptor.display_name = BOARD_NAME;
     descriptor.identity_fingerprint = DeviceIdentity::GetInstance().Fingerprint();

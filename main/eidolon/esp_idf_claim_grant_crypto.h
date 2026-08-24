@@ -16,6 +16,7 @@ public:
     std::string HandoffPublicKey() const;
     std::string OperationalPublicKey() const;
     bool BuildDevelopmentCommissioningProof(
+        const std::string& hardware_lookup_id,
         const std::string& device_instance_id,
         const std::string& owner_domain_id,
         const std::string& nonce,
