@@ -71,7 +71,10 @@ def test_private_overlay_is_path_only_and_keeps_sdkconfig_outside_repo(
     defaults_line = next(
         line for line in result.stdout.splitlines() if line.startswith("-DSDKCONFIG_DEFAULTS=")
     )
-    assert defaults_line.endswith(f";{overlay}")
+    sealed_overlay = private_root / "sdkconfig.private.esp-box-3"
+    assert defaults_line.endswith(f";{sealed_overlay}")
+    assert sealed_overlay.read_text(encoding="utf-8") == f'{SETTING}="{secret}"\n'
+    assert stat.S_IMODE(sealed_overlay.stat().st_mode) == 0o600
     assert before == {
         path: path.read_bytes()
         for path in public_build.glob("sdkconfig*")
@@ -116,6 +119,22 @@ def test_private_overlay_rejects_permissions_other_than_0600(tmp_path: Path) -> 
     assert "permissions must be 0600" in result.stderr
 
 
+@pytest.mark.parametrize("mode", [0o750, 0o770, 0o777])
+def test_private_overlay_rejects_shared_parent(tmp_path: Path, mode: int) -> None:
+    shared_parent = tmp_path / "shared"
+    shared_parent.mkdir(mode=mode)
+    shared_parent.chmod(mode)
+    overlay = _write_overlay(
+        shared_parent / "commissioning.sdkconfig",
+        f'{SETTING}="{"ab" * 32}"\n',
+    )
+
+    result = _run_validation(str(overlay))
+
+    assert result.returncode != 0
+    assert "parent permissions must be 0700" in result.stderr
+
+
 def test_private_overlay_rejects_oversized_input(tmp_path: Path) -> None:
     overlay = _write_overlay(tmp_path / "oversized.sdkconfig", "x" * 257)
 
@@ -152,13 +171,59 @@ def test_private_overlay_rejects_relative_path(tmp_path: Path) -> None:
 
 
 def test_private_overlay_rejects_repository_path() -> None:
-    overlay = REPO_ROOT / "build/private-sdkconfig-overlay-test"
-    overlay.parent.mkdir(parents=True, exist_ok=True)
+    secure_parent = REPO_ROOT / "build/private-sdkconfig-overlay-parent-test"
+    secure_parent.mkdir(parents=True, exist_ok=True)
+    secure_parent.chmod(0o700)
+    overlay = secure_parent / "private-sdkconfig-overlay-test"
     _write_overlay(overlay, f'{SETTING}="{"ab" * 32}"\n')
     try:
         result = _run_validation(str(overlay))
     finally:
         overlay.unlink(missing_ok=True)
+        secure_parent.rmdir()
 
     assert result.returncode != 0
     assert "must be outside the repository" in result.stderr
+
+
+def test_replacing_source_after_validation_cannot_change_sealed_input(
+    tmp_path: Path,
+) -> None:
+    original_secret = "ab" * 32
+    replacement_secret = "cd" * 32
+    overlay = _write_overlay(
+        tmp_path / "commissioning.sdkconfig",
+        f'{SETTING}="{original_secret}"\n',
+    )
+    replacement = _write_overlay(
+        tmp_path / "replacement.sdkconfig",
+        f'{SETTING}="{replacement_secret}"\n',
+    )
+    command = r'''
+source "$1"
+configure_private_sdkconfig_overlay
+mv "$2" "$3"
+idf_args
+'''
+    environment = os.environ.copy()
+    environment["EIDOLON_PRIVATE_SDKCONFIG_OVERLAY"] = str(overlay)
+
+    result = subprocess.run(
+        ["bash", "-c", command, "bash", str(WRAPPER), str(replacement), str(overlay)],
+        cwd=REPO_ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert original_secret not in result.stdout + result.stderr
+    assert replacement_secret not in result.stdout + result.stderr
+    defaults_line = next(
+        line for line in result.stdout.splitlines() if line.startswith("-DSDKCONFIG_DEFAULTS=")
+    )
+    sealed_overlay = Path(defaults_line.rsplit(";", 1)[1])
+    assert sealed_overlay.read_text(encoding="utf-8") == (
+        f'{SETTING}="{original_secret}"\n'
+    )
