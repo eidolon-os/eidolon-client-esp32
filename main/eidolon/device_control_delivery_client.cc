@@ -7,6 +7,7 @@
 #include "esp_idf_device_local_erase_adapter.h"
 #include "esp_idf_owner_data_erase_storage.h"
 #include "hub_pinned_http.h"
+#include "rfc3339_utc.h"
 
 #include <cJSON.h>
 #include <esp_random.h>
@@ -15,7 +16,7 @@
 #include <mbedtls/sha256.h>
 
 #include <cstdio>
-#include <ctime>
+#include <sys/time.h>
 
 namespace eidolon {
 namespace {
@@ -63,41 +64,15 @@ std::string RandomNonce() {
 class OperationalClock final : public DeviceEraseClockPort {
 public:
     bool DeadlineExpired(const std::string& deadline) const override {
-        int year = 0;
-        int month = 0;
-        int day = 0;
-        int hour = 0;
-        int minute = 0;
-        int second = 0;
-        if (std::sscanf(deadline.c_str(), "%4d-%2d-%2dT%2d:%2d:%2d",
-                        &year, &month, &day, &hour, &minute, &second) != 6) {
-            return true;
-        }
-        std::tm parsed{};
-        parsed.tm_year = year - 1900;
-        parsed.tm_mon = month - 1;
-        parsed.tm_mday = day;
-        parsed.tm_hour = hour;
-        parsed.tm_min = minute;
-        parsed.tm_sec = second;
-        std::time_t due = timegm(&parsed);
-        const size_t zone = deadline.find_first_of("Z+-", 19);
-        if (zone == std::string::npos) return true;
-        if (deadline[zone] != 'Z') {
-            int offset_hour = 0;
-            int offset_minute = 0;
-            if (std::sscanf(deadline.c_str() + zone + 1, "%2d:%2d",
-                            &offset_hour, &offset_minute) != 2 ||
-                offset_hour > 23 || offset_minute > 59) {
-                return true;
-            }
-            const int offset = (offset_hour * 60 + offset_minute) * 60;
-            due += deadline[zone] == '+' ? -offset : offset;
-        }
-        const std::time_t now = std::time(nullptr);
+        timeval current{};
+        if (gettimeofday(&current, nullptr) != 0) return true;
+        const int64_t now_millis =
+            static_cast<int64_t>(current.tv_sec) * 1000 +
+            current.tv_usec / 1000;
         // TLS validation already requires wall-clock synchronization. An
         // untrusted clock must not authorize a destructive command.
-        return due <= 0 || now < 1704067200 || now >= due;
+        return IsRfc3339DeadlineExpired(
+            deadline, now_millis, 1704067200000LL);
     }
     uint64_t MonotonicTime() const override {
         return static_cast<uint64_t>(esp_timer_get_time() / 1000);
