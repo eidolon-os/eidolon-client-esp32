@@ -40,8 +40,12 @@ public:
     EidolonVoiceController* controller() { return controller_.get(); }
 
 private:
+    VoiceRuntimeStatus BuildRuntimeStatus(VoiceSessionState state) const;
+    void NotifyRuntimeStatus(VoiceSessionState state);
+
     std::unique_ptr<EidolonVoiceController> controller_;
     EidolonDeviceStore device_store_;
+    std::function<void(const VoiceRuntimeStatus&)> on_runtime_status_;
     bool mic_enabled_ = true;
 };
 

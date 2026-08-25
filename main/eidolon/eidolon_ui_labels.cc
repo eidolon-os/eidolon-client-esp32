@@ -7,173 +7,134 @@ const char* EidolonBrandLabel()
     return "EIDOLON";
 }
 
-const char* LifecycleLabel(LifecyclePhase phase)
+const char* UiSceneLabel(UiScene scene)
 {
-    switch (phase) {
-    case LifecyclePhase::Booting:
+    switch (scene) {
+    case UiScene::Starting:
         return "BOOT";
-    case LifecyclePhase::LoadingAssets:
+    case UiScene::Loading:
         return "ASSETS";
-    case LifecyclePhase::WifiScanning:
-    case LifecyclePhase::WifiConnecting:
-        return "WIFI";
-    case LifecyclePhase::WifiSetup:
+    case UiScene::Network:
+        return "NETWORK";
+    case UiScene::Commissioning:
         return "SETUP";
-    case LifecyclePhase::HubDiscovering:
-        return "HUB";
-    case LifecyclePhase::HubRegistering:
-        return "REGISTER";
-    case LifecyclePhase::Updating:
+    case UiScene::Updating:
         return "UPDATE";
-    case LifecyclePhase::Offline:
-        return "OFFLINE";
-    case LifecyclePhase::Error:
-        return "ERROR";
-    case LifecyclePhase::Operational:
-    default:
+    case UiScene::WaitingApproval:
+        return "REVIEW";
+    case UiScene::PreparingService:
+        return "SERVICE";
+    case UiScene::Ready:
         return "READY";
-    }
-}
-
-const char* DefaultLifecycleDetail(LifecyclePhase phase)
-{
-    switch (phase) {
-    case LifecyclePhase::Booting:
-        return "Starting Eidolon...";
-    case LifecyclePhase::LoadingAssets:
-        return "Loading UI assets...";
-    case LifecyclePhase::WifiScanning:
-        return "Scanning Wi-Fi...";
-    case LifecyclePhase::WifiConnecting:
-        return "Connecting to Wi-Fi...";
-    case LifecyclePhase::WifiSetup:
-        return "Wi-Fi setup mode";
-    case LifecyclePhase::HubDiscovering:
-        return "Finding Eidolon Hub...";
-    case LifecyclePhase::HubRegistering:
-        return "Registering device...";
-    case LifecyclePhase::Updating:
-        return "Updating device...";
-    case LifecyclePhase::Offline:
-        return "Check Wi-Fi and Hub";
-    case LifecyclePhase::Error:
-        return "Device setup failed";
-    case LifecyclePhase::Operational:
-    default:
-        return "";
-    }
-}
-
-const char* CompactStateLabel(const EidolonUiSnapshot& snapshot)
-{
-    // Pairing/authorization always wins: READY while approval is still required
-    // is actively misleading, regardless of the underlying connection phase.
-    switch (snapshot.pairing) {
-    case PairingStatus::PendingApproval:
-        return "APPROVE";
-    case PairingStatus::WaitingBinding:
-        return "BIND";
-    case PairingStatus::Unauthorized:
-        return "DENIED";
-    case PairingStatus::Active:
-    default:
-        break;
-    }
-
-    if (snapshot.presence_wake == PresenceWakePhase::VerifyingOwner &&
-        snapshot.connection != ConnectionPhase::InRoom) {
-        return "VERIFY";
-    }
-    if (snapshot.presence_wake == PresenceWakePhase::OwnerRecognized &&
-        snapshot.connection != ConnectionPhase::Connecting &&
-        snapshot.connection != ConnectionPhase::Reconnecting &&
-        snapshot.connection != ConnectionPhase::InRoom) {
-        return "OWNER";
-    }
-
-    switch (snapshot.connection) {
-    case ConnectionPhase::Connecting:
-        return "JOINING";
-    case ConnectionPhase::Reconnecting:
+    case UiScene::OpeningConversation:
+        return "OPENING";
+    case UiScene::Conversation:
+        return "LISTEN";
+    case UiScene::Reconnecting:
         return "REJOIN";
-    case ConnectionPhase::Unreachable:
-        return "OFFLINE";
-    case ConnectionPhase::Error:
-        return "ERROR";
-    case ConnectionPhase::InRoom:
-        switch (snapshot.turn) {
-        case TurnPhase::Committing:
-        case TurnPhase::AgentThinking:
-            return "THINK";
-        case TurnPhase::AgentSpeaking:
-            return "SPEAK";
-        case TurnPhase::Recording:
-        case TurnPhase::UserSpeaking:
-        case TurnPhase::Idle:
-        default:
-            return "LISTEN";
-        }
-    case ConnectionPhase::Ready:
-        return "READY";
-    case ConnectionPhase::Offline:
+    case UiScene::Ended:
+        return "ENDED";
+    case UiScene::Removed:
+        return "REMOVED";
+    case UiScene::RecoveryRequired:
+        return "RESET";
+    case UiScene::Error:
     default:
-        return "OFFLINE";
+        return "ERROR";
     }
 }
 
-const char* CompactVoiceDetail(const EidolonUiSnapshot& snapshot)
+const char* UiSceneStatus(UiScene scene)
 {
-    switch (snapshot.pairing) {
-    case PairingStatus::PendingApproval:
-        return "Approve in Eidolon Admin";
-    case PairingStatus::WaitingBinding:
-        return "Bind an Agent in Admin";
-    case PairingStatus::Unauthorized:
-        return "Approve this device again";
-    case PairingStatus::Active:
+    switch (scene) {
+    case UiScene::Starting:
+        return "Starting Eidolon";
+    case UiScene::Loading:
+        return "Loading assets";
+    case UiScene::Network:
+        return "Connecting network";
+    case UiScene::Commissioning:
+        return "Device setup";
+    case UiScene::Updating:
+        return "Updating device";
+    case UiScene::WaitingApproval:
+        return "Waiting for approval";
+    case UiScene::PreparingService:
+        return "Preparing service";
+    case UiScene::Ready:
+        return "Ready";
+    case UiScene::OpeningConversation:
+        return "Opening conversation";
+    case UiScene::Conversation:
+        return "Listening";
+    case UiScene::Reconnecting:
+        return "Reconnecting";
+    case UiScene::Ended:
+        return "Conversation ended";
+    case UiScene::Removed:
+        return "Device removed";
+    case UiScene::RecoveryRequired:
+        return "Recovery required";
+    case UiScene::Error:
     default:
-        break;
+        return "Unavailable";
     }
+}
 
-    if (snapshot.presence_wake == PresenceWakePhase::VerifyingOwner &&
-        snapshot.connection != ConnectionPhase::InRoom) {
-        return "Checking owner...";
-    }
-    if (snapshot.presence_wake == PresenceWakePhase::OwnerRecognized &&
-        snapshot.connection != ConnectionPhase::InRoom) {
-        return "Owner recognized";
-    }
-
-    switch (snapshot.connection) {
-    case ConnectionPhase::Connecting:
-        return "Opening voice session...";
-    case ConnectionPhase::Reconnecting:
-        return "Restoring connection...";
-    case ConnectionPhase::Unreachable:
-        return "Check Wi-Fi and Hub";
-    case ConnectionPhase::Error:
-        return "Voice session failed";
-    case ConnectionPhase::InRoom:
-        switch (snapshot.turn) {
-        case TurnPhase::Committing:
-        case TurnPhase::AgentThinking:
-            return "Working on it...";
-        case TurnPhase::AgentSpeaking:
-            return "Eidolon is speaking";
-        case TurnPhase::Recording:
-        case TurnPhase::UserSpeaking:
-        case TurnPhase::Idle:
-        default:
-            return "Listening...";
-        }
-    case ConnectionPhase::Ready:
-        // READY describes the current actionable state, not how the previous
-        // session ended. Once the transport has settled back on the control
-        // room, the next action is identical to first boot.
-        return "Press BOOT to talk";
-    case ConnectionPhase::Offline:
+const char* UiSceneDetail(UiScene scene, EndReason end_reason)
+{
+    switch (scene) {
+    case UiScene::Starting:
+        return "Starting Eidolon...";
+    case UiScene::Loading:
+        return "Loading UI assets...";
+    case UiScene::Network:
+        return "Connecting to Owner network...";
+    case UiScene::Commissioning:
+        return "Complete setup on your controller";
+    case UiScene::Updating:
+        return "Updating device...";
+    case UiScene::WaitingApproval:
+        return "Approve this device in Eidolon";
+    case UiScene::PreparingService:
+        return "Device claimed; service is not ready";
+    case UiScene::Ready:
+        return "Start a conversation";
+    case UiScene::OpeningConversation:
+        return "Waiting for Channel confirmation...";
+    case UiScene::Conversation:
+        return "Listening...";
+    case UiScene::Reconnecting:
+        return "Restoring Channel connection...";
+    case UiScene::Ended:
+        return end_reason == EndReason::Error ? "Conversation ended with an error"
+                                              : "Ready for another conversation";
+    case UiScene::Removed:
+        return "Voice service disabled; reset is required";
+    case UiScene::RecoveryRequired:
+        return "Use the physical recovery procedure";
+    case UiScene::Error:
     default:
-        return "Waiting for setup";
+        return "Service unavailable";
+    }
+}
+
+const char* UiSceneEmotion(UiScene scene)
+{
+    switch (scene) {
+    case UiScene::WaitingApproval:
+    case UiScene::PreparingService:
+    case UiScene::OpeningConversation:
+    case UiScene::Reconnecting:
+        return "thinking";
+    case UiScene::Ended:
+        return "happy";
+    case UiScene::Removed:
+    case UiScene::RecoveryRequired:
+    case UiScene::Error:
+        return "sad";
+    default:
+        return "neutral";
     }
 }
 

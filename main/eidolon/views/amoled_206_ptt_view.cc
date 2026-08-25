@@ -1,7 +1,5 @@
 #include "eidolon/views/amoled_206_ptt_view.h"
 
-#include "application.h"
-#include "assets/lang_config.h"
 #include "display.h"
 
 #include <esp_log.h>
@@ -18,83 +16,35 @@ const char* ModeBadgeText(InteractionMode mode)
     return mode == InteractionMode::PushToTalk ? "PTT" : "LIVE";
 }
 
-bool IsInterrupting(const EidolonUiSnapshot& snapshot)
+const char* RingLabelText(const EidolonUiModel& model)
 {
-    return snapshot.input_policy.barge_in_enabled &&
-           snapshot.input_policy.interrupt == InterruptPhase::Interrupting;
+    if (model.primary_label != nullptr && model.primary_label[0] != '\0') {
+        return model.primary_label;
+    }
+    return model.state_label;
 }
 
-const char* RingLabelText(const EidolonUiSnapshot& snapshot)
-{
-    if (snapshot.pairing != PairingStatus::Active) {
-        return snapshot.pairing == PairingStatus::Unauthorized ? "AUTH" : "WAIT";
-    }
-    switch (snapshot.connection) {
-    case ConnectionPhase::Connecting:
-    case ConnectionPhase::Reconnecting:
-        return "...";
-    case ConnectionPhase::Unreachable:
-    case ConnectionPhase::Error:
-        return "!";
-    case ConnectionPhase::InRoom:
-        break;
-    case ConnectionPhase::Offline:
-    case ConnectionPhase::Ready:
-    default:
-        return "JOIN";
-    }
-
-    if (snapshot.show_mute_icon) {
-        return "MUTE";
-    }
-    if (IsInterrupting(snapshot)) {
-        return "MIC";
-    }
-    switch (snapshot.turn) {
-    case TurnPhase::Recording:
-    case TurnPhase::UserSpeaking:
-        return "REC";
-    case TurnPhase::Committing:
-        return "SEND";
-    case TurnPhase::AgentThinking:
-        return "AI";
-    case TurnPhase::AgentSpeaking:
-        return "AI";
-    case TurnPhase::Idle:
-    default:
-        return snapshot.mode == InteractionMode::PushToTalk ? "TALK" : "";
-    }
-}
-
-lv_color_t RingColor(const EidolonUiSnapshot& snapshot, lv_color_t accent_color, lv_color_t live_color,
+lv_color_t RingColor(const EidolonUiModel& model, lv_color_t accent_color, lv_color_t live_color,
                      lv_color_t idle_color, lv_color_t muted_color)
 {
-    if (snapshot.pairing != PairingStatus::Active) {
-        return snapshot.pairing == PairingStatus::Unauthorized ? lv_color_hex(0xFF5B63)
-                                                               : lv_color_hex(0xF5B84B);
+    if (model.severity == UiSeverity::Error) {
+        return lv_color_hex(0xFF5B63);
     }
-    if (snapshot.show_mute_icon) {
+    if (model.severity == UiSeverity::Attention) {
+        return lv_color_hex(0xF5B84B);
+    }
+    if (model.show_mute_icon) {
         return muted_color;
     }
-    if (IsInterrupting(snapshot)) {
-        return accent_color;
-    }
-    switch (snapshot.connection) {
-    case ConnectionPhase::Connecting:
-    case ConnectionPhase::Reconnecting:
+    if (model.scene == UiScene::OpeningConversation ||
+        model.scene == UiScene::Reconnecting) {
         return lv_color_hex(0x5EC8FF);
-    case ConnectionPhase::Unreachable:
-    case ConnectionPhase::Error:
-        return lv_color_hex(0xFF5B63);
-    case ConnectionPhase::InRoom:
-        break;
-    case ConnectionPhase::Offline:
-    case ConnectionPhase::Ready:
-    default:
+    }
+    if (model.scene != UiScene::Conversation) {
         return idle_color;
     }
 
-    switch (snapshot.turn) {
+    switch (model.turn) {
     case TurnPhase::Recording:
     case TurnPhase::UserSpeaking:
         return accent_color;
@@ -105,16 +55,13 @@ lv_color_t RingColor(const EidolonUiSnapshot& snapshot, lv_color_t accent_color,
         return live_color;
     case TurnPhase::Idle:
     default:
-        return snapshot.mode == InteractionMode::PushToTalk ? idle_color : live_color;
+        return model.interaction_mode == InteractionMode::PushToTalk ? idle_color : live_color;
     }
 }
 
-int RingBorderWidth(const EidolonUiSnapshot& snapshot)
+int RingBorderWidth(const EidolonUiModel& model)
 {
-    if (IsInterrupting(snapshot)) {
-        return 9;
-    }
-    switch (snapshot.turn) {
+    switch (model.turn) {
     case TurnPhase::Recording:
     case TurnPhase::UserSpeaking:
     case TurnPhase::AgentSpeaking:
@@ -128,122 +75,18 @@ int RingBorderWidth(const EidolonUiSnapshot& snapshot)
     }
 }
 
-bool CanRequestJoin(PairingStatus pairing, ConnectionPhase connection,
-                    VoiceSessionButtonState button_state)
-{
-    if (pairing != PairingStatus::Active || button_state != VoiceSessionButtonState::Start) {
-        return false;
-    }
-    return connection == ConnectionPhase::Offline || connection == ConnectionPhase::Ready ||
-           connection == ConnectionPhase::Unreachable || connection == ConnectionPhase::Error;
-}
-
-const char* InteractionModeName(InteractionMode mode)
-{
-    switch (mode) {
-    case InteractionMode::PushToTalk:
-        return "ptt";
-    case InteractionMode::Streaming:
-        return "streaming";
-    }
-    return "unknown";
-}
-
-const char* ConnectionPhaseName(ConnectionPhase connection)
-{
-    switch (connection) {
-    case ConnectionPhase::Offline:
-        return "Offline";
-    case ConnectionPhase::Ready:
-        return "Ready";
-    case ConnectionPhase::Connecting:
-        return "Connecting";
-    case ConnectionPhase::InRoom:
-        return "InRoom";
-    case ConnectionPhase::Reconnecting:
-        return "Reconnecting";
-    case ConnectionPhase::Unreachable:
-        return "Unreachable";
-    case ConnectionPhase::Error:
-        return "Error";
-    }
-    return "unknown";
-}
-
-const char* LvEventName(lv_event_code_t code)
-{
-    switch (code) {
-    case LV_EVENT_CLICKED:
-        return "clicked";
-    case LV_EVENT_PRESSED:
-        return "pressed";
-    case LV_EVENT_RELEASED:
-        return "released";
-    case LV_EVENT_PRESS_LOST:
-        return "press_lost";
-    default:
-        return "other";
-    }
-}
-
 void OnEndButtonEvent(lv_event_t* e)
 {
     if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
-        ESP_LOGI(kTag, "[ui] end button clicked -> RequestVoiceLeave");
-        Application::GetInstance().Schedule([]() {
-            Application::GetInstance().RequestVoiceLeave();
-        });
+        ESP_LOGI(kTag, "[ui] end button clicked");
+        DispatchEidolonUiIntent(UiIntent::CloseConversation);
     }
 }
 
-const char* FooterText(const EidolonUiSnapshot& snapshot)
+const char* FooterText(const EidolonUiModel& model)
 {
-    if (snapshot.subtitle != nullptr && snapshot.subtitle[0] != '\0') {
-        return snapshot.subtitle;
-    }
-    if (snapshot.pairing != PairingStatus::Active &&
-        snapshot.status_text != nullptr && snapshot.status_text[0] != '\0') {
-        return snapshot.status_text;
-    }
-    switch (snapshot.connection) {
-    case ConnectionPhase::Connecting:
-        return Lang::Strings::ROOM_CONNECTING;
-    case ConnectionPhase::Reconnecting:
-        return Lang::Strings::EIDOLON_RECONNECTING;
-    case ConnectionPhase::Unreachable:
-        return Lang::Strings::EIDOLON_SERVER_UNREACHABLE_HINT;
-    case ConnectionPhase::Error:
-        return Lang::Strings::ERROR;
-    case ConnectionPhase::Offline:
-    case ConnectionPhase::Ready:
-        return Lang::Strings::EIDOLON_CONNECT;
-    case ConnectionPhase::InRoom:
-        break;
-    }
-
-    if (snapshot.show_mute_icon) {
-        return Lang::Strings::MIC_MUTED;
-    }
-    if (IsInterrupting(snapshot)) {
-        return snapshot.mode == InteractionMode::PushToTalk ? Lang::Strings::ROOM_INTERRUPT
-                                                            : Lang::Strings::LISTENING;
-    }
-    switch (snapshot.turn) {
-    case TurnPhase::Recording:
-        return Lang::Strings::EIDOLON_PTT_RELEASE;
-    case TurnPhase::Committing:
-    case TurnPhase::AgentThinking:
-        return Lang::Strings::EIDOLON_THINKING;
-    case TurnPhase::AgentSpeaking:
-        return Lang::Strings::SPEAKING;
-    case TurnPhase::UserSpeaking:
-        return snapshot.mode == InteractionMode::PushToTalk ? Lang::Strings::EIDOLON_PTT_HOLD
-                                                            : Lang::Strings::LISTENING;
-    case TurnPhase::Idle:
-    default:
-        return snapshot.mode == InteractionMode::PushToTalk ? Lang::Strings::EIDOLON_PTT_HOLD
-                                                            : Lang::Strings::LISTENING;
-    }
+    return model.subtitle != nullptr && model.subtitle[0] != '\0' ? model.subtitle
+                                                                   : model.detail_text;
 }
 
 }  // namespace
@@ -332,29 +175,23 @@ void Amoled206PttView::Build(const BuildContext& ctx)
     lv_obj_add_flag(end_btn_, LV_OBJ_FLAG_HIDDEN);
 }
 
-void Amoled206PttView::Render(const EidolonUiSnapshot& snapshot)
+void Amoled206PttView::Render(const EidolonUiModel& model)
 {
     if (display_ != nullptr) {
-        RenderFooter(snapshot);
+        RenderFooter(model);
     }
 
     DisplayLockGuard lock(display_);
-    last_mode_ = snapshot.mode;
-    last_pairing_ = snapshot.pairing;
-    last_connection_ = snapshot.connection;
-    last_button_state_ = snapshot.button_state;
-    if (snapshot.connection != ConnectionPhase::Connecting &&
-        snapshot.connection != ConnectionPhase::Reconnecting) {
-        join_request_pending_ = false;
-    }
+    last_primary_intent_ = model.primary_intent;
+    last_primary_enabled_ = model.primary_enabled;
     if (legacy_status_label_ != nullptr) {
         lv_label_set_text(legacy_status_label_, "");
     }
     SetObjectVisible(legacy_status_label_, false);
     SetObjectVisible(legacy_emoji_box_, false);
-    RenderModeBadge(snapshot);
-    RenderVoiceRing(snapshot);
-    RenderControls(snapshot);
+    RenderModeBadge(model);
+    RenderVoiceRing(model);
+    RenderControls(model);
 }
 
 void Amoled206PttView::SetObjectVisible(lv_obj_t* obj, bool visible)
@@ -385,60 +222,60 @@ void Amoled206PttView::StyleEndButton(lv_obj_t* btn)
     lv_obj_set_style_shadow_color(btn, lv_color_hex(0xD94B54), 0);
 }
 
-void Amoled206PttView::RenderModeBadge(const EidolonUiSnapshot& snapshot)
+void Amoled206PttView::RenderModeBadge(const EidolonUiModel& model)
 {
     if (mode_badge_label_ == nullptr || mode_badge_ == nullptr) {
         return;
     }
-    lv_color_t color = snapshot.mode == InteractionMode::PushToTalk ? accent_color_ : live_color_;
+    lv_color_t color = model.interaction_mode == InteractionMode::PushToTalk
+                           ? accent_color_
+                           : live_color_;
     lv_obj_set_style_bg_color(mode_badge_, color, 0);
-    lv_label_set_text(mode_badge_label_, ModeBadgeText(snapshot.mode));
+    lv_label_set_text(mode_badge_label_, ModeBadgeText(model.interaction_mode));
 }
 
-void Amoled206PttView::RenderVoiceRing(const EidolonUiSnapshot& snapshot)
+void Amoled206PttView::RenderVoiceRing(const EidolonUiModel& model)
 {
     if (ring_outer_ == nullptr || ring_inner_ == nullptr || ring_label_ == nullptr) {
         return;
     }
-    lv_color_t color = RingColor(snapshot, accent_color_, live_color_, idle_color_, muted_color_);
-    int border_width = RingBorderWidth(snapshot);
+    lv_color_t color = RingColor(model, accent_color_, live_color_, idle_color_, muted_color_);
+    int border_width = RingBorderWidth(model);
     int inner_size = 132;
-    if (snapshot.turn == TurnPhase::Recording || snapshot.turn == TurnPhase::UserSpeaking) {
+    if (model.turn == TurnPhase::Recording || model.turn == TurnPhase::UserSpeaking) {
         inner_size = 150;
-    } else if (snapshot.turn == TurnPhase::AgentSpeaking) {
+    } else if (model.turn == TurnPhase::AgentSpeaking) {
         inner_size = 144;
-    } else if (snapshot.turn == TurnPhase::Committing || snapshot.turn == TurnPhase::AgentThinking) {
+    } else if (model.turn == TurnPhase::Committing || model.turn == TurnPhase::AgentThinking) {
         inner_size = 126;
     }
 
     lv_obj_set_style_border_width(ring_outer_, border_width, 0);
     lv_obj_set_style_border_color(ring_outer_, color, 0);
-    lv_obj_set_style_shadow_width(ring_outer_, snapshot.connection == ConnectionPhase::InRoom ? 24 : 10, 0);
+    lv_obj_set_style_shadow_width(ring_outer_, model.scene == UiScene::Conversation ? 24 : 10,
+                                  0);
     lv_obj_set_style_shadow_opa(ring_outer_, LV_OPA_20, 0);
     lv_obj_set_style_shadow_color(ring_outer_, color, 0);
 
     lv_obj_set_size(ring_inner_, inner_size, inner_size);
     lv_obj_set_style_bg_color(ring_inner_, color, 0);
     lv_obj_set_style_border_color(ring_inner_, color, 0);
-    lv_label_set_text(ring_label_, RingLabelText(snapshot));
+    lv_label_set_text(ring_label_, RingLabelText(model));
     lv_obj_center(ring_inner_);
     lv_obj_center(ring_label_);
 }
 
-void Amoled206PttView::RenderControls(const EidolonUiSnapshot& snapshot)
+void Amoled206PttView::RenderControls(const EidolonUiModel& model)
 {
-    bool active = snapshot.connection == ConnectionPhase::InRoom ||
-                  snapshot.connection == ConnectionPhase::Connecting ||
-                  snapshot.connection == ConnectionPhase::Reconnecting;
-    SetObjectVisible(end_btn_, active);
+    SetObjectVisible(end_btn_, model.show_end_action);
 }
 
-void Amoled206PttView::RenderFooter(const EidolonUiSnapshot& snapshot)
+void Amoled206PttView::RenderFooter(const EidolonUiModel& model)
 {
     if (display_ == nullptr) {
         return;
     }
-    display_->SetChatMessage(snapshot.subtitle_role, FooterText(snapshot));
+    display_->SetChatMessage(model.subtitle_role, FooterText(model));
 }
 
 void Amoled206PttView::OnRingEvent(lv_event_t* e)
@@ -451,65 +288,23 @@ void Amoled206PttView::OnRingEvent(lv_event_t* e)
 
 void Amoled206PttView::HandleRingEvent(lv_event_t* e)
 {
-    lv_event_code_t code = lv_event_get_code(e);
-    bool can_join = CanRequestJoin(last_pairing_, last_connection_, last_button_state_);
-    if (last_mode_ == InteractionMode::PushToTalk) {
-        if (last_connection_ != ConnectionPhase::InRoom) {
-            if (code == LV_EVENT_CLICKED && can_join && !join_request_pending_) {
-                join_request_pending_ = true;
-                ESP_LOGI(kTag,
-                         "[ui] ring clicked -> RequestVoiceJoin mode=ptt connection=%s "
-                         "pending=%d",
-                         ConnectionPhaseName(last_connection_), join_request_pending_ ? 1 : 0);
-                Application::GetInstance().RequestVoiceJoin();
-            } else if (code == LV_EVENT_CLICKED || code == LV_EVENT_PRESSED ||
-                       code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
-                ESP_LOGI(kTag,
-                         "[ui] ring %s ignored mode=ptt connection=%s pending=%d "
-                         "can_join=%d",
-                         LvEventName(code), ConnectionPhaseName(last_connection_),
-                         join_request_pending_ ? 1 : 0,
-                         can_join ? 1 : 0);
-            }
-            return;
-        }
-        if (code == LV_EVENT_PRESSED) {
-            ESP_LOGI(kTag, "[ui] ring pressed -> PttPress mode=ptt connection=%s",
-                     ConnectionPhaseName(last_connection_));
-            Application::GetInstance().PttPress();
-        } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
-            ESP_LOGI(kTag, "[ui] ring %s -> PttRelease mode=ptt connection=%s",
-                     LvEventName(code), ConnectionPhaseName(last_connection_));
-            Application::GetInstance().PttRelease();
-        }
+    const auto code = lv_event_get_code(e);
+    if (code == LV_EVENT_PRESSED && last_primary_enabled_ &&
+        last_primary_intent_ == UiIntent::BeginTalk) {
+        talk_gesture_active_ = true;
+        DispatchEidolonUiIntent(UiIntent::BeginTalk);
         return;
     }
-
-    if (code != LV_EVENT_CLICKED) {
+    if ((code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) &&
+        talk_gesture_active_) {
+        talk_gesture_active_ = false;
+        DispatchEidolonUiIntent(UiIntent::CommitTalk);
         return;
     }
-    if (last_connection_ == ConnectionPhase::InRoom) {
-        ESP_LOGI(kTag, "[ui] ring clicked -> ToggleMicrophone mode=%s connection=%s",
-                 InteractionModeName(last_mode_), ConnectionPhaseName(last_connection_));
-        Application::GetInstance().ToggleMicrophone();
-    } else if (can_join && !join_request_pending_) {
-        join_request_pending_ = true;
-        ESP_LOGI(kTag, "[ui] ring clicked -> RequestVoiceJoin mode=%s connection=%s pending=%d",
-                 InteractionModeName(last_mode_), ConnectionPhaseName(last_connection_),
-                 join_request_pending_ ? 1 : 0);
-        Application::GetInstance().RequestVoiceJoin();
-    } else {
-        ESP_LOGI(kTag,
-                 "[ui] ring clicked ignored mode=%s connection=%s pending=%d can_join=%d",
-                 InteractionModeName(last_mode_), ConnectionPhaseName(last_connection_),
-                 join_request_pending_ ? 1 : 0, can_join ? 1 : 0);
-    }
-}
-
-void Amoled206PttView::ShowChatMessage(const char* role, const char* content)
-{
-    if (display_ != nullptr) {
-        display_->SetChatMessage(role, content);
+    if (code == LV_EVENT_CLICKED && last_primary_enabled_ &&
+        (last_primary_intent_ == UiIntent::OpenConversation ||
+         last_primary_intent_ == UiIntent::ToggleMicrophone)) {
+        DispatchEidolonUiIntent(last_primary_intent_);
     }
 }
 

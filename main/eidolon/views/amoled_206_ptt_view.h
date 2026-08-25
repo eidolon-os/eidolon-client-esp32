@@ -31,16 +31,15 @@ public:
     // display lock (called from the board's SetupUI, like the rest of UI setup).
     void Build(const BuildContext& ctx);
 
-    void Render(const EidolonUiSnapshot& snapshot) override;
-    void ShowChatMessage(const char* role, const char* content) override;
+    void Render(const EidolonUiModel& model) override;
 
 private:
     void SetObjectVisible(lv_obj_t* obj, bool visible);
     void StyleEndButton(lv_obj_t* btn);
-    void RenderModeBadge(const EidolonUiSnapshot& snapshot);
-    void RenderVoiceRing(const EidolonUiSnapshot& snapshot);
-    void RenderControls(const EidolonUiSnapshot& snapshot);
-    void RenderFooter(const EidolonUiSnapshot& snapshot);
+    void RenderModeBadge(const EidolonUiModel& model);
+    void RenderVoiceRing(const EidolonUiModel& model);
+    void RenderControls(const EidolonUiModel& model);
+    void RenderFooter(const EidolonUiModel& model);
     void HandleRingEvent(lv_event_t* e);
     static void OnRingEvent(lv_event_t* e);
 
@@ -58,11 +57,9 @@ private:
     lv_obj_t* ring_outer_ = nullptr;
     lv_obj_t* ring_inner_ = nullptr;
     lv_obj_t* ring_label_ = nullptr;
-    InteractionMode last_mode_ = InteractionMode::PushToTalk;
-    PairingStatus last_pairing_ = PairingStatus::Active;
-    ConnectionPhase last_connection_ = ConnectionPhase::Offline;
-    VoiceSessionButtonState last_button_state_ = VoiceSessionButtonState::Start;
-    bool join_request_pending_ = false;
+    UiIntent last_primary_intent_ = UiIntent::None;
+    bool last_primary_enabled_ = false;
+    bool talk_gesture_active_ = false;
 };
 
 }  // namespace eidolon

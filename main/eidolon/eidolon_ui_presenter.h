@@ -1,14 +1,12 @@
 #ifndef EIDOLON_UI_PRESENTER_H_
 #define EIDOLON_UI_PRESENTER_H_
 
-#include "agent_session_tracker.h"
-#include "device_state.h"
-#include "eidolon_ui_types.h"
-#include "eidolon_voice_controller.h"
-
-#include <esp_timer.h>
-
 #include <string>
+
+#include "agent_session_tracker.h"
+#include "eidolon_runtime_status.h"
+#include "eidolon_ui_model.h"
+#include "eidolon_ui_types.h"
 
 class Application;
 
@@ -19,42 +17,29 @@ public:
     explicit EidolonUiPresenter(Application& app);
     ~EidolonUiPresenter();
 
-    void Apply(VoiceSessionState session_state, bool mic_enabled,
-               EndReason end_reason = EndReason::None);
+    void ApplyVoiceStatus(const VoiceRuntimeStatus& status);
+    void SetRuntimePhase(RuntimePhase phase, const std::string& detail = "");
+    void SetEnrollmentPhase(EnrollmentPhase phase, const std::string& detail = "");
+    void SetServicePhase(ServicePhase phase, const std::string& detail = "");
     void OnTranscription(const TranscriptionEvent& event);
     void OnAgentPhase(AgentPhase phase);
     void OnPttTurnStatus(const std::string& outcome);
     void OnPresenceWakePhase(PresenceWakePhase phase);
-    void SetLifecyclePhase(LifecyclePhase phase, const std::string& detail = "");
-    // Push-to-talk: the user is currently holding the talk button (mic recording).
     void SetPttRecording(bool recording);
 
+    const EidolonRuntimeStatus& runtime_status() const { return status_; }
     AgentSessionTracker& tracker() { return tracker_; }
 
 private:
     void Reapply();
-    void ApplyLifecycle();
-    void ApplySnapshot(const EidolonUiSnapshot& snapshot);
-    void SyncDeviceState();
-    DeviceState MapToDeviceState(VoiceSessionState session_state, AgentPhase phase) const;
-    // Bridge the gap between PTT release and the agent's first thinking/speaking
-    // signal: hold a "processing" state so the UI never flashes back to standby.
-    void BeginCommitting();
-    void ClearCommitting();
-    static void CommitTimeoutCb(void* arg);
+    void ApplyModel(const EidolonUiModel& model);
+    void SyncLegacyDeviceState();
+    void HandleIntent(UiIntent intent);
 
     Application& app_;
     AgentSessionTracker tracker_;
-    LifecyclePhase lifecycle_phase_ = LifecyclePhase::Booting;
-    std::string lifecycle_detail_;
+    EidolonRuntimeStatus status_;
     std::string last_visible_state_;
-    VoiceSessionState session_state_ = VoiceSessionState::Idle;
-    EndReason end_reason_ = EndReason::None;
-    bool mic_enabled_ = true;
-    bool ptt_recording_ = false;
-    bool ptt_committing_ = false;
-    PresenceWakePhase presence_wake_phase_ = PresenceWakePhase::Idle;
-    esp_timer_handle_t commit_timer_ = nullptr;
 };
 
 }  // namespace eidolon

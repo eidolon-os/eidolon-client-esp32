@@ -35,6 +35,7 @@ enum class VoiceSessionState {
     WaitingBinding,
     ConfigReady,
     Connecting,
+    Opening,
     InRoom,
     Reconnecting,
     Error,
@@ -82,6 +83,7 @@ public:
     // written only on the controller task; a cross-thread read is benign (returns a
     // recent value) and the authoritative decisions re-check state on the task.
     VoiceSessionState GetState() const { return state_; }
+    HubConfigStatus GetConfigStatus() const { return config_.status; }
     static const char* VoiceStateName(VoiceSessionState state);
     // Why the last voice session ended (None until the channel reports one via
     // session_end). Read by the UI to distinguish a normal end from a JOIN
@@ -225,7 +227,8 @@ private:
     esp_err_t RefreshHubConfig(bool persist = true);
     esp_err_t RediscoverHub();
     esp_err_t ConnectChannel();
-    esp_err_t PublishSessionRequest(const char* type);
+    esp_err_t PublishSessionRequest(const char* type, const std::string& conversation_id);
+    std::string NewConversationId();
     bool HasActiveConfig() const;
     bool HasChannelConfig() const;
     VoiceSessionState StateForConfig(const Esp32HubConfig& config) const;
@@ -369,6 +372,15 @@ private:
     // stood in. The channel no longer moves, so the device says which of the
     // two it is.
     bool standby_ = false;
+    // Correlation key for the one logical conversation currently desired by
+    // this device. It survives channel reconnects and fences late lifecycle
+    // packets from a conversation that has already been closed or superseded.
+    std::string current_conversation_id_;
+    // True only after the Channel has confirmed that the correlated agent
+    // dispatch started. Transport reconnects preserve an active conversation;
+    // an unconfirmed open is superseded instead of assuming that it started.
+    bool conversation_confirmed_ = false;
+    uint32_t conversation_sequence_ = 0;
     GuardService* guard_service_ = nullptr;
 #if CONFIG_EIDOLON_GUARD_SERVICE
     RoomConfig guard_control_config_;

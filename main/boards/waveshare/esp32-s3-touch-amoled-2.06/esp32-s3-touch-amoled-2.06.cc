@@ -288,10 +288,12 @@ private:
             ESP_LOGI(TAG, "Long press: opening device setup");
             EnterWifiConfigMode();
         });
-        boot_button_.OnClick([]() { Application::GetInstance().ToggleVoiceSession(); });
+        boot_button_.OnClick([]() {
+            eidolon::DispatchEidolonUiIntent(eidolon::UiIntent::OpenConversation);
+        });
 
-        boot_button_.OnDoubleClick([this]() {
-            Application::GetInstance().ToggleMicrophone();
+        boot_button_.OnDoubleClick([]() {
+            eidolon::DispatchEidolonUiIntent(eidolon::UiIntent::ToggleMicrophone);
         });
 #endif
     }

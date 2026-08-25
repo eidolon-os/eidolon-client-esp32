@@ -1,269 +1,262 @@
 #include "ui_state_mapper.h"
 
-#include "assets/lang_config.h"
+#include "eidolon_ui_labels.h"
 
 namespace eidolon {
 
 namespace {
 
-// VoiceSessionState bundles three orthogonal concerns; split it back into the
-// explicit flows so the rendering below reasons about one thing at a time.
-
-PairingStatus PairingStatusFor(VoiceSessionState state)
+UiScene RuntimeScene(RuntimePhase phase)
 {
-    switch (state) {
-    case VoiceSessionState::PendingApproval:
-        return PairingStatus::PendingApproval;
-    case VoiceSessionState::WaitingBinding:
-        return PairingStatus::WaitingBinding;
-    case VoiceSessionState::Unauthorized:
-        return PairingStatus::Unauthorized;
+    switch (phase) {
+    case RuntimePhase::Booting:
+        return UiScene::Starting;
+    case RuntimePhase::LoadingAssets:
+        return UiScene::Loading;
+    case RuntimePhase::NetworkScanning:
+    case RuntimePhase::NetworkConnecting:
+        return UiScene::Network;
+    case RuntimePhase::Commissioning:
+        return UiScene::Commissioning;
+    case RuntimePhase::Updating:
+        return UiScene::Updating;
+    case RuntimePhase::RecoveryRequired:
+        return UiScene::RecoveryRequired;
+    case RuntimePhase::Fault:
+        return UiScene::Error;
+    case RuntimePhase::Normal:
     default:
-        return PairingStatus::Active;
+        return UiScene::Ready;
     }
 }
 
-ConnectionPhase ConnectionPhaseFor(VoiceSessionState state)
+UiScene ConversationScene(const EidolonRuntimeStatus& status)
 {
-    switch (state) {
-    case VoiceSessionState::Connecting:
-        return ConnectionPhase::Connecting;
-    case VoiceSessionState::Reconnecting:
-        return ConnectionPhase::Reconnecting;
-    case VoiceSessionState::InRoom:
-        return ConnectionPhase::InRoom;
-    case VoiceSessionState::ServerUnreachable:
-        return ConnectionPhase::Unreachable;
-    case VoiceSessionState::Error:
-        return ConnectionPhase::Error;
-    case VoiceSessionState::ConfigReady:
-        return ConnectionPhase::Ready;
-    case VoiceSessionState::Idle:
-        return ConnectionPhase::Offline;
-    // Pairing states are not yet connected; the pairing screen takes precedence
-    // so their connection phase is not rendered.
-    case VoiceSessionState::PendingApproval:
-    case VoiceSessionState::WaitingBinding:
-    case VoiceSessionState::Unauthorized:
+    switch (status.conversation) {
+    case ConversationPhase::Opening:
+        return UiScene::OpeningConversation;
+    case ConversationPhase::Active:
+        return UiScene::Conversation;
+    case ConversationPhase::Reconnecting:
+        return UiScene::Reconnecting;
+    case ConversationPhase::Ended:
+        return UiScene::Ended;
+    case ConversationPhase::Failed:
+        return UiScene::Error;
+    case ConversationPhase::Closed:
     default:
-        return ConnectionPhase::Ready;
+        break;
+    }
+
+    switch (status.service) {
+    case ServicePhase::Reconnecting:
+        return UiScene::Reconnecting;
+    case ServicePhase::Connecting:
+    case ServicePhase::DiscoveringAuthority:
+    case ServicePhase::Registering:
+    case ServicePhase::Preparing:
+    case ServicePhase::Unavailable:
+        return UiScene::PreparingService;
+    case ServicePhase::Unreachable:
+        return UiScene::Error;
+    case ServicePhase::Ready:
+    default:
+        return UiScene::Ready;
     }
 }
 
-TurnPhase TurnPhaseFor(AgentPhase agent_phase, bool ptt_recording, bool ptt_committing)
+UiScene SelectScene(const EidolonRuntimeStatus& status)
 {
-    if (ptt_recording) {
-        return TurnPhase::Recording;
+    if (status.enrollment == EnrollmentPhase::Revoked) {
+        return UiScene::Removed;
     }
-    // Real agent progress wins over the optimistic committing bridge.
-    if (agent_phase == AgentPhase::AgentThinking) {
-        return TurnPhase::AgentThinking;
+    if (status.runtime != RuntimePhase::Normal) {
+        return RuntimeScene(status.runtime);
     }
-    if (agent_phase == AgentPhase::AgentSpeaking) {
-        return TurnPhase::AgentSpeaking;
+
+    switch (status.enrollment) {
+    case EnrollmentPhase::PendingReview:
+        return UiScene::WaitingApproval;
+    case EnrollmentPhase::Unknown:
+        return UiScene::PreparingService;
+    case EnrollmentPhase::ClaimActive:
+    case EnrollmentPhase::Revoked:
+    default:
+        break;
     }
-    // After release, hold "processing" across the STT/end-of-turn gap (the server
-    // still reports listening/idle here) so the UI never flashes back to standby.
-    if (ptt_committing) {
-        return TurnPhase::Committing;
-    }
-    if (agent_phase == AgentPhase::UserSpeaking) {
-        return TurnPhase::UserSpeaking;
-    }
-    return TurnPhase::Idle;
+
+    return ConversationScene(status);
 }
 
-// The conversation/ready screen: pairing is Active and the connection is settled
-// (Offline/Ready/InRoom). Driven by mode + turn so push-to-talk and streaming each
-// read straight off the explicit flows.
-void RenderConversation(EidolonUiSnapshot& snapshot)
+void ResolveConversationPresentation(const EidolonRuntimeStatus& status,
+                                     EidolonUiModel& model)
 {
-    if (snapshot.mode == InteractionMode::PushToTalk) {
-        // Two explicit phases: until connected the button is a "connect" tap (the
-        // room/agent come up first, then the user holds to talk — so the first
-        // words are never dropped). Hold-to-talk only appears in-room.
-        if (snapshot.connection != ConnectionPhase::InRoom) {
-            snapshot.status_text = Lang::Strings::EIDOLON_READY;
-            snapshot.button_state = VoiceSessionButtonState::Start;
-            // "连接" reads as "establish the room connection" — clearer than
-            // "开始对话", which sounds like you can already talk.
-            snapshot.button_label = Lang::Strings::EIDOLON_CONNECT;
-            snapshot.emotion = "neutral";
-            return;
-        }
-        // The talk button stays visible whether idle or in-room; hold to record,
-        // release to send. Its label flips with whether the user is holding.
-        snapshot.button_state = VoiceSessionButtonState::Talk;
-        // The button label follows the gesture in context: release-to-send while
-        // recording, hold-to-interrupt while the agent is talking, hold-to-talk
-        // otherwise.
-        if (snapshot.turn == TurnPhase::Recording) {
-            snapshot.button_label = Lang::Strings::EIDOLON_PTT_RELEASE;
-        } else if (snapshot.turn == TurnPhase::AgentSpeaking) {
-            snapshot.button_label = Lang::Strings::ROOM_INTERRUPT;
-        } else {
-            snapshot.button_label = Lang::Strings::EIDOLON_PTT_HOLD;
-        }
-        switch (snapshot.turn) {
-        case TurnPhase::Recording:
-            snapshot.status_text = Lang::Strings::EIDOLON_PTT_RECORDING;
-            snapshot.emotion = "happy";
-            break;
-        case TurnPhase::Committing:
-        case TurnPhase::AgentThinking:
-            snapshot.status_text = Lang::Strings::EIDOLON_THINKING;
-            snapshot.emotion = "thinking";
-            break;
-        case TurnPhase::AgentSpeaking:
-            snapshot.status_text = Lang::Strings::SPEAKING;
-            snapshot.emotion = "happy";
-            break;
-        case TurnPhase::Idle:
-        case TurnPhase::UserSpeaking:
-        default:
-            snapshot.status_text = Lang::Strings::EIDOLON_READY;
-            snapshot.emotion = "neutral";
-            break;
-        }
+    if (model.scene != UiScene::Conversation) {
         return;
     }
-
-    // Streaming (full-duplex): a tap starts the session from the ready screen; once
-    // in-room the mic is open continuously and the button is hidden.
-    snapshot.emotion = "neutral";
-    if (snapshot.connection == ConnectionPhase::InRoom) {
-        snapshot.button_state = VoiceSessionButtonState::Hidden;
-        switch (snapshot.turn) {
-        case TurnPhase::AgentThinking:
-            snapshot.status_text = Lang::Strings::EIDOLON_THINKING;
-            snapshot.emotion = "thinking";
-            break;
-        case TurnPhase::AgentSpeaking:
-            snapshot.status_text = Lang::Strings::SPEAKING;
-            snapshot.emotion = "happy";
-            break;
-        default:
-            snapshot.status_text = Lang::Strings::LISTENING;
-            snapshot.emotion = "neutral";
-            break;
-        }
-    } else {
-        snapshot.status_text = Lang::Strings::EIDOLON_READY;
-        snapshot.button_state = VoiceSessionButtonState::Start;
+    switch (status.turn) {
+    case TurnPhase::Recording:
+    case TurnPhase::UserSpeaking:
+        model.state_label = "REC";
+        model.status_text = "Listening";
+        model.detail_text = "Release to send";
+        model.emotion = "happy";
+        break;
+    case TurnPhase::Committing:
+        model.state_label = "SEND";
+        model.status_text = "Sending";
+        model.detail_text = "Waiting for response";
+        model.emotion = "thinking";
+        break;
+    case TurnPhase::AgentThinking:
+        model.state_label = "THINK";
+        model.status_text = "Thinking";
+        model.detail_text = "Working on it...";
+        model.emotion = "thinking";
+        break;
+    case TurnPhase::AgentSpeaking:
+        model.state_label = "SPEAK";
+        model.status_text = "Speaking";
+        model.detail_text = "Eidolon is speaking";
+        model.emotion = "happy";
+        break;
+    case TurnPhase::Idle:
+    default:
+        model.state_label = status.interaction_mode == InteractionMode::PushToTalk
+                                ? "TALK"
+                                : "LISTEN";
+        model.status_text = status.interaction_mode == InteractionMode::PushToTalk
+                                ? "Ready to talk"
+                                : "Listening";
+        model.detail_text = status.interaction_mode == InteractionMode::PushToTalk
+                                ? "Hold to talk"
+                                : "Listening...";
+        break;
     }
+}
+
+void ResolveActions(const EidolonRuntimeStatus& status, EidolonUiModel& model)
+{
+    switch (model.scene) {
+    case UiScene::Ready:
+    case UiScene::Ended:
+        model.primary_intent = UiIntent::OpenConversation;
+        model.primary_label = "JOIN";
+        model.primary_enabled = true;
+        break;
+    case UiScene::OpeningConversation:
+    case UiScene::Reconnecting:
+        model.primary_label = "...";
+        model.show_end_action = true;
+        break;
+    case UiScene::Conversation:
+        model.show_end_action = true;
+        model.primary_enabled = true;
+        if (status.interaction_mode == InteractionMode::PushToTalk) {
+            model.primary_intent = status.turn == TurnPhase::Recording
+                                       ? UiIntent::CommitTalk
+                                       : UiIntent::BeginTalk;
+            model.primary_label = status.turn == TurnPhase::Recording ? "REC" : "TALK";
+        } else {
+            model.primary_intent = UiIntent::ToggleMicrophone;
+            model.primary_label = status.mic_enabled ? "MIC" : "MUTE";
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+const std::string* DetailOverride(const EidolonRuntimeStatus& status,
+                                  UiScene scene)
+{
+    if (status.runtime != RuntimePhase::Normal) {
+        return &status.runtime_detail;
+    }
+    if (scene == UiScene::WaitingApproval || scene == UiScene::Removed) {
+        return &status.enrollment_detail;
+    }
+    if (status.conversation == ConversationPhase::Closed ||
+        status.conversation == ConversationPhase::Failed) {
+        return &status.service_detail;
+    }
+    return nullptr;
 }
 
 }  // namespace
 
-EidolonUiSnapshot UiStateMapper::Map(VoiceSessionState session_state,
-                                     AgentPhase agent_phase,
-                                     const std::string& last_transcription,
-                                     TranscriptionSource last_transcription_source,
-                                     bool mic_enabled,
-                                     bool ptt_recording,
-                                     bool ptt_committing,
-                                     VoiceInputPolicy input_policy,
-                                     EndReason end_reason,
-                                     PresenceWakePhase presence_wake)
+EidolonUiModel UiStateProjector::Project(const EidolonRuntimeStatus& status)
 {
-    EidolonUiSnapshot snapshot;
-    snapshot.show_mute_icon = !mic_enabled;
-    snapshot.input_policy = input_policy;
-    snapshot.mode = CurrentInteractionMode();
-    snapshot.pairing = PairingStatusFor(session_state);
-    snapshot.connection = ConnectionPhaseFor(session_state);
-    snapshot.turn = TurnPhaseFor(agent_phase, ptt_recording, ptt_committing);
-    snapshot.end_reason = end_reason;
-    snapshot.presence_wake = presence_wake;
+    EidolonUiModel model;
+    model.scene = SelectScene(status);
+    model.interaction_mode = status.interaction_mode;
+    model.turn = status.turn;
+    model.end_reason = status.end_reason;
+    model.show_mute_icon = !status.mic_enabled;
+    model.state_label = UiSceneLabel(model.scene);
+    model.status_text = UiSceneStatus(model.scene);
+    const std::string* detail = DetailOverride(status, model.scene);
+    model.detail_text = detail == nullptr || detail->empty()
+                            ? UiSceneDetail(model.scene, status.end_reason)
+                            : detail->c_str();
+    model.emotion = UiSceneEmotion(model.scene);
 
-    if (snapshot.pairing != PairingStatus::Active) {
-        snapshot.button_state = VoiceSessionButtonState::Hidden;
-        snapshot.emotion = "neutral";
-        switch (snapshot.pairing) {
-        case PairingStatus::PendingApproval:
-            snapshot.status_text = Lang::Strings::EIDOLON_WAITING_APPROVAL;
-            snapshot.subtitle = Lang::Strings::EIDOLON_WAITING_APPROVAL_HINT;
-            break;
-        case PairingStatus::WaitingBinding:
-            snapshot.status_text = Lang::Strings::EIDOLON_WAITING_BINDING;
-            snapshot.subtitle = Lang::Strings::EIDOLON_WAITING_BINDING_HINT;
-            break;
-        case PairingStatus::Unauthorized:
-        default:
-            snapshot.status_text = Lang::Strings::EIDOLON_UNAUTHORIZED;
-            snapshot.subtitle = Lang::Strings::EIDOLON_UNAUTHORIZED_HINT;
-            break;
-        }
-        return snapshot;
+    if (!status.last_transcription.empty() && model.scene == UiScene::Conversation) {
+        model.subtitle = status.last_transcription.c_str();
+        model.subtitle_role = status.last_transcription_role;
     }
 
-    switch (snapshot.connection) {
-    case ConnectionPhase::Connecting:
-        snapshot.status_text = Lang::Strings::ROOM_CONNECTING;
-        snapshot.button_state = VoiceSessionButtonState::Cancel;
-        snapshot.emotion = "neutral";
-        break;
-    case ConnectionPhase::Reconnecting:
-        snapshot.status_text = Lang::Strings::EIDOLON_RECONNECTING;
-        snapshot.button_state = VoiceSessionButtonState::Cancel;
-        snapshot.emotion = "neutral";
-        break;
-    case ConnectionPhase::Unreachable:
-        snapshot.status_text = Lang::Strings::EIDOLON_SERVER_UNREACHABLE;
-        snapshot.subtitle = Lang::Strings::EIDOLON_SERVER_UNREACHABLE_HINT;
-        snapshot.button_state = VoiceSessionButtonState::Start;
-        snapshot.emotion = "sad";
-        return snapshot;  // no transcript subtitle while unreachable
-    case ConnectionPhase::Error:
-        snapshot.status_text = Lang::Strings::ERROR;
-        snapshot.button_state = VoiceSessionButtonState::Start;
-        snapshot.emotion = "sad";
-        break;
-    case ConnectionPhase::Offline:
-    case ConnectionPhase::Ready:
-    case ConnectionPhase::InRoom:
+    if (status.presence_wake == PresenceWakePhase::VerifyingOwner &&
+        model.scene == UiScene::Ready) {
+        model.state_label = "VERIFY";
+        model.status_text = "Verifying owner";
+        model.detail_text = "Checking owner...";
+    } else if (status.presence_wake == PresenceWakePhase::OwnerRecognized &&
+               model.scene == UiScene::Ready) {
+        model.state_label = "OWNER";
+        model.status_text = "Owner recognized";
+        model.detail_text = "Opening conversation";
+        model.emotion = "happy";
+    }
+
+    ResolveConversationPresentation(status, model);
+    ResolveActions(status, model);
+    model.severity = model.scene == UiScene::Error ||
+                             model.scene == UiScene::RecoveryRequired ||
+                             model.scene == UiScene::Removed ||
+                             (model.scene == UiScene::Ended &&
+                              model.end_reason == EndReason::Error)
+                         ? UiSeverity::Error
+                         : (model.scene == UiScene::WaitingApproval ||
+                                    model.scene == UiScene::PreparingService
+                                ? UiSeverity::Attention
+                                : UiSeverity::Normal);
+    return model;
+}
+
+bool UiStateProjector::AllowsIntent(const EidolonRuntimeStatus& status, UiIntent intent)
+{
+    const auto model = Project(status);
+    switch (intent) {
+    case UiIntent::OpenConversation:
+        return model.primary_enabled && model.primary_intent == intent;
+    case UiIntent::CloseConversation:
+        return model.show_end_action;
+    case UiIntent::BeginTalk:
+        return model.scene == UiScene::Conversation &&
+               status.interaction_mode == InteractionMode::PushToTalk &&
+               status.turn != TurnPhase::Recording;
+    case UiIntent::CommitTalk:
+        return model.scene == UiScene::Conversation &&
+               status.interaction_mode == InteractionMode::PushToTalk &&
+               status.turn == TurnPhase::Recording;
+    case UiIntent::ToggleMicrophone:
+        return model.scene == UiScene::Conversation &&
+               status.interaction_mode == InteractionMode::Streaming;
+    case UiIntent::None:
     default:
-        RenderConversation(snapshot);
-        break;
+        return false;
     }
-
-    if (!last_transcription.empty()) {
-        snapshot.subtitle = last_transcription.c_str();
-        switch (last_transcription_source) {
-        case TranscriptionSource::User:
-            snapshot.subtitle_role = "user";
-            break;
-        case TranscriptionSource::System:
-            snapshot.subtitle_role = "system";
-            break;
-        case TranscriptionSource::Agent:
-        case TranscriptionSource::Unknown:
-        default:
-            snapshot.subtitle_role = "assistant";
-            break;
-        }
-    }
-
-    if (snapshot.connection != ConnectionPhase::InRoom) {
-        if (presence_wake == PresenceWakePhase::VerifyingOwner) {
-            snapshot.status_text = "VERIFYING";
-            snapshot.subtitle = "Checking owner...";
-            snapshot.subtitle_role = "system";
-            snapshot.emotion = "neutral";
-            snapshot.button_state = VoiceSessionButtonState::Hidden;
-        } else if (presence_wake == PresenceWakePhase::OwnerRecognized) {
-            snapshot.subtitle = "Owner recognized";
-            snapshot.subtitle_role = "system";
-            snapshot.emotion = "happy";
-            if (snapshot.connection != ConnectionPhase::Connecting &&
-                snapshot.connection != ConnectionPhase::Reconnecting) {
-                snapshot.status_text = "OWNER FOUND";
-                snapshot.button_state = VoiceSessionButtonState::Hidden;
-            }
-        }
-    }
-
-    return snapshot;
 }
 
 }  // namespace eidolon

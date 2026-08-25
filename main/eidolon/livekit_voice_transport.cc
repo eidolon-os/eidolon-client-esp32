@@ -15,10 +15,16 @@ LiveKitVoiceTransport::LiveKitVoiceTransport(VoiceSessionCallbacks cb, GuardServ
 
     mic_enabled_ = device_store_.LoadMicEnabled(true);
     controller_ = std::make_unique<EidolonVoiceController>(guard_service);
+    on_runtime_status_ = std::move(cb.on_runtime_status);
 
-    if (cb.on_session_state) {
-        controller_->SetOnStateChanged(std::move(cb.on_session_state));
-    }
+    auto on_session_state = std::move(cb.on_session_state);
+    controller_->SetOnStateChanged(
+        [this, on_session_state = std::move(on_session_state)](VoiceSessionState state) {
+            if (on_session_state) {
+                on_session_state(state);
+            }
+            NotifyRuntimeStatus(state);
+        });
     if (cb.on_operational_ready) {
         controller_->SetOnOperationalReady(std::move(cb.on_operational_ready));
     }
@@ -35,6 +41,79 @@ LiveKitVoiceTransport::LiveKitVoiceTransport(VoiceSessionCallbacks cb, GuardServ
         controller_->SetOnPttTurnStatus(std::move(cb.on_ptt_turn_status));
     }
     controller_->SetMicEnabled(mic_enabled_);
+}
+
+VoiceRuntimeStatus LiveKitVoiceTransport::BuildRuntimeStatus(VoiceSessionState state) const
+{
+    VoiceRuntimeStatus status;
+    status.mic_enabled = mic_enabled_;
+    status.end_reason = controller_->LastEndReason();
+    switch (controller_->GetConfigStatus()) {
+    case HubConfigStatus::PendingApproval:
+        status.enrollment = EnrollmentPhase::PendingReview;
+        break;
+    case HubConfigStatus::WaitingBinding:
+    case HubConfigStatus::Active:
+        status.enrollment = EnrollmentPhase::ClaimActive;
+        break;
+    case HubConfigStatus::Revoked:
+        status.enrollment = EnrollmentPhase::Revoked;
+        break;
+    }
+
+    switch (state) {
+    case VoiceSessionState::Idle:
+        status.enrollment = EnrollmentPhase::Unknown;
+        status.service = ServicePhase::Unavailable;
+        break;
+    case VoiceSessionState::PendingApproval:
+        status.enrollment = EnrollmentPhase::PendingReview;
+        status.service = ServicePhase::Unavailable;
+        break;
+    case VoiceSessionState::WaitingBinding:
+        status.service = ServicePhase::Preparing;
+        break;
+    case VoiceSessionState::ConfigReady:
+        status.service = ServicePhase::Ready;
+        status.conversation = status.end_reason == EndReason::None
+                                  ? ConversationPhase::Closed
+                                  : ConversationPhase::Ended;
+        break;
+    case VoiceSessionState::Connecting:
+    case VoiceSessionState::Opening:
+        status.service = ServicePhase::Connecting;
+        status.conversation = ConversationPhase::Opening;
+        break;
+    case VoiceSessionState::InRoom:
+        status.service = ServicePhase::Ready;
+        status.conversation = ConversationPhase::Active;
+        break;
+    case VoiceSessionState::Reconnecting:
+        status.service = ServicePhase::Reconnecting;
+        status.conversation = ConversationPhase::Reconnecting;
+        break;
+    case VoiceSessionState::ServerUnreachable:
+        status.service = ServicePhase::Unreachable;
+        status.conversation = ConversationPhase::Failed;
+        break;
+    case VoiceSessionState::Unauthorized:
+        status.enrollment = EnrollmentPhase::Revoked;
+        status.service = ServicePhase::Unavailable;
+        break;
+    case VoiceSessionState::Error:
+    default:
+        status.service = ServicePhase::Unreachable;
+        status.conversation = ConversationPhase::Failed;
+        break;
+    }
+    return status;
+}
+
+void LiveKitVoiceTransport::NotifyRuntimeStatus(VoiceSessionState state)
+{
+    if (on_runtime_status_) {
+        on_runtime_status_(BuildRuntimeStatus(state));
+    }
 }
 
 LiveKitVoiceTransport::~LiveKitVoiceTransport() = default;
@@ -112,6 +191,7 @@ void LiveKitVoiceTransport::ToggleSession()
         JoinSession();
         break;
     case VoiceSessionState::Connecting:
+    case VoiceSessionState::Opening:
     case VoiceSessionState::Reconnecting:
         LeaveSession();
         break;
@@ -131,6 +211,7 @@ void LiveKitVoiceTransport::SetMicrophoneEnabled(bool enabled)
     mic_enabled_ = enabled;
     device_store_.SaveMicEnabled(enabled);
     controller_->SetMicEnabled(enabled);
+    NotifyRuntimeStatus(controller_->GetState());
 }
 
 bool LiveKitVoiceTransport::IsMicrophoneEnabled() const

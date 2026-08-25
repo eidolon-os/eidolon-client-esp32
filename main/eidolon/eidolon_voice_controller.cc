@@ -827,6 +827,8 @@ const char* EidolonVoiceController::VoiceStateName(VoiceSessionState state)
         return "ConfigReady";
     case VoiceSessionState::Connecting:
         return "Connecting";
+    case VoiceSessionState::Opening:
+        return "Opening";
     case VoiceSessionState::InRoom:
         return "InRoom";
     case VoiceSessionState::Reconnecting:
@@ -847,6 +849,7 @@ const char* EidolonVoiceController::CurrentRoomKind() const
         return "control";
     }
     if (session_.IsConnected() || state_ == VoiceSessionState::Connecting ||
+        state_ == VoiceSessionState::Opening ||
         state_ == VoiceSessionState::InRoom || state_ == VoiceSessionState::Reconnecting) {
         return "voice";
     }
@@ -884,7 +887,8 @@ void EidolonVoiceController::SetState(VoiceSessionState state, const char* reaso
              CurrentRoomKind(), static_cast<unsigned long>(session_generation_));
     // The watchdog runs only while an attempt is in flight; any terminal state
     // (InRoom / ConfigReady / Error / ...) disarms it.
-    if (state == VoiceSessionState::Connecting || state == VoiceSessionState::Reconnecting) {
+    if (state == VoiceSessionState::Connecting || state == VoiceSessionState::Opening ||
+        state == VoiceSessionState::Reconnecting) {
         ArmConnectWatchdog();
     } else {
         DisarmConnectWatchdog();
@@ -1064,7 +1068,38 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
 #if CONFIG_EIDOLON_GUARD_SERVICE
             FlushPendingGuardPresence();
 #endif
-            SetState(StateForConfig(config_), "channel_connected");
+            if (current_conversation_id_.empty()) {
+                SetState(StateForConfig(config_), "channel_connected");
+            } else {
+                // A confirmed conversation is durable desired state across a
+                // transport reconnect. Re-announce it idempotently, then
+                // restore local media without waiting for a second start ack.
+                // An unconfirmed open may have reached a dispatch whose ack was
+                // lost with the old transport, so supersede it with a fresh id.
+                if (!conversation_confirmed_) {
+                    current_conversation_id_ = NewConversationId();
+                }
+                const esp_err_t open_err = PublishSessionRequest(
+                    kSessionOpenType, current_conversation_id_);
+                if (open_err == ESP_OK) {
+                    if (conversation_confirmed_) {
+                        standby_ = false;
+                        channel_recovery_.OnConversationStarted();
+                        SetState(VoiceSessionState::InRoom,
+                                 "channel_reconnected_conversation_restored");
+                        OpenConversationAudio();
+                    } else {
+                        SetState(VoiceSessionState::Opening,
+                                 "channel_connected_session_open_sent");
+                    }
+                } else {
+                    current_conversation_id_.clear();
+                    conversation_confirmed_ = false;
+                    last_end_reason_ = EndReason::Error;
+                    SetState(VoiceSessionState::Error,
+                             "channel_connected_session_open_failed");
+                }
+            }
 #if CONFIG_EIDOLON_RADAR_PRESENCE_BROADCAST
             if (radar_presence_known_) {
                 PublishRadarPresenceState(
@@ -1083,12 +1118,20 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
             SetOperationalReady(false, "channel_failed");
             DisarmConnectWatchdog();
             ESP_LOGW(TAG, "Channel connection failed");
+            if (!current_conversation_id_.empty()) {
+                SetState(VoiceSessionState::Reconnecting,
+                         "channel_failed_during_conversation_open");
+            }
             ScheduleChannelReconnect("channel_failed");
             break;
         case LiveKitConnectionState::Disconnected:
             channel_recovery_.OnDisconnected();
             SetOperationalReady(false, "channel_disconnected");
             DisarmConnectWatchdog();
+            if (!current_conversation_id_.empty()) {
+                SetState(VoiceSessionState::Reconnecting,
+                         "channel_disconnected_during_conversation_open");
+            }
             ScheduleChannelReconnect("channel_disconnected");
             break;
         case LiveKitConnectionState::Reconnecting:
@@ -1097,7 +1140,12 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
             // same watchdog forces the ordinary recovery loop.
             SetOperationalReady(false, "channel_reconnecting");
             channel_recovery_.OnReconnecting();
-            ArmConnectWatchdog();
+            if (!current_conversation_id_.empty()) {
+                SetState(VoiceSessionState::Reconnecting,
+                         "channel_reconnecting_during_conversation");
+            } else {
+                ArmConnectWatchdog();
+            }
             break;
         }
         return;
@@ -1137,6 +1185,13 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         CompletePendingRoomJoinCommand(
             "failed", "ROOM_JOIN_FAILED",
             livekit_failure_reason_str(session_.LastFailureReason()));
+        standby_ = true;
+        if (!current_conversation_id_.empty()) {
+            SetState(VoiceSessionState::Reconnecting,
+                     "channel_failed_during_conversation");
+            ScheduleChannelReconnect("channel_failed_during_conversation");
+            break;
+        }
         if (session_.LastFailureReason() == LIVEKIT_FAILURE_REASON_ROOM_DELETED ||
             session_.LastFailureReason() == LIVEKIT_FAILURE_REASON_ROOM_CLOSED) {
             // [lifecycle] Room Deleted/Closed: the server tore down the voice room.
@@ -1164,10 +1219,15 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         CloseConversationAudio();
         agent_phase_ = AgentPhase::Silent;
         CompletePendingRoomJoinCommand("failed", "ROOM_JOIN_DISCONNECTED");
-        if (state_ != VoiceSessionState::Idle && state_ != VoiceSessionState::ConfigReady &&
-            state_ != VoiceSessionState::PendingApproval &&
-            state_ != VoiceSessionState::WaitingBinding) {
-            SetState(StateForConfig(config_), "voice_disconnected");
+        standby_ = true;
+        if (!current_conversation_id_.empty()) {
+            SetState(VoiceSessionState::Reconnecting,
+                     "channel_disconnected_during_conversation");
+        } else if (state_ != VoiceSessionState::Idle &&
+                   state_ != VoiceSessionState::ConfigReady &&
+                   state_ != VoiceSessionState::PendingApproval &&
+                   state_ != VoiceSessionState::WaitingBinding) {
+            SetState(StateForConfig(config_), "channel_disconnected");
         }
         ScheduleChannelReconnect("voice_disconnected");
         break;
@@ -1356,7 +1416,8 @@ void EidolonVoiceController::DoConnectTimeout()
 {
     // The attempt may have completed between the timer firing and now.
     const bool voice_connecting =
-        state_ == VoiceSessionState::Connecting || state_ == VoiceSessionState::Reconnecting;
+        state_ == VoiceSessionState::Connecting || state_ == VoiceSessionState::Opening ||
+        state_ == VoiceSessionState::Reconnecting;
     const bool standby_connecting = standby_ && channel_recovery_.connect_in_flight();
     if (!voice_connecting && !standby_connecting) {
         return;
@@ -1367,13 +1428,28 @@ void EidolonVoiceController::DoConnectTimeout()
              static_cast<unsigned long>(session_generation_));
     CloseConversationAudio();
     CompletePendingRoomJoinCommand("failed", "ROOM_JOIN_TIMEOUT");
+    if (state_ == VoiceSessionState::Opening && session_.IsConnected()) {
+        const std::string expired_conversation_id = current_conversation_id_;
+        current_conversation_id_.clear();
+        conversation_confirmed_ = false;
+        if (!expired_conversation_id.empty()) {
+            PublishSessionRequest(kSessionCloseType, expired_conversation_id);
+        }
+        last_end_reason_ = EndReason::Error;
+        standby_ = true;
+        SetState(StateForConfig(config_), "session_start_timeout");
+        return;
+    }
     // Drop the in-flight guards so ScheduleChannelReconnect isn't suppressed, then
     // tear down the hung session and fall back to a stable base state.
     switching_to_voice_ = false;
     channel_recovery_.OnDisconnected();
     channel_recovery_.FinishRetry();
     session_.Disconnect();
-    standby_ = false;
+    standby_ = true;
+    current_conversation_id_.clear();
+    conversation_confirmed_ = false;
+    last_end_reason_ = EndReason::Error;
     // Supersede the hung attempt so any of its late callbacks are dropped rather
     // than accepted after we fall back (the next ConnectChannel bumps again).
     MarkSessionSuperseded("connect_timeout");
@@ -1670,7 +1746,19 @@ EndReason EidolonVoiceController::ParseEndReason(const std::string& payload)
     return reason;
 }
 
-esp_err_t EidolonVoiceController::PublishSessionRequest(const char* type)
+std::string EidolonVoiceController::NewConversationId()
+{
+    char id[48];
+    conversation_sequence_ += 1;
+    snprintf(id, sizeof(id), "esp32-%08lx-%08lx-%08lx",
+             static_cast<unsigned long>(esp_random()),
+             static_cast<unsigned long>(esp_random()),
+             static_cast<unsigned long>(conversation_sequence_));
+    return id;
+}
+
+esp_err_t EidolonVoiceController::PublishSessionRequest(
+    const char* type, const std::string& conversation_id)
 {
     // Asking is a statement of desired state, not an event: the device may say
     // the same thing twice — after a retry, or after a reconnection it is not
@@ -1681,6 +1769,7 @@ esp_err_t EidolonVoiceController::PublishSessionRequest(const char* type)
     }
     cJSON_AddNumberToObject(root, "schema_v", kWireSchemaVersion);
     cJSON_AddStringToObject(root, "type", type);
+    cJSON_AddStringToObject(root, kSessionConversationIdField, conversation_id.c_str());
     char* printed = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
     if (!printed) {
@@ -1688,13 +1777,75 @@ esp_err_t EidolonVoiceController::PublishSessionRequest(const char* type)
     }
     const esp_err_t err = session_.PublishData(kSessionControlTopic, printed, /*reliable=*/true);
     cJSON_free(printed);
-    ESP_LOGI(TAG, "[lifecycle] sent %s err=%s gen=%lu", type, esp_err_to_name(err),
+    ESP_LOGI(TAG, "[lifecycle] sent %s conversation_id=%s err=%s gen=%lu", type,
+             conversation_id.c_str(), esp_err_to_name(err),
              static_cast<unsigned long>(session_generation_));
     return err;
 }
 
 void EidolonVoiceController::DoSessionControl(const std::string& payload)
 {
+    cJSON* root = cJSON_Parse(payload.c_str());
+    if (root == nullptr) {
+        ESP_LOGW(TAG, "Ignoring malformed session_control payload");
+        return;
+    }
+    const cJSON* schema = cJSON_GetObjectItem(root, "schema_v");
+    const cJSON* type_item = cJSON_GetObjectItem(root, "type");
+    const cJSON* conversation_item =
+        cJSON_GetObjectItem(root, kSessionConversationIdField);
+    const char* type = cJSON_IsString(type_item) ? type_item->valuestring : nullptr;
+    const char* conversation_id = cJSON_IsString(conversation_item)
+                                      ? conversation_item->valuestring
+                                      : nullptr;
+    const bool valid_envelope = cJSON_IsNumber(schema) &&
+                                schema->valueint == kWireSchemaVersion && type != nullptr &&
+                                conversation_id != nullptr && conversation_id[0] != '\0';
+    if (!valid_envelope) {
+        cJSON_Delete(root);
+        ESP_LOGW(TAG, "Ignoring invalid session_control envelope");
+        return;
+    }
+    if (current_conversation_id_.empty() ||
+        current_conversation_id_ != conversation_id) {
+        ESP_LOGI(TAG,
+                 "Ignoring stale session_control type=%s conversation_id=%s current=%s",
+                 type, conversation_id,
+                 current_conversation_id_.empty() ? "<none>"
+                                                  : current_conversation_id_.c_str());
+        cJSON_Delete(root);
+        return;
+    }
+
+    if (strcmp(type, kSessionStartedType) == 0) {
+        cJSON_Delete(root);
+        if (state_ != VoiceSessionState::Opening &&
+            state_ != VoiceSessionState::Connecting &&
+            state_ != VoiceSessionState::Reconnecting) {
+            ESP_LOGI(TAG, "Ignoring duplicate session_started in state=%s",
+                     VoiceStateName(state_));
+            return;
+        }
+        standby_ = false;
+        conversation_confirmed_ = true;
+        channel_recovery_.OnConversationStarted();
+        SetOperationalReady(true, "session_started");
+        SetState(VoiceSessionState::InRoom, "session_started");
+        SetPresenceWakePhase(PresenceWakePhase::Idle);
+        OpenConversationAudio();
+        if (pending_room_join_command_active_) {
+            char result[224];
+            snprintf(result, sizeof(result),
+                     "{\"status\":\"in_room\",\"conversation_id\":\"%s\","
+                     "\"generation\":%lu}",
+                     current_conversation_id_.c_str(),
+                     static_cast<unsigned long>(session_generation_));
+            CompletePendingRoomJoinCommand("completed", "OK", "", result);
+        }
+        return;
+    }
+    cJSON_Delete(root);
+
     EndReason reason = ParseEndReason(payload);
     if (reason == EndReason::None) {
         ESP_LOGI(TAG, "Ignoring unsupported session_control payload");
@@ -2995,6 +3146,8 @@ void EidolonVoiceController::HandleSessionEnd(EndReason reason)
     // only thing that changed is that no one is listening any more.
     CloseConversationAudio();
     standby_ = true;
+    current_conversation_id_.clear();
+    conversation_confirmed_ = false;
     SetState(StateForConfig(config_), "session_end");
 }
 
@@ -3133,6 +3286,12 @@ bool EidolonVoiceController::DoCommissioningQuiesce()
 {
     ESP_LOGI(TAG,
              "[commissioning] quiescing operational runtime before RadioLease");
+    // Commissioning is an explicit product-mode boundary, not a transient
+    // network interruption. Do not resurrect the old conversation after the
+    // Owner finishes setup and the operational channel reconnects.
+    current_conversation_id_.clear();
+    conversation_confirmed_ = false;
+    last_end_reason_ = EndReason::UserLeft;
     DoNetworkLost();
     const bool quiesced = !session_.HasRoom() && !session_.IsConnected();
     ESP_LOGI(TAG, "[commissioning] operational runtime quiesced=%d",
@@ -3218,7 +3377,8 @@ esp_err_t EidolonVoiceController::DoJoinRoom()
              static_cast<unsigned long>(session_generation_), standby_ ? 1 : 0,
              session_.IsConnected() ? 1 : 0, config_.session.room_name.c_str(),
              pending_session_intent_.empty() ? "user" : pending_session_intent_.c_str());
-    if (state_ == VoiceSessionState::Connecting || state_ == VoiceSessionState::Reconnecting) {
+    if (state_ == VoiceSessionState::Connecting || state_ == VoiceSessionState::Opening ||
+        state_ == VoiceSessionState::Reconnecting) {
         ESP_LOGI(TAG, "[lifecycle] join ignored while session is already transitioning state=%s",
                  VoiceStateName(state_));
         return ESP_ERR_INVALID_STATE;
@@ -3263,11 +3423,14 @@ esp_err_t EidolonVoiceController::DoJoinRoom()
     // Fresh session: drop any end reason from the previous conversation so the
     // connecting/ready chrome doesn't show a stale "已结束".
     last_end_reason_ = EndReason::None;
+    current_conversation_id_ = NewConversationId();
+    conversation_confirmed_ = false;
 
     // The channel is normally already up and the conversation starts by saying
     // so. Connecting here is the exception — a device that was knocked offline
     // and has not got back yet — and only then is there anything to wait for.
     if (!session_.IsConnected()) {
+        standby_ = true;
         SetState(VoiceSessionState::Connecting, "join_requested");
         esp_err_t connect_err = ConnectChannel();
         if (connect_err != ESP_OK) {
@@ -3278,30 +3441,30 @@ esp_err_t EidolonVoiceController::DoJoinRoom()
             }
         }
         if (connect_err != ESP_OK) {
+            current_conversation_id_.clear();
+            conversation_confirmed_ = false;
             SetState(VoiceSessionState::Error, "join_connect_failed");
             ScheduleChannelReconnect("channel_connect_sync_failed");
             return connect_err;
         }
+        // ConnectChannel completes asynchronously. The Connected event publishes
+        // this same desired conversation; no request is sent against a channel
+        // that is not ready yet.
+        return ESP_OK;
     }
 
-    esp_err_t err = PublishSessionRequest(kSessionOpenType);
+    esp_err_t err = PublishSessionRequest(kSessionOpenType, current_conversation_id_);
     if (err != ESP_OK) {
         // The request never left the device, so nobody is coming. Say so rather
         // than sit in a conversation the server was never asked for.
+        current_conversation_id_.clear();
+        conversation_confirmed_ = false;
         SetState(VoiceSessionState::Error, "join_request_failed");
         return err;
     }
-    standby_ = false;
-    // In a conversation from here, matching what the device used to mean by it:
-    // the old device entered this state when its voice room finished
-    // connecting, which was likewise before the agent had arrived to say
-    // anything. The agent's welcome lands afterwards either way.
-    SetState(VoiceSessionState::InRoom, "join_requested");
-    // This used to ride on the LiveKit "Connected" event, back when a
-    // conversation and a connection began together. The connection now predates
-    // the conversation by however long the device sat in standby, so what opens
-    // the microphone has to be the thing that actually starts a conversation.
-    OpenConversationAudio();
+    // The request is only desired state. Audio and the active UI begin after the
+    // agent has successfully started and confirms this exact conversation id.
+    SetState(VoiceSessionState::Opening, "session_open_sent");
     return ESP_OK;
 }
 
@@ -3342,8 +3505,18 @@ esp_err_t EidolonVoiceController::ConnectChannel()
         ESP_LOGW(TAG, "Connect channel failed: %s", esp_err_to_name(err));
     }
     // ServerUnreachable remains visible until LiveKit actually reports Connected.
+    // A desired conversation is orthogonal to transport health: keep its
+    // opening/reconnecting projection while the persistent channel comes back.
     if (state_ != VoiceSessionState::ServerUnreachable) {
-        SetState(StateForConfig(config_), "control_connect");
+        if (current_conversation_id_.empty()) {
+            SetState(StateForConfig(config_), "control_connect");
+        } else if (state_ == VoiceSessionState::Reconnecting) {
+            SetState(VoiceSessionState::Reconnecting,
+                     "control_connect_for_conversation");
+        } else {
+            SetState(VoiceSessionState::Connecting,
+                     "control_connect_for_conversation");
+        }
     }
     if (err == ESP_OK) {
         ArmConnectWatchdog();
@@ -3620,7 +3793,13 @@ esp_err_t EidolonVoiceController::DoLeaveRoom()
     // goes. Failing to say it is not worth dropping the channel over: the
     // server ends an unattended session on its own, and staying reachable is
     // what lets the next conversation start at all.
-    esp_err_t err = PublishSessionRequest(kSessionCloseType);
+    esp_err_t err = ESP_OK;
+    if (!current_conversation_id_.empty()) {
+        err = PublishSessionRequest(kSessionCloseType, current_conversation_id_);
+    }
+    current_conversation_id_.clear();
+    conversation_confirmed_ = false;
+    last_end_reason_ = EndReason::UserLeft;
     standby_ = true;
     if (state_ != VoiceSessionState::Idle) {
         SetState(StateForConfig(config_), "leave_room");

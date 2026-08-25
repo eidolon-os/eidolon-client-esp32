@@ -13,6 +13,9 @@ namespace eidolon {
 class GuardService;
 
 struct VoiceSessionCallbacks {
+    std::function<void(const VoiceRuntimeStatus&)> on_runtime_status;
+    // Raw controller state remains available to non-UI runtime integrations
+    // such as wake-word ownership. UI must consume on_runtime_status instead.
     std::function<void(VoiceSessionState)> on_session_state;
     // A Connected operational channel is an independent confirmed fact. It
     // must still be projected when VoiceSessionState remains ConfigReady.

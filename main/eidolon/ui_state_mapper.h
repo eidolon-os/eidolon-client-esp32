@@ -1,24 +1,15 @@
 #ifndef EIDOLON_UI_STATE_MAPPER_H_
 #define EIDOLON_UI_STATE_MAPPER_H_
 
-#include "eidolon_ui_types.h"
-#include "eidolon_voice_controller.h"
+#include "eidolon_runtime_status.h"
+#include "eidolon_ui_model.h"
 
 namespace eidolon {
 
-class UiStateMapper {
+class UiStateProjector {
 public:
-    static EidolonUiSnapshot Map(VoiceSessionState session_state,
-                                 AgentPhase agent_phase,
-                                 const std::string& last_transcription,
-                                 TranscriptionSource last_transcription_source,
-                                 bool mic_enabled,
-                                 bool ptt_recording = false,
-                                 bool ptt_committing = false,
-                                 VoiceInputPolicy input_policy = {},
-                                 EndReason end_reason = EndReason::None,
-                                 PresenceWakePhase presence_wake =
-                                     PresenceWakePhase::Idle);
+    static EidolonUiModel Project(const EidolonRuntimeStatus& status);
+    static bool AllowsIntent(const EidolonRuntimeStatus& status, UiIntent intent);
 };
 
 }  // namespace eidolon

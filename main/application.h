@@ -21,7 +21,9 @@
 
 #if CONFIG_EIDOLON_HUB_MODE
 namespace eidolon {
-enum class LifecyclePhase;
+enum class RuntimePhase;
+enum class EnrollmentPhase;
+enum class ServicePhase;
 enum class VoiceSessionState;
 }
 #if CONFIG_EIDOLON_WAKE_WORD_ENABLE
@@ -144,8 +146,12 @@ public:
     void PttPress();
     void PttRelease();
     void OnAmbientPresenceChanged(bool present);
-    void SetEidolonLifecycleUi(eidolon::LifecyclePhase phase,
-                               const std::string& detail = "");
+    void SetEidolonRuntimeUi(eidolon::RuntimePhase phase,
+                             const std::string& detail = "");
+    void SetEidolonEnrollmentUi(eidolon::EnrollmentPhase phase,
+                                const std::string& detail = "");
+    void SetEidolonServiceUi(eidolon::ServicePhase phase,
+                             const std::string& detail = "");
 #endif
     
     /**

@@ -37,6 +37,8 @@ inline constexpr const char* kCompanionFlowNodeType = "companion.flow.node";
 // connected no longer says whether it wants to be heard; it says so itself.
 inline constexpr const char* kSessionOpenType = "session_open";
 inline constexpr const char* kSessionCloseType = "session_close";
+inline constexpr const char* kSessionStartedType = "session_started";
+inline constexpr const char* kSessionConversationIdField = "conversation_id";
 
 // client.audio_state — body "type" label (NOT the routing topic above) + enums.
 inline constexpr const char* kClientAudioStateType = "client.audio_state";

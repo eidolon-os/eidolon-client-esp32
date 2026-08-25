@@ -2,8 +2,11 @@
 #include <cstring>
 
 #include "eidolon/eidolon_ui_labels.h"
+#include "eidolon/ui_state_mapper.h"
 
 namespace {
+
+using namespace eidolon;
 
 void Expect(const char* actual, const char* expected)
 {
@@ -11,177 +14,151 @@ void Expect(const char* actual, const char* expected)
     assert(std::strcmp(actual, expected) == 0);
 }
 
-void ExpectStateAndDetail(const eidolon::EidolonUiSnapshot& snapshot,
-                          const char* state, const char* detail)
+EidolonRuntimeStatus ReadyStatus()
 {
-    Expect(eidolon::CompactStateLabel(snapshot), state);
-    Expect(eidolon::CompactVoiceDetail(snapshot), detail);
+    EidolonRuntimeStatus status;
+    status.runtime = RuntimePhase::Normal;
+    status.enrollment = EnrollmentPhase::ClaimActive;
+    status.service = ServicePhase::Ready;
+    return status;
 }
 
-void TestLifecycleLabels()
+void TestSafetyAndRuntimePrecedence()
 {
-    Expect(eidolon::EidolonBrandLabel(), "EIDOLON");
-    Expect(eidolon::LifecycleLabel(eidolon::LifecyclePhase::Booting), "BOOT");
-    Expect(eidolon::DefaultLifecycleDetail(eidolon::LifecyclePhase::Booting),
-           "Starting Eidolon...");
-    Expect(eidolon::LifecycleLabel(eidolon::LifecyclePhase::LoadingAssets), "ASSETS");
-    Expect(eidolon::DefaultLifecycleDetail(eidolon::LifecyclePhase::LoadingAssets),
-           "Loading UI assets...");
-    Expect(eidolon::LifecycleLabel(eidolon::LifecyclePhase::WifiScanning), "WIFI");
-    Expect(eidolon::DefaultLifecycleDetail(eidolon::LifecyclePhase::WifiScanning),
-           "Scanning Wi-Fi...");
-    Expect(eidolon::DefaultLifecycleDetail(eidolon::LifecyclePhase::WifiConnecting),
-           "Connecting to Wi-Fi...");
-    Expect(eidolon::LifecycleLabel(eidolon::LifecyclePhase::WifiSetup), "SETUP");
-    Expect(eidolon::DefaultLifecycleDetail(eidolon::LifecyclePhase::WifiSetup),
-           "Wi-Fi setup mode");
-    Expect(eidolon::LifecycleLabel(eidolon::LifecyclePhase::HubDiscovering), "HUB");
-    Expect(eidolon::DefaultLifecycleDetail(eidolon::LifecyclePhase::HubDiscovering),
-           "Finding Eidolon Hub...");
-    Expect(eidolon::LifecycleLabel(eidolon::LifecyclePhase::HubRegistering), "REGISTER");
-    Expect(eidolon::DefaultLifecycleDetail(eidolon::LifecyclePhase::HubRegistering),
-           "Registering device...");
-    Expect(eidolon::LifecycleLabel(eidolon::LifecyclePhase::Updating), "UPDATE");
-    Expect(eidolon::DefaultLifecycleDetail(eidolon::LifecyclePhase::Updating),
-           "Updating device...");
-    Expect(eidolon::LifecycleLabel(eidolon::LifecyclePhase::Offline), "OFFLINE");
-    Expect(eidolon::DefaultLifecycleDetail(eidolon::LifecyclePhase::Offline),
-           "Check Wi-Fi and Hub");
-    Expect(eidolon::LifecycleLabel(eidolon::LifecyclePhase::Error), "ERROR");
-    Expect(eidolon::DefaultLifecycleDetail(eidolon::LifecyclePhase::Error),
-           "Device setup failed");
+    auto status = ReadyStatus();
+    status.conversation = ConversationPhase::Active;
+    status.turn = TurnPhase::AgentSpeaking;
+
+    status.runtime = RuntimePhase::Commissioning;
+    auto model = UiStateProjector::Project(status);
+    assert(model.scene == UiScene::Commissioning);
+    assert(!model.primary_enabled);
+
+    status.runtime = RuntimePhase::RecoveryRequired;
+    model = UiStateProjector::Project(status);
+    assert(model.scene == UiScene::RecoveryRequired);
+    assert(model.severity == UiSeverity::Error);
+
+    status.runtime = RuntimePhase::Normal;
+    status.enrollment = EnrollmentPhase::Revoked;
+    model = UiStateProjector::Project(status);
+    assert(model.scene == UiScene::Removed);
+    assert(!model.show_end_action);
 }
 
-void TestPairingTakesVisualPrecedence()
+void TestEnrollmentAndServiceAreOrthogonal()
 {
-    eidolon::EidolonUiSnapshot snapshot;
-    snapshot.connection = eidolon::ConnectionPhase::InRoom;
-    snapshot.turn = eidolon::TurnPhase::AgentSpeaking;
+    auto status = ReadyStatus();
+    status.enrollment = EnrollmentPhase::PendingReview;
+    status.service = ServicePhase::Ready;
+    auto model = UiStateProjector::Project(status);
+    assert(model.scene == UiScene::WaitingApproval);
+    Expect(model.detail_text, "Approve this device in Eidolon");
 
-    snapshot.pairing = eidolon::PairingStatus::PendingApproval;
-    ExpectStateAndDetail(snapshot, "APPROVE", "Approve in Eidolon Admin");
+    status.enrollment = EnrollmentPhase::ClaimActive;
+    status.service = ServicePhase::Preparing;
+    model = UiStateProjector::Project(status);
+    assert(model.scene == UiScene::PreparingService);
+    Expect(model.detail_text, "Device claimed; service is not ready");
 
-    snapshot.pairing = eidolon::PairingStatus::WaitingBinding;
-    ExpectStateAndDetail(snapshot, "BIND", "Bind an Agent in Admin");
-
-    snapshot.pairing = eidolon::PairingStatus::Unauthorized;
-    ExpectStateAndDetail(snapshot, "DENIED", "Approve this device again");
+    status.service_detail = "Waiting for Channel binding";
+    model = UiStateProjector::Project(status);
+    Expect(model.detail_text, "Waiting for Channel binding");
 }
 
-void TestConversationProjection()
+void TestConversationRequiresExplicitStart()
 {
-    eidolon::EidolonUiSnapshot snapshot;
-    snapshot.pairing = eidolon::PairingStatus::Active;
-    snapshot.connection = eidolon::ConnectionPhase::InRoom;
+    auto status = ReadyStatus();
+    auto model = UiStateProjector::Project(status);
+    assert(model.scene == UiScene::Ready);
+    assert(model.primary_intent == UiIntent::OpenConversation);
+    assert(UiStateProjector::AllowsIntent(status, UiIntent::OpenConversation));
 
-    snapshot.turn = eidolon::TurnPhase::Idle;
-    ExpectStateAndDetail(snapshot, "LISTEN", "Listening...");
+    status.conversation = ConversationPhase::Opening;
+    model = UiStateProjector::Project(status);
+    assert(model.scene == UiScene::OpeningConversation);
+    assert(!model.primary_enabled);
+    assert(model.show_end_action);
+    assert(!UiStateProjector::AllowsIntent(status, UiIntent::OpenConversation));
+    assert(UiStateProjector::AllowsIntent(status, UiIntent::CloseConversation));
 
-    snapshot.turn = eidolon::TurnPhase::UserSpeaking;
-    ExpectStateAndDetail(snapshot, "LISTEN", "Listening...");
+    status.conversation = ConversationPhase::Active;
+    status.interaction_mode = InteractionMode::PushToTalk;
+    model = UiStateProjector::Project(status);
+    assert(model.scene == UiScene::Conversation);
+    assert(model.primary_intent == UiIntent::BeginTalk);
+    assert(UiStateProjector::AllowsIntent(status, UiIntent::BeginTalk));
 
-    snapshot.turn = eidolon::TurnPhase::Recording;
-    ExpectStateAndDetail(snapshot, "LISTEN", "Listening...");
-
-    snapshot.turn = eidolon::TurnPhase::Committing;
-    ExpectStateAndDetail(snapshot, "THINK", "Working on it...");
-
-    snapshot.turn = eidolon::TurnPhase::AgentThinking;
-    ExpectStateAndDetail(snapshot, "THINK", "Working on it...");
-
-    snapshot.turn = eidolon::TurnPhase::AgentSpeaking;
-    ExpectStateAndDetail(snapshot, "SPEAK", "Eidolon is speaking");
+    status.turn = TurnPhase::Recording;
+    model = UiStateProjector::Project(status);
+    assert(model.primary_intent == UiIntent::CommitTalk);
+    Expect(model.state_label, "REC");
+    assert(UiStateProjector::AllowsIntent(status, UiIntent::CommitTalk));
 }
 
-void TestConnectionProjection()
+void TestTurnAndModeProjection()
 {
-    eidolon::EidolonUiSnapshot snapshot;
-    snapshot.pairing = eidolon::PairingStatus::Active;
+    auto status = ReadyStatus();
+    status.conversation = ConversationPhase::Active;
+    status.interaction_mode = InteractionMode::Streaming;
 
-    snapshot.connection = eidolon::ConnectionPhase::Connecting;
-    ExpectStateAndDetail(snapshot, "JOINING", "Opening voice session...");
+    status.turn = TurnPhase::AgentThinking;
+    auto model = UiStateProjector::Project(status);
+    Expect(model.state_label, "THINK");
+    assert(model.primary_intent == UiIntent::ToggleMicrophone);
 
-    snapshot.connection = eidolon::ConnectionPhase::Reconnecting;
-    ExpectStateAndDetail(snapshot, "REJOIN", "Restoring connection...");
+    status.turn = TurnPhase::AgentSpeaking;
+    model = UiStateProjector::Project(status);
+    Expect(model.state_label, "SPEAK");
+    Expect(model.detail_text, "Eidolon is speaking");
 
-    snapshot.connection = eidolon::ConnectionPhase::Unreachable;
-    ExpectStateAndDetail(snapshot, "OFFLINE", "Check Wi-Fi and Hub");
-
-    snapshot.connection = eidolon::ConnectionPhase::Error;
-    ExpectStateAndDetail(snapshot, "ERROR", "Voice session failed");
-
-    snapshot.connection = eidolon::ConnectionPhase::Offline;
-    ExpectStateAndDetail(snapshot, "OFFLINE", "Waiting for setup");
+    status.last_transcription = "hello";
+    status.last_transcription_role = "assistant";
+    model = UiStateProjector::Project(status);
+    Expect(model.subtitle, "hello");
+    Expect(model.subtitle_role, "assistant");
 }
 
-void TestConnectionOwnsTurnProjection()
+void TestEndReasonAndDetailOwnership()
 {
-    eidolon::EidolonUiSnapshot snapshot;
-    snapshot.pairing = eidolon::PairingStatus::Active;
-    // A delayed agent-phase packet must never keep the UI in a conversation
-    // state after the transport has returned to the control room.
-    snapshot.turn = eidolon::TurnPhase::AgentSpeaking;
+    auto status = ReadyStatus();
+    status.runtime_detail = "stale boot detail";
+    status.service_detail = "stale service detail";
+    status.conversation = ConversationPhase::Ended;
+    status.end_reason = EndReason::Error;
+    auto model = UiStateProjector::Project(status);
+    assert(model.scene == UiScene::Ended);
+    assert(model.severity == UiSeverity::Error);
+    Expect(model.detail_text, "Conversation ended with an error");
 
-    snapshot.connection = eidolon::ConnectionPhase::Connecting;
-    Expect(eidolon::CompactStateLabel(snapshot), "JOINING");
-
-    snapshot.connection = eidolon::ConnectionPhase::Ready;
-    Expect(eidolon::CompactStateLabel(snapshot), "READY");
-    Expect(eidolon::CompactVoiceDetail(snapshot), "Press BOOT to talk");
+    status.runtime = RuntimePhase::NetworkConnecting;
+    model = UiStateProjector::Project(status);
+    Expect(model.detail_text, "stale boot detail");
 }
 
-void TestReadyAndRecoveryDetails()
+void TestPresenceDoesNotOverrideConversation()
 {
-    eidolon::EidolonUiSnapshot snapshot;
-    snapshot.pairing = eidolon::PairingStatus::Active;
-    snapshot.connection = eidolon::ConnectionPhase::Ready;
-    const eidolon::EndReason end_reasons[] = {
-        eidolon::EndReason::None,
-        eidolon::EndReason::IdleNormalEnd,
-        eidolon::EndReason::ProactiveDone,
-        eidolon::EndReason::UserLeft,
-        eidolon::EndReason::Superseded,
-        eidolon::EndReason::Error,
-    };
-    for (const auto end_reason : end_reasons) {
-        snapshot.end_reason = end_reason;
-        Expect(eidolon::CompactStateLabel(snapshot), "READY");
-        Expect(eidolon::CompactVoiceDetail(snapshot), "Press BOOT to talk");
-    }
+    auto status = ReadyStatus();
+    status.presence_wake = PresenceWakePhase::VerifyingOwner;
+    auto model = UiStateProjector::Project(status);
+    Expect(model.state_label, "VERIFY");
 
-    snapshot.connection = eidolon::ConnectionPhase::Reconnecting;
-    ExpectStateAndDetail(snapshot, "REJOIN", "Restoring connection...");
-}
-
-void TestPresenceWakeProjectionAndReset()
-{
-    eidolon::EidolonUiSnapshot snapshot;
-    snapshot.pairing = eidolon::PairingStatus::Active;
-    snapshot.connection = eidolon::ConnectionPhase::Ready;
-    snapshot.presence_wake = eidolon::PresenceWakePhase::VerifyingOwner;
-    ExpectStateAndDetail(snapshot, "VERIFY", "Checking owner...");
-
-    snapshot.presence_wake = eidolon::PresenceWakePhase::OwnerRecognized;
-    ExpectStateAndDetail(snapshot, "OWNER", "Owner recognized");
-
-    snapshot.connection = eidolon::ConnectionPhase::Connecting;
-    ExpectStateAndDetail(snapshot, "JOINING", "Owner recognized");
-
-    snapshot.presence_wake = eidolon::PresenceWakePhase::Idle;
-    snapshot.connection = eidolon::ConnectionPhase::Ready;
-    ExpectStateAndDetail(snapshot, "READY", "Press BOOT to talk");
+    status.conversation = ConversationPhase::Opening;
+    model = UiStateProjector::Project(status);
+    assert(model.scene == UiScene::OpeningConversation);
+    Expect(model.state_label, "OPENING");
 }
 
 }  // namespace
 
 int main()
 {
-    TestLifecycleLabels();
-    TestPairingTakesVisualPrecedence();
-    TestConversationProjection();
-    TestConnectionProjection();
-    TestConnectionOwnsTurnProjection();
-    TestReadyAndRecoveryDetails();
-    TestPresenceWakeProjectionAndReset();
+    Expect(EidolonBrandLabel(), "EIDOLON");
+    TestSafetyAndRuntimePrecedence();
+    TestEnrollmentAndServiceAreOrthogonal();
+    TestConversationRequiresExplicitStart();
+    TestTurnAndModeProjection();
+    TestEndReasonAndDetailOwnership();
+    TestPresenceDoesNotOverrideConversation();
     return 0;
 }

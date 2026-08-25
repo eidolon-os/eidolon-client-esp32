@@ -103,61 +103,30 @@ void StackChanAvatarView::PulseEmotion(const char* emotion, int ttl_ms)
     pulse_until_us_ = esp_timer_get_time() + static_cast<int64_t>(ttl_ms) * 1000;
 }
 
-void StackChanAvatarView::Render(const EidolonUiSnapshot& snapshot)
+void StackChanAvatarView::Render(const EidolonUiModel& model)
 {
     if (!avatar_) {
         return;
     }
     DisplayLockGuard lock(display_);
 
-    // Expression: start from the presenter-resolved emotion, then let connection /
-    // pairing states the emotion string doesn't capture take over (they are the
-    // avatar's most legible cues for "resting / working / trouble / needs setup").
-    Emotion emotion = MapEmotion(snapshot.emotion);
-    if (snapshot.pairing != PairingStatus::Active) {
-        emotion = Emotion::Doubt;  // pending approval / unauthorized / waiting binding
-    } else {
-        switch (snapshot.connection) {
-        case ConnectionPhase::Offline:
-        case ConnectionPhase::Ready:
-            // Idle & not in a voice room -> rest, unless the mapper picked a mood.
-            if (emotion == Emotion::Neutral) {
-                emotion = Emotion::Sleepy;
-            }
-            break;
-        case ConnectionPhase::Connecting:
-        case ConnectionPhase::Reconnecting:
-            emotion = Emotion::Doubt;
-            break;
-        case ConnectionPhase::Unreachable:
-        case ConnectionPhase::Error:
-            emotion = Emotion::Sad;
-            break;
-        case ConnectionPhase::InRoom:
-            // Live turn: keep the presenter's dialogue emotion (thinking -> Doubt, etc.).
-            break;
-        }
+    // The device-independent projection owns semantic mood. This view only maps
+    // that mood onto the avatar engine's visual vocabulary.
+    Emotion emotion = MapEmotion(model.emotion);
+    if (model.scene == UiScene::Ready && emotion == Emotion::Neutral) {
+        emotion = Emotion::Sleepy;
     }
     // Record the resolved mood as the base; a live PulseEmotion window overrides it.
     // ApplyEmotion (here + on the 20ms timer) is the single place that calls setEmotion.
     base_emotion_code_ = static_cast<int>(emotion);
     ApplyEmotion();
 
-    // The speech bubble mirrors the live conversation (ShowChatMessage). Outside a
-    // voice room there is no dialogue, so clear any stale line.
-    if (snapshot.connection != ConnectionPhase::InRoom) {
-        avatar_->clearSpeech();
-    }
-}
-
-void StackChanAvatarView::ShowChatMessage(const char* /*role*/, const char* content)
-{
-    if (!avatar_) {
-        return;
-    }
-    DisplayLockGuard lock(display_);
-    if (content != nullptr && content[0] != '\0') {
-        avatar_->setSpeech(content);
+    if (model.scene == UiScene::Conversation && model.subtitle != nullptr &&
+        model.subtitle[0] != '\0') {
+        avatar_->setSpeech(model.subtitle);
+    } else if (model.detail_text != nullptr && model.detail_text[0] != '\0' &&
+               model.scene != UiScene::Conversation) {
+        avatar_->setSpeech(model.detail_text);
     } else {
         avatar_->clearSpeech();
     }

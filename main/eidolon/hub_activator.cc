@@ -23,19 +23,26 @@ namespace eidolon {
 
 namespace {
 
-const char* ActivationMessageForStatus(HubConfigStatus status)
+void ProjectHubConfig(Application& app, HubConfigStatus status)
 {
     switch (status) {
     case HubConfigStatus::PendingApproval:
-        return "Waiting for approval";
+        app.SetEidolonEnrollmentUi(EnrollmentPhase::PendingReview);
+        app.SetEidolonServiceUi(ServicePhase::Unavailable);
+        break;
     case HubConfigStatus::WaitingBinding:
-        return "Waiting for Agent";
+        app.SetEidolonEnrollmentUi(EnrollmentPhase::ClaimActive);
+        app.SetEidolonServiceUi(ServicePhase::Preparing);
+        break;
     case HubConfigStatus::Active:
-        return "Device registered";
+        app.SetEidolonEnrollmentUi(EnrollmentPhase::ClaimActive);
+        app.SetEidolonServiceUi(ServicePhase::Ready);
+        break;
     case HubConfigStatus::Revoked:
-        return "Device authorization required";
+        app.SetEidolonEnrollmentUi(EnrollmentPhase::Revoked);
+        app.SetEidolonServiceUi(ServicePhase::Unavailable);
+        break;
     }
-    return "Device registration failed";
 }
 
 }  // namespace
@@ -50,8 +57,8 @@ bool HubActivator::Run() {
         ESP_LOGE(TAG,
                  "RemovalJournal blocks Claim/runtime until recovery is terminal result=%d",
                  static_cast<int>(removal_recovery.result));
-        app.SetEidolonLifecycleUi(
-            LifecyclePhase::HubRegistering,
+        app.SetEidolonRuntimeUi(
+            RuntimePhase::RecoveryRequired,
             "Device removal recovery required");
         return false;
     }
@@ -75,12 +82,12 @@ bool HubActivator::Run() {
             ESP_LOGI(TAG, "Commissioning owns the RadioLease; suspending Hub activation");
             return false;
         }
-        app.SetEidolonLifecycleUi(LifecyclePhase::HubDiscovering);
+        app.SetEidolonServiceUi(ServicePhase::DiscoveringAuthority);
 
         AuthorityCandidateRecord txt;
         esp_err_t err = discovery.Discover(txt);
         if (err == ESP_OK) {
-            app.SetEidolonLifecycleUi(LifecyclePhase::HubRegistering);
+            app.SetEidolonServiceUi(ServicePhase::Registering);
             Esp32HubConfig config;
             err = client.Run(txt, device_id, config);
             if (err == ESP_OK) {
@@ -97,11 +104,7 @@ bool HubActivator::Run() {
                     ESP_LOGW(TAG, "Hub activation could not be cached; using it for this session");
                 }
 
-                app.SetEidolonLifecycleUi(
-                    LifecyclePhase::HubRegistering,
-                    config.status == HubConfigStatus::Active
-                        ? "Device registered"
-                        : ActivationMessageForStatus(config.status));
+                ProjectHubConfig(app, config.status);
                 return true;
             }
         }
@@ -118,7 +121,7 @@ bool HubActivator::Run() {
         // the device being put to use another way.
         char buffer[96];
         snprintf(buffer, sizeof(buffer), "Looking for the Hub again in %ds", retry_delay);
-        app.SetEidolonLifecycleUi(LifecyclePhase::HubDiscovering, buffer);
+        app.SetEidolonServiceUi(ServicePhase::DiscoveringAuthority, buffer);
 
         ESP_LOGW(TAG, "Hub activation failed (%s), retry in %ds", esp_err_to_name(err),
                  retry_delay);

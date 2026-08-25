@@ -19,7 +19,7 @@ namespace eidolon {
 // screen is the StackChan expressive avatar (eyes / mouth / speech bubble). The
 // presenter's fully-resolved snapshot drives the face:
 //   - emotion  <- snapshot.emotion + connection/pairing overrides (the avatar's mood)
-//   - speech   <- incremental transcript lines (ShowChatMessage)
+//   - speech   <- projected transcript subtitle
 // A ~20ms LVGL timer runs avatar->update() so decorator/animation lifetimes advance.
 // The avatar engine is the ported StackChan renderer (LVGL 9 + smooth_ui_toolkit).
 class StackChanAvatarView : public EidolonView {
@@ -37,8 +37,7 @@ public:
     // lock (called from the board's SetupUI, like the rest of UI setup).
     void Build(const BuildContext& ctx);
 
-    void Render(const EidolonUiSnapshot& snapshot) override;
-    void ShowChatMessage(const char* role, const char* content) override;
+    void Render(const EidolonUiModel& model) override;
 
     // Transiently override the face with a short-lived emotion (e.g. "happy" on
     // owner-presence wake). For ttl_ms the pulse wins over the presenter-resolved

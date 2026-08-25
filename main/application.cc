@@ -118,11 +118,27 @@ eidolon::GuardService* Application::GetGuardService()
 #endif
 }
 
-void Application::SetEidolonLifecycleUi(eidolon::LifecyclePhase phase,
-                                        const std::string& detail)
+void Application::SetEidolonRuntimeUi(eidolon::RuntimePhase phase,
+                                      const std::string& detail)
 {
     if (ui_presenter_) {
-        ui_presenter_->SetLifecyclePhase(phase, detail);
+        ui_presenter_->SetRuntimePhase(phase, detail);
+    }
+}
+
+void Application::SetEidolonEnrollmentUi(eidolon::EnrollmentPhase phase,
+                                         const std::string& detail)
+{
+    if (ui_presenter_) {
+        ui_presenter_->SetEnrollmentPhase(phase, detail);
+    }
+}
+
+void Application::SetEidolonServiceUi(eidolon::ServicePhase phase,
+                                      const std::string& detail)
+{
+    if (ui_presenter_) {
+        ui_presenter_->SetServicePhase(phase, detail);
     }
 }
 
@@ -186,11 +202,6 @@ void Application::ToggleMicrophone()
             return;
         }
         voice_transport_->SetMicrophoneEnabled(!voice_transport_->IsMicrophoneEnabled());
-        if (ui_presenter_) {
-            ui_presenter_->Apply(voice_transport_->GetSessionState(),
-                                 voice_transport_->IsMicrophoneEnabled(),
-                                 voice_transport_->LastEndReason());
-        }
     });
 }
 
@@ -286,6 +297,7 @@ void Application::OnEidolonVoiceSessionState(eidolon::VoiceSessionState state)
 
     switch (state) {
     case eidolon::VoiceSessionState::Connecting:
+    case eidolon::VoiceSessionState::Opening:
     case eidolon::VoiceSessionState::InRoom:
     case eidolon::VoiceSessionState::Reconnecting:
     case eidolon::VoiceSessionState::PendingApproval:
@@ -347,9 +359,9 @@ void Application::Initialize() {
     // The UI presenter is created before assets/network so it is the sole owner
     // of every visible Eidolon lifecycle and voice state from this point on.
     ui_presenter_ = std::make_unique<eidolon::EidolonUiPresenter>(*this);
-    SetEidolonLifecycleUi(eidolon::LifecyclePhase::LoadingAssets);
+    SetEidolonRuntimeUi(eidolon::RuntimePhase::LoadingAssets);
     ApplyLocalAssets();
-    SetEidolonLifecycleUi(eidolon::LifecyclePhase::Booting);
+    SetEidolonRuntimeUi(eidolon::RuntimePhase::Booting);
 
     // Reserve the control-plane actor before the voice transport and other
     // optional services consume internal RAM. EnsureActivationWorker() remains
@@ -372,40 +384,41 @@ void Application::Initialize() {
                 case State::QuiescingOperationalRuntime:
                 case State::AcquiringRadio:
                 case State::StartingTransport:
-                    SetEidolonLifecycleUi(
-                        eidolon::LifecyclePhase::WifiConnecting,
+                    SetEidolonRuntimeUi(
+                        eidolon::RuntimePhase::NetworkConnecting,
                         "Preparing secure device setup...");
                     break;
                 case State::Advertising:
                 case State::SessionActive:
                     SetDeviceState(kDeviceStateWifiConfiguring);
-                    SetEidolonLifecycleUi(
-                        eidolon::LifecyclePhase::WifiSetup,
+                    SetEidolonRuntimeUi(
+                        eidolon::RuntimePhase::Commissioning,
                         "Ready for secure device setup");
                     break;
                 case State::ApplyingConfiguration:
-                    SetEidolonLifecycleUi(
-                        eidolon::LifecyclePhase::WifiConnecting,
+                    SetEidolonRuntimeUi(
+                        eidolon::RuntimePhase::NetworkConnecting,
                         snapshot.transaction_committed
                             ? "Wi-Fi and Host confirmed"
                             : "Validating Wi-Fi and Host...");
                     break;
                 case State::ReturningToPreviousMode:
                 case State::RestoringPreviousMode:
-                    SetEidolonLifecycleUi(
-                        eidolon::LifecyclePhase::WifiConnecting,
+                    SetEidolonRuntimeUi(
+                        eidolon::RuntimePhase::NetworkConnecting,
                         "Returning to the confirmed Wi-Fi route...");
                     break;
                 case State::Idle:
                     if (snapshot.station_route_ready) {
-                        SetEidolonLifecycleUi(
-                            eidolon::LifecyclePhase::HubDiscovering,
+                        SetEidolonRuntimeUi(eidolon::RuntimePhase::Normal);
+                        SetEidolonServiceUi(
+                            eidolon::ServicePhase::DiscoveringAuthority,
                             "Wi-Fi route confirmed");
                         xEventGroupSetBits(event_group_,
                                            MAIN_EVENT_NETWORK_CONNECTED);
                     } else if (snapshot.previous_station_mode) {
-                        SetEidolonLifecycleUi(
-                            eidolon::LifecyclePhase::WifiScanning,
+                        SetEidolonRuntimeUi(
+                            eidolon::RuntimePhase::NetworkScanning,
                             "Restoring the previous Wi-Fi route...");
                     } else {
                         // The only screen an Owner has after a setup window
@@ -413,8 +426,8 @@ void Application::Initialize() {
                         // waiting look like a device that had failed, with the
                         // reopen gesture discoverable nowhere, so the state and
                         // the way out of it are said together.
-                        SetEidolonLifecycleUi(
-                            eidolon::LifecyclePhase::Offline,
+                        SetEidolonRuntimeUi(
+                            eidolon::RuntimePhase::Commissioning,
                             "Setup closed - long-press BOOT to reopen");
                     }
                     break;
@@ -432,17 +445,17 @@ void Application::Initialize() {
     }
 
     eidolon::VoiceSessionCallbacks callbacks;
+    callbacks.on_runtime_status = [this](const eidolon::VoiceRuntimeStatus& status) {
+        Schedule([this, status]() {
+            if (ui_presenter_) {
+                ui_presenter_->ApplyVoiceStatus(status);
+            }
+        });
+    };
     callbacks.on_session_state = [this](eidolon::VoiceSessionState state) {
         ESP_LOGI(TAG, "[EIDOLON_UI] queue session_state=%s",
                  eidolon::EidolonVoiceController::VoiceStateName(state));
         Schedule([this, state]() {
-            if (!voice_transport_ || !ui_presenter_) {
-                return;
-            }
-            ESP_LOGI(TAG, "[EIDOLON_UI] dispatch session_state=%s",
-                     eidolon::EidolonVoiceController::VoiceStateName(state));
-            ui_presenter_->Apply(state, voice_transport_->IsMicrophoneEnabled(),
-                                 voice_transport_->LastEndReason());
 #if CONFIG_EIDOLON_WAKE_WORD_ENABLE
             OnEidolonVoiceSessionState(state);
 #endif
@@ -462,12 +475,13 @@ void Application::Initialize() {
                     eidolon::CommissioningRuntime::GetInstance().IsInProgress(),
             };
             if (eidolon::IsOperationalConfirmed(snapshot)) {
-                ui_presenter_->SetLifecyclePhase(eidolon::LifecyclePhase::Operational);
+                ui_presenter_->SetRuntimePhase(eidolon::RuntimePhase::Normal);
+                ui_presenter_->SetServicePhase(eidolon::ServicePhase::Ready);
             } else if (!snapshot.commissioning_in_progress &&
                        snapshot.owner_network_ready &&
                        snapshot.hub_activation_ready) {
-                ui_presenter_->SetLifecyclePhase(
-                    eidolon::LifecyclePhase::HubDiscovering,
+                ui_presenter_->SetServicePhase(
+                    eidolon::ServicePhase::Reconnecting,
                     "Restoring the operational channel...");
             }
         });
@@ -567,7 +581,7 @@ void Application::Initialize() {
         switch (event) {
             case NetworkEvent::Scanning:
 #if CONFIG_EIDOLON_HUB_MODE
-                SetEidolonLifecycleUi(eidolon::LifecyclePhase::WifiScanning);
+                SetEidolonRuntimeUi(eidolon::RuntimePhase::NetworkScanning);
 #else
                 display->ShowNotification(Lang::Strings::SCANNING_WIFI, 30000);
 #endif
@@ -581,7 +595,7 @@ void Application::Initialize() {
                     detail += data;
                 }
                 detail += "...";
-                SetEidolonLifecycleUi(eidolon::LifecyclePhase::WifiConnecting, detail);
+                SetEidolonRuntimeUi(eidolon::RuntimePhase::NetworkConnecting, detail);
 #else
                 if (data.empty()) {
                     // Cellular network - registering without carrier info yet
@@ -598,8 +612,9 @@ void Application::Initialize() {
             }
             case NetworkEvent::Connected: {
 #if CONFIG_EIDOLON_HUB_MODE
-                SetEidolonLifecycleUi(eidolon::LifecyclePhase::HubDiscovering,
-                                      "Wi-Fi connected");
+                SetEidolonRuntimeUi(eidolon::RuntimePhase::Normal);
+                SetEidolonServiceUi(eidolon::ServicePhase::DiscoveringAuthority,
+                                    "Wi-Fi connected");
 #else
                 std::string msg = Lang::Strings::CONNECTED_TO;
                 msg += data;
@@ -611,20 +626,20 @@ void Application::Initialize() {
             case NetworkEvent::Disconnected:
 #if CONFIG_EIDOLON_HUB_MODE
                 if (!eidolon::CommissioningRuntime::GetInstance().IsInProgress()) {
-                    SetEidolonLifecycleUi(eidolon::LifecyclePhase::Offline,
-                                          "Wi-Fi disconnected");
+                    SetEidolonRuntimeUi(eidolon::RuntimePhase::NetworkConnecting,
+                                        "Wi-Fi disconnected");
                 }
 #endif
                 xEventGroupSetBits(event_group_, MAIN_EVENT_NETWORK_DISCONNECTED);
                 break;
             case NetworkEvent::WifiConfigModeEnter:
 #if CONFIG_EIDOLON_HUB_MODE
-                SetEidolonLifecycleUi(eidolon::LifecyclePhase::WifiSetup);
+                SetEidolonRuntimeUi(eidolon::RuntimePhase::Commissioning);
 #endif
                 break;
             case NetworkEvent::WifiConfigModeExit:
 #if CONFIG_EIDOLON_HUB_MODE
-                SetEidolonLifecycleUi(eidolon::LifecyclePhase::WifiScanning,
+                SetEidolonRuntimeUi(eidolon::RuntimePhase::NetworkScanning,
                                       "Applying Wi-Fi settings...");
 #endif
                 break;
@@ -762,7 +777,8 @@ void Application::HandleNetworkConnectedEvent() {
     if (state == kDeviceStateStarting || state == kDeviceStateWifiConfiguring) {
         // Network is ready, start activation
 #if CONFIG_EIDOLON_HUB_MODE
-        SetEidolonLifecycleUi(eidolon::LifecyclePhase::HubDiscovering);
+        SetEidolonRuntimeUi(eidolon::RuntimePhase::Normal);
+        SetEidolonServiceUi(eidolon::ServicePhase::DiscoveringAuthority);
 #endif
         SetDeviceState(kDeviceStateActivating);
         bool expected = false;
@@ -774,8 +790,8 @@ void Application::HandleNetworkConnectedEvent() {
             activation_in_progress_.store(false);
             ESP_LOGE(TAG, "Unable to start Hub activation actor");
             SetDeviceState(kDeviceStateWifiConfiguring);
-            SetEidolonLifecycleUi(eidolon::LifecyclePhase::Offline,
-                                  "Hub activation worker unavailable");
+            SetEidolonServiceUi(eidolon::ServicePhase::Unreachable,
+                                "Hub activation worker unavailable");
             return;
         }
         xTaskNotifyGive(activation_task_handle_);
@@ -785,8 +801,8 @@ void Application::HandleNetworkConnectedEvent() {
             voice_transport_->OnNetworkRestored();
         }
         if (hub_activation_done_) {
-            SetEidolonLifecycleUi(eidolon::LifecyclePhase::HubDiscovering,
-                                  "Restoring the operational channel...");
+            SetEidolonServiceUi(eidolon::ServicePhase::Reconnecting,
+                                "Restoring the operational channel...");
         }
 #endif
     }
@@ -806,7 +822,8 @@ void Application::HandleNetworkDisconnectedEvent() {
         state != kDeviceStateWifiConfiguring &&
         state != kDeviceStateActivating &&
         !commissioning_in_progress) {
-        SetEidolonLifecycleUi(eidolon::LifecyclePhase::Offline);
+        SetEidolonRuntimeUi(eidolon::RuntimePhase::NetworkConnecting,
+                            "Owner network disconnected");
     }
     if (voice_transport_ && !commissioning_in_progress) {
         voice_transport_->OnNetworkLost();
@@ -839,8 +856,8 @@ void Application::HandleActivationDoneEvent() {
         SetDeviceState(kDeviceStateWifiConfiguring);
 #if CONFIG_EIDOLON_HUB_MODE
         hub_activation_done_ = false;
-        SetEidolonLifecycleUi(eidolon::LifecyclePhase::Offline,
-                              "Hub activation failed; reconnect to retry");
+        SetEidolonServiceUi(eidolon::ServicePhase::Unreachable,
+                            "Hub activation failed; reconnect to retry");
 #endif
         return;
     }
@@ -871,12 +888,8 @@ void Application::HandleActivationDoneEvent() {
             voice_transport_->OnActivationComplete();
         } else {
             ESP_LOGW(TAG, "Activation completed while offline; deferring transport restore");
-            SetEidolonLifecycleUi(eidolon::LifecyclePhase::Offline);
-        }
-        if (ui_presenter_) {
-            ui_presenter_->Apply(voice_transport_->GetSessionState(),
-                                 voice_transport_->IsMicrophoneEnabled(),
-                                 voice_transport_->LastEndReason());
+            SetEidolonRuntimeUi(eidolon::RuntimePhase::NetworkConnecting,
+                                "Owner network unavailable");
         }
     }
 #if CONFIG_EIDOLON_WAKE_WORD_ENABLE
@@ -955,7 +968,8 @@ bool Application::ActivationTask() {
 
     CheckAssetsVersion();
 
-    SetEidolonLifecycleUi(eidolon::LifecyclePhase::HubDiscovering);
+    SetEidolonRuntimeUi(eidolon::RuntimePhase::Normal);
+    SetEidolonServiceUi(eidolon::ServicePhase::DiscoveringAuthority);
     eidolon::HubActivator activator;
     if (!activator.Run()) {
         ESP_LOGE(TAG, "Hub activation failed, staying in activating state");
@@ -1014,7 +1028,7 @@ void Application::CheckAssetsVersion() {
         settings.EraseKey("download_url");
 
 #if CONFIG_EIDOLON_HUB_MODE
-        SetEidolonLifecycleUi(eidolon::LifecyclePhase::Updating,
+        SetEidolonRuntimeUi(eidolon::RuntimePhase::Updating,
                               "Downloading UI assets...");
 #endif
 #if !CONFIG_EIDOLON_HUB_MODE
@@ -1038,7 +1052,7 @@ void Application::CheckAssetsVersion() {
             char buffer[32];
             snprintf(buffer, sizeof(buffer), "%d%% %uKB/s", progress, speed / 1024);
             Schedule([this, message = std::string(buffer)]() {
-                SetEidolonLifecycleUi(eidolon::LifecyclePhase::Updating, message);
+                SetEidolonRuntimeUi(eidolon::RuntimePhase::Updating, message);
             });
         });
 #else
@@ -1056,7 +1070,7 @@ void Application::CheckAssetsVersion() {
 
         if (!success) {
 #if CONFIG_EIDOLON_HUB_MODE
-            SetEidolonLifecycleUi(eidolon::LifecyclePhase::Error,
+            SetEidolonRuntimeUi(eidolon::RuntimePhase::Fault,
                                   "UI asset update failed");
 #else
             Alert(Lang::Strings::ERROR, Lang::Strings::DOWNLOAD_ASSETS_FAILED, "circle_xmark", Lang::Sounds::OGG_EXCLAMATION);
@@ -1685,7 +1699,7 @@ bool Application::UpgradeFirmware(const std::string& url, const std::string& ver
     ESP_LOGI(TAG, "Starting firmware upgrade from URL: %s", upgrade_url.c_str());
 
 #if CONFIG_EIDOLON_HUB_MODE
-    SetEidolonLifecycleUi(eidolon::LifecyclePhase::Updating,
+    SetEidolonRuntimeUi(eidolon::RuntimePhase::Updating,
                           version.empty() ? "Installing firmware..."
                                           : "Installing firmware " + version);
 #else
@@ -1709,7 +1723,7 @@ bool Application::UpgradeFirmware(const std::string& url, const std::string& ver
         char buffer[32];
         snprintf(buffer, sizeof(buffer), "%d%% %uKB/s", progress, speed / 1024);
         Schedule([this, message = std::string(buffer)]() {
-            SetEidolonLifecycleUi(eidolon::LifecyclePhase::Updating, message);
+            SetEidolonRuntimeUi(eidolon::RuntimePhase::Updating, message);
         });
     });
 #else
@@ -1728,7 +1742,7 @@ bool Application::UpgradeFirmware(const std::string& url, const std::string& ver
         audio_service_.Start(); // Restart audio service
         board.SetPowerSaveLevel(PowerSaveLevel::LOW_POWER); // Restore power save level
 #if CONFIG_EIDOLON_HUB_MODE
-        SetEidolonLifecycleUi(eidolon::LifecyclePhase::Error,
+        SetEidolonRuntimeUi(eidolon::RuntimePhase::Fault,
                               "Firmware update failed");
 #else
         Alert(Lang::Strings::ERROR, Lang::Strings::UPGRADE_FAILED, "circle_xmark", Lang::Sounds::OGG_EXCLAMATION);
@@ -1736,10 +1750,12 @@ bool Application::UpgradeFirmware(const std::string& url, const std::string& ver
         vTaskDelay(pdMS_TO_TICKS(3000));
 #if CONFIG_EIDOLON_HUB_MODE
         if (network_connected_ && hub_activation_done_) {
-            SetEidolonLifecycleUi(eidolon::LifecyclePhase::HubDiscovering,
-                                  "Restoring the operational channel...");
+            SetEidolonRuntimeUi(eidolon::RuntimePhase::Normal);
+            SetEidolonServiceUi(eidolon::ServicePhase::Reconnecting,
+                                "Restoring the operational channel...");
         } else {
-            SetEidolonLifecycleUi(eidolon::LifecyclePhase::Offline);
+            SetEidolonRuntimeUi(eidolon::RuntimePhase::NetworkConnecting,
+                                "Owner network unavailable");
         }
 #endif
         return false;
@@ -1747,7 +1763,7 @@ bool Application::UpgradeFirmware(const std::string& url, const std::string& ver
         // Upgrade success, reboot immediately
         ESP_LOGI(TAG, "Firmware upgrade successful, rebooting...");
 #if CONFIG_EIDOLON_HUB_MODE
-        SetEidolonLifecycleUi(eidolon::LifecyclePhase::Updating,
+        SetEidolonRuntimeUi(eidolon::RuntimePhase::Updating,
                               "Update complete. Restarting...");
 #else
         display->SetChatMessage("system", "Upgrade successful, rebooting...");
