@@ -20,12 +20,6 @@ constexpr size_t kMaxOwnerDomainIdBytes = 128;
 
 constexpr const char* kPemPrefix = "-----BEGIN CERTIFICATE-----";
 
-// The two values the Eidolon OS device abstraction admits for descriptor trust.
-// A development device is discovered without a manufacturer-bound identity; a
-// production device proves one. Nothing else about the act changes.
-constexpr const char* kTrustDevelopmentTofu = "development-tofu";
-constexpr const char* kTrustManufacturerBound = "manufacturer-bound";
-
 std::string JsonString(const cJSON* root, const char* key)
 {
     const cJSON* item = cJSON_GetObjectItemCaseSensitive(root, key);
@@ -108,29 +102,35 @@ std::string PrintAndDelete(cJSON* root)
 
 }  // namespace
 
-std::string BuildProvisioningDescriptorJson(const ProvisioningDescriptor& descriptor)
+std::string BuildSetupDescriptorJson(
+    const device_foundation::v1::SetupDescriptor& descriptor)
 {
+    using Keys = device_foundation::v1::SetupDescriptorKeys;
     cJSON* root = cJSON_CreateObject();
     if (root == nullptr) {
         return std::string();
     }
-    cJSON_AddStringToObject(root, "contract_version", kContractVersion);
-    cJSON_AddStringToObject(root, "device_id", descriptor.device_id.c_str());
-    cJSON_AddStringToObject(root, "device_kind", descriptor.device_kind.c_str());
-    cJSON_AddStringToObject(root, "display_name", descriptor.display_name.c_str());
-    cJSON_AddStringToObject(root, "identity_fingerprint",
-                            descriptor.identity_fingerprint.c_str());
-    cJSON_AddStringToObject(root, "session_id", descriptor.session_id.c_str());
+    // Written in canonical key order, so these bytes are the golden vector's
+    // bytes and nothing else has to be trusted to keep the two in step.
+    cJSON_AddStringToObject(root, Keys::kContractVersion,
+                            device_foundation::v1::kSetupDescriptorContractVersion);
+    cJSON_AddStringToObject(root, Keys::kDeviceId, descriptor.device_id.c_str());
+    cJSON_AddStringToObject(root, Keys::kDeviceKind, descriptor.device_kind.c_str());
+    cJSON_AddStringToObject(root, Keys::kDisplayName, descriptor.display_name.c_str());
     // Only a duration that exists is written. This layer does not decide
     // whether the offer ends — the window policy already did, and an offer with
-    // no end has nothing to serialise here.
-    if (descriptor.expires_in_seconds.has_value()) {
-        cJSON_AddNumberToObject(root, "expires_in_seconds",
-                                *descriptor.expires_in_seconds);
+    // no end has nothing to serialise here. The canonical duration type cannot
+    // hold a sentinel, so there is no number available to write instead.
+    if (descriptor.expires_in.has_value()) {
+        cJSON_AddNumberToObject(root, Keys::kExpiresInSeconds,
+                                descriptor.expires_in->seconds());
     }
-    cJSON_AddStringToObject(root, "trust",
-                            descriptor.manufacturer_bound ? kTrustManufacturerBound
-                                                          : kTrustDevelopmentTofu);
+    cJSON_AddStringToObject(root, Keys::kIdentityFingerprint,
+                            descriptor.identity_fingerprint.c_str());
+    cJSON_AddStringToObject(root, Keys::kSessionId, descriptor.session_id.c_str());
+    cJSON_AddStringToObject(root, Keys::kTrust,
+                            device_foundation::v1::SetupDescriptorTrustWireValue(
+                                descriptor.trust));
     return PrintAndDelete(root);
 }
 

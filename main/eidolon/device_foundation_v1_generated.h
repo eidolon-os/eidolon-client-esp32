@@ -4,6 +4,7 @@
 #define EIDOLON_DEVICE_FOUNDATION_V1_GENERATED_H_
 
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <set>
 #include <string>
@@ -44,6 +45,82 @@ struct OwnerDomainDescriptor {
     std::string expires_at;
     std::string signing_key_id;
     std::string signature;
+};
+
+// How much longer a setup offer lasts, when it lasts a bounded time at all.
+//
+// The class exists so that "this offer does not end" cannot be written as a
+// number. There is no public way to build one, and the only factory refuses
+// anything that is not a duration a controller could act on — so the wire can
+// never carry 0, which is what the descriptor used to send for an endless
+// window and what made every uncommissioned device look like it was advertising
+// a window that had already closed. The absence of a deadline is carried by an
+// empty std::optional, and therefore by an absent field.
+class SetupWindowRemainingSeconds {
+  public:
+    static std::optional<SetupWindowRemainingSeconds> FromPositiveSeconds(int64_t seconds) {
+        if (seconds < 1 || seconds > std::numeric_limits<uint32_t>::max()) {
+            return std::nullopt;
+        }
+        return SetupWindowRemainingSeconds(static_cast<uint32_t>(seconds));
+    }
+
+    uint32_t seconds() const { return seconds_; }
+
+  private:
+    explicit constexpr SetupWindowRemainingSeconds(uint32_t seconds) : seconds_(seconds) {}
+
+    uint32_t seconds_;
+};
+
+// Whether this descriptor's identity is bound to a product credential.
+// Development and production devices differ in this value only — the setup act
+// that follows is the same one either way.
+enum class SetupDescriptorTrust {
+    DevelopmentTofu,
+    ManufacturerBound,
+};
+
+inline constexpr const char* SetupDescriptorTrustWireValue(SetupDescriptorTrust trust) {
+    return trust == SetupDescriptorTrust::ManufacturerBound ? "manufacturer-bound"
+                                                           : "development-tofu";
+}
+
+// The descriptor's own wire version. It is not the Device Foundation "1.0":
+// this document predates a device having any Owner, and a controller that reads
+// a version it does not know must refuse rather than guess.
+inline constexpr const char* kSetupDescriptorContractVersion = "1";
+
+// The field names, in the canonical (sorted) order a descriptor is serialised
+// in. A producer that writes them in this order can be compared byte-for-byte
+// against the golden vector, which is the only thing that makes "a field was
+// added to the contract and not to the firmware" a red test rather than a
+// device the controller refuses to talk to.
+struct SetupDescriptorKeys {
+    static constexpr const char* kContractVersion = "contract_version";
+    static constexpr const char* kDeviceId = "device_id";
+    static constexpr const char* kDeviceKind = "device_kind";
+    static constexpr const char* kDisplayName = "display_name";
+    static constexpr const char* kExpiresInSeconds = "expires_in_seconds";
+    static constexpr const char* kIdentityFingerprint = "identity_fingerprint";
+    static constexpr const char* kSessionId = "session_id";
+    static constexpr const char* kTrust = "trust";
+};
+
+// What a device tells a controller about itself before it belongs to anyone.
+struct SetupDescriptor {
+    std::string device_id;
+    std::string device_kind;
+    std::string display_name;
+    std::string identity_fingerprint;
+    std::string session_id;
+    // A duration, not an instant: a device being set up has not joined a
+    // network and has no wall clock, so it can say how long this window lasts
+    // but not when it ends. Empty when the offer does not end at all — a device
+    // nobody has claimed keeps advertising until it is claimed, cancelled or
+    // powered off, and so has no duration to name.
+    std::optional<SetupWindowRemainingSeconds> expires_in;
+    SetupDescriptorTrust trust = SetupDescriptorTrust::DevelopmentTofu;
 };
 
 enum class CommissioningStatusState {

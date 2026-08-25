@@ -20,12 +20,29 @@ def load_lock() -> dict:
     return json.loads(LOCK_PATH.read_text(encoding="utf-8"))
 
 
+class MissingCanonicalSource(RuntimeError):
+    """The pinned SDK commit does not contain a file this lock claims.
+
+    That is the normal state while a contract change is still uncommitted in the
+    SDK: the canonical file exists in the working tree and nowhere in history
+    yet. Saying so is worth a sentence, because the alternative was a git
+    traceback that read like a broken tool rather than a lock waiting to be
+    repointed at the commit that carries the change.
+    """
+
+
 def sdk_blob(sdk_repo: Path, commit: str, source: str) -> bytes:
-    return subprocess.run(
+    result = subprocess.run(
         ["git", "-C", str(sdk_repo), "show", f"{commit}:{source}"],
-        check=True,
         stdout=subprocess.PIPE,
-    ).stdout
+        stderr=subprocess.DEVNULL,
+    )
+    if result.returncode != 0:
+        raise MissingCanonicalSource(
+            f"{source} is not in SDK commit {commit}: repoint sdk_commit at the "
+            f"commit that carries it"
+        )
+    return result.stdout
 
 
 def main() -> int:
@@ -45,7 +62,11 @@ def main() -> int:
     lock = load_lock()
     failures: list[str] = []
     for item in lock["files"]:
-        data = sdk_blob(args.sdk_repo, lock["sdk_commit"], item["source"])
+        try:
+            data = sdk_blob(args.sdk_repo, lock["sdk_commit"], item["source"])
+        except MissingCanonicalSource as missing:
+            failures.append(str(missing))
+            continue
         digest = hashlib.sha256(data).hexdigest()
         if digest != item["sha256"]:
             failures.append(

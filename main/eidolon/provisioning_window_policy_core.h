@@ -4,6 +4,8 @@
 #include <optional>
 #include <string>
 
+#include "device_foundation_v1_generated.h"
+
 namespace eidolon {
 
 // Why this device is offering to be set up right now. The two cases are not
@@ -63,7 +65,13 @@ ProvisioningWindowPolicy DecideProvisioningWindow(
 // device out of the box — advertised a duration the controller read as a broken
 // descriptor and refused to connect to. A sentinel is also indistinguishable
 // from a field nobody filled in, which is the other way this returns wrong.
-std::optional<int> AdvertisedWindowSeconds(const ProvisioningWindowPolicy& policy);
+//
+// The canonical duration type is what keeps that fix from being reversible: it
+// has no representation for 0, so this is the only place where "bounded" is
+// turned into a number, and it looks at no number at all when the window is
+// unbounded.
+std::optional<device_foundation::v1::SetupWindowRemainingSeconds>
+AdvertisedWindowSeconds(const ProvisioningWindowPolicy& policy);
 
 }  // namespace eidolon
 

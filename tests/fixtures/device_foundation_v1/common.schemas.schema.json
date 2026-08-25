@@ -346,6 +346,43 @@
         "grant_id": { "$ref": "#/$defs/Identifier" }
       }
     },
+    "CommissioningSessionId": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "SetupWindowRemainingSeconds": {
+      "description": "How much longer a setup offer lasts. Only a duration that exists has a value here: a positive integer. There is deliberately no encoding for an offer that does not end, because a sentinel cannot be told apart from a field nobody filled in — the device that shipped 0 for an endless window had every controller read it as a window that had already closed and refuse the descriptor. An offer with no deadline says so by omitting the field that carries this type.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "SetupDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "device_id",
+        "device_kind",
+        "display_name",
+        "identity_fingerprint",
+        "session_id",
+        "trust"
+      ],
+      "properties": {
+        "contract_version": { "const": "1" },
+        "device_id": { "$ref": "#/$defs/Identifier" },
+        "device_kind": { "$ref": "#/$defs/Identifier" },
+        "display_name": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "identity_fingerprint": { "type": "string", "pattern": "^p256:[0-9a-f]{64}$" },
+        "session_id": { "$ref": "#/$defs/CommissioningSessionId" },
+        "expires_in_seconds": {
+          "description": "Absent when this offer does not end. A device nobody has claimed keeps advertising until it is claimed, cancelled or powered off, so it has no duration to name; the absence is the whole of that answer.",
+          "$ref": "#/$defs/SetupWindowRemainingSeconds"
+        },
+        "trust": { "enum": ["development-tofu", "manufacturer-bound"] }
+      }
+    },
     "CommissioningProfile": {
       "type": "object",
       "additionalProperties": false,
@@ -430,12 +467,7 @@
         "contract": { "const": "eidolon.device-foundation.commissioning-status" },
         "contract_version": { "const": "1.0" },
         "profile_id": { "const": "eidolon-trust-p256-hpke-v1" },
-        "session_id": {
-          "type": "string",
-          "minLength": 16,
-          "maxLength": 128,
-          "pattern": "^[A-Za-z0-9_-]+$"
-        },
+        "session_id": { "$ref": "#/$defs/CommissioningSessionId" },
         "setup_generation": { "type": "integer", "minimum": 1 },
         "state_revision": { "type": "integer", "minimum": 1 },
         "state": {
@@ -524,12 +556,7 @@
       "properties": {
         "contract": { "const": "eidolon.device-foundation.commissioning-terminal-ack" },
         "contract_version": { "const": "1.0" },
-        "session_id": {
-          "type": "string",
-          "minLength": 16,
-          "maxLength": 128,
-          "pattern": "^[A-Za-z0-9_-]+$"
-        },
+        "session_id": { "$ref": "#/$defs/CommissioningSessionId" },
         "setup_generation": { "type": "integer", "minimum": 1 },
         "observed_state_revision": { "type": "integer", "minimum": 1 }
       }

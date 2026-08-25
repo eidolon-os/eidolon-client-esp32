@@ -80,8 +80,10 @@ void TheAdvertisedDurationSaysWhatTheDeviceWillActuallyDo()
     // offer must not advertise one: a device that announced 600 seconds and
     // then kept listening would be lying in the direction that makes the
     // controller give up while the device is still reachable.
-    assert(AdvertisedWindowSeconds(DecideProvisioningWindow(
-               ProvisioningWindowTrigger::OwnerPresenceReopen, 600)) == 600);
+    const auto advertised = AdvertisedWindowSeconds(DecideProvisioningWindow(
+        ProvisioningWindowTrigger::OwnerPresenceReopen, 600));
+    assert(advertised.has_value());
+    assert(advertised->seconds() == 600);
 }
 
 void AnUnboundedWindowHasNoDurationToAdvertiseAtAll()
@@ -90,10 +92,13 @@ void AnUnboundedWindowHasNoDurationToAdvertiseAtAll()
     // and the controller, which requires a positive duration, refused every
     // brand new device on the grounds that its descriptor broke the contract.
     // "There is a deadline" and "there is no deadline" are two different facts,
-    // so the absent one must not be reachable as an int.
-    const std::optional<int> advertised = AdvertisedWindowSeconds(
+    // so the absent one must not be reachable as a number — the canonical
+    // duration type has no representation for one, and this returns nothing.
+    const auto advertised = AdvertisedWindowSeconds(
         DecideProvisioningWindow(ProvisioningWindowTrigger::NeverCommissioned, 600));
     assert(!advertised.has_value());
+    assert(!device_foundation::v1::SetupWindowRemainingSeconds::FromPositiveSeconds(0)
+                .has_value());
 }
 
 }  // namespace

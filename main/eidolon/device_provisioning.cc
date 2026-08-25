@@ -163,7 +163,7 @@ esp_err_t DeviceProvisioningService::HandleDescriptor(uint32_t, const uint8_t*, 
                                                      uint8_t** outbuf, ssize_t* outlen, void*)
 {
     auto& self = GetInstance();
-    ProvisioningDescriptor descriptor;
+    device_foundation::v1::SetupDescriptor descriptor;
     auto& identity = DeviceIdentity::GetInstance();
     if (identity.EnsureKeypair() != ESP_OK || identity.DeviceInstanceId().empty()) {
         return ESP_FAIL;
@@ -173,15 +173,15 @@ esp_err_t DeviceProvisioningService::HandleDescriptor(uint32_t, const uint8_t*, 
     descriptor.display_name = BOARD_NAME;
     descriptor.identity_fingerprint = DeviceIdentity::GetInstance().Fingerprint();
     descriptor.session_id = self.session_id_;
-    descriptor.expires_in_seconds = AdvertisedWindowSeconds(self.window_);
+    descriptor.expires_in = AdvertisedWindowSeconds(self.window_);
     // This build carries a shared development secret unless it was given a
     // per-device one, and says so rather than letting the controller assume.
 #ifdef CONFIG_EIDOLON_PROVISIONING_MANUFACTURER_BOUND
-    descriptor.manufacturer_bound = true;
+    descriptor.trust = device_foundation::v1::SetupDescriptorTrust::ManufacturerBound;
 #else
-    descriptor.manufacturer_bound = false;
+    descriptor.trust = device_foundation::v1::SetupDescriptorTrust::DevelopmentTofu;
 #endif
-    return Answer(BuildProvisioningDescriptorJson(descriptor), outbuf, outlen);
+    return Answer(BuildSetupDescriptorJson(descriptor), outbuf, outlen);
 }
 
 esp_err_t DeviceProvisioningService::HandleTrust(uint32_t, const uint8_t* inbuf, ssize_t inlen,

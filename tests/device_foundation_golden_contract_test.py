@@ -77,6 +77,25 @@ def main() -> None:
     assert wire["envelope"]["aad"]["owner_domain_id"] == "owner-domain_01"
     assert "business_owner_id" not in canonical(wire["envelope"])
 
+    # The setup descriptor's field table lives in the SDK now. The generated
+    # header has to carry a key constant for every field the vector declares,
+    # because the serialiser writes the document out of those constants: a field
+    # the contract gained and the header did not is a field this device cannot
+    # advertise, and the controller then refuses a descriptor neither side
+    # believes it got wrong.
+    setup = json.loads((FIXTURES / "setup-descriptor.json").read_text())
+    keys = re.search(r"struct SetupDescriptorKeys \{(.*?)\n\};", header, re.S)
+    assert keys is not None
+    declared = set(re.findall(r'"([a-z][a-z0-9_]*)"', keys.group(1)))
+    assert declared == set(setup["required_fields"]) | set(setup["optional_fields"])
+    assert setup["optional_fields"] == ["expires_in_seconds"]
+    # There is no constructor that could produce the sentinel this contract
+    # used to ship, so the header must keep refusing it rather than clamping.
+    assert "FromPositiveSeconds" in header
+    assert "if (seconds < 1" in header
+    for value in setup["trust_values"]:
+        assert f'"{value}"' in header, value
+
     erase = json.loads((FIXTURES / "device-local-erase.json").read_text())
     assert canonical(erase["operation"]) == erase["operation_canonical_utf8"]
     assert canonical(erase["ack_signing_document"]) == erase["ack_canonical_utf8"]

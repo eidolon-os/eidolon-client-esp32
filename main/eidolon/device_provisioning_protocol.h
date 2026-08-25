@@ -27,30 +27,19 @@ namespace eidolon {
 // that names decryption rather than the empty request that caused it.
 
 // What this device tells a controller about itself before it belongs to anyone.
-struct ProvisioningDescriptor {
-    std::string device_id;
-    std::string device_kind;
-    std::string display_name;
-    std::string identity_fingerprint;
-    std::string session_id;
-    // A duration, not an instant. A device being set up has not joined a network
-    // and has no wall clock, so it can say how long this window lasts but not
-    // when it ends; the controller turns this into the absolute expiry its own
-    // contract carries.
-    //
-    // Absent when this offer does not end — a device nobody has claimed keeps
-    // advertising until it is claimed, cancelled or powered off, and so has no
-    // duration to name. The absence travels as the absence of the field, not as
-    // a number standing in for it: whoever decides there is no deadline has no
-    // number to give, so no consumer has to know which number meant "never".
-    std::optional<int> expires_in_seconds;
-    // Whether this descriptor's identity is bound to a product credential.
-    // Development and production devices differ in this value only — the act
-    // that follows is the same one either way.
-    bool manufacturer_bound = false;
-};
-
-std::string BuildProvisioningDescriptorJson(const ProvisioningDescriptor& descriptor);
+//
+// The descriptor's fields are the SDK's `SetupDescriptor`, not a table restated
+// here. It used to be a table here and a second one in the controller, and the
+// two were kept in step by review: this device encoded an endless setup window
+// as `expires_in_seconds: 0`, the controller refused any duration it could not
+// act on, and every device out of the box was told its own description broke
+// the v1 contract. Neither end was wrong about its own half.
+//
+// Emitted in canonical (sorted-key) order so the bytes can be compared against
+// the SDK golden vector — which is what makes a field added to the contract and
+// not here a red test rather than a device nobody can commission.
+std::string BuildSetupDescriptorJson(
+    const device_foundation::v1::SetupDescriptor& descriptor);
 
 // The one thing a controller hands this device: the Owner Domain it belongs to.
 //

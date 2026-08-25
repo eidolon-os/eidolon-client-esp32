@@ -1,0 +1,56 @@
+{
+  "vector_id": "DF-SETUP-DESCRIPTOR-001",
+  "schema": "https://contracts.eidolon.live/device-foundation/v1/common/schemas.schema.json#/$defs/SetupDescriptor",
+  "contract_version": "1",
+  "required_fields": [
+    "contract_version",
+    "device_id",
+    "device_kind",
+    "display_name",
+    "identity_fingerprint",
+    "session_id",
+    "trust"
+  ],
+  "optional_fields": [
+    "expires_in_seconds"
+  ],
+  "trust_values": [
+    "development-tofu",
+    "manufacturer-bound"
+  ],
+  "bounded_window": {
+    "descriptor": {
+      "contract_version": "1",
+      "device_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+      "device_kind": "atk-dnesp32s3",
+      "display_name": "Eidolon atk-dnesp32s3",
+      "identity_fingerprint": "p256:591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+      "session_id": "setup_session_01",
+      "expires_in_seconds": 600,
+      "trust": "manufacturer-bound"
+    },
+    "canonical_utf8": "{\"contract_version\":\"1\",\"device_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"device_kind\":\"atk-dnesp32s3\",\"display_name\":\"Eidolon atk-dnesp32s3\",\"expires_in_seconds\":600,\"identity_fingerprint\":\"p256:591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"session_id\":\"setup_session_01\",\"trust\":\"manufacturer-bound\"}",
+    "canonical_sha256": "sha256:103cfa3c0c02b9d3b2d0c8082de1f38b027de49ed7289df70238e8d09f394a35"
+  },
+  "no_deadline": {
+    "descriptor": {
+      "contract_version": "1",
+      "device_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+      "device_kind": "atk-dnesp32s3",
+      "display_name": "Eidolon atk-dnesp32s3",
+      "identity_fingerprint": "p256:591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+      "session_id": "setup_session_01",
+      "trust": "development-tofu"
+    },
+    "canonical_utf8": "{\"contract_version\":\"1\",\"device_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"device_kind\":\"atk-dnesp32s3\",\"display_name\":\"Eidolon atk-dnesp32s3\",\"identity_fingerprint\":\"p256:591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"session_id\":\"setup_session_01\",\"trust\":\"development-tofu\"}",
+    "canonical_sha256": "sha256:9669cd0ad4ad51bc61c6e86a77ac6cdc50514657a49ca2a7eac59a40b4b66ce9"
+  },
+  "rejected_expires_in_seconds": [
+    0,
+    -1,
+    1.5,
+    null,
+    "600",
+    true
+  ]
+}

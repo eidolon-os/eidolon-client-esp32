@@ -33,12 +33,16 @@ ProvisioningWindowPolicy DecideProvisioningWindow(
     return policy;
 }
 
-std::optional<int> AdvertisedWindowSeconds(const ProvisioningWindowPolicy& policy)
+std::optional<device_foundation::v1::SetupWindowRemainingSeconds>
+AdvertisedWindowSeconds(const ProvisioningWindowPolicy& policy)
 {
     if (!policy.bounded) {
         return std::nullopt;
     }
-    return policy.seconds;
+    // DecideProvisioningWindow has already clamped a bounded window into the
+    // configured range, so this can only fail if that stopped being true.
+    return device_foundation::v1::SetupWindowRemainingSeconds::FromPositiveSeconds(
+        policy.seconds);
 }
 
 }  // namespace eidolon
