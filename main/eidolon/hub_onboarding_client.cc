@@ -1,5 +1,7 @@
 #include "hub_onboarding_client.h"
 
+#include "board.h"
+
 #include "authority_locator.h"
 #include "device_identity.h"
 #include "device_control_delivery_client.h"
@@ -584,7 +586,18 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
         const std::string hardware_evidence =
             evidence_document + "." + evidence_signature;
         const std::string hardware_digest = Sha256Digest(hardware_evidence);
-        const std::string manifest_document = "{\"endpoints\":[]}";
+        // What this board actually is. Asked of the board rather than assumed:
+        // a build with no camera must not offer one, or the Host provisions a
+        // video channel nobody publishes to.
+        //
+        // The canonical Admission cutover left a `{"endpoints":[]}` placeholder
+        // here, so every device claimed through it declared nothing at all. It
+        // was admitted, mounted and bound to a Companion, and then the Channel
+        // Provider had nothing to provision from: the device sat in
+        // WaitingBinding forever, having told the Host it could carry nothing.
+        const bool has_camera = Board::GetInstance().GetCamera() != nullptr;
+        const std::string manifest_document =
+            BuildDeviceManifestJson(BOARD_NAME, has_camera);
         const std::string manifest_digest = Sha256Digest(manifest_document);
         const std::string canonical_create =
             std::string("{\"profile_id\":\"eidolon-trust-p256-hpke-v1\"") +
@@ -599,7 +612,8 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
                 std::string("\"scheme\":\"protocomm-security2-srp6a-aes256gcm\",\"proof\":") +
                 Quote(commissioning_proof) + ",\"nonce\":" + Quote(nonce) + "}" +
             ",\"manifest\":{" +
-                std::string("\"manifest_id\":\"box3-device-manifest\",\"revision\":1,\"digest\":") +
+                std::string("\"manifest_id\":") + Quote(BOARD_NAME) +
+                ",\"revision\":1,\"digest\":" +
                 Quote(manifest_digest) + ",\"document\":" + manifest_document + "}" +
             ",\"handoff_key\":{" +
                 std::string("\"scheme\":\"DHKEM-P256-HKDF-SHA256\",\"public_key\":") +
