@@ -1,4 +1,5 @@
 #include <cassert>
+#include <optional>
 #include <string>
 
 #include "eidolon/provisioning_window_policy_core.h"
@@ -80,9 +81,19 @@ void TheAdvertisedDurationSaysWhatTheDeviceWillActuallyDo()
     // then kept listening would be lying in the direction that makes the
     // controller give up while the device is still reachable.
     assert(AdvertisedWindowSeconds(DecideProvisioningWindow(
-               ProvisioningWindowTrigger::NeverCommissioned, 600)) == 0);
-    assert(AdvertisedWindowSeconds(DecideProvisioningWindow(
                ProvisioningWindowTrigger::OwnerPresenceReopen, 600)) == 600);
+}
+
+void AnUnboundedWindowHasNoDurationToAdvertiseAtAll()
+{
+    // Not "zero seconds" — no number. A factory device once advertised 0 here
+    // and the controller, which requires a positive duration, refused every
+    // brand new device on the grounds that its descriptor broke the contract.
+    // "There is a deadline" and "there is no deadline" are two different facts,
+    // so the absent one must not be reachable as an int.
+    const std::optional<int> advertised = AdvertisedWindowSeconds(
+        DecideProvisioningWindow(ProvisioningWindowTrigger::NeverCommissioned, 600));
+    assert(!advertised.has_value());
 }
 
 }  // namespace
@@ -96,5 +107,6 @@ int main()
     TheConfiguredRangeEndpointsPassThroughUntouched();
     ADurationOutsideTheConfiguredRangeStillLeavesAUsableWindow();
     TheAdvertisedDurationSaysWhatTheDeviceWillActuallyDo();
+    AnUnboundedWindowHasNoDurationToAdvertiseAtAll();
     return 0;
 }

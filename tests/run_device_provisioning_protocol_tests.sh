@@ -12,6 +12,7 @@ read -r -a cjson_flags <<<"$(pkg-config --cflags --libs libcjson)"
   -I main \
   tests/device_provisioning_protocol_test.cc \
   main/eidolon/device_provisioning_protocol.cc \
+  main/eidolon/provisioning_window_policy_core.cc \
   "${cjson_flags[@]}" \
   -o "${output}"
 

@@ -33,9 +33,12 @@ ProvisioningWindowPolicy DecideProvisioningWindow(
     return policy;
 }
 
-int AdvertisedWindowSeconds(const ProvisioningWindowPolicy& policy)
+std::optional<int> AdvertisedWindowSeconds(const ProvisioningWindowPolicy& policy)
 {
-    return policy.bounded ? policy.seconds : 0;
+    if (!policy.bounded) {
+        return std::nullopt;
+    }
+    return policy.seconds;
 }
 
 }  // namespace eidolon

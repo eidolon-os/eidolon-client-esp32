@@ -1,6 +1,7 @@
 #ifndef EIDOLON_PROVISIONING_WINDOW_POLICY_CORE_H_
 #define EIDOLON_PROVISIONING_WINDOW_POLICY_CORE_H_
 
+#include <optional>
 #include <string>
 
 namespace eidolon {
@@ -51,10 +52,18 @@ ProvisioningWindowTrigger ProvisioningWindowTriggerFor(
 ProvisioningWindowPolicy DecideProvisioningWindow(
     ProvisioningWindowTrigger trigger, int configured_window_seconds);
 
-// What the descriptor tells the controller. Zero means "no expiry": the
-// controller must not compute a deadline the device is not going to honour in
-// either direction.
-int AdvertisedWindowSeconds(const ProvisioningWindowPolicy& policy);
+// How long the descriptor may tell the controller this offer lasts — and
+// nothing at all when it does not end. "There is a deadline" and "there is no
+// deadline" are two different facts about the offer, so an unbounded window
+// cannot produce a number here to be mistaken for one: it returns no value, and
+// the descriptor then carries no duration.
+//
+// This used to hand back 0 for an unbounded window. The controller requires a
+// positive duration, so every device that had never been commissioned — every
+// device out of the box — advertised a duration the controller read as a broken
+// descriptor and refused to connect to. A sentinel is also indistinguishable
+// from a field nobody filled in, which is the other way this returns wrong.
+std::optional<int> AdvertisedWindowSeconds(const ProvisioningWindowPolicy& policy);
 
 }  // namespace eidolon
 

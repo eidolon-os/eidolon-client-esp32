@@ -2,17 +2,21 @@
 #include <string>
 
 #include "eidolon/device_provisioning_protocol.h"
+#include "eidolon/provisioning_window_policy_core.h"
 
 namespace {
 
+using eidolon::AdvertisedWindowSeconds;
 using eidolon::BuildEnrollmentReceiptJson;
 using eidolon::BuildProvisioningDescriptorJson;
 using eidolon::BuildTrustStagedJson;
 using eidolon::BuildTrustRefusedJson;
+using eidolon::DecideProvisioningWindow;
 using eidolon::IsCommissionableCertificate;
 using eidolon::IsCommissionedOwnerDomain;
 using eidolon::ParseTrustHandover;
 using eidolon::ProvisioningDescriptor;
+using eidolon::ProvisioningWindowTrigger;
 using eidolon::TrustHandover;
 
 // The same certificate twice: as it travels inside JSON, and as it arrives once
@@ -64,6 +68,41 @@ void SaysHowLongTheWindowLastsRatherThanWhenItEnds()
     const std::string body = BuildProvisioningDescriptorJson(SampleDescriptor());
     assert(Contains(body, "\"expires_in_seconds\":600"));
     assert(!Contains(body, "expires_at"));
+}
+
+void AnOfferWithNoDeadlineCarriesNoDurationField()
+{
+    // A window that never closes has no duration, so the descriptor leaves the
+    // field out entirely. It must not encode "no deadline" as a number: a
+    // controller cannot tell a sentinel apart from an uninitialised one, and
+    // the last sentinel we shipped here (0) made every factory device look
+    // like it was advertising a window that had already closed.
+    ProvisioningDescriptor descriptor = SampleDescriptor();
+    descriptor.expires_in_seconds.reset();
+    const std::string body = BuildProvisioningDescriptorJson(descriptor);
+    assert(!Contains(body, "expires_in_seconds"));
+    // Everything else about the offer is still there to be acted on.
+    assert(Contains(body, "\"session_id\":\"sess-0001\""));
+    assert(Contains(body, "\"contract_version\":\"1\""));
+}
+
+void AFactoryDeviceAdvertisesAnOfferTheControllerCanAccept()
+{
+    // The seam this whole pair of types exists for: the window policy decides
+    // whether there is a deadline at all, and only a deadline that exists
+    // reaches the wire. A device that has never been commissioned keeps its
+    // offer open, so its descriptor names no duration; an Owner reopening setup
+    // on a commissioned device gets the bounded window it advertised.
+    ProvisioningDescriptor factory = SampleDescriptor();
+    factory.expires_in_seconds = AdvertisedWindowSeconds(DecideProvisioningWindow(
+        ProvisioningWindowTrigger::NeverCommissioned, 600));
+    assert(!Contains(BuildProvisioningDescriptorJson(factory), "expires_in_seconds"));
+
+    ProvisioningDescriptor reopened = SampleDescriptor();
+    reopened.expires_in_seconds = AdvertisedWindowSeconds(DecideProvisioningWindow(
+        ProvisioningWindowTrigger::OwnerPresenceReopen, 600));
+    assert(Contains(BuildProvisioningDescriptorJson(reopened),
+                    "\"expires_in_seconds\":600"));
 }
 
 void DeclaresDevelopmentAndProductionTrustAsOneField()
@@ -220,6 +259,8 @@ int main()
 {
     DescribesThisDeviceToAController();
     SaysHowLongTheWindowLastsRatherThanWhenItEnds();
+    AnOfferWithNoDeadlineCarriesNoDurationField();
+    AFactoryDeviceAdvertisesAnOfferTheControllerCanAccept();
     DeclaresDevelopmentAndProductionTrustAsOneField();
     AcceptsTheOwnerDomainAControllerHandsOver();
     RefusesAHandoverThatNamesNoOwnerDomain();

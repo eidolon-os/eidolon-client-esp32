@@ -121,7 +121,13 @@ std::string BuildProvisioningDescriptorJson(const ProvisioningDescriptor& descri
     cJSON_AddStringToObject(root, "identity_fingerprint",
                             descriptor.identity_fingerprint.c_str());
     cJSON_AddStringToObject(root, "session_id", descriptor.session_id.c_str());
-    cJSON_AddNumberToObject(root, "expires_in_seconds", descriptor.expires_in_seconds);
+    // Only a duration that exists is written. This layer does not decide
+    // whether the offer ends — the window policy already did, and an offer with
+    // no end has nothing to serialise here.
+    if (descriptor.expires_in_seconds.has_value()) {
+        cJSON_AddNumberToObject(root, "expires_in_seconds",
+                                *descriptor.expires_in_seconds);
+    }
     cJSON_AddStringToObject(root, "trust",
                             descriptor.manufacturer_bound ? kTrustManufacturerBound
                                                           : kTrustDevelopmentTofu);
