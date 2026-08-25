@@ -1,11 +1,30 @@
+#include <cJSON.h>
+
 #include <cassert>
+#include <fstream>
 #include <map>
+#include <sstream>
 #include <string>
 
 #include "eidolon/hub_onboarding_protocol.h"
 #include "eidolon/hub_txt_parser.h"
 
 namespace {
+
+// The Device Foundation golden vector, synced byte-for-byte from the SDK by
+// scripts/sync_device_foundation_v1.py. Tests read it rather than restating it:
+// an inlined copy of the canonical signing bytes is a second authority, and the
+// two drifted the moment a descriptor field was added — signature verification
+// would break on device with this suite still green.
+std::string ReadGoldenVector()
+{
+    std::ifstream file(
+        "tests/fixtures/device_foundation_v1/owner-domain-descriptor.json");
+    assert(file.is_open());
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
 
 using eidolon::HubConfigStatus;
 
@@ -42,10 +61,45 @@ void TestMdnsConsumesOnlyDescriptorContract()
                record) == ESP_ERR_INVALID_RESPONSE);
 }
 
-void TestDescriptorParsesToCanonicalSignedDocument()
+void TestDescriptorCanonicalisationMatchesTheGoldenVector()
 {
+    cJSON* vector = cJSON_Parse(ReadGoldenVector().c_str());
+    assert(vector != nullptr);
+    const cJSON* document = cJSON_GetObjectItemCaseSensitive(vector, "descriptor");
+    char* encoded = cJSON_PrintUnformatted(document);
+    assert(encoded != nullptr);
+    const std::string descriptor(encoded);
+    cJSON_free(encoded);
+    const cJSON* expected =
+        cJSON_GetObjectItemCaseSensitive(vector, "canonical_signing_utf8");
+    assert(cJSON_IsString(expected));
+    const std::string expected_canonical(expected->valuestring);
+    cJSON_Delete(vector);
+
+    eidolon::device_foundation::v1::OwnerDomainDescriptor parsed;
+    std::string canonical;
+    assert(eidolon::ParseOwnerDomainDescriptor(descriptor, parsed, canonical));
+    assert(canonical == expected_canonical);
+    assert(parsed.owner_domain_id == "owner-domain_01");
+    assert(parsed.owner_domain_generation == 3);
+    assert(parsed.endpoints.size() == 2);
+    assert(parsed.endpoints.front().authority ==
+           eidolon::device_foundation::v1::LogicalAuthority::Admission);
+    // The document says where it is published; the device never derives that
+    // from an endpoint base address.
+    assert(parsed.descriptor_uri ==
+           "https://host-a.owner.test/api/device-onboarding/v1/descriptor");
+    assert(parsed.descriptor_uri != parsed.endpoints.front().uri + "/descriptor");
+}
+
+void TestDescriptorWithoutItsOwnRouteIsRejected()
+{
+    // A document that does not say where it is published cannot be re-fetched on
+    // the Owner route, so accepting it would only move the failure later, to a
+    // request built from a guess.
     const std::string descriptor =
-        "{\"owner_domain_id\":\"owner-domain_01\",\"owner_domain_generation\":3,\"directory_revision\":7,"
+        "{\"owner_domain_id\":\"owner-domain_01\",\"owner_domain_generation\":3,"
+        "\"directory_revision\":7,"
         "\"trust_root_refs\":[\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"],"
         "\"endpoints\":[{\"authority\":\"admission\","
         "\"logical_audience\":\"eidolon-admission\","
@@ -57,23 +111,12 @@ void TestDescriptorParsesToCanonicalSignedDocument()
         "\"signature\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"}";
     eidolon::device_foundation::v1::OwnerDomainDescriptor parsed;
     std::string canonical;
-    assert(eidolon::ParseOwnerDomainDescriptor(descriptor, parsed, canonical));
-    assert(parsed.owner_domain_id == "owner-domain_01");
-    assert(parsed.owner_domain_generation == 3);
-    assert(canonical ==
-           "{\"directory_revision\":7,\"endpoints\":[{\"authority\":\"admission\","
-           "\"logical_audience\":\"eidolon-admission\",\"priority\":10,"
-           "\"transport_profile\":\"https-json\","
-           "\"uri\":\"https://host-a.owner.test/api/admission/v1\"}],"
-           "\"expires_at\":\"2026-08-19T00:00:00Z\","
-           "\"issued_at\":\"2026-08-18T00:00:00Z\","
-           "\"owner_domain_generation\":3,"
-           "\"owner_domain_id\":\"owner-domain_01\","
-           "\"signing_key_id\":\"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\","
-           "\"trust_root_refs\":[\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"]}");
-    assert(parsed.endpoints.size() == 1);
-    assert(parsed.endpoints.front().authority ==
-           eidolon::device_foundation::v1::LogicalAuthority::Admission);
+    assert(!eidolon::ParseOwnerDomainDescriptor(descriptor, parsed, canonical));
+
+    const std::string plaintext_route =
+        descriptor.substr(0, descriptor.size() - 1) +
+        ",\"descriptor_uri\":\"http://host-a.owner.test/api/device-onboarding/v1/descriptor\"}";
+    assert(!eidolon::ParseOwnerDomainDescriptor(plaintext_route, parsed, canonical));
 }
 
 void TestCanonicalManifest()
@@ -224,7 +267,8 @@ void TestOperationalKeyIsPresentedInTheFormTheClaimRecords()
 int main()
 {
     TestMdnsConsumesOnlyDescriptorContract();
-    TestDescriptorParsesToCanonicalSignedDocument();
+    TestDescriptorCanonicalisationMatchesTheGoldenVector();
+    TestDescriptorWithoutItsOwnRouteIsRejected();
     TestCanonicalManifest();
     TestActiveClaimConfigurationAndProviderBinding();
     TestFinishedProposalIsRecognizedOnlyFromTheAuthoritysOwnWords();

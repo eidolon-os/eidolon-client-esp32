@@ -1,15 +1,15 @@
 {
-  "sdk_commit": "dc83e8885f5cca97ef78f0d1012c8d0a4fe06195",
+  "sdk_commit": "6ecd5428cc37cdbad1f6623240efc2a82485b9cf",
   "files": [
     {
       "source": "contracts/device_foundation/v1/generated/cpp/device_foundation_v1_generated.h",
       "target": "main/eidolon/device_foundation_v1_generated.h",
-      "sha256": "c777db340de6a5713196dc596f1574be9d481346a11fd8bca1c60501990e150d"
+      "sha256": "9bec5d6d406020fed95102c64af3c833e90fd714096064d22fd13ddf236bce5f"
     },
     {
       "source": "contracts/device_foundation/v1/common/schemas.schema.json",
       "target": "tests/fixtures/device_foundation_v1/common.schemas.schema.json",
-      "sha256": "7c8d45ce6b79ff97aa2abf60b6da33964cb5ad13e463e0509ccf19674f89f71f"
+      "sha256": "f2159afeabf093559cc443262eafc21bfc3182ba716ac1392fb512c6bd084e9d"
     },
     {
       "source": "contracts/device_foundation/v1/admission/schemas.schema.json",
@@ -45,6 +45,11 @@
       "source": "contracts/device_foundation/v1/golden/device-delivery.json",
       "target": "tests/fixtures/device_foundation_v1/device-delivery.json",
       "sha256": "983e2236c0b40d8ab1c5e77138a04b6f020cb11182338a5c628d73b365e37500"
+    },
+    {
+      "source": "contracts/device_foundation/v1/golden/owner-domain-descriptor.json",
+      "target": "tests/fixtures/device_foundation_v1/owner-domain-descriptor.json",
+      "sha256": "a1601efa5bf3dd10d8e061c0d474696226c1f0c591e493b0d39f2c70594a3cfa"
     }
   ]
 }

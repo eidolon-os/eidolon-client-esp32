@@ -40,12 +40,6 @@ constexpr const char* kTrustEndpoint = "eidolon-trust";
 constexpr const char* kStatusEndpoint = "eidolon-status";
 constexpr const char* kTerminalAckEndpoint = "eidolon-terminal-ack";
 
-// How long this device offers to be set up. A window rather than a permanent
-// door: an uncommissioned device that never closed would let anything on the
-// network claim it, and every commissioning standard bounds this the same way.
-// The controller receives it as a duration and computes its own expiry.
-constexpr int kWindowSeconds = CONFIG_EIDOLON_PROVISIONING_WINDOW_SECONDS;
-
 // The leading bytes of the verifier that belongs to the shared development
 // passphrase. A build that claims a manufacturer-bound identity while carrying
 // this value would be telling controllers a per-device secret protects it when
@@ -179,7 +173,7 @@ esp_err_t DeviceProvisioningService::HandleDescriptor(uint32_t, const uint8_t*, 
     descriptor.display_name = BOARD_NAME;
     descriptor.identity_fingerprint = DeviceIdentity::GetInstance().Fingerprint();
     descriptor.session_id = self.session_id_;
-    descriptor.expires_in_seconds = kWindowSeconds;
+    descriptor.expires_in_seconds = AdvertisedWindowSeconds(self.window_);
     // This build carries a shared development secret unless it was given a
     // per-device one, and says so rather than letting the controller assume.
 #ifdef CONFIG_EIDOLON_PROVISIONING_MANUFACTURER_BOUND
@@ -421,7 +415,8 @@ esp_err_t DeviceProvisioningService::StartTransport()
 }
 
 esp_err_t DeviceProvisioningService::Start(
-    uint32_t generation, std::string session_id, Events events)
+    uint32_t generation, std::string session_id,
+    ProvisioningWindowPolicy window, Events events)
 {
     if (generation == 0 || session_id.empty()) return ESP_ERR_INVALID_ARG;
     if (running_.load(std::memory_order_acquire) &&
@@ -431,6 +426,7 @@ esp_err_t DeviceProvisioningService::Start(
     if (!resources_.Begin(generation)) return ESP_ERR_INVALID_STATE;
     events_ = std::move(events);
     session_id_ = std::move(session_id);
+    window_ = window;
     transport_generation_.store(generation, std::memory_order_release);
     cleanup_in_progress_.store(false, std::memory_order_release);
     manager_started_.store(false, std::memory_order_release);
@@ -513,6 +509,18 @@ esp_err_t DeviceProvisioningService::Start(
 
     running_.store(true, std::memory_order_release);
 
+    if (!window_.bounded) {
+        // A device nobody has claimed yet keeps the offer open. Closing it
+        // would leave a board that is not commissioned, cannot be
+        // commissioned, and has no way to say so — recoverable only by
+        // somebody standing in front of it holding a button. Security here is
+        // the SRP6a setup secret the handshake already requires, not a
+        // deadline; there is no Owner trust material on this device for an open
+        // window to give away.
+        ESP_LOGI(TAG, "Awaiting setup indefinitely: this device has no Owner yet");
+        return ESP_OK;
+    }
+
     // Arm the window this device is about to advertise. Started only once the
     // session is up, so a failed start does not leave a timer to fire into
     // nothing.
@@ -544,13 +552,13 @@ esp_err_t DeviceProvisioningService::Start(
     if (window_timer_ != nullptr) {
         const esp_err_t armed = esp_timer_start_once(
             static_cast<esp_timer_handle_t>(window_timer_),
-            static_cast<uint64_t>(kWindowSeconds) * 1000000ULL);
+            static_cast<uint64_t>(window_.seconds) * 1000000ULL);
         if (armed != ESP_OK) {
             ESP_LOGE(TAG, "Setup window is not bounded: esp_timer_start_once said %s",
                      esp_err_to_name(armed));
             return armed;
         } else {
-            ESP_LOGI(TAG, "Awaiting setup for %d seconds", kWindowSeconds);
+            ESP_LOGI(TAG, "Awaiting setup for %d seconds", window_.seconds);
         }
     } else {
         ESP_LOGE(TAG, "Setup window cannot be bounded");
@@ -565,7 +573,13 @@ void DeviceProvisioningService::OnWindowElapsed(void*)
     if (!self.running_.load(std::memory_order_acquire)) {
         return;
     }
-    ESP_LOGI(TAG, "Setup window elapsed with nobody claiming this device");
+    // Say what closed and how to get it back. The Owner is not reading this
+    // log — the projection published through window_expired reaches the panel
+    // they are looking at — but the two must agree, so the gesture is named in
+    // both places rather than left as tribal knowledge.
+    ESP_LOGW(TAG,
+             "Setup window elapsed with nobody claiming this device; "
+             "long-press BOOT to reopen it");
     if (self.events_.window_expired) {
         self.events_.window_expired(
             self.transport_generation_.load(std::memory_order_acquire));

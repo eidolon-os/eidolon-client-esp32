@@ -34,6 +34,10 @@ struct OwnerDomainDescriptor {
     std::string owner_domain_id;
     uint64_t owner_domain_generation = 0;
     uint64_t directory_revision = 0;
+    // The absolute https URL this document is published at. A consumer GETs it
+    // verbatim; deriving it from an endpoint base address is what made
+    // commissioning fail at its last step against every Host.
+    std::string descriptor_uri;
     std::vector<std::string> trust_root_refs;
     std::vector<AuthorityEndpoint> endpoints;
     std::string issued_at;

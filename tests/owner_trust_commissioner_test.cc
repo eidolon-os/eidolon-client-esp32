@@ -20,6 +20,7 @@ std::string Descriptor(const std::string& owner = "owner-domain_01")
 {
     return std::string("{\"owner_domain_id\":\"") + owner +
            "\",\"owner_domain_generation\":1,\"directory_revision\":7,"
+           "\"descriptor_uri\":\"https://host-a.owner.test/api/device-onboarding/v1/descriptor\","
            "\"trust_root_refs\":[\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"],"
            "\"endpoints\":[{\"authority\":\"admission\","
            "\"logical_audience\":\"eidolon-admission\","

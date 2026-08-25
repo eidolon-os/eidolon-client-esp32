@@ -1085,6 +1085,7 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/commissioning_transaction.cc"
         "eidolon/device_provisioning.cc"
         "eidolon/device_provisioning_protocol.cc"
+        "eidolon/provisioning_window_policy_core.cc"
         "eidolon/device_event_bus.cc"
         "eidolon/device_event_builder.cc"
         "eidolon/eidolon_audio_input.cc"

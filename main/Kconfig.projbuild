@@ -1164,15 +1164,20 @@ menu "Eidolon Hub"
             the Wi-Fi driver already in use.
 
     config EIDOLON_PROVISIONING_WINDOW_SECONDS
-        int "How long a device offers to be set up (seconds)"
+        int "How long a commissioned device reoffers to be set up (seconds)"
         default 600
         range 60 3600
         depends on EIDOLON_HUB_MODE
         help
-            An uncommissioned device that never closed its window would let
-            anything on the network claim it. The controller reads this as a
-            duration and computes its own expiry, because a device being set up
-            has no wall clock yet.
+            A device that already holds Owner trust material is the one an open
+            setup offer could hand to somebody else, so the reopen gesture is
+            bounded by this duration. A device that has never been commissioned
+            keeps advertising instead: closing that offer leaves a board that is
+            not commissioned, cannot be commissioned, and cannot say so, which
+            an Owner cannot tell apart from broken hardware. The controller
+            reads this as a duration and computes its own expiry, because a
+            device being set up has no wall clock yet; zero means the offer has
+            no expiry.
 
     config EIDOLON_OWNER_TRUST_WORKER_STACK_BYTES
         int "Owner trust commissioner worker stack (bytes)"

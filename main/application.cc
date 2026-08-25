@@ -407,9 +407,14 @@ void Application::Initialize() {
                             eidolon::LifecyclePhase::WifiScanning,
                             "Restoring the previous Wi-Fi route...");
                     } else {
+                        // The only screen an Owner has after a setup window
+                        // closes. "Closed" alone made a device that was merely
+                        // waiting look like a device that had failed, with the
+                        // reopen gesture discoverable nowhere, so the state and
+                        // the way out of it are said together.
                         SetEidolonLifecycleUi(
                             eidolon::LifecyclePhase::Offline,
-                            "Secure setup window closed");
+                            "Setup closed - long-press BOOT to reopen");
                     }
                     break;
                 }

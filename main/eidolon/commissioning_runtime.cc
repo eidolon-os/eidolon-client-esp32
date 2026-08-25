@@ -10,6 +10,9 @@
 #include "hub_pinned_http.h"
 #include "hub_trust_store.h"
 #include "owner_trust_commissioning_worker.h"
+#include "provisioning_window_policy_core.h"
+
+#include "sdkconfig.h"
 
 #include <ssid_manager.h>
 #include <wifi_manager.h>
@@ -35,6 +38,22 @@ namespace {
 
 constexpr size_t kQueueDepth = 8;
 constexpr size_t kRuntimeStackBytes = 16384;
+
+// How long a device that already has an Owner reoffers itself after the
+// physical-presence gesture. A device still waiting to be claimed does not use
+// this at all; the policy core says why.
+constexpr int kConfiguredWindowSeconds =
+    CONFIG_EIDOLON_PROVISIONING_WINDOW_SECONDS;
+
+// The policy core carries its own copy of the range so it can be tested without
+// Kconfig. Were the two to disagree, the tested rules would stop describing what
+// this build actually does, so the disagreement has to stop the build instead.
+static_assert(kConfiguredWindowSeconds >=
+                  ProvisioningWindowBounds::kMinSeconds &&
+              kConfiguredWindowSeconds <=
+                  ProvisioningWindowBounds::kMaxSeconds,
+              "EIDOLON_PROVISIONING_WINDOW_SECONDS left the range mirrored in "
+              "ProvisioningWindowBounds; update both together.");
 
 struct RuntimeMessage {
     CommissioningEvent event;
@@ -212,39 +231,85 @@ void PublishEvidence(RuntimeState& state)
     }
 }
 
+// Re-fetch the staged Owner document over the joined network and confirm the
+// Owner route serves the same directory the setup channel handed over.
+//
+// Every failure here is logged and each message is distinct. This step used to
+// return false six ways with no log at all: the Owner saw only "configuration
+// failed", and neither device, app nor Host could name the missing fact. That
+// silence is what let a wrong descriptor route survive — the request 404'd on
+// every Host and the transaction rolled back with nothing written down.
 bool ValidateStagedOwnerRoute(uint32_t generation)
 {
     OwnerTrustBundle trust;
-    if (!OwnerTrustStore().LoadStaged(generation, trust)) return false;
-    device_foundation::v1::OwnerDomainDescriptor staged;
-    std::string staged_canonical;
-    if (!ParseOwnerDomainDescriptor(trust.owner_domain_descriptor_json,
-                                    staged, staged_canonical) ||
-        staged.owner_domain_id != trust.owner_domain_id ||
-        VerifyOwnerDomainDescriptor(
-            staged, staged_canonical, trust.owner_root_certificate_pem,
-            trust.authority_signing_certificate_pem) != ESP_OK) {
+    if (!OwnerTrustStore().LoadStaged(generation, trust)) {
+        ESP_LOGE(TAG,
+                 "Owner route rejected: staged Owner trust for generation %lu "
+                 "is unreadable",
+                 static_cast<unsigned long>(generation));
         return false;
     }
-    for (const auto& endpoint : staged.endpoints) {
-        if (endpoint.authority !=
-            device_foundation::v1::LogicalAuthority::Admission) continue;
-        HubHttpResponse response;
-        if (HubHttpRequest("GET", endpoint.uri + "/descriptor",
-                           trust.owner_root_certificate_pem, "", response) != ESP_OK ||
-            response.status != 200) continue;
-        device_foundation::v1::OwnerDomainDescriptor observed;
-        std::string canonical;
-        if (ParseOwnerDomainDescriptor(response.body, observed, canonical) &&
-            observed.owner_domain_id == staged.owner_domain_id &&
-            observed.directory_revision >= staged.directory_revision &&
-            VerifyOwnerDomainDescriptor(
-                observed, canonical, trust.owner_root_certificate_pem,
-                trust.authority_signing_certificate_pem) == ESP_OK) {
-            return true;
-        }
+    device_foundation::v1::OwnerDomainDescriptor staged;
+    std::string staged_canonical;
+    if (!ParseOwnerDomainDescriptor(trust.owner_domain_descriptor_json, staged,
+                                    staged_canonical)) {
+        ESP_LOGE(TAG,
+                 "Owner route rejected: staged Owner Domain descriptor does not "
+                 "parse against the canonical contract");
+        return false;
     }
-    return false;
+    if (staged.owner_domain_id != trust.owner_domain_id) {
+        ESP_LOGE(TAG,
+                 "Owner route rejected: staged descriptor names Owner Domain "
+                 "'%s' but the staged trust names '%s'",
+                 staged.owner_domain_id.c_str(), trust.owner_domain_id.c_str());
+        return false;
+    }
+    if (VerifyOwnerDomainDescriptor(
+            staged, staged_canonical, trust.owner_root_certificate_pem,
+            trust.authority_signing_certificate_pem) != ESP_OK) {
+        ESP_LOGE(TAG,
+                 "Owner route rejected: staged descriptor signature does not "
+                 "verify under the staged Owner root");
+        return false;
+    }
+    // The parser already requires an absolute https route, so this restates the
+    // invariant where the request is actually built: a URL handed to the HTTP
+    // client must never come from an unchecked field of a signed document.
+    if (staged.descriptor_uri.rfind("https://", 0) != 0) {
+        ESP_LOGE(TAG,
+                 "Owner route rejected: staged descriptor publishes no absolute "
+                 "https descriptor_uri");
+        return false;
+    }
+    HubHttpResponse response;
+    const esp_err_t transport =
+        HubHttpRequest("GET", staged.descriptor_uri,
+                       trust.owner_root_certificate_pem, "", response);
+    if (transport != ESP_OK || response.status != 200) {
+        ESP_LOGE(TAG,
+                 "Owner route rejected: GET %s failed (transport=%s status=%d)",
+                 staged.descriptor_uri.c_str(), esp_err_to_name(transport),
+                 response.status);
+        return false;
+    }
+    device_foundation::v1::OwnerDomainDescriptor observed;
+    std::string canonical;
+    if (!ParseOwnerDomainDescriptor(response.body, observed, canonical) ||
+        observed.owner_domain_id != staged.owner_domain_id ||
+        observed.directory_revision < staged.directory_revision ||
+        VerifyOwnerDomainDescriptor(
+            observed, canonical, trust.owner_root_certificate_pem,
+            trust.authority_signing_certificate_pem) != ESP_OK) {
+        ESP_LOGE(TAG,
+                 "Owner route rejected: %s served a directory that is not the "
+                 "staged one (owner='%s' revision=%lu staged revision=%lu)",
+                 staged.descriptor_uri.c_str(), observed.owner_domain_id.c_str(),
+                 static_cast<unsigned long>(observed.directory_revision),
+                 static_cast<unsigned long>(staged.directory_revision));
+        return false;
+    }
+    return true;
 }
 
 bool CommitTransaction(RuntimeState& state, uint32_t generation)
@@ -368,8 +433,18 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
             return Enqueue(CommissioningEventType::ControllerObservedTerminal,
                            generation);
         };
+        // The trust store, not the caller of RequestOpen, decides whether this
+        // act is a first claim or an Owner reopening setup on a device that is
+        // already theirs: both intents arrive through the same gesture, and
+        // only the store knows whether there is an Owner Domain to protect.
+        // Read once per generation so the answer cannot change underneath the
+        // window that was armed from it.
+        const ProvisioningWindowPolicy window = DecideProvisioningWindow(
+            ProvisioningWindowTriggerFor(
+                OwnerTrustStore().CommissionedOwnerDomainId()),
+            kConfiguredWindowSeconds);
         const esp_err_t result = DeviceProvisioningService::GetInstance().Start(
-            action.generation, state.session_id, std::move(events));
+            action.generation, state.session_id, window, std::move(events));
         if (result != ESP_OK) {
             completion.type = CommissioningEventType::TransportStartFailed;
             Apply(state, completion);

@@ -1,0 +1,35 @@
+{
+  "vector_id": "DF-OWNER-DIRECTORY-ES256-001",
+  "profile_id": "eidolon-trust-p256-hpke-v1",
+  "descriptor": {
+    "owner_domain_id": "owner-domain_01",
+    "owner_domain_generation": 3,
+    "directory_revision": 7,
+    "descriptor_uri": "https://host-a.owner.test/api/device-onboarding/v1/descriptor",
+    "trust_root_refs": [
+      "sha256:81dfde78f973f61f95705c3003de320e81d44f8ef993e46e05b0513ceff5ea08"
+    ],
+    "endpoints": [
+      {
+        "authority": "admission",
+        "logical_audience": "eidolon-admission",
+        "uri": "https://host-a.owner.test/api/admission/v1",
+        "transport_profile": "https-json",
+        "priority": 10
+      },
+      {
+        "authority": "device-control",
+        "logical_audience": "eidolon-device-control",
+        "uri": "https://host-a.owner.test/api/device-control/v1",
+        "transport_profile": "https-json",
+        "priority": 10
+      }
+    ],
+    "issued_at": "2026-08-18T00:00:00Z",
+    "expires_at": "2027-08-18T00:00:00Z",
+    "signing_key_id": "sha256:6d7a20af65639e764cd34d2247501a096935e7feaac2b0dc8d3f1366285d4f7e",
+    "signature": "0lQGySAt7EVIS8PcahHD8fXnVT-vYbKsIMh0SlRjLReYf9dR67BWSgFkd5Fg5-Z9c6N_FvsbeIoErKrfqllMyA"
+  },
+  "canonical_signing_utf8": "{\"descriptor_uri\":\"https://host-a.owner.test/api/device-onboarding/v1/descriptor\",\"directory_revision\":7,\"endpoints\":[{\"authority\":\"admission\",\"logical_audience\":\"eidolon-admission\",\"priority\":10,\"transport_profile\":\"https-json\",\"uri\":\"https://host-a.owner.test/api/admission/v1\"},{\"authority\":\"device-control\",\"logical_audience\":\"eidolon-device-control\",\"priority\":10,\"transport_profile\":\"https-json\",\"uri\":\"https://host-a.owner.test/api/device-control/v1\"}],\"expires_at\":\"2027-08-18T00:00:00Z\",\"issued_at\":\"2026-08-18T00:00:00Z\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"signing_key_id\":\"sha256:6d7a20af65639e764cd34d2247501a096935e7feaac2b0dc8d3f1366285d4f7e\",\"trust_root_refs\":[\"sha256:81dfde78f973f61f95705c3003de320e81d44f8ef993e46e05b0513ceff5ea08\"]}",
+  "authority_signing_spki_pem": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDGUDuhxtSYkUjq9Ydj9A/hk62nj6\nlSLCwvqiGQeOvKy5Gr70biw2ZJuNw4OhkRTNEaCu9o3qERuqfYKMzhYuuw==\n-----END PUBLIC KEY-----\n"
+}

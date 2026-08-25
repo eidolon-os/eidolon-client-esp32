@@ -233,11 +233,12 @@ bool ParseOwnerDomainDescriptor(
         return false;
     }
     cJSON* root = cJSON_ParseWithLength(body.data(), body.size());
-    if (!ExactObjectSize(root, 9)) {
+    if (!ExactObjectSize(root, 10)) {
         cJSON_Delete(root);
         return false;
     }
     out.owner_domain_id = JsonString(root, "owner_domain_id");
+    out.descriptor_uri = JsonString(root, "descriptor_uri");
     out.issued_at = JsonString(root, "issued_at");
     out.expires_at = JsonString(root, "expires_at");
     out.signing_key_id = JsonString(root, "signing_key_id");
@@ -246,6 +247,7 @@ bool ParseOwnerDomainDescriptor(
         !ReadRevision(root, "owner_domain_generation",
                       out.owner_domain_generation) ||
         !ReadRevision(root, "directory_revision", out.directory_revision) ||
+        !IsHttpsUrl(out.descriptor_uri) || out.descriptor_uri.size() > 2048 ||
         out.issued_at.empty() || out.expires_at.empty() ||
         !Digest(out.signing_key_id) || !Signature(out.signature)) {
         cJSON_Delete(root);
@@ -311,8 +313,13 @@ bool ParseOwnerDomainDescriptor(
         canonical_roots += Quote(out.trust_root_refs[index]);
     }
     canonical_roots += ']';
+    // RFC 8785 orders members by their UTF-16 code units, which puts
+    // "descriptor_uri" ahead of "directory_revision". The order is not a style
+    // choice: the golden vector in tests/fixtures pins these exact bytes, and a
+    // single misplaced member verifies as a forged signature.
     canonical_signing_bytes =
-        std::string("{\"directory_revision\":") +
+        std::string("{\"descriptor_uri\":") + Quote(out.descriptor_uri) +
+        ",\"directory_revision\":" +
         std::to_string(out.directory_revision) + ",\"endpoints\":" +
         canonical_endpoints + ",\"expires_at\":" + Quote(out.expires_at) +
         ",\"issued_at\":" + Quote(out.issued_at) +
