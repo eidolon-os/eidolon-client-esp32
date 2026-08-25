@@ -5,6 +5,8 @@
 
 #include <string>
 
+#include "hub_onboarding_protocol.h"
+
 #include "device_instance_identity.h"
 
 namespace eidolon {
@@ -27,7 +29,15 @@ public:
     esp_err_t SignGetRequest(const std::string& path_query, const std::string& device_id,
                              SignedRequestHeaders& out);
     esp_err_t SignCanonical(const std::string& canonical, std::string& signature);
-    const std::string& PublicKeySpki() const { return public_key_b64_; }
+    // The same key, spelled the two ways the contracts spell it. Device
+    // Control's schema forbids a scheme prefix; Admission's carries one. They
+    // are not interchangeable on the wire, and picking the wrong one is a
+    // rejection with no other symptom, so each says which contract it is for.
+    const std::string& DeviceControlPublicKey() const { return public_key_b64_; }
+
+    std::string AdmissionOperationalPublicKey() const {
+        return CanonicalOperationalPublicKeySpki(public_key_b64_);
+    }
     const std::string& Fingerprint() const { return fingerprint_; }
     const std::string& DeviceInstanceId() const { return device_instance_id_; }
     // The recovery transaction calls this only after it has durably archived

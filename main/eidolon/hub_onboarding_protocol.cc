@@ -436,4 +436,11 @@ bool IsFinishedProposalProblem(int status, const std::string& body)
            code == "NOT_FOUND";
 }
 
+std::string CanonicalOperationalPublicKeySpki(const std::string& public_key_base64)
+{
+    if (public_key_base64.empty()) return {};
+    if (public_key_base64.rfind("p256-spki:", 0) == 0) return public_key_base64;
+    return "p256-spki:" + public_key_base64;
+}
+
 }  // namespace eidolon

@@ -300,7 +300,7 @@ std::string EspIdfClaimGrantCrypto::HandoffPublicKey() const {
 }
 
 std::string EspIdfClaimGrantCrypto::OperationalPublicKey() const {
-    return "p256-spki:" + DeviceIdentity::GetInstance().PublicKeySpki();
+    return DeviceIdentity::GetInstance().AdmissionOperationalPublicKey();
 }
 
 std::string EspIdfClaimGrantCrypto::HandoffKeyId() const {

@@ -133,7 +133,7 @@ esp_err_t DeviceControlDeliveryClient::PollAndExecute(
         std::string("{\"device_ref\":") + DeviceRefJson(claim.device_ref) +
         ",\"device_signature\":" + Quote(signature) +
         ",\"nonce\":" + Quote(nonce) +
-        ",\"public_key_spki\":" + Quote(identity.PublicKeySpki()) + "}";
+        ",\"public_key_spki\":" + Quote(identity.DeviceControlPublicKey()) + "}";
     device_foundation::v1::AuthorityEndpoint endpoint;
     err = DeviceAuthorityLocator::GetInstance().Resolve(
         device_foundation::v1::LogicalAuthority::DeviceControl, endpoint);

@@ -369,7 +369,7 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
     esp_err_t err = identity.EnsureKeypair();
     if (err != ESP_OK) return err;
     const std::string nonce = Base64UrlRandom(18);
-    const std::string public_key = identity.PublicKeySpki();
+    const std::string public_key = identity.DeviceControlPublicKey();
     std::string signature;
     err = identity.SignCanonical(
         ConfigurationProofDocument(claim.device_ref, nonce), signature);

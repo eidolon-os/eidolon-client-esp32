@@ -34,6 +34,14 @@ bool ParseLiveKitBinding(const std::string& body, Esp32HubConfig& out);
 // drops its checkpoint and proposes again for review.
 bool IsFinishedProposalProblem(int status, const std::string& body);
 
+// The canonical SPKI string the Admission Claim records for a device's
+// operational key, built from its bare base64 DER.
+//
+// Distinct from the bare base64 the pre-canonical signed-request header
+// carries, and not interchangeable with it: the Authority compares this string
+// exactly, so presenting the other form is a rejection with no other symptom.
+std::string CanonicalOperationalPublicKeySpki(const std::string& public_key_base64);
+
 }  // namespace eidolon
 
 #endif  // EIDOLON_HUB_ONBOARDING_PROTOCOL_H_

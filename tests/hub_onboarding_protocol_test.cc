@@ -179,6 +179,22 @@ void TestFinishedProposalIsRecognizedOnlyFromTheAuthoritysOwnWords()
         410, problem("PROPOSAL_EXPIRED", "device-control")));
 }
 
+void TestOperationalKeyIsPresentedInTheFormTheClaimRecords()
+{
+    // Admission records `p256-spki:<base64>`; Device Control compares that
+    // string exactly. The device also has a bare base64 form, for the
+    // pre-canonical signed-request header, and sending that one to Device
+    // Control is a 403 with no other symptom — which is what a claimed BOX-3
+    // did on every boot, forever.
+    const std::string base64 = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE";
+    assert(eidolon::CanonicalOperationalPublicKeySpki(base64) ==
+           "p256-spki:" + base64);
+    // Idempotent, so a caller that already holds the canonical form is safe.
+    assert(eidolon::CanonicalOperationalPublicKeySpki("p256-spki:" + base64) ==
+           "p256-spki:" + base64);
+    assert(eidolon::CanonicalOperationalPublicKeySpki("").empty());
+}
+
 }  // namespace
 
 int main()
@@ -188,5 +204,6 @@ int main()
     TestCanonicalManifest();
     TestActiveClaimConfigurationAndProviderBinding();
     TestFinishedProposalIsRecognizedOnlyFromTheAuthoritysOwnWords();
+    TestOperationalKeyIsPresentedInTheFormTheClaimRecords();
     return 0;
 }
