@@ -6,6 +6,9 @@
 
 #include <esp_http_client.h>
 #include <esp_log.h>
+#include <lwip/netdb.h>
+#include <lwip/inet.h>
+#include <lwip/sockets.h>
 
 #define TAG "HubHttp"
 
@@ -25,6 +28,52 @@ esp_http_client_method_t MethodFor(const std::string& method)
         return HTTP_METHOD_POST;
     }
     return HTTP_METHOD_GET;
+}
+
+// Where a URL's host actually resolves to, for the log line that reports a
+// failure to reach it.
+//
+// "Failed to connect" without an address cannot be acted on: a Host that is up
+// and a name that resolves somewhere else produce the identical message, and
+// only the second one is the device looking at the wrong machine. Resolution
+// here uses the same family this transport binds to, so what is reported is
+// what was attempted.
+std::string ResolvedAddressOf(const std::string& url)
+{
+    const size_t scheme = url.find("://");
+    if (scheme == std::string::npos) {
+        return "unparsable-url";
+    }
+    const size_t start = scheme + 3;
+    size_t end = url.find_first_of("/:", start);
+    if (end == std::string::npos) {
+        end = url.size();
+    }
+    const std::string host = url.substr(start, end - start);
+    if (host.empty()) {
+        return "unparsable-url";
+    }
+    addrinfo hints = {};
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    addrinfo* results = nullptr;
+    if (getaddrinfo(host.c_str(), nullptr, &hints, &results) != 0 || results == nullptr) {
+        return host + " does not resolve";
+    }
+    std::string reported = host + " does not resolve";
+    for (addrinfo* entry = results; entry != nullptr; entry = entry->ai_next) {
+        if (entry->ai_family != AF_INET || entry->ai_addr == nullptr) {
+            continue;
+        }
+        char text[INET_ADDRSTRLEN] = {};
+        const auto* address = reinterpret_cast<const sockaddr_in*>(entry->ai_addr);
+        if (inet_ntop(AF_INET, &address->sin_addr, text, sizeof(text)) != nullptr) {
+            reported = host + " -> " + text;
+            break;
+        }
+    }
+    freeaddrinfo(results);
+    return reported;
 }
 
 }  // namespace
@@ -76,8 +125,8 @@ esp_err_t HubHttpRequest(const std::string& method,
 
     err = esp_http_client_open(client, request_body.size());
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s %s failed to open: %s", method.c_str(), url.c_str(),
-                 esp_err_to_name(err));
+        ESP_LOGE(TAG, "%s %s failed to open: %s (%s)", method.c_str(), url.c_str(),
+                 esp_err_to_name(err), ResolvedAddressOf(url).c_str());
         esp_http_client_cleanup(client);
         return err;
     }
