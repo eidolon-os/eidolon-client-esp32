@@ -4,6 +4,7 @@
 
 #include "authority_locator.h"
 #include "device_identity.h"
+#include "device_manifest_assertion_core.h"
 #include "device_control_delivery_client.h"
 #include "esp_idf_claim_grant_crypto.h"
 #include "device_provisioning_protocol.h"
@@ -119,6 +120,22 @@ std::string ConfigurationProofDocument(
     return std::string("{\"device_ref\":") + DeviceRefCanonicalJson(ref) +
            ",\"nonce\":" + Quote(nonce) +
            ",\"operation_type\":\"device-control.configuration\"}";
+}
+
+// The document a device signs to assert its own Manifest. Keys are emitted in
+// the order RFC 8785 sorts them, as everywhere else this device signs. The
+// content is bound by its digest, which the Authority recomputes from the
+// document it receives — so this signature cannot carry from one set of
+// declared capabilities to another.
+std::string ManifestAssertionProofDocument(
+    const device_foundation::v1::DeviceRef& ref,
+    const std::string& manifest_digest,
+    const std::string& nonce)
+{
+    return std::string("{\"device_ref\":") + DeviceRefCanonicalJson(ref) +
+           ",\"manifest_digest\":" + Quote(manifest_digest) +
+           ",\"nonce\":" + Quote(nonce) +
+           ",\"operation_type\":\"device-control.manifest-assert\"}";
 }
 
 cJSON* DeviceRefJson(const device_foundation::v1::DeviceRef& ref)
@@ -406,9 +423,17 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
     if (response.status != 200) return StatusError(response.status);
     HubConfigStatus status = HubConfigStatus::PendingApproval;
     HubChannelAssignment assignment;
+    AcceptedManifestRef accepted_manifest;
     if (!ParseDeviceConfigurationResponse(
-            response.body, nonce, claim, status, assignment)) {
+            response.body, nonce, claim, status, assignment, accepted_manifest)) {
         return ESP_ERR_INVALID_RESPONSE;
+    }
+    // What this build can do is this device's own fact to state, and the answer
+    // just told it which of its declarations the Authority holds. If they
+    // differ, correct it now: a Manifest the Authority has outgrown is what the
+    // Channel Provider would otherwise keep provisioning from.
+    if (status != HubConfigStatus::Revoked) {
+        ReconcileDeclaredManifest(claim, accepted_manifest);
     }
     out = Esp32HubConfig{};
     out.status = status;
@@ -429,6 +454,66 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
         return ESP_ERR_NOT_ALLOWED;
     }
     return ESP_OK;
+}
+
+void HubOnboardingClient::ReconcileDeclaredManifest(
+    const ActiveClaimState& claim,
+    const AcceptedManifestRef& accepted)
+{
+    const bool has_camera = Board::GetInstance().GetCamera() != nullptr;
+    const std::string manifest_document =
+        BuildDeviceManifestJson(BOARD_NAME, has_camera);
+    const std::string manifest_digest = Sha256Digest(manifest_document);
+    const ManifestAssertionPlan plan =
+        PlanManifestAssertion(accepted, manifest_digest);
+    if (!plan.assert_now) return;
+
+    auto& identity = DeviceIdentity::GetInstance();
+    if (identity.EnsureKeypair() != ESP_OK) return;
+    const std::string nonce = Base64UrlRandom(18);
+    const std::string public_key = identity.DeviceControlPublicKey();
+    std::string signature;
+    if (identity.SignCanonical(
+            ManifestAssertionProofDocument(
+                claim.device_ref, manifest_digest, nonce),
+            signature) != ESP_OK ||
+        nonce.empty() || public_key.empty() || signature.size() != 86) {
+        return;
+    }
+
+    const std::string body =
+        std::string("{\"contract\":\"eidolon.device-foundation.manifest-assertion\"") +
+        ",\"contract_version\":\"1.0\"" +
+        ",\"device_ref\":" + DeviceRefCanonicalJson(claim.device_ref) +
+        ",\"manifest\":{\"manifest_id\":" + Quote(BOARD_NAME) +
+            ",\"revision\":" + std::to_string(plan.revision) +
+            ",\"digest\":" + Quote(manifest_digest) +
+            ",\"document\":" + manifest_document + "}" +
+        ",\"nonce\":" + Quote(nonce) +
+        ",\"public_key_spki\":" + Quote(public_key) +
+        ",\"device_signature\":" + Quote(signature) + "}";
+
+    device_foundation::v1::AuthorityEndpoint control;
+    if (DeviceAuthorityLocator::GetInstance().Resolve(
+            device_foundation::v1::LogicalAuthority::DeviceControl, control) !=
+        ESP_OK) {
+        return;
+    }
+    HubHttpResponse response;
+    if (HubHttpRequest("POST", control.uri + "/manifest:assert",
+                       trust_.owner_root_certificate_pem, body,
+                       response) != ESP_OK) {
+        ESP_LOGW(TAG, "Manifest assertion did not reach the Authority");
+        return;
+    }
+    if (response.status != 200) {
+        // Not fatal, and not retried in a tight loop: the next configuration
+        // poll reports what the Authority holds and this is reconsidered then.
+        ESP_LOGW(TAG, "Manifest assertion refused status=%d", response.status);
+        return;
+    }
+    ESP_LOGI(TAG, "Declared manifest revision=%d digest=%s",
+             plan.revision, manifest_digest.c_str());
 }
 
 esp_err_t HubOnboardingClient::LoadCommissionedTrust()

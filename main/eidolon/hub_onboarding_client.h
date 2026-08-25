@@ -6,6 +6,7 @@
 #include <string>
 
 #include "device_claim_consumer_core.h"
+#include "device_manifest_assertion_core.h"
 #include "hub_types.h"
 #include "hub_trust_store.h"
 
@@ -28,6 +29,12 @@ private:
         device_foundation::v1::OwnerDomainDescriptor& out);
     esp_err_t PullActiveConfiguration(const ActiveClaimState& claim,
                                       Esp32HubConfig& out);
+    // Tell the Authority what this build declares, when it differs from what
+    // the Authority just said it holds. Best effort on purpose: a device whose
+    // assertion fails is still a working device, and the next configuration
+    // poll carries the same opportunity a few seconds later.
+    void ReconcileDeclaredManifest(const ActiveClaimState& claim,
+                                   const AcceptedManifestRef& accepted);
     // [allow_reproposal] permits exactly one abandonment per activation
     // attempt: when the Authority answers that this Proposal is finished for
     // good, the checkpoint is dropped and a fresh Proposal is made in the same

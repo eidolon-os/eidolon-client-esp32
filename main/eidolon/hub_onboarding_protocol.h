@@ -4,6 +4,7 @@
 #include <string>
 
 #include "device_claim_consumer_core.h"
+#include "device_manifest_assertion_core.h"
 #include "hub_types.h"
 
 namespace eidolon {
@@ -20,7 +21,9 @@ bool ParseDeviceConfigurationResponse(
     const std::string& expected_nonce,
     const ActiveClaimState& expected,
     HubConfigStatus& status,
-    HubChannelAssignment& assignment);
+    HubChannelAssignment& assignment,
+    AcceptedManifestRef& accepted_manifest);
+
 
 bool ParseLiveKitBinding(const std::string& body, Esp32HubConfig& out);
 

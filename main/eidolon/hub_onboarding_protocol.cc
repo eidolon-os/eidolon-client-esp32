@@ -368,7 +368,8 @@ bool ParseDeviceConfigurationResponse(
     const std::string& expected_nonce,
     const ActiveClaimState& expected,
     HubConfigStatus& status,
-    HubChannelAssignment& assignment)
+    HubChannelAssignment& assignment,
+    AcceptedManifestRef& accepted_manifest)
 {
     cJSON* root = cJSON_ParseWithLength(body.data(), body.size());
     device_foundation::v1::DeviceRef ref;
@@ -388,6 +389,19 @@ bool ParseDeviceConfigurationResponse(
                  : (assignment.opaque_binding.empty()
                         ? HubConfigStatus::WaitingBinding
                         : HubConfigStatus::Active);
+    // Which of this device's own declarations the Authority holds. Absent is a
+    // valid answer and is reported as such, never as "it holds nothing".
+    accepted_manifest = AcceptedManifestRef{};
+    const cJSON* manifest = cJSON_GetObjectItemCaseSensitive(root, "manifest");
+    if (cJSON_IsObject(manifest)) {
+        const cJSON* revision = cJSON_GetObjectItemCaseSensitive(manifest, "revision");
+        const std::string digest = JsonString(manifest, "digest");
+        if (cJSON_IsNumber(revision) && revision->valueint >= 1 && !digest.empty()) {
+            accepted_manifest.known = true;
+            accepted_manifest.digest = digest;
+            accepted_manifest.revision = revision->valueint;
+        }
+    }
     cJSON_Delete(root);
     return true;
 }

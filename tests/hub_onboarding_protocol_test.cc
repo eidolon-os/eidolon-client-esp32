@@ -120,9 +120,33 @@ void TestActiveClaimConfigurationAndProviderBinding()
         "\"application/vnd.eidolon.livekit-session+json;v=2\","
         "\"issued_at_ms\":1,\"expires_at_ms\":1786000000000,"
         "\"opaque_binding\":\"e30=\"}]}";
+    eidolon::AcceptedManifestRef accepted_manifest;
     assert(eidolon::ParseDeviceConfigurationResponse(
         configuration, "configuration-nonce", active_claim, status,
-        assignment));
+        assignment, accepted_manifest));
+    // An answer that says nothing about the Manifest says nothing: it is not a
+    // statement that the Authority holds none, and must not read as one.
+    assert(!accepted_manifest.known);
+
+    // When it does report one, that is what the device measures itself against.
+    const std::string with_manifest =
+        "{\"operation\":\"device-control.configuration\","
+        "\"nonce\":\"configuration-nonce\",\"device_ref\":{"
+        "\"device_instance_id\":\"aa:bb\",\"owner_domain_id\":\"owner-domain_01\","
+        "\"owner_domain_generation\":3,\"claim_generation\":1,"
+        "\"trust_epoch\":1},"
+        "\"lifecycle_state\":\"approved\",\"manifest\":{"
+        "\"manifest_id\":\"esp-box-3\",\"revision\":4,\"digest\":"
+        "\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},"
+        "\"channels\":[]}";
+    assert(eidolon::ParseDeviceConfigurationResponse(
+        with_manifest, "configuration-nonce", active_claim, status,
+        assignment, accepted_manifest));
+    assert(accepted_manifest.known);
+    assert(accepted_manifest.revision == 4);
+    assert(accepted_manifest.digest ==
+           "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+    assert(status == eidolon::HubConfigStatus::WaitingBinding);
 
     const std::string binding =
         "{\"schema_version\":2,\"session\":{\"server_url\":\"wss://lk\","
