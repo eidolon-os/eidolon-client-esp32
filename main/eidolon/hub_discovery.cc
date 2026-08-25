@@ -56,8 +56,16 @@ esp_err_t HubDiscovery::QueryOnce(AuthorityCandidateRecord& best,
     esp_err_t err = mdns_query_ptr(service.c_str(), "_tcp",
                                    CONFIG_EIDOLON_MDNS_QUERY_TIMEOUT_MS, 20, &results);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "mdns_query_ptr failed: %s", esp_err_to_name(err));
+        ESP_LOGW(TAG, "mdns_query_ptr(%s._tcp) failed: %s", service.c_str(),
+                 esp_err_to_name(err));
         return err;
+    }
+    if (results == nullptr) {
+        // Name what was asked for. "No Hub" and "no Hub answering to this name"
+        // are different problems, and only the second one is a device looking in
+        // the wrong place — which a build carrying a service type from before it
+        // was renamed does silently, forever, with nothing in the log to say so.
+        ESP_LOGW(TAG, "Nothing answers %s._tcp on this network", service.c_str());
     }
 
     AuthorityCandidateRecord preferred;
