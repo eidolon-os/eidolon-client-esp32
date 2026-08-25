@@ -1,10 +1,10 @@
 #include "livekit_session.h"
 
 #include "eidolon_topics.h"
+#include "internal_memory_report.h"
 #include "livekit_board.h"
 
 #include <cJSON.h>
-#include <esp_heap_caps.h>
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -40,21 +40,6 @@ const char* JsonString(cJSON* root, const char* key)
 {
     cJSON* item = cJSON_GetObjectItem(root, key);
     return cJSON_IsString(item) ? item->valuestring : nullptr;
-}
-
-// livekit_room_create()/engine_init() allocates its task stack, event queue and
-// websocket client from INTERNAL RAM and reports every one of those failures as a
-// single silent "Failed to create engine". Log the internal budget around the call
-// so a memory cliff is diagnosable from the serial log alone: the largest
-// contiguous block matters more than the total, because the engine needs an
-// 8 KiB task stack and a multi-KiB event queue in one piece each.
-void LogInternalHeapBudget(const char* phase, const char* room_kind)
-{
-    ESP_LOGI(TAG, "[mem] %s room_kind=%s internal_free=%u largest_block=%u min_free=%u",
-             phase, room_kind,
-             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
-             static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)),
-             static_cast<unsigned>(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL)));
 }
 
 bool JsonBool(cJSON* root, const char* key, bool fallback)
@@ -324,6 +309,55 @@ esp_err_t LiveKitSession::EnsureMediaBoard()
     return err;
 }
 
+bool LiveKitSession::AdmitEngineMemory()
+{
+    const InternalHeapSnapshot heap = CaptureInternalHeap();
+    const EngineInternalMemoryRequirement requirement =
+        LiveKitEngineInternalMemoryRequirement();
+    const SessionMemoryVerdict verdict = JudgeSessionMemory(heap, requirement);
+
+    ESP_LOGI(TAG,
+             "[mem] room_create verdict=%s internal free=%u largest_block=%u "
+             "free_blocks=%u need_contiguous=%u need_total=%u",
+             SessionMemoryVerdictName(verdict),
+             static_cast<unsigned>(heap.free_bytes),
+             static_cast<unsigned>(heap.largest_free_block),
+             static_cast<unsigned>(heap.free_blocks),
+             static_cast<unsigned>(LargestContiguousRequirement(requirement)),
+             static_cast<unsigned>(TotalRequirement(requirement)));
+
+    if (verdict == SessionMemoryVerdict::Sufficient) {
+        return true;
+    }
+
+    const bool retry_worthwhile = memory_ledger_.RecordRefusal(heap, requirement);
+
+    // One line that carries the whole failure: what is missing, how much of it,
+    // and whether waiting can produce it. The predecessor of this message said
+    // "Failed to create engine" and left the numbers on a different line with no
+    // statement about either.
+    ESP_LOGE(TAG,
+             "Cannot build a LiveKit room: internal RAM %s. Need %u bytes in one "
+             "block (short by %u) and %u bytes total (short by %u); have %u free in "
+             "%u blocks, largest %u. Attempt %d, best block seen %u. Retrying %s.",
+             SessionMemoryVerdictName(verdict),
+             static_cast<unsigned>(LargestContiguousRequirement(requirement)),
+             static_cast<unsigned>(ContiguousShortfallBytes(heap, requirement)),
+             static_cast<unsigned>(TotalRequirement(requirement)),
+             static_cast<unsigned>(TotalShortfallBytes(heap, requirement)),
+             static_cast<unsigned>(heap.free_bytes),
+             static_cast<unsigned>(heap.free_blocks),
+             static_cast<unsigned>(heap.largest_free_block),
+             memory_ledger_.consecutive_refusals(),
+             static_cast<unsigned>(memory_ledger_.best_largest_free_block()),
+             retry_worthwhile ? "may still help" : "will not help until something frees internal RAM");
+
+    // Who is holding it. Printed only on refusal, because it is a dozen lines
+    // and it is worth every one of them exactly here.
+    LogInternalMemoryLedger("room_create_refused");
+    return false;
+}
+
 void LiveKitSession::ReleaseMediaBoard()
 {
     if (!media_board_initialized_) {
@@ -377,20 +411,48 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
     room_options.on_data_received = OnDataReceived;
     room_options.ctx = this;
 
-    LogInternalHeapBudget("room_create", "voice");
+    // The engine is built out of FreeRTOS objects, and every FreeRTOS object
+    // comes from pvPortMalloc(), which ESP-IDF hardcodes to MALLOC_CAP_INTERNAL.
+    // So the room's cost is paid entirely out of the one heap that the board's
+    // 5.8 MB of PSRAM cannot relieve, and it is paid as two separate contiguous
+    // blocks. Judge that before the call: livekit_room_create() answers a
+    // starved heap with a bare "Failed to create engine", and one of its cleanup
+    // paths frees the room while leaking the engine behind it.
+    if (!AdmitEngineMemory()) {
+        ReleaseMediaBoard();
+        return ESP_ERR_NO_MEM;
+    }
+
     if (livekit_room_create(&room_handle_, &room_options) != LIVEKIT_ERR_NONE) {
-        ESP_LOGE(TAG, "livekit_room_create failed");
-        LogInternalHeapBudget("room_create_failed", "voice");
+        // Admission said yes and the SDK still could not build it, so the
+        // requirement model in session_memory_admission_core is short of what
+        // this SDK pin actually asks for. Say that, rather than let it read as a
+        // second unexplained memory failure, and record the attempt so a run of
+        // them still terminates.
+        const InternalHeapSnapshot heap = CaptureInternalHeap();
+        const EngineInternalMemoryRequirement requirement =
+            LiveKitEngineInternalMemoryRequirement();
+        ESP_LOGE(TAG,
+                 "livekit_room_create failed despite passing admission "
+                 "(internal free=%u largest_block=%u free_blocks=%u, modelled need "
+                 "total=%u contiguous=%u) — the requirement model is under-counting",
+                 static_cast<unsigned>(heap.free_bytes),
+                 static_cast<unsigned>(heap.largest_free_block),
+                 static_cast<unsigned>(heap.free_blocks),
+                 static_cast<unsigned>(TotalRequirement(requirement)),
+                 static_cast<unsigned>(LargestContiguousRequirement(requirement)));
+        LogInternalMemoryLedger("room_create_failed");
+        memory_ledger_.RecordRefusal(heap, requirement);
         room_handle_ = nullptr;
         transcription_registered_ = false;
         agent_session_registered_ = false;
-        // Release the media board on the way out, mirroring ConnectDataOnly.
-        // Leaving the codec/AFE/renderer resident makes the caller's bounded
-        // retry AND the control-room fallback fail for the very same reason
+        // Release the media board on the way out. Leaving the codec/AFE/renderer
+        // resident makes the caller's bounded retry fail for the very same reason
         // this attempt did, turning one recoverable failure into a flap.
         ReleaseMediaBoard();
-        return ESP_FAIL;
+        return ESP_ERR_NO_MEM;
     }
+    memory_ledger_.Reset();
 
     RegisterTranscriptionHandler();
     RegisterAgentSessionDrainHandler();

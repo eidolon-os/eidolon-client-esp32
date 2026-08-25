@@ -1227,6 +1227,26 @@ void EidolonVoiceController::DoOnboardingPoll()
 
 void EidolonVoiceController::ScheduleChannelReconnect(const char* reason)
 {
+    // A timer cannot free internal RAM. Once LiveKitSession has measured the
+    // same internal-memory shortfall attempt after attempt, another tick is not
+    // a retry — it is the same measurement again, and the device would spend the
+    // rest of its uptime taking it every 30 s while telling nobody why. Say it
+    // once, stop the loop, and wait for an edge that could actually change the
+    // answer (network restored, re-activation, a person asking for a
+    // conversation), each of which clears the ceiling explicitly.
+    if (session_.InternalMemoryCeilingReached()) {
+        if (!memory_ceiling_announced_) {
+            memory_ceiling_announced_ = true;
+            SetState(VoiceSessionState::Error, "channel_internal_memory_exhausted");
+            ESP_LOGE(TAG,
+                     "[lifecycle] channel reconnect abandoned reason=%s cause=internal_memory "
+                     "short_by=%u bytes — this will not clear on its own; see the [mem] ledger "
+                     "above for what is holding internal RAM",
+                     reason ? reason : "disconnect",
+                     static_cast<unsigned>(session_.InternalMemoryShortfallBytes()));
+        }
+        return;
+    }
     if (!channel_recovery_.TrySchedule(switching_to_voice_, HasChannelConfig())) {
         return;
     }
@@ -2983,6 +3003,11 @@ void EidolonVoiceController::HandleSessionEnd(EndReason reason)
 void EidolonVoiceController::DoActivation()
 {
     channel_recovery_.OnActivation();
+    // Activation rebuilds the device's whole operational picture, so any
+    // internal-memory ceiling measured before it describes a device that no
+    // longer exists.
+    session_.ForgetInternalMemoryCeiling();
+    memory_ceiling_announced_ = false;
     // Wire the SDK callbacks to post events so all state mutation stays on the loop.
     session_.SetOnStateChanged([this](LiveKitConnectionState s, uint32_t generation) {
         Event ev;
@@ -3119,6 +3144,11 @@ void EidolonVoiceController::DoNetworkRestored()
 {
     ESP_LOGI(TAG, "Network restored; refreshing Hub discovery/config");
     channel_recovery_.OnNetworkRestored();
+    // Going offline and back tears down and rebuilds sockets, TLS sessions and
+    // buffers, which is exactly the kind of churn that can hand back the
+    // contiguous internal block a session needs. Worth one more look.
+    session_.ForgetInternalMemoryCeiling();
+    memory_ceiling_announced_ = false;
     if (reconnect_timer_ != nullptr) {
         esp_timer_stop(reconnect_timer_);
     }
@@ -3176,6 +3206,11 @@ esp_err_t EidolonVoiceController::DoJoinRoom()
     if (!presence_initiated) {
         ResetPresenceManagedSession();
     }
+    // Somebody (or presence) is asking for a conversation now. Never answer that
+    // with a refusal cached from an earlier attempt: measure the heap again and
+    // let the attempt fail on today's numbers if it must.
+    session_.ForgetInternalMemoryCeiling();
+    memory_ceiling_announced_ = false;
     ESP_LOGI(TAG,
              "[lifecycle] join executing state=%s room_kind=%s gen=%lu standby=%d "
              "connected=%d room=%s intent=%s",

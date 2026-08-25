@@ -1,6 +1,8 @@
 #include "pcm_push_capture_source.h"
 
+#include <esp_heap_caps.h>
 #include <esp_log.h>
+#include <freertos/idf_additions.h>
 
 #include <cstring>
 
@@ -22,16 +24,26 @@ PcmPushCaptureSource::PcmPushCaptureSource(uint32_t sample_rate, size_t ring_cap
     base_.stop = Stop;
     base_.close = Close;
 
-    ring_ = xStreamBufferCreate(ring_capacity_bytes, /*trigger_level=*/1);
+    // ...WithCaps, not xStreamBufferCreate: see the header. The plain call routes
+    // through pvPortMalloc() and would take this whole ring out of internal RAM,
+    // which is the one memory class the LiveKit engine cannot substitute PSRAM for.
+    // No fallback to internal on failure — a silent fallback would put the block
+    // back exactly where it starved the engine, and be invisible until the next
+    // "Failed to create engine".
+    ring_ = xStreamBufferCreateWithCaps(ring_capacity_bytes, /*trigger_level=*/1,
+                                        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (ring_ == nullptr) {
-        ESP_LOGE(TAG, "Failed to allocate %u byte PCM ring",
-                 static_cast<unsigned>(ring_capacity_bytes));
+        ESP_LOGE(TAG, "Failed to allocate %u byte PCM ring in PSRAM (psram_free=%u)",
+                 static_cast<unsigned>(ring_capacity_bytes),
+                 static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
     }
 }
 
 PcmPushCaptureSource::~PcmPushCaptureSource() {
     if (ring_ != nullptr) {
-        vStreamBufferDelete(ring_);
+        // Must pair with xStreamBufferCreateWithCaps: the plain delete would free
+        // the control block and leak the PSRAM storage behind it.
+        vStreamBufferDeleteWithCaps(ring_);
         ring_ = nullptr;
     }
 }

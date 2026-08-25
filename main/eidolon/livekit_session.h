@@ -10,6 +10,7 @@
 
 #include "eidolon_ui_types.h"
 #include "hub_types.h"
+#include "session_memory_admission_core.h"
 
 namespace eidolon {
 
@@ -34,6 +35,24 @@ public:
     esp_err_t Connect(const Esp32HubConfig& config, uint32_t generation);
 
     esp_err_t Disconnect();
+
+    // True once repeated Connect() attempts have been refused for internal RAM
+    // with the shortfall not moving. Callers own retry policy, and this is the
+    // fact that tells them a retry is not a retry — it is the same measurement
+    // again. Cleared by the next room that does get built.
+    bool InternalMemoryCeilingReached() const { return memory_ledger_.ceiling_reached(); }
+    std::size_t InternalMemoryShortfallBytes() const
+    {
+        return memory_ledger_.last_contiguous_shortfall();
+    }
+
+    // An edge that legitimately changes the device's situation — network
+    // restored, re-activation, a person asking for a conversation — earns one
+    // more look at the heap. Without this the ceiling would be permanent for the
+    // uptime, which trades a flapping retry loop for a device that has quietly
+    // stopped trying.
+    void ForgetInternalMemoryCeiling() { memory_ledger_.Reset(); }
+
     bool HasRoom() const { return room_handle_ != nullptr; }
     bool IsConnected() const;
     livekit_failure_reason_t LastFailureReason() const { return last_failure_reason_; }
@@ -65,6 +84,9 @@ private:
     // Built once and kept, because the channel it serves is kept.
     esp_err_t EnsureMediaBoard();
     void ReleaseMediaBoard();
+    // Decides, and says in the log, whether the internal heap can hold a room
+    // right now. Returns false having already reported why.
+    bool AdmitEngineMemory();
 
     livekit_room_handle_t room_handle_ = nullptr;
     std::string identity_;
@@ -74,6 +96,7 @@ private:
     bool transcription_registered_ = false;
     bool agent_session_registered_ = false;
     livekit_failure_reason_t last_failure_reason_ = LIVEKIT_FAILURE_REASON_NONE;
+    SessionMemoryRetryLedger memory_ledger_;
     uint32_t generation_ = 0;
     StateCallback on_state_changed_;
     TranscriptionCallback on_transcription_;

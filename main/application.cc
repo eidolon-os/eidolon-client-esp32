@@ -22,6 +22,7 @@
 #endif
 #include "eidolon/hub_activator.h"
 #include "eidolon/hub_types.h"
+#include "eidolon/internal_memory_report.h"
 #include "eidolon/livekit_voice_transport.h"
 #include "eidolon/activation_worker_resources.h"
 #include "eidolon/operational_readiness.h"
@@ -852,6 +853,11 @@ void Application::HandleActivationDoneEvent() {
 #if CONFIG_EIDOLON_HUB_MODE
     has_server_time_ = false;
     hub_activation_done_ = true;
+    // A baseline for the internal-RAM ledger, taken at the one moment the device
+    // is fully up and not yet in a conversation. Without a before, the ledger
+    // printed later at "could not build a room" says who is holding internal RAM
+    // but not who took it.
+    eidolon::LogInternalMemoryLedger("activation_done");
     auto app_desc = esp_app_get_description();
     ESP_LOGI(TAG, "[EIDOLON_UI] firmware ready version=%s", app_desc->version);
     board.SetPowerSaveLevel(PowerSaveLevel::PERFORMANCE);

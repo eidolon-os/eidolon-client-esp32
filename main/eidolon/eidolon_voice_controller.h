@@ -380,6 +380,11 @@ private:
 #endif
     bool switching_to_voice_ = false;
     ChannelRecovery channel_recovery_;
+    // The internal-memory ceiling is stated once per episode. One failed join
+    // walks through ConnectChannel, a Hub-config refresh and a second
+    // ConnectChannel, each of which asks to reschedule; repeating a terminal
+    // diagnosis three times makes it read like three different problems.
+    bool memory_ceiling_announced_ = false;
     bool pending_room_join_command_active_ = false;
     uint32_t pending_room_join_generation_ = 0;
     ControlCommand pending_room_join_command_;

@@ -20,9 +20,20 @@ namespace eidolon {
 // AfeAudioProcessor (AFE_TYPE_VC + AEC_MODE_VOIP_HIGH_PERF) to produce clean PCM
 // and feed it here, so LiveKit only transports already-cancelled audio.
 //
-// An internal byte ring (FreeRTOS stream buffer) decouples the AFE output frame
-// size from the encoder pull size. Single-writer (AFE task) / single-reader
-// (capture fetch task), which the stream buffer supports without extra locking.
+// A byte ring (FreeRTOS stream buffer) decouples the AFE output frame size from
+// the encoder pull size. Single-writer (AFE task) / single-reader (capture fetch
+// task), which the stream buffer supports without extra locking.
+//
+// The ring lives in PSRAM, and that placement is load-bearing rather than
+// incidental. xStreamBufferCreate() allocates through pvPortMalloc(), which
+// ESP-IDF hardcodes to MALLOC_CAP_INTERNAL — so the plain API put this half-second
+// of PCM into a single ~16 KB block of internal RAM, taken inside the media-board
+// build that runs immediately before livekit_room_create(). On the Waveshare 2.06
+// AMOLED board that block was the difference between an engine and
+// "Failed to create engine": the engine needs one contiguous ~9.3 KiB internal
+// block for its event queue and another 8 KiB for its task stack, and neither can
+// use PSRAM, while this ring can. Nothing here runs from an ISR or with the flash
+// cache disabled, so PSRAM is where it belongs.
 class PcmPushCaptureSource {
 public:
     static constexpr size_t kDefaultRingBytes = 16000;

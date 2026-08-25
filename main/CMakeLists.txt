@@ -1112,6 +1112,8 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/hub_txt_parser.cc"
         "eidolon/owner_trust_commissioner.cc"
         "eidolon/owner_trust_commissioning_worker.cc"
+        "eidolon/internal_memory_report.cc"
+        "eidolon/session_memory_admission_core.cc"
         "eidolon/livekit_board.cc"
         "eidolon/livekit_session.cc"
         "eidolon/livekit_voice_transport.cc"
