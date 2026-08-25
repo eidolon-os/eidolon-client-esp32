@@ -12,6 +12,7 @@
 #include "power_save_timer.h"
 #include "axp2101.h"
 #include "i2c_device.h"
+#include "../common/i2c_bus_recovery.h"
 
 #include <esp_log.h>
 #include <esp_lcd_panel_vendor.h>
@@ -203,6 +204,13 @@ private:
     }
 
     void InitializeCodecI2c() {
+        // Free the bus before taking the pins. A slave reset mid-transfer keeps
+        // driving SDA, and every master after it reads the bus as busy — the
+        // PMIC on this bus powers the board, so its hold survives a power cycle
+        // at the USB connector and the only way out was a person holding BOOT.
+        // On an idle bus this changes nothing.
+        RecoverI2cBus(AUDIO_CODEC_I2C_SDA_PIN, AUDIO_CODEC_I2C_SCL_PIN);
+
         // Initialize I2C peripheral
         i2c_master_bus_config_t i2c_bus_cfg = {
             .i2c_port = I2C_NUM_0,
@@ -218,7 +226,36 @@ private:
 
     void InitializeAxp2101() {
         ESP_LOGI(TAG, "Init AXP2101");
-        pmic_ = new Pmic(i2c_bus_, 0x34);
+        // Ask before writing. Writing first meant one unanswered register write
+        // aborted the whole boot, and abort restarts immediately: the board
+        // rebooted as fast as it could, for hours, holding the PMIC in the state
+        // that was causing it. A device with no way out of that but a person
+        // with the case open is not a state this firmware may enter.
+        for (int attempt = 1; attempt <= 5; ++attempt) {
+            if (i2c_master_probe(i2c_bus_, 0x34, 100) == ESP_OK) {
+                pmic_ = new Pmic(i2c_bus_, 0x34);
+                return;
+            }
+            ESP_LOGW(TAG, "AXP2101 did not answer (attempt %d/5); recovering the bus",
+                     attempt);
+            // Not ESP_ERROR_CHECK: aborting inside the recovery for an abort
+            // is the same dead end one level down.
+            const esp_err_t released = i2c_del_master_bus(i2c_bus_);
+            if (released != ESP_OK) {
+                ESP_LOGW(TAG, "Could not release the I2C bus: %s",
+                         esp_err_to_name(released));
+                vTaskDelay(pdMS_TO_TICKS(200 * attempt));
+                continue;
+            }
+            InitializeCodecI2c();  // recovers the bus before retaking the pins
+            vTaskDelay(pdMS_TO_TICKS(200 * attempt));
+        }
+        // Still nothing. Restarting is still the right answer — the fault is
+        // usually transient — but slowly, and after saying so, so the console
+        // stays readable and the retry does not itself become the fault.
+        ESP_LOGE(TAG, "AXP2101 is unreachable; restarting in 10s");
+        vTaskDelay(pdMS_TO_TICKS(10000));
+        esp_restart();
     }
 
     void InitializeSpi() {

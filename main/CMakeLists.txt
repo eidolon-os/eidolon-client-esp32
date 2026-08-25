@@ -67,6 +67,7 @@ list(APPEND SOURCES
     "boards/common/axp2101.cc"
     "boards/common/backlight.cc"
     "boards/common/button.cc"
+    "boards/common/i2c_bus_recovery.cc"
     "boards/common/i2c_device.cc"
     "boards/common/knob.cc"
     "boards/common/power_save_timer.cc"
