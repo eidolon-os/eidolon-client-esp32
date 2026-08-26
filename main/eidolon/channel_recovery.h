@@ -135,6 +135,13 @@ inline bool ShouldSurfaceChannelServerUnreachable(int attempt)
     return attempt >= 2;
 }
 
+inline bool ShouldEnterStandbyServerUnreachable(int attempt,
+                                                bool conversation_desired)
+{
+    return !conversation_desired &&
+           ShouldSurfaceChannelServerUnreachable(attempt);
+}
+
 // Registration credentials are authoritative once registration is active.
 // Guard runtime credentials remain a fallback only before that point.
 //

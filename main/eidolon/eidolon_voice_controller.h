@@ -24,24 +24,11 @@
 #endif
 #include "hub_types.h"
 #include "livekit_session.h"
+#include "voice_session_state.h"
 
 namespace eidolon {
 
 class GuardService;
-
-enum class VoiceSessionState {
-    Idle,
-    PendingApproval,
-    WaitingBinding,
-    ConfigReady,
-    Connecting,
-    Opening,
-    InRoom,
-    Reconnecting,
-    Error,
-    Unauthorized,       // revoked or unregistered by admin
-    ServerUnreachable,  // repeated connect failures; re-discovery exhausted
-};
 
 // Single-task actor. Every external entry point (PTT, join/leave, mic, network,
 // activation) and every LiveKit/SDK callback only *posts an event*; all state is

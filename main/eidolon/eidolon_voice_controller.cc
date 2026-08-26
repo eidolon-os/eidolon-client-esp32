@@ -1367,7 +1367,12 @@ void EidolonVoiceController::DoReconnectTick()
             return;
         }
     }
-    if (ShouldSurfaceChannelServerUnreachable(attempt)) {
+    if (ShouldEnterStandbyServerUnreachable(
+            attempt, !current_conversation_id_.empty())) {
+        // Keep a durable conversation in its reconnecting lifecycle. The
+        // standby-only ServerUnreachable state must not turn a recoverable
+        // conversation into a terminal failure merely because the retry count
+        // crossed a presentation threshold.
         SetState(VoiceSessionState::ServerUnreachable, "reconnect_exhausted");
     }
 

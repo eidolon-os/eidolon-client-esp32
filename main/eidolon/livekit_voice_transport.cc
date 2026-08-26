@@ -25,9 +25,18 @@ LiveKitVoiceTransport::LiveKitVoiceTransport(VoiceSessionCallbacks cb, GuardServ
             }
             NotifyRuntimeStatus(state);
         });
-    if (cb.on_operational_ready) {
-        controller_->SetOnOperationalReady(std::move(cb.on_operational_ready));
-    }
+    auto on_operational_ready = std::move(cb.on_operational_ready);
+    controller_->SetOnOperationalReady(
+        [this, on_operational_ready = std::move(on_operational_ready)](bool ready) {
+            operational_ready_.store(ready);
+            if (ready) {
+                service_was_ready_.store(true);
+            }
+            NotifyRuntimeStatus(controller_->GetState());
+            if (on_operational_ready) {
+                on_operational_ready(ready);
+            }
+        });
     if (cb.on_transcription) {
         controller_->SetOnTranscription(std::move(cb.on_transcription));
     }
@@ -40,73 +49,32 @@ LiveKitVoiceTransport::LiveKitVoiceTransport(VoiceSessionCallbacks cb, GuardServ
     if (cb.on_ptt_turn_status) {
         controller_->SetOnPttTurnStatus(std::move(cb.on_ptt_turn_status));
     }
-    controller_->SetMicEnabled(mic_enabled_);
+    controller_->SetMicEnabled(mic_enabled_.load());
 }
 
 VoiceRuntimeStatus LiveKitVoiceTransport::BuildRuntimeStatus(VoiceSessionState state) const
 {
-    VoiceRuntimeStatus status;
-    status.mic_enabled = mic_enabled_;
-    status.end_reason = controller_->LastEndReason();
+    EnrollmentPhase enrollment = EnrollmentPhase::Unknown;
     switch (controller_->GetConfigStatus()) {
     case HubConfigStatus::PendingApproval:
-        status.enrollment = EnrollmentPhase::PendingReview;
+        enrollment = EnrollmentPhase::PendingReview;
         break;
     case HubConfigStatus::WaitingBinding:
     case HubConfigStatus::Active:
-        status.enrollment = EnrollmentPhase::ClaimActive;
+        enrollment = EnrollmentPhase::ClaimActive;
         break;
     case HubConfigStatus::Revoked:
-        status.enrollment = EnrollmentPhase::Revoked;
+        enrollment = EnrollmentPhase::Revoked;
         break;
     }
-
-    switch (state) {
-    case VoiceSessionState::Idle:
-        status.enrollment = EnrollmentPhase::Unknown;
-        status.service = ServicePhase::Unavailable;
-        break;
-    case VoiceSessionState::PendingApproval:
-        status.enrollment = EnrollmentPhase::PendingReview;
-        status.service = ServicePhase::Unavailable;
-        break;
-    case VoiceSessionState::WaitingBinding:
-        status.service = ServicePhase::Preparing;
-        break;
-    case VoiceSessionState::ConfigReady:
-        status.service = ServicePhase::Ready;
-        status.conversation = status.end_reason == EndReason::None
-                                  ? ConversationPhase::Closed
-                                  : ConversationPhase::Ended;
-        break;
-    case VoiceSessionState::Connecting:
-    case VoiceSessionState::Opening:
-        status.service = ServicePhase::Connecting;
-        status.conversation = ConversationPhase::Opening;
-        break;
-    case VoiceSessionState::InRoom:
-        status.service = ServicePhase::Ready;
-        status.conversation = ConversationPhase::Active;
-        break;
-    case VoiceSessionState::Reconnecting:
-        status.service = ServicePhase::Reconnecting;
-        status.conversation = ConversationPhase::Reconnecting;
-        break;
-    case VoiceSessionState::ServerUnreachable:
-        status.service = ServicePhase::Unreachable;
-        status.conversation = ConversationPhase::Failed;
-        break;
-    case VoiceSessionState::Unauthorized:
-        status.enrollment = EnrollmentPhase::Revoked;
-        status.service = ServicePhase::Unavailable;
-        break;
-    case VoiceSessionState::Error:
-    default:
-        status.service = ServicePhase::Unreachable;
-        status.conversation = ConversationPhase::Failed;
-        break;
-    }
-    return status;
+    return VoiceRuntimeProjector::Project({
+        .session = state,
+        .enrollment = enrollment,
+        .end_reason = controller_->LastEndReason(),
+        .operational_ready = operational_ready_.load(),
+        .service_was_ready = service_was_ready_.load(),
+        .mic_enabled = mic_enabled_.load(),
+    });
 }
 
 void LiveKitVoiceTransport::NotifyRuntimeStatus(VoiceSessionState state)
@@ -216,7 +184,7 @@ void LiveKitVoiceTransport::SetMicrophoneEnabled(bool enabled)
 
 bool LiveKitVoiceTransport::IsMicrophoneEnabled() const
 {
-    return mic_enabled_;
+    return mic_enabled_.load();
 }
 
 VoiceSessionState LiveKitVoiceTransport::GetSessionState() const

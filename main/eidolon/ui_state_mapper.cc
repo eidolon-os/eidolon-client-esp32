@@ -40,7 +40,13 @@ UiScene ConversationScene(const EidolonRuntimeStatus& status)
     case ConversationPhase::Reconnecting:
         return UiScene::Reconnecting;
     case ConversationPhase::Ended:
-        return UiScene::Ended;
+        // An end summary is actionable only while the service can open the next
+        // conversation. Recovery takes precedence when the operational channel
+        // is unavailable.
+        if (status.service == ServicePhase::Ready) {
+            return UiScene::Ended;
+        }
+        break;
     case ConversationPhase::Failed:
         return UiScene::Error;
     case ConversationPhase::Closed:
@@ -58,6 +64,8 @@ UiScene ConversationScene(const EidolonRuntimeStatus& status)
     case ServicePhase::Unavailable:
         return UiScene::PreparingService;
     case ServicePhase::Unreachable:
+        return UiScene::Reconnecting;
+    case ServicePhase::Fault:
         return UiScene::Error;
     case ServicePhase::Ready:
     default:
@@ -132,6 +140,20 @@ void ResolveConversationPresentation(const EidolonRuntimeStatus& status,
                                 ? "Hold to talk"
                                 : "Listening...";
         break;
+    }
+}
+
+void ResolveRecoveryPresentation(const EidolonRuntimeStatus& status,
+                                 EidolonUiModel& model)
+{
+    if (model.scene != UiScene::Reconnecting ||
+        status.conversation == ConversationPhase::Reconnecting) {
+        return;
+    }
+    model.state_label = "RETRY";
+    model.status_text = "Restoring service";
+    if (status.service_detail.empty()) {
+        model.detail_text = "Retrying Channel connection...";
     }
 }
 
@@ -220,6 +242,7 @@ EidolonUiModel UiStateProjector::Project(const EidolonRuntimeStatus& status)
     }
 
     ResolveConversationPresentation(status, model);
+    ResolveRecoveryPresentation(status, model);
     ResolveActions(status, model);
     model.severity = model.scene == UiScene::Error ||
                              model.scene == UiScene::RecoveryRequired ||
@@ -228,7 +251,8 @@ EidolonUiModel UiStateProjector::Project(const EidolonRuntimeStatus& status)
                               model.end_reason == EndReason::Error)
                          ? UiSeverity::Error
                          : (model.scene == UiScene::WaitingApproval ||
-                                    model.scene == UiScene::PreparingService
+                                    model.scene == UiScene::PreparingService ||
+                                    model.scene == UiScene::Reconnecting
                                 ? UiSeverity::Attention
                                 : UiSeverity::Normal);
     return model;

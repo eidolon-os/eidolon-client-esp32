@@ -1117,6 +1117,7 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/livekit_board.cc"
         "eidolon/livekit_session.cc"
         "eidolon/livekit_voice_transport.cc"
+        "eidolon/voice_runtime_projector.cc"
         "eidolon/ambient_presence_state.cc"
         "eidolon/eidolon_voice_controller.cc"
         "eidolon/ui_state_mapper.cc"

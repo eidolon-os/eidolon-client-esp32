@@ -1,11 +1,13 @@
 #ifndef EIDOLON_LIVEKIT_VOICE_TRANSPORT_H_
 #define EIDOLON_LIVEKIT_VOICE_TRANSPORT_H_
 
+#include <atomic>
 #include <memory>
 
 #include "eidolon_device_store.h"
 #include "eidolon_voice_controller.h"
 #include "voice_session_transport.h"
+#include "voice_runtime_projector.h"
 
 namespace eidolon {
 
@@ -46,7 +48,9 @@ private:
     std::unique_ptr<EidolonVoiceController> controller_;
     EidolonDeviceStore device_store_;
     std::function<void(const VoiceRuntimeStatus&)> on_runtime_status_;
-    bool mic_enabled_ = true;
+    std::atomic<bool> operational_ready_{false};
+    std::atomic<bool> service_was_ready_{false};
+    std::atomic<bool> mic_enabled_{true};
 };
 
 }  // namespace eidolon

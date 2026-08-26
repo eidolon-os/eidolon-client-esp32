@@ -476,13 +476,6 @@ void Application::Initialize() {
             };
             if (eidolon::IsOperationalConfirmed(snapshot)) {
                 ui_presenter_->SetRuntimePhase(eidolon::RuntimePhase::Normal);
-                ui_presenter_->SetServicePhase(eidolon::ServicePhase::Ready);
-            } else if (!snapshot.commissioning_in_progress &&
-                       snapshot.owner_network_ready &&
-                       snapshot.hub_activation_ready) {
-                ui_presenter_->SetServicePhase(
-                    eidolon::ServicePhase::Reconnecting,
-                    "Restoring the operational channel...");
             }
         });
     };
@@ -790,7 +783,7 @@ void Application::HandleNetworkConnectedEvent() {
             activation_in_progress_.store(false);
             ESP_LOGE(TAG, "Unable to start Hub activation actor");
             SetDeviceState(kDeviceStateWifiConfiguring);
-            SetEidolonServiceUi(eidolon::ServicePhase::Unreachable,
+            SetEidolonServiceUi(eidolon::ServicePhase::Fault,
                                 "Hub activation worker unavailable");
             return;
         }

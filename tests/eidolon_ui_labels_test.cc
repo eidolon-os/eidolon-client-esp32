@@ -66,6 +66,40 @@ void TestEnrollmentAndServiceAreOrthogonal()
     Expect(model.detail_text, "Waiting for Channel binding");
 }
 
+void TestRecoverableServiceLossIsNotADeviceError()
+{
+    auto status = ReadyStatus();
+    status.service = ServicePhase::Unreachable;
+
+    auto model = UiStateProjector::Project(status);
+    assert(model.scene == UiScene::Reconnecting);
+    assert(model.severity == UiSeverity::Attention);
+    Expect(model.state_label, "RETRY");
+    Expect(model.status_text, "Restoring service");
+    Expect(model.detail_text, "Retrying Channel connection...");
+    assert(!model.primary_enabled);
+
+    status.conversation = ConversationPhase::Reconnecting;
+    model = UiStateProjector::Project(status);
+    Expect(model.state_label, "REJOIN");
+    Expect(model.status_text, "Reconnecting");
+    Expect(model.detail_text, "Restoring Channel connection...");
+
+    status.conversation = ConversationPhase::Ended;
+    status.end_reason = EndReason::IdleNormalEnd;
+    model = UiStateProjector::Project(status);
+    assert(model.scene == UiScene::Reconnecting);
+    assert(!model.primary_enabled);
+
+    status.conversation = ConversationPhase::Closed;
+    status.end_reason = EndReason::None;
+    status.service = ServicePhase::Fault;
+    model = UiStateProjector::Project(status);
+    assert(model.scene == UiScene::Error);
+    assert(model.severity == UiSeverity::Error);
+    Expect(model.detail_text, "Service unavailable");
+}
+
 void TestConversationRequiresExplicitStart()
 {
     auto status = ReadyStatus();
@@ -156,6 +190,7 @@ int main()
     Expect(EidolonBrandLabel(), "EIDOLON");
     TestSafetyAndRuntimePrecedence();
     TestEnrollmentAndServiceAreOrthogonal();
+    TestRecoverableServiceLossIsNotADeviceError();
     TestConversationRequiresExplicitStart();
     TestTurnAndModeProjection();
     TestEndReasonAndDetailOwnership();

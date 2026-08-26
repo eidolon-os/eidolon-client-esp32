@@ -219,6 +219,14 @@ void TestBackoffRediscoveryAndServerUnreachable()
     assert(h.recovery.reconnect_attempts() == 0);
 }
 
+void TestConversationRecoveryNeverBecomesStandbyUnreachable()
+{
+    assert(!eidolon::ShouldEnterStandbyServerUnreachable(1, false));
+    assert(eidolon::ShouldEnterStandbyServerUnreachable(2, false));
+    assert(!eidolon::ShouldEnterStandbyServerUnreachable(2, true));
+    assert(!eidolon::ShouldEnterStandbyServerUnreachable(20, true));
+}
+
 void TestRegistrationCredentialsWinAndGenerationNeverRollsBack()
 {
     eidolon::Esp32HubConfig registration;
@@ -257,6 +265,7 @@ int main()
     TestVoiceHandoffDropsOldGenerationAndQueuedTimer();
     TestNetworkLostRestoredOwnsRecovery();
     TestBackoffRediscoveryAndServerUnreachable();
+    TestConversationRecoveryNeverBecomesStandbyUnreachable();
     TestRegistrationCredentialsWinAndGenerationNeverRollsBack();
     return 0;
 }
