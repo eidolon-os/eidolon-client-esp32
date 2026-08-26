@@ -31,7 +31,7 @@
         "enrollment_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
         "proposal_revision": { "type": "integer", "minimum": 1 },
         "state": { "$ref": "#/$defs/EnrollmentProposalState" },
-        "device_instance_candidate_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
+        "device_instance_candidate_id": { "$ref": "../common/schemas.schema.json#/$defs/DeviceInstanceId" },
         "requested_owner_domain_id": { "$ref": "../common/schemas.schema.json#/$defs/OwnerDomainId" },
         "hardware_evidence_digest": { "$ref": "../common/schemas.schema.json#/$defs/Sha256Digest" },
         "manifest_ref": { "$ref": "../common/schemas.schema.json#/$defs/ManifestRef" },
@@ -120,7 +120,7 @@
       "properties": {
         "profile_id": { "const": "eidolon-trust-p256-hpke-v1" },
         "device_instance_candidate_id": {
-          "$ref": "../common/schemas.schema.json#/$defs/Identifier"
+          "$ref": "../common/schemas.schema.json#/$defs/DeviceInstanceId"
         },
         "requested_owner_domain_id": {
           "$ref": "../common/schemas.schema.json#/$defs/OwnerDomainId"

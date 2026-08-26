@@ -14,6 +14,41 @@
 namespace eidolon::device_foundation::v1 {
 
 struct OwnerDomainId { std::string value; };
+
+// A device instance identity is a statement about this device's own operational
+// key, not a name anything may choose. No public constructor takes an arbitrary
+// string: the only way to hold one is to derive it from a key digest or to parse
+// something that already has this exact shape. The firmware used to build the
+// same string by hand in its own file, agreeing with Hub by coincidence.
+class DeviceInstanceId {
+  public:
+    static std::optional<DeviceInstanceId> FromSpkiSha256Hex(const std::string& hex) {
+        if (hex.size() != 64) {
+            return std::nullopt;
+        }
+        for (const char ch : hex) {
+            const bool hexit = (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f');
+            if (!hexit) {
+                return std::nullopt;
+            }
+        }
+        return DeviceInstanceId("device-instance-" + hex);
+    }
+
+    static std::optional<DeviceInstanceId> Parse(const std::string& value) {
+        if (value.rfind("device-instance-", 0) != 0 || value.size() != 80) {
+            return std::nullopt;
+        }
+        return FromSpkiSha256Hex(value.substr(16));
+    }
+
+    const std::string& value() const { return value_; }
+
+  private:
+    explicit DeviceInstanceId(std::string value) : value_(std::move(value)) {}
+
+    std::string value_;
+};
 struct BusinessOwnerId { std::string value; };
 
 enum class LogicalAuthority {

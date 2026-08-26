@@ -4,7 +4,7 @@
     "message_id": "erase_operation_01",
     "kind": "operation",
     "device_ref": {
-      "device_instance_id": "device_erase_01",
+      "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
       "owner_domain_id": "owner-domain_01",
       "owner_domain_generation": 3,
       "claim_generation": 7,
@@ -17,7 +17,7 @@
       "contract_version": "1.0",
       "deadline": "2026-08-30T00:00:00Z",
       "device_ref": {
-        "device_instance_id": "device_erase_01",
+        "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
         "owner_domain_id": "owner-domain_01",
         "owner_domain_generation": 3,
         "claim_generation": 7,
@@ -34,8 +34,8 @@
       }
     }
   },
-  "deliver_canonical_utf8": "{\"deadline\":\"2026-08-30T00:00:00Z\",\"delivery_attempt_id\":\"erase_attempt_01\",\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device_erase_01\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"kind\":\"operation\",\"message_id\":\"erase_operation_01\",\"payload\":{\"contract\":\"eidolon.device-foundation.device-operation\",\"contract_version\":\"1.0\",\"deadline\":\"2026-08-30T00:00:00Z\",\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device_erase_01\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"operation_id\":\"erase_operation_01\",\"operation_type\":\"device-local.erase\",\"payload\":{\"erase_scopes\":[\"owner-credentials\",\"owner-data\",\"network-profiles\"]}},\"payload_schema\":\"https://contracts.eidolon.live/device-foundation/v1/device-control/schemas.schema.json#/$defs/DeviceLocalEraseCommand\"}",
-  "deliver_sha256": "sha256:510efcbc64c7a71273dc8f789a497f2fa4818912f47f9f72309906415d3b5a29",
+  "deliver_canonical_utf8": "{\"deadline\":\"2026-08-30T00:00:00Z\",\"delivery_attempt_id\":\"erase_attempt_01\",\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"kind\":\"operation\",\"message_id\":\"erase_operation_01\",\"payload\":{\"contract\":\"eidolon.device-foundation.device-operation\",\"contract_version\":\"1.0\",\"deadline\":\"2026-08-30T00:00:00Z\",\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"operation_id\":\"erase_operation_01\",\"operation_type\":\"device-local.erase\",\"payload\":{\"erase_scopes\":[\"owner-credentials\",\"owner-data\",\"network-profiles\"]}},\"payload_schema\":\"https://contracts.eidolon.live/device-foundation/v1/device-control/schemas.schema.json#/$defs/DeviceLocalEraseCommand\"}",
+  "deliver_sha256": "sha256:6ec0e2d4b242b14b3ff3dcb3b08760a0f6ef0f2e555c4c307f34e2c59762a19a",
   "acceptance": {
     "delivery_attempt_id": "erase_attempt_01",
     "state": "accepted",
@@ -48,7 +48,7 @@
     "message_id": "erase_operation_01",
     "kind": "operation_ack",
     "device_ref": {
-      "device_instance_id": "device_erase_01",
+      "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
       "owner_domain_id": "owner-domain_01",
       "owner_domain_generation": 3,
       "claim_generation": 7,
@@ -61,19 +61,19 @@
       "contract_version": "1.0",
       "device_monotonic_time": 1234,
       "device_ref": {
-        "device_instance_id": "device_erase_01",
-        "owner_domain_id": "owner-domain_01",
-        "owner_domain_generation": 3,
         "claim_generation": 7,
+        "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+        "owner_domain_generation": 3,
+        "owner_domain_id": "owner-domain_01",
         "trust_epoch": 4
       },
       "operation_id": "erase_operation_01",
       "operation_type": "device-local.erase",
       "result": "erased",
       "result_code": "ERASED",
-      "device_signature": "9YwY2X3VwSxtmJWwIBQTsv0Tufr-tUbRz4MyDGK7h0VAXI_D4EQ_RV_h7jwTkVauiBMhgbY-2omxMmpku6DSpw"
+      "device_signature": "oH_qjrqXUxO1bNWo-eK8ML4iDiZs2hEZc9iBfQ_h2GDmV0LHxMWopTouDxhuDKFpHGrFfOU69d3zUrRkPSlnJw"
     }
   },
-  "evidence_canonical_utf8": "{\"delivery_attempt_id\":\"erase_attempt_01\",\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device_erase_01\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"kind\":\"operation_ack\",\"message_id\":\"erase_operation_01\",\"payload\":{\"ack_sequence\":1,\"contract\":\"eidolon.device-foundation.device-operation-ack\",\"contract_version\":\"1.0\",\"device_monotonic_time\":1234,\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device_erase_01\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"device_signature\":\"9YwY2X3VwSxtmJWwIBQTsv0Tufr-tUbRz4MyDGK7h0VAXI_D4EQ_RV_h7jwTkVauiBMhgbY-2omxMmpku6DSpw\",\"operation_id\":\"erase_operation_01\",\"operation_type\":\"device-local.erase\",\"result\":\"erased\",\"result_code\":\"ERASED\"},\"payload_schema\":\"https://contracts.eidolon.live/device-foundation/v1/device-control/schemas.schema.json#/$defs/DeviceLocalEraseAck\"}",
-  "evidence_sha256": "sha256:0bf1df47e29ec004707f6462f68e81341c49615bfe8d4a6d339b252f742eacb9"
+  "evidence_canonical_utf8": "{\"delivery_attempt_id\":\"erase_attempt_01\",\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"kind\":\"operation_ack\",\"message_id\":\"erase_operation_01\",\"payload\":{\"ack_sequence\":1,\"contract\":\"eidolon.device-foundation.device-operation-ack\",\"contract_version\":\"1.0\",\"device_monotonic_time\":1234,\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"device_signature\":\"oH_qjrqXUxO1bNWo-eK8ML4iDiZs2hEZc9iBfQ_h2GDmV0LHxMWopTouDxhuDKFpHGrFfOU69d3zUrRkPSlnJw\",\"operation_id\":\"erase_operation_01\",\"operation_type\":\"device-local.erase\",\"result\":\"erased\",\"result_code\":\"ERASED\"},\"payload_schema\":\"https://contracts.eidolon.live/device-foundation/v1/device-control/schemas.schema.json#/$defs/DeviceLocalEraseAck\"}",
+  "evidence_sha256": "sha256:92c580c6e573bc67612060c178c3de7ce446cc0bd976ae033c6de34d0c89f094"
 }

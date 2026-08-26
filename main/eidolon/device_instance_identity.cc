@@ -16,11 +16,9 @@ bool EvidenceAtom(const std::string& value) {
 }  // namespace
 
 std::string DeviceInstanceIdFromSpkiSha256Hex(const std::string& hex) {
-    if (hex.size() != 64 ||
-        hex.find_first_not_of("0123456789abcdef") != std::string::npos) {
-        return {};
-    }
-    return "device-instance-" + hex;
+    const auto identity =
+        device_foundation::v1::DeviceInstanceId::FromSpkiSha256Hex(hex);
+    return identity ? identity->value() : std::string{};
 }
 
 std::string DevelopmentCommissioningHmacInput(

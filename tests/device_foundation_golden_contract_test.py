@@ -96,6 +96,36 @@ def main() -> None:
     for value in setup["trust_values"]:
         assert f'"{value}"' in header, value
 
+    # The firmware's own identity test typed this vector out by hand: the same
+    # digest, the same lookup id, the same evidence document, copied from the
+    # contract and then unlinked from it. Rewording either side would have left
+    # both green while they disagreed, so the copy is checked against the
+    # vector it came from.
+    identity = json.loads(
+        (FIXTURES / "development-commissioning-identity.json").read_text()
+    )
+    unit_test = (ROOT / "tests/device_instance_identity_test.cc").read_text()
+    assert identity["device_instance_id"] == "device-instance-" + identity[
+        "operational_spki_sha256"
+    ].removeprefix("sha256:")
+    for literal in (
+        identity["operational_spki_sha256"].removeprefix("sha256:"),
+        identity["operational_public_key"],
+        identity["hardware_lookup_id"],
+        identity["owner_domain_id"],
+        identity["commissioning_nonce"],
+        identity["evidence_canonical_utf8"].replace('"', '\\"'),
+    ):
+        assert literal in unit_test, literal
+    assert identity["hmac_input_utf8_with_nul_separators"] == "\0".join(
+        (
+            identity["hardware_lookup_id"],
+            identity["device_instance_id"],
+            identity["owner_domain_id"],
+            identity["commissioning_nonce"],
+        )
+    )
+
     erase = json.loads((FIXTURES / "device-local-erase.json").read_text())
     assert canonical(erase["operation"]) == erase["operation_canonical_utf8"]
     assert canonical(erase["ack_signing_document"]) == erase["ack_canonical_utf8"]

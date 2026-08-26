@@ -5,7 +5,7 @@
     "profile_id": "eidolon-trust-p256-hpke-v1",
     "enrollment_id": "enrollment_01",
     "proposal_revision": 3,
-    "device_instance_id": "device_01",
+    "device_instance_id": "device-instance-3164c593258209d757654dbd421d2bd9732fe088bce70d8c90be15dd98b587ba",
     "hardware_evidence_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
     "manifest_ref": {
       "manifest_id": "manifest_01",
@@ -18,12 +18,12 @@
     "trust_epoch": 4,
     "grant_id": "grant_01"
   },
-  "canonical_aad_sha256": "5ccf563c3754b3690f175b3a6c91f5577d6d612ece4228eee83f5e7c9abf134c",
+  "canonical_aad_sha256": "a3dabb42b900ff0d807adf22a4b96f726705e1f88cbe3e9d1bc8ac1b5fe53d94",
   "test_aead": "AES-128-GCM",
   "test_key": "000102030405060708090a0b0c0d0e0f",
   "test_nonce": "101112131415161718191a1b",
   "plaintext": "636c61696d2d6772616e742d666978747572652d7631",
-  "ciphertext": "a74262c66262d19d76b329d8a14e934a4fce11aa40c5cd245b6a8680f1a8b963751606ac734e",
+  "ciphertext": "a74262c66262d19d76b329d8a14e934a4fce11aa40c5efae0aa9b8c9e1c327dfd09174d4c482",
   "mutate_each_field_must_fail": [
     "contract",
     "profile_id",

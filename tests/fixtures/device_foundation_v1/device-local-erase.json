@@ -8,7 +8,7 @@
     "deadline": "2026-08-30T00:00:00Z",
     "device_ref": {
       "claim_generation": 7,
-      "device_instance_id": "device_erase_01",
+      "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
       "owner_domain_generation": 3,
       "owner_domain_id": "owner-domain_01",
       "trust_epoch": 4
@@ -23,8 +23,8 @@
       ]
     }
   },
-  "operation_canonical_utf8": "{\"contract\":\"eidolon.device-foundation.device-operation\",\"contract_version\":\"1.0\",\"deadline\":\"2026-08-30T00:00:00Z\",\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device_erase_01\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"operation_id\":\"erase_operation_01\",\"operation_type\":\"device-local.erase\",\"payload\":{\"erase_scopes\":[\"owner-credentials\",\"owner-data\",\"network-profiles\"]}}",
-  "operation_fingerprint": "sha256:db4db5a1baf21755c5e8945c0923e5be95466ad036d55df54c964b9a5c0f03b4",
+  "operation_canonical_utf8": "{\"contract\":\"eidolon.device-foundation.device-operation\",\"contract_version\":\"1.0\",\"deadline\":\"2026-08-30T00:00:00Z\",\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"operation_id\":\"erase_operation_01\",\"operation_type\":\"device-local.erase\",\"payload\":{\"erase_scopes\":[\"owner-credentials\",\"owner-data\",\"network-profiles\"]}}",
+  "operation_fingerprint": "sha256:8ade5c9b1c44101514f8ee222149eeb41ae24253d8404203fb2c877f8f97f336",
   "ack_signing_document": {
     "ack_sequence": 1,
     "contract": "eidolon.device-foundation.device-operation-ack",
@@ -32,7 +32,7 @@
     "device_monotonic_time": 1234,
     "device_ref": {
       "claim_generation": 7,
-      "device_instance_id": "device_erase_01",
+      "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
       "owner_domain_generation": 3,
       "owner_domain_id": "owner-domain_01",
       "trust_epoch": 4
@@ -42,12 +42,12 @@
     "result": "erased",
     "result_code": "ERASED"
   },
-  "ack_canonical_utf8": "{\"ack_sequence\":1,\"contract\":\"eidolon.device-foundation.device-operation-ack\",\"contract_version\":\"1.0\",\"device_monotonic_time\":1234,\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device_erase_01\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"operation_id\":\"erase_operation_01\",\"operation_type\":\"device-local.erase\",\"result\":\"erased\",\"result_code\":\"ERASED\"}",
-  "ack_signature": "9YwY2X3VwSxtmJWwIBQTsv0Tufr-tUbRz4MyDGK7h0VAXI_D4EQ_RV_h7jwTkVauiBMhgbY-2omxMmpku6DSpw",
+  "ack_canonical_utf8": "{\"ack_sequence\":1,\"contract\":\"eidolon.device-foundation.device-operation-ack\",\"contract_version\":\"1.0\",\"device_monotonic_time\":1234,\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"operation_id\":\"erase_operation_01\",\"operation_type\":\"device-local.erase\",\"result\":\"erased\",\"result_code\":\"ERASED\"}",
+  "ack_signature": "oH_qjrqXUxO1bNWo-eK8ML4iDiZs2hEZc9iBfQ_h2GDmV0LHxMWopTouDxhuDKFpHGrFfOU69d3zUrRkPSlnJw",
   "key_proof_signing_document": {
-    "device_instance_id": "device_erase_01",
+    "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
     "enrollment_request_id": "enrollment_request_01",
     "public_key_spki": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5vPc7n-PZAfYfydYSjgD_prv1_vMqhWK3V4PkmTVXCSik3KwH5u30WQu0pad-LgIwLcSnr2zfmVDdIOngURgag"
   },
-  "key_proof_signature": "F2Yei2t4NmEfBz32PB88bwX6RFC1SgTktBbx3LlSvv7Z5ooq-Vyfm5F8XrJzw9Rsp2unczD8xuDMrFZ5hLxI2Q"
+  "key_proof_signature": "zgVH3iUQZ8-oXhKAgDwpQJhdMKs0IEH5K-XM38gLvgDq-_Zj6d5tn0ACftVOoJciaMsc6uiSa3Cx9DyTU2sLaQ"
 }

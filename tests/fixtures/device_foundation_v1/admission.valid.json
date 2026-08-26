@@ -18,7 +18,7 @@
       "definition": "CreateEnrollment",
       "value": {
         "profile_id": "eidolon-trust-p256-hpke-v1",
-        "device_instance_candidate_id": "device_candidate_01",
+        "device_instance_candidate_id": "device-instance-1aa0ad0054afc2f841e72ddbadb37e06f52b5c7621679bbe60fe3aa4c461c594",
         "requested_owner_domain_id": "owner-domain_01",
         "hardware_identity_evidence": {
           "scheme": "manufacturer-p256",
@@ -128,7 +128,7 @@
             "profile_id": "eidolon-trust-p256-hpke-v1",
             "enrollment_id": "enrollment_01",
             "proposal_revision": 2,
-            "device_instance_id": "device_01",
+            "device_instance_id": "device-instance-3164c593258209d757654dbd421d2bd9732fe088bce70d8c90be15dd98b587ba",
             "hardware_evidence_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
             "manifest_ref": {"manifest_id": "manifest_01", "revision": 2, "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"},
             "owner_domain_id": "owner-domain_01",
@@ -160,7 +160,7 @@
       "definition": "AckClaimGrantResult",
       "value": {
         "device_ref": {
-          "device_instance_id": "device_01",
+          "device_instance_id": "device-instance-3164c593258209d757654dbd421d2bd9732fe088bce70d8c90be15dd98b587ba",
           "owner_domain_id": "owner-domain_01",
           "owner_domain_generation": 3,
           "claim_generation": 2,
@@ -177,7 +177,7 @@
         "enrollment_id": "enrollment_01",
         "proposal_revision": 1,
         "state": "approved_awaiting_handoff",
-        "device_instance_candidate_id": "device_01",
+        "device_instance_candidate_id": "device-instance-3164c593258209d757654dbd421d2bd9732fe088bce70d8c90be15dd98b587ba",
         "requested_owner_domain_id": "owner-domain_01",
         "hardware_evidence_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
         "manifest_ref": {"manifest_id": "manifest_01", "revision": 2, "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"},
@@ -208,7 +208,7 @@
       "definition": "ClaimGrant",
       "value": {
         "grant_id": "grant_01", "enrollment_id": "enrollment_01",
-        "device_ref": {"device_instance_id": "device_01", "owner_domain_id": "owner-domain_01", "owner_domain_generation": 3, "claim_generation": 2, "trust_epoch": 1},
+        "device_ref": {"device_instance_id": "device-instance-3164c593258209d757654dbd421d2bd9732fe088bce70d8c90be15dd98b587ba", "owner_domain_id": "owner-domain_01", "owner_domain_generation": 3, "claim_generation": 2, "trust_epoch": 1},
         "manifest_ref": {"manifest_id": "manifest_01", "revision": 2, "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"},
         "approval_decision_id": "decision_01",
         "handoff_key_id": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
@@ -222,7 +222,7 @@
       "definition": "GrantAck",
       "value": {
         "enrollment_id": "enrollment_01", "grant_id": "grant_01",
-        "device_ref": {"device_instance_id": "device_01", "owner_domain_id": "owner-domain_01", "owner_domain_generation": 3, "claim_generation": 2, "trust_epoch": 1},
+        "device_ref": {"device_instance_id": "device-instance-3164c593258209d757654dbd421d2bd9732fe088bce70d8c90be15dd98b587ba", "owner_domain_id": "owner-domain_01", "owner_domain_generation": 3, "claim_generation": 2, "trust_epoch": 1},
         "acknowledged_at": "2026-08-18T00:05:00Z"
       }
     },
@@ -231,7 +231,7 @@
       "schema": "https://contracts.eidolon.live/device-foundation/v1/admission/schemas.schema.json",
       "definition": "ClaimRecord",
       "value": {
-        "device_ref": {"device_instance_id": "device_01", "owner_domain_id": "owner-domain_01", "owner_domain_generation": 3, "claim_generation": 2, "trust_epoch": 1},
+        "device_ref": {"device_instance_id": "device-instance-3164c593258209d757654dbd421d2bd9732fe088bce70d8c90be15dd98b587ba", "owner_domain_id": "owner-domain_01", "owner_domain_generation": 3, "claim_generation": 2, "trust_epoch": 1},
         "business_owner_id": "owner_01",
         "manifest_ref": {"manifest_id": "manifest_01", "revision": 2, "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"},
         "state": "active", "revision": 1, "updated_at": "2026-08-18T00:05:00Z"

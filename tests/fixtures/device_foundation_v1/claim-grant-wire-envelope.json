@@ -14,7 +14,7 @@
       "profile_id": "eidolon-trust-p256-hpke-v1",
       "enrollment_id": "enrollment_01",
       "proposal_revision": 2,
-      "device_instance_id": "device_01",
+      "device_instance_id": "device-instance-3164c593258209d757654dbd421d2bd9732fe088bce70d8c90be15dd98b587ba",
       "hardware_evidence_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
       "manifest_ref": {
         "manifest_id": "manifest_01",
@@ -28,8 +28,8 @@
       "grant_id": "grant_01"
     }
   },
-  "aad_canonical_utf8": "{\"claim_generation\":2,\"contract\":\"eidolon.device-foundation.claim-grant-aad\",\"device_instance_id\":\"device_01\",\"enrollment_id\":\"enrollment_01\",\"grant_id\":\"grant_01\",\"hardware_evidence_digest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\",\"manifest_ref\":{\"digest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\",\"manifest_id\":\"manifest_01\",\"revision\":2},\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"profile_id\":\"eidolon-trust-p256-hpke-v1\",\"proposal_revision\":2,\"trust_epoch\":1}",
-  "aad_sha256": "sha256:0f18b352607ca4ddb616aff0196d0db953499a5db7dff5c18e2a09d95e6fe7dc",
+  "aad_canonical_utf8": "{\"claim_generation\":2,\"contract\":\"eidolon.device-foundation.claim-grant-aad\",\"device_instance_id\":\"device-instance-3164c593258209d757654dbd421d2bd9732fe088bce70d8c90be15dd98b587ba\",\"enrollment_id\":\"enrollment_01\",\"grant_id\":\"grant_01\",\"hardware_evidence_digest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\",\"manifest_ref\":{\"digest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\",\"manifest_id\":\"manifest_01\",\"revision\":2},\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"profile_id\":\"eidolon-trust-p256-hpke-v1\",\"proposal_revision\":2,\"trust_epoch\":1}",
+  "aad_sha256": "sha256:2643076cbd8c542a2a11bc438547ec7ce70f977bc782fa7f5a7be44d517236ae",
   "pre_open_mutations_must_fail": [
     "profile_id",
     "kem",

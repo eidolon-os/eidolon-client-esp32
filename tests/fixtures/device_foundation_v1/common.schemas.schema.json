@@ -7,7 +7,14 @@
       "type": "string",
       "minLength": 3,
       "maxLength": 128,
-        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "DeviceInstanceId": {
+      "description": "A device instance identity, derived from the device's own operational public key: 'device-instance-' followed by the lowercase hex SHA-256 of its SPKI. Stated here because it was stated nowhere: Hub enforced this shape in one local expression, the firmware built the same string by hand, and a client that invented its own id compared unequal forever instead of being refused.",
+      "type": "string",
+      "minLength": 80,
+      "maxLength": 80,
+      "pattern": "^device-instance-[0-9a-f]{64}$"
     },
     "OwnerDomainId": {
       "type": "string",
@@ -40,31 +47,66 @@
         "trust_epoch"
       ],
       "properties": {
-        "device_instance_id": { "$ref": "#/$defs/Identifier" },
-        "owner_domain_id": { "$ref": "#/$defs/OwnerDomainId" },
-        "owner_domain_generation": { "type": "integer", "minimum": 1 },
-        "claim_generation": { "type": "integer", "minimum": 1 },
-        "trust_epoch": { "type": "integer", "minimum": 1 }
+        "device_instance_id": {
+          "$ref": "#/$defs/DeviceInstanceId"
+        },
+        "owner_domain_id": {
+          "$ref": "#/$defs/OwnerDomainId"
+        },
+        "owner_domain_generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "claim_generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "trust_epoch": {
+          "type": "integer",
+          "minimum": 1
+        }
       }
     },
     "ManifestRef": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["manifest_id", "revision", "digest"],
+      "required": [
+        "manifest_id",
+        "revision",
+        "digest"
+      ],
       "properties": {
-        "manifest_id": { "$ref": "#/$defs/Identifier" },
-        "revision": { "type": "integer", "minimum": 1 },
-        "digest": { "$ref": "#/$defs/Sha256Digest" }
+        "manifest_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "digest": {
+          "$ref": "#/$defs/Sha256Digest"
+        }
       }
     },
     "BodyTargetRef": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["mount_id", "body_endpoint_id", "assignment_generation"],
+      "required": [
+        "mount_id",
+        "body_endpoint_id",
+        "assignment_generation"
+      ],
       "properties": {
-        "mount_id": { "$ref": "#/$defs/Identifier" },
-        "body_endpoint_id": { "$ref": "#/$defs/Identifier" },
-        "assignment_generation": { "type": "integer", "minimum": 1 }
+        "mount_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "body_endpoint_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "assignment_generation": {
+          "type": "integer",
+          "minimum": 1
+        }
       }
     },
     "ActorRef": {
@@ -78,31 +120,59 @@
         "authentication_strength"
       ],
       "properties": {
-        "principal_id": { "$ref": "#/$defs/Identifier" },
+        "principal_id": {
+          "$ref": "#/$defs/Identifier"
+        },
         "principal_type": {
-          "enum": ["controller", "device", "service", "operator"]
+          "enum": [
+            "controller",
+            "device",
+            "service",
+            "operator"
+          ]
         },
         "owner_domain_id": {
-          "oneOf": [{ "$ref": "#/$defs/OwnerDomainId" }, { "type": "null" }]
+          "oneOf": [
+            {
+              "$ref": "#/$defs/OwnerDomainId"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "granted_scopes": {
           "type": "array",
           "minItems": 1,
-          "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "uniqueItems": true
         },
         "authentication_strength": {
-          "enum": ["software", "hardware-backed", "physical-presence"]
+          "enum": [
+            "software",
+            "hardware-backed",
+            "physical-presence"
+          ]
         }
       }
     },
     "ControllerActorRef": {
       "allOf": [
-        { "$ref": "#/$defs/ActorRef" },
+        {
+          "$ref": "#/$defs/ActorRef"
+        },
         {
           "properties": {
-            "principal_type": { "const": "controller" },
-            "owner_domain_id": { "$ref": "#/$defs/OwnerDomainId" }
+            "principal_type": {
+              "const": "controller"
+            },
+            "owner_domain_id": {
+              "$ref": "#/$defs/OwnerDomainId"
+            }
           }
         }
       ]
@@ -123,20 +193,52 @@
         "extensions"
       ],
       "properties": {
-        "contract": { "const": "eidolon.device-foundation.command" },
-        "contract_version": { "const": "1.0" },
-        "command_type": { "$ref": "#/$defs/Identifier" },
-        "command_id": { "$ref": "#/$defs/Identifier" },
-        "correlation_id": { "$ref": "#/$defs/Identifier" },
+        "contract": {
+          "const": "eidolon.device-foundation.command"
+        },
+        "contract_version": {
+          "const": "1.0"
+        },
+        "command_type": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "command_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "correlation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
         "causation_id": {
-          "oneOf": [{ "$ref": "#/$defs/Identifier" }, { "type": "null" }]
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
-        "issued_at": { "type": "string", "format": "date-time" },
+        "issued_at": {
+          "type": "string",
+          "format": "date-time"
+        },
         "deadline": {
-          "oneOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }]
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
-        "payload": { "type": "object" },
-        "extensions": { "type": "object" }
+        "payload": {
+          "type": "object"
+        },
+        "extensions": {
+          "type": "object"
+        }
       }
     },
     "CommandResult": {
@@ -151,14 +253,37 @@
         "extensions"
       ],
       "properties": {
-        "command_id": { "$ref": "#/$defs/Identifier" },
-        "outcome": { "enum": ["committed", "replayed", "accepted"] },
-        "resource_ref": { "type": "object" },
-        "resource_revision": {
-          "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }]
+        "command_id": {
+          "$ref": "#/$defs/Identifier"
         },
-        "occurred_at": { "type": "string", "format": "date-time" },
-        "extensions": { "type": "object" }
+        "outcome": {
+          "enum": [
+            "committed",
+            "replayed",
+            "accepted"
+          ]
+        },
+        "resource_ref": {
+          "type": "object"
+        },
+        "resource_revision": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "occurred_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "extensions": {
+          "type": "object"
+        }
       }
     },
     "DeviceProblem": {
@@ -217,37 +342,119 @@
             "internal"
           ]
         },
-        "retryable": { "type": "boolean" },
+        "retryable": {
+          "type": "boolean"
+        },
         "authority": {
-          "enum": ["admission", "device-control", "body-mesh", "companion", "delivery"]
+          "enum": [
+            "admission",
+            "device-control",
+            "body-mesh",
+            "companion",
+            "delivery"
+          ]
         },
         "command_id": {
-          "oneOf": [{ "$ref": "#/$defs/Identifier" }, { "type": "null" }]
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
-        "resource_ref": { "oneOf": [{ "type": "object" }, { "type": "null" }] },
+        "resource_ref": {
+          "oneOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "current_revision": {
-          "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }]
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "current_generation": {
-          "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }]
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "retry_after_ms": {
-          "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }]
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
-        "detail": { "type": "string", "maxLength": 1024 },
-        "incident_id": { "$ref": "#/$defs/Identifier" }
+        "detail": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "incident_id": {
+          "$ref": "#/$defs/Identifier"
+        }
       },
       "allOf": [
         {
-          "if": { "properties": { "retryable": { "const": false } }, "required": ["retryable"] },
-          "then": { "properties": { "retry_after_ms": { "type": "null" } } }
-        },
-        {
-          "if": { "properties": { "code": { "const": "RATE_LIMITED" } }, "required": ["code"] },
+          "if": {
+            "properties": {
+              "retryable": {
+                "const": false
+              }
+            },
+            "required": [
+              "retryable"
+            ]
+          },
           "then": {
             "properties": {
-              "retryable": { "const": true },
-              "retry_after_ms": { "type": "integer", "minimum": 1 }
+              "retry_after_ms": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "RATE_LIMITED"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "retryable": {
+                "const": true
+              },
+              "retry_after_ms": {
+                "type": "integer",
+                "minimum": 1
+              }
             }
           }
         }
@@ -269,9 +476,17 @@
         "signature"
       ],
       "properties": {
-        "owner_domain_id": { "$ref": "#/$defs/OwnerDomainId" },
-        "owner_domain_generation": { "type": "integer", "minimum": 1 },
-        "directory_revision": { "type": "integer", "minimum": 1 },
+        "owner_domain_id": {
+          "$ref": "#/$defs/OwnerDomainId"
+        },
+        "owner_domain_generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "directory_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
         "descriptor_uri": {
           "type": "string",
           "format": "uri",
@@ -282,7 +497,9 @@
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "$ref": "#/$defs/Sha256Digest" }
+          "items": {
+            "$ref": "#/$defs/Sha256Digest"
+          }
         },
         "endpoints": {
           "type": "array",
@@ -299,19 +516,50 @@
             ],
             "properties": {
               "authority": {
-                "enum": ["admission", "device-control", "body-mesh", "companion"]
+                "enum": [
+                  "admission",
+                  "device-control",
+                  "body-mesh",
+                  "companion"
+                ]
               },
-              "logical_audience": { "$ref": "#/$defs/Identifier" },
-              "uri": { "type": "string", "format": "uri", "pattern": "^https://" },
-              "transport_profile": { "enum": ["https-json", "mqtt-tls", "nats-tls"] },
-              "priority": { "type": "integer", "minimum": 0, "maximum": 65535 }
+              "logical_audience": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "uri": {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https://"
+              },
+              "transport_profile": {
+                "enum": [
+                  "https-json",
+                  "mqtt-tls",
+                  "nats-tls"
+                ]
+              },
+              "priority": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              }
             }
           }
         },
-        "issued_at": { "type": "string", "format": "date-time" },
-        "expires_at": { "type": "string", "format": "date-time" },
-        "signing_key_id": { "$ref": "#/$defs/Sha256Digest" },
-        "signature": { "$ref": "#/$defs/P256RawSignature" }
+        "issued_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "signing_key_id": {
+          "$ref": "#/$defs/Sha256Digest"
+        },
+        "signature": {
+          "$ref": "#/$defs/P256RawSignature"
+        }
       }
     },
     "ClaimGrantAAD": {
@@ -332,18 +580,46 @@
         "grant_id"
       ],
       "properties": {
-        "contract": { "const": "eidolon.device-foundation.claim-grant-aad" },
-        "profile_id": { "const": "eidolon-trust-p256-hpke-v1" },
-        "enrollment_id": { "$ref": "#/$defs/Identifier" },
-        "proposal_revision": { "type": "integer", "minimum": 1 },
-        "device_instance_id": { "$ref": "#/$defs/Identifier" },
-        "hardware_evidence_digest": { "$ref": "#/$defs/Sha256Digest" },
-        "manifest_ref": { "$ref": "#/$defs/ManifestRef" },
-        "owner_domain_id": { "$ref": "#/$defs/OwnerDomainId" },
-        "owner_domain_generation": { "type": "integer", "minimum": 1 },
-        "claim_generation": { "type": "integer", "minimum": 1 },
-        "trust_epoch": { "type": "integer", "minimum": 1 },
-        "grant_id": { "$ref": "#/$defs/Identifier" }
+        "contract": {
+          "const": "eidolon.device-foundation.claim-grant-aad"
+        },
+        "profile_id": {
+          "const": "eidolon-trust-p256-hpke-v1"
+        },
+        "enrollment_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "proposal_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "device_instance_id": {
+          "$ref": "#/$defs/DeviceInstanceId"
+        },
+        "hardware_evidence_digest": {
+          "$ref": "#/$defs/Sha256Digest"
+        },
+        "manifest_ref": {
+          "$ref": "#/$defs/ManifestRef"
+        },
+        "owner_domain_id": {
+          "$ref": "#/$defs/OwnerDomainId"
+        },
+        "owner_domain_generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "claim_generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "trust_epoch": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "grant_id": {
+          "$ref": "#/$defs/Identifier"
+        }
       }
     },
     "CommissioningSessionId": {
@@ -370,17 +646,37 @@
         "trust"
       ],
       "properties": {
-        "contract_version": { "const": "1" },
-        "device_id": { "$ref": "#/$defs/Identifier" },
-        "device_kind": { "$ref": "#/$defs/Identifier" },
-        "display_name": { "type": "string", "minLength": 1, "maxLength": 128 },
-        "identity_fingerprint": { "type": "string", "pattern": "^p256:[0-9a-f]{64}$" },
-        "session_id": { "$ref": "#/$defs/CommissioningSessionId" },
+        "contract_version": {
+          "const": "1"
+        },
+        "device_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "device_kind": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "identity_fingerprint": {
+          "type": "string",
+          "pattern": "^p256:[0-9a-f]{64}$"
+        },
+        "session_id": {
+          "$ref": "#/$defs/CommissioningSessionId"
+        },
         "expires_in_seconds": {
           "description": "Absent when this offer does not end. A device nobody has claimed keeps advertising until it is claimed, cancelled or powered off, so it has no duration to name; the absence is the whole of that answer.",
           "$ref": "#/$defs/SetupWindowRemainingSeconds"
         },
-        "trust": { "enum": ["development-tofu", "manufacturer-bound"] }
+        "trust": {
+          "enum": [
+            "development-tofu",
+            "manufacturer-bound"
+          ]
+        }
       }
     },
     "CommissioningProfile": {
@@ -403,48 +699,110 @@
         "reset_modes"
       ],
       "properties": {
-        "profile_id": { "const": "eidolon-trust-p256-hpke-v1" },
-        "schema_version": { "const": "1.0" },
+        "profile_id": {
+          "const": "eidolon-trust-p256-hpke-v1"
+        },
+        "schema_version": {
+          "const": "1.0"
+        },
         "eid_pair_versions": {
           "type": "array",
           "minItems": 1,
-          "items": { "const": "1.0" },
+          "items": {
+            "const": "1.0"
+          },
           "uniqueItems": true
         },
         "methods": {
           "type": "array",
           "minItems": 1,
-          "items": { "enum": ["ble", "softap", "usb", "nfc", "lan_authenticated"] },
+          "items": {
+            "enum": [
+              "ble",
+              "softap",
+              "usb",
+              "nfc",
+              "lan_authenticated"
+            ]
+          },
           "uniqueItems": true
         },
         "network_bearers": {
           "type": "array",
           "minItems": 1,
-          "items": { "enum": ["wifi", "ethernet", "thread", "cellular", "none"] },
+          "items": {
+            "enum": [
+              "wifi",
+              "ethernet",
+              "thread",
+              "cellular",
+              "none"
+            ]
+          },
           "uniqueItems": true
         },
         "physical_presence": {
           "type": "array",
           "minItems": 1,
-          "items": { "enum": ["button", "qr_secret", "nfc", "trusted_display"] },
+          "items": {
+            "enum": [
+              "button",
+              "qr_secret",
+              "nfc",
+              "trusted_display"
+            ]
+          },
           "uniqueItems": true
         },
         "attestation_schemes": {
           "type": "array",
           "minItems": 1,
-          "items": { "enum": ["manufacturer-p256", "dev-self-signed-p256"] },
+          "items": {
+            "enum": [
+              "manufacturer-p256",
+              "dev-self-signed-p256"
+            ]
+          },
           "uniqueItems": true
         },
-        "secure_storage_level": { "enum": ["secure-element", "hardware-backed", "encrypted-flash"] },
-        "monotonic_counter": { "type": "boolean" },
-        "candidate_network": { "type": "boolean" },
-        "rollback_guarantee": { "enum": ["crash-safe", "best-effort", "unsupported"] },
-        "max_message_size": { "type": "integer", "minimum": 2, "maximum": 1048576 },
-        "trusted_clock": { "type": "boolean" },
+        "secure_storage_level": {
+          "enum": [
+            "secure-element",
+            "hardware-backed",
+            "encrypted-flash"
+          ]
+        },
+        "monotonic_counter": {
+          "type": "boolean"
+        },
+        "candidate_network": {
+          "type": "boolean"
+        },
+        "rollback_guarantee": {
+          "enum": [
+            "crash-safe",
+            "best-effort",
+            "unsupported"
+          ]
+        },
+        "max_message_size": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 1048576
+        },
+        "trusted_clock": {
+          "type": "boolean"
+        },
         "reset_modes": {
           "type": "array",
           "minItems": 1,
-          "items": { "enum": ["network", "owner", "factory"] },
+          "items": {
+            "enum": [
+              "network",
+              "owner",
+              "factory"
+            ]
+          },
           "uniqueItems": true
         }
       }
@@ -464,14 +822,33 @@
         "failure_code"
       ],
       "properties": {
-        "contract": { "const": "eidolon.device-foundation.commissioning-status" },
-        "contract_version": { "const": "1.0" },
-        "profile_id": { "const": "eidolon-trust-p256-hpke-v1" },
-        "session_id": { "$ref": "#/$defs/CommissioningSessionId" },
-        "setup_generation": { "type": "integer", "minimum": 1 },
-        "state_revision": { "type": "integer", "minimum": 1 },
+        "contract": {
+          "const": "eidolon.device-foundation.commissioning-status"
+        },
+        "contract_version": {
+          "const": "1.0"
+        },
+        "profile_id": {
+          "const": "eidolon-trust-p256-hpke-v1"
+        },
+        "session_id": {
+          "$ref": "#/$defs/CommissioningSessionId"
+        },
+        "setup_generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "state_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
         "state": {
-          "enum": ["applying-configuration", "committed", "rolled-back", "failed"]
+          "enum": [
+            "applying-configuration",
+            "committed",
+            "rolled-back",
+            "failed"
+          ]
         },
         "conditions": {
           "type": "object",
@@ -483,10 +860,18 @@
             "network_committed"
           ],
           "properties": {
-            "wifi_connected": { "type": "boolean" },
-            "owner_route_validated": { "type": "boolean" },
-            "trust_committed": { "type": "boolean" },
-            "network_committed": { "type": "boolean" }
+            "wifi_connected": {
+              "type": "boolean"
+            },
+            "owner_route_validated": {
+              "type": "boolean"
+            },
+            "trust_committed": {
+              "type": "boolean"
+            },
+            "network_committed": {
+              "type": "boolean"
+            }
           }
         },
         "failure_code": {
@@ -502,40 +887,69 @@
                 "INTERNAL"
               ]
             },
-            { "type": "null" }
+            {
+              "type": "null"
+            }
           ]
         }
       },
       "allOf": [
         {
-          "if": { "properties": { "state": { "const": "committed" } } },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "committed"
+              }
+            }
+          },
           "then": {
             "properties": {
               "conditions": {
                 "properties": {
-                  "wifi_connected": { "const": true },
-                  "owner_route_validated": { "const": true },
-                  "trust_committed": { "const": true },
-                  "network_committed": { "const": true }
+                  "wifi_connected": {
+                    "const": true
+                  },
+                  "owner_route_validated": {
+                    "const": true
+                  },
+                  "trust_committed": {
+                    "const": true
+                  },
+                  "network_committed": {
+                    "const": true
+                  }
                 }
               },
-              "failure_code": { "type": "null" }
+              "failure_code": {
+                "type": "null"
+              }
             }
           }
         },
         {
           "if": {
             "properties": {
-              "state": { "enum": ["rolled-back", "failed"] }
+              "state": {
+                "enum": [
+                  "rolled-back",
+                  "failed"
+                ]
+              }
             }
           },
           "then": {
             "properties": {
-              "failure_code": { "type": "string" },
+              "failure_code": {
+                "type": "string"
+              },
               "conditions": {
                 "properties": {
-                  "trust_committed": { "const": false },
-                  "network_committed": { "const": false }
+                  "trust_committed": {
+                    "const": false
+                  },
+                  "network_committed": {
+                    "const": false
+                  }
                 }
               }
             }
@@ -554,11 +968,23 @@
         "observed_state_revision"
       ],
       "properties": {
-        "contract": { "const": "eidolon.device-foundation.commissioning-terminal-ack" },
-        "contract_version": { "const": "1.0" },
-        "session_id": { "$ref": "#/$defs/CommissioningSessionId" },
-        "setup_generation": { "type": "integer", "minimum": 1 },
-        "observed_state_revision": { "type": "integer", "minimum": 1 }
+        "contract": {
+          "const": "eidolon.device-foundation.commissioning-terminal-ack"
+        },
+        "contract_version": {
+          "const": "1.0"
+        },
+        "session_id": {
+          "$ref": "#/$defs/CommissioningSessionId"
+        },
+        "setup_generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "observed_state_revision": {
+          "type": "integer",
+          "minimum": 1
+        }
       }
     }
   }

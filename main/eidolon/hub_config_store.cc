@@ -1,5 +1,6 @@
 #include "hub_config_store.h"
 
+#include "device_foundation_v1_generated.h"
 #include "settings.h"
 
 #include <cJSON.h>
@@ -59,6 +60,14 @@ static bool AsciiAlphaNumeric(unsigned char value) {
     return (value >= '0' && value <= '9') ||
            (value >= 'A' && value <= 'Z') ||
            (value >= 'a' && value <= 'z');
+}
+
+// A device instance id is a digest of this device's operational key, so it is
+// checked as one rather than as "any identifier". The looser check accepted
+// whatever a journal happened to hold, including the MAC-shaped ids the
+// contract's own vectors used to carry.
+static bool IsDeviceInstanceId(const std::string& value) {
+    return device_foundation::v1::DeviceInstanceId::Parse(value).has_value();
 }
 
 static bool Identifier(const std::string& value) {
@@ -205,7 +214,7 @@ bool HubConfigStore::StoreEnrollment(const EnrollmentJournalEntry& state) {
         (grant_staged && !valid_stage) ||
         !OwnerDomainId(state.owner_domain_id.value) ||
         !JsonSafeUint(state.owner_domain_generation) ||
-        !Identifier(state.device_instance_candidate_id) ||
+        !IsDeviceInstanceId(state.device_instance_candidate_id) ||
         !Identifier(state.enrollment_id) ||
         !JsonSafeUint(state.proposal_revision) ||
         !Base64Url(state.collection_challenge, 22, 128) ||
@@ -327,7 +336,7 @@ ClaimStoreLoadResult HubConfigStore::LoadEnrollment(
         (phase == static_cast<int>(EnrollmentJournalPhase::ProposalCreated) ||
          phase == static_cast<int>(EnrollmentJournalPhase::GrantStaged)) &&
         OwnerDomainId(state.owner_domain_id.value) &&
-        Identifier(state.device_instance_candidate_id) &&
+        IsDeviceInstanceId(state.device_instance_candidate_id) &&
         Identifier(state.enrollment_id) &&
         Base64Url(state.collection_challenge, 22, 128) &&
         Digest(state.hardware_evidence_digest) &&
