@@ -1,5 +1,5 @@
 {
-  "sdk_commit": "2f0555969d68c17bb83889ab75ff4f97de5a46ac",
+  "sdk_commit": "6a62e2f762637d9bff0103fdcbe7e5f6e45a310e",
   "files": [
     {
       "source": "contracts/device_foundation/v1/generated/cpp/device_foundation_v1_generated.h",
@@ -9,7 +9,7 @@
     {
       "source": "contracts/device_foundation/v1/common/schemas.schema.json",
       "target": "tests/fixtures/device_foundation_v1/common.schemas.schema.json",
-      "sha256": "e8b95780d9b4176de32edfe3dd54dc661fb8068d9c6d3316504f236fe8a67f25"
+      "sha256": "fe9af35a6cba5318c9d6b208721688ae06c18a31450a8885794f8dd6db12af38"
     },
     {
       "source": "contracts/device_foundation/v1/admission/schemas.schema.json",

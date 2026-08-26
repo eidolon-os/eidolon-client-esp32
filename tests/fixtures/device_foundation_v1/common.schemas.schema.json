@@ -650,7 +650,7 @@
           "const": "1"
         },
         "device_id": {
-          "$ref": "#/$defs/Identifier"
+          "$ref": "#/$defs/DeviceInstanceId"
         },
         "device_kind": {
           "$ref": "#/$defs/Identifier"
