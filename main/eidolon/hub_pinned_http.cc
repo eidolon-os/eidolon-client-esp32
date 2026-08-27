@@ -1,14 +1,18 @@
 #include "hub_pinned_http.h"
 
+#include "host_resolution_core.h"
+
 #include "system_info.h"
 
 #include "sdkconfig.h"
 
 #include <esp_http_client.h>
 #include <esp_log.h>
+#include <lwip/dns.h>
 #include <lwip/netdb.h>
 #include <lwip/inet.h>
 #include <lwip/sockets.h>
+#include <lwip/tcpip.h>
 
 #define TAG "HubHttp"
 
@@ -40,16 +44,7 @@ esp_http_client_method_t MethodFor(const std::string& method)
 // what was attempted.
 std::string ResolvedAddressOf(const std::string& url)
 {
-    const size_t scheme = url.find("://");
-    if (scheme == std::string::npos) {
-        return "unparsable-url";
-    }
-    const size_t start = scheme + 3;
-    size_t end = url.find_first_of("/:", start);
-    if (end == std::string::npos) {
-        end = url.size();
-    }
-    const std::string host = url.substr(start, end - start);
+    const std::string host = HostOfUrl(url);
     if (host.empty()) {
         return "unparsable-url";
     }
@@ -74,6 +69,31 @@ std::string ResolvedAddressOf(const std::string& url)
     }
     freeaddrinfo(results);
     return reported;
+}
+
+// dns_table is TCPIP-thread state and this build has no core locking
+// (CONFIG_LWIP_TCPIP_CORE_LOCKING is off, so LOCK_TCPIP_CORE is a no-op), so
+// the clear is marshalled onto that thread rather than raced from this one.
+// Waiting for it matters: the next attempt has to resolve again, not race the
+// clear that was supposed to precede it.
+//
+// dns_clear_cache() drops every entry, not one name. On a device that talks to
+// one Host that is a handful of names, and it fails any lookup already in
+// flight, whose caller retries.
+void ClearDnsCacheOnTcpipThread(void*)
+{
+    dns_clear_cache();
+}
+
+void DropCachedResolutionIfStale(const std::string& host, HubRequestFailure failure)
+{
+    if (!ShouldDropCachedResolution(host, failure)) {
+        return;
+    }
+    ESP_LOGW(TAG, "Dropping the cached address for %s so the next attempt resolves again",
+             host.c_str());
+    // Never called from the TCPIP thread itself, which would deadlock here.
+    tcpip_callback_wait(ClearDnsCacheOnTcpipThread, nullptr);
 }
 
 }  // namespace
@@ -128,6 +148,8 @@ esp_err_t HubHttpRequest(const std::string& method,
         ESP_LOGE(TAG, "%s %s failed to open: %s (%s)", method.c_str(), url.c_str(),
                  esp_err_to_name(err), ResolvedAddressOf(url).c_str());
         esp_http_client_cleanup(client);
+        DropCachedResolutionIfStale(HostOfUrl(url),
+                                    HubRequestFailure::ConnectionNotOpened);
         return err;
     }
 

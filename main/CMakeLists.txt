@@ -1100,6 +1100,7 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/eidolon_ui_presenter.cc"
         "eidolon/eidolon_view.cc"
         "eidolon/claim_recovery_core.cc"
+        "eidolon/host_resolution_core.cc"
         "eidolon/hub_activation_retry_core.cc"
         "eidolon/hub_activator.cc"
         "eidolon/hub_config_client.cc"
