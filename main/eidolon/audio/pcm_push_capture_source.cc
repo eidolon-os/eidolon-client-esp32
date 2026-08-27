@@ -1,5 +1,7 @@
 #include "pcm_push_capture_source.h"
 
+#include "sdkconfig.h"
+
 #include <esp_heap_caps.h>
 #include <esp_log.h>
 #include <freertos/idf_additions.h>
@@ -24,26 +26,38 @@ PcmPushCaptureSource::PcmPushCaptureSource(uint32_t sample_rate, size_t ring_cap
     base_.stop = Stop;
     base_.close = Close;
 
-    // ...WithCaps, not xStreamBufferCreate: see the header. The plain call routes
-    // through pvPortMalloc() and would take this whole ring out of internal RAM,
-    // which is the one memory class the LiveKit engine cannot substitute PSRAM for.
-    // No fallback to internal on failure — a silent fallback would put the block
-    // back exactly where it starved the engine, and be invisible until the next
-    // "Failed to create engine".
+#if CONFIG_BOARD_TYPE_ESP_BOX_3
+    // BOX-3 full-duplex AEC has been hardware-qualified with the PCM ring in
+    // internal SRAM. Putting this real-time producer/consumer path in PSRAM
+    // causes corrupted/noisy capture under concurrent codec, display and Wi-Fi
+    // load, which in turn prevents STT from producing a usable utterance.
+    ring_ = xStreamBufferCreate(ring_capacity_bytes, /*trigger_level=*/1);
+#else
+    // Internal-SRAM-tight boards keep the ring in PSRAM so the LiveKit engine
+    // can still obtain its internal-only event queue and task stack.
     ring_ = xStreamBufferCreateWithCaps(ring_capacity_bytes, /*trigger_level=*/1,
                                         MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+#endif
     if (ring_ == nullptr) {
+#if CONFIG_BOARD_TYPE_ESP_BOX_3
+        ESP_LOGE(TAG, "Failed to allocate %u byte PCM ring in internal SRAM (internal_free=%u)",
+                 static_cast<unsigned>(ring_capacity_bytes),
+                 static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)));
+#else
         ESP_LOGE(TAG, "Failed to allocate %u byte PCM ring in PSRAM (psram_free=%u)",
                  static_cast<unsigned>(ring_capacity_bytes),
                  static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
+#endif
     }
 }
 
 PcmPushCaptureSource::~PcmPushCaptureSource() {
     if (ring_ != nullptr) {
-        // Must pair with xStreamBufferCreateWithCaps: the plain delete would free
-        // the control block and leak the PSRAM storage behind it.
+#if CONFIG_BOARD_TYPE_ESP_BOX_3
+        vStreamBufferDelete(ring_);
+#else
         vStreamBufferDeleteWithCaps(ring_);
+#endif
         ring_ = nullptr;
     }
 }
@@ -53,7 +67,10 @@ PcmPushCaptureSource* PcmPushCaptureSource::From(esp_capture_audio_src_if_t* h) 
 }
 
 void PcmPushCaptureSource::Push(const int16_t* samples, size_t sample_count) {
-    if (ring_ == nullptr || samples == nullptr || sample_count == 0) {
+    // The mic/AFE is initialized before LiveKit starts the esp_capture source.
+    // Audio produced before Start() has no consumer and Start() flushes it
+    // anyway, so do not fill the ring during room negotiation.
+    if (!running_ || ring_ == nullptr || samples == nullptr || sample_count == 0) {
         return;
     }
     const size_t bytes = sample_count * sizeof(int16_t);
