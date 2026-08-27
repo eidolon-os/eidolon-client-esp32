@@ -3,6 +3,7 @@
 #include "board.h"
 
 #include "authority_locator.h"
+#include "claim_recovery_core.h"
 #include "device_identity.h"
 #include "device_manifest_assertion_core.h"
 #include "device_control_delivery_client.h"
@@ -544,6 +545,95 @@ esp_err_t HubOnboardingClient::Run(const AuthorityCandidateRecord& candidate,
     return RunAccepted(descriptor, device_id, out);
 }
 
+esp_err_t HubOnboardingClient::ConsultOwnerInstruction(
+    const ActiveClaimState& claim, bool& fenced)
+{
+    fenced = false;
+    bool removal_completed = false;
+    const esp_err_t err = DeviceControlDeliveryClient().PollAndExecute(
+        claim, trust_, removal_completed);
+    if (err != ESP_OK) return err;
+    if (removal_completed) {
+        ESP_LOGW(TAG, "Device removal completed; operational runtime is fenced");
+        fenced = true;
+    }
+    return ESP_OK;
+}
+
+esp_err_t HubOnboardingClient::StandDownRevoked(const ActiveClaimState& claim,
+                                                Esp32HubConfig& out)
+{
+    // Say what this is through the lifecycle channel. esp_err_t cannot carry it:
+    // ESP_ERR_NOT_ALLOWED is also what a plain 401/403 becomes, and a rejected
+    // request is not a decision about this device.
+    out = {};
+    out.status = HubConfigStatus::Revoked;
+
+    // Being revoked is the moment an erase instruction is most likely to exist,
+    // so the Owner is asked before this device stops asking. Concluding
+    // "revoked, nothing more to do" first is what left the one device still
+    // holding Owner data as the one that had stopped collecting the instruction
+    // to drop it — the Authority re-arms a lapsed delivery for exactly this
+    // device, and it was no longer listening.
+    bool fenced = false;
+    const esp_err_t err = ConsultOwnerInstruction(claim, fenced);
+    if (err != ESP_OK) return err;
+    if (fenced) return ESP_ERR_NOT_ALLOWED;
+
+    // No instruction. The Owner's decision still stands, and this device does
+    // not undo it by asking again on its own; the way back is a person at the
+    // device, which the screen says and the setup gesture performs.
+    ESP_LOGW(TAG, "Claim was revoked by the Owner and no erase instruction is "
+                  "pending; physical presence is required to claim it again");
+    return ESP_ERR_NOT_ALLOWED;
+}
+
+esp_err_t HubOnboardingClient::ProposeFreshClaim(
+    const device_foundation::v1::OwnerDomainDescriptor& descriptor,
+    const std::string& device_id,
+    ActiveClaimState& claim,
+    Esp32HubConfig& out)
+{
+    bool activated = false;
+    const esp_err_t err =
+        ContinueCanonicalClaim(descriptor, device_id, claim, activated);
+    if (err != ESP_OK) return err;
+    if (!activated) {
+        // Asking is not being granted. The Proposal waits in pending-approval,
+        // where the Owner decides as they did the first time.
+        out = {};
+        out.status = HubConfigStatus::PendingApproval;
+        return ESP_OK;
+    }
+    return PullActiveConfiguration(claim, out);
+}
+
+void HubOnboardingClient::LogDeadClaim(
+    ClaimUsability usability, const ActiveClaimState& claim,
+    const std::string& device_id,
+    const device_foundation::v1::OwnerDomainDescriptor& descriptor)
+{
+    // Which fact moved is the whole diagnosis. One message across three
+    // unrelated causes is how a Host that had merely been re-keyed looked
+    // identical to a device nobody could account for.
+    if (usability == ClaimUsability::ForeignPrincipal) {
+        ESP_LOGW(TAG,
+                 "Stored Claim belongs to another principal (%s); proposing "
+                 "again as %s",
+                 claim.device_ref.device_instance_id.c_str(), device_id.c_str());
+        return;
+    }
+    ESP_LOGW(TAG,
+             "Owner Domain moved on (claim owner=%s generation=%lu, directory "
+             "owner=%s generation=%lu); dropping the dead Claim and proposing "
+             "again for review",
+             claim.device_ref.owner_domain_id.value.c_str(),
+             static_cast<unsigned long>(
+                 claim.device_ref.owner_domain_generation),
+             descriptor.owner_domain_id.c_str(),
+             static_cast<unsigned long>(descriptor.owner_domain_generation));
+}
+
 esp_err_t HubOnboardingClient::RunAccepted(
     const device_foundation::v1::OwnerDomainDescriptor& descriptor,
     const std::string& device_id,
@@ -551,45 +641,66 @@ esp_err_t HubOnboardingClient::RunAccepted(
 {
     HubConfigStore store;
     ActiveClaimState active_claim;
-    const ClaimStoreLoadResult claim_load =
-        store.LoadActiveClaim(active_claim);
-    esp_err_t err = ESP_OK;
+    const ClaimStoreLoadResult claim_load = store.LoadActiveClaim(active_claim);
     if (claim_load == ClaimStoreLoadResult::StorageFailure) {
         ESP_LOGE(TAG, "ActiveClaimStore is unreadable; refusing runtime");
         return ESP_FAIL;
     }
-    if (claim_load == ClaimStoreLoadResult::Loaded) {
-        if (active_claim.state == ActiveClaimLocalState::Revoked) {
-            ESP_LOGW(TAG, "Claim is terminal revoked; physical recovery required");
-            return ESP_ERR_NOT_ALLOWED;
-        }
-        if (active_claim.device_ref.device_instance_id != device_id ||
-            active_claim.device_ref.owner_domain_id.value !=
-                descriptor.owner_domain_id ||
-            active_claim.device_ref.owner_domain_generation !=
-                descriptor.owner_domain_generation) {
-            ESP_LOGE(TAG, "Recovery required: active Claim Authority changed");
-            return ESP_ERR_NOT_ALLOWED;
-        }
-        bool removal_completed = false;
-        err = DeviceControlDeliveryClient().PollAndExecute(
-            active_claim, trust_, removal_completed);
+    if (claim_load != ClaimStoreLoadResult::Loaded) {
+        return ProposeFreshClaim(descriptor, device_id, active_claim, out);
+    }
+
+    const ClaimUsability usability =
+        ClassifyStoredClaim(active_claim, device_id, descriptor);
+
+    if (RecoveryForUsability(usability) ==
+        ClaimRecovery::RequirePhysicalPresence) {
+        return StandDownRevoked(active_claim, out);
+    }
+
+    // What the Owner asked for outranks anything this device concludes about
+    // its own Claim, so the instruction is collected before any local verdict is
+    // acted on — including before a Claim this device has decided is dead.
+    if (MayConsultOwnerInstruction(usability)) {
+        bool fenced = false;
+        const esp_err_t err = ConsultOwnerInstruction(active_claim, fenced);
         if (err != ESP_OK) return err;
-        if (removal_completed) {
-            ESP_LOGW(TAG, "Device removal completed; operational runtime is fenced");
+        if (fenced) {
+            out = {};
+            out.status = HubConfigStatus::Revoked;
             return ESP_ERR_NOT_ALLOWED;
         }
-        return PullActiveConfiguration(active_claim, out);
     }
-    bool activated = false;
-    err = ContinueCanonicalClaim(descriptor, device_id, active_claim, activated);
-    if (err != ESP_OK) return err;
-    if (!activated) {
-        out = {};
-        out.status = HubConfigStatus::PendingApproval;
-        return ESP_OK;
+
+    if (RecoveryForUsability(usability) == ClaimRecovery::DropAndRepropose) {
+        LogDeadClaim(usability, active_claim, device_id, descriptor);
+        // The Claim goes; identity, Owner trust and the enrolment journal stay,
+        // so the device that proposes again is the same device.
+        if (!store.ClearActiveClaim()) {
+            ESP_LOGE(TAG, "Could not forget the dead Claim");
+            return ESP_FAIL;
+        }
+        return ProposeFreshClaim(descriptor, device_id, active_claim, out);
     }
-    return PullActiveConfiguration(active_claim, out);
+
+    const esp_err_t err = PullActiveConfiguration(active_claim, out);
+    if (err != ESP_ERR_NOT_ALLOWED) return err;
+
+    // ESP_ERR_NOT_ALLOWED is also what a 401/403 becomes, and an Authority that
+    // rejected this request has not said anything about this device's
+    // lifecycle. The Claim's own recorded state is the evidence, because
+    // PullActiveConfiguration commits a revocation before refusing.
+    ActiveClaimState recorded;
+    if (store.LoadActiveClaim(recorded) != ClaimStoreLoadResult::Loaded ||
+        ClassifyStoredClaim(recorded, device_id, descriptor) !=
+            ClaimUsability::OwnerRevoked) {
+        return err;
+    }
+    // The Authority just answered "revoked". Learning it now is the same fact as
+    // having known it at the top of this call, and it must reach the same place:
+    // ask for the Owner's instruction before standing down, rather than sitting
+    // out a whole power cycle with their data still on board.
+    return StandDownRevoked(recorded, out);
 }
 
 esp_err_t HubOnboardingClient::AbandonAndRepropose(

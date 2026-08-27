@@ -5,6 +5,7 @@
 #include "device_boot_recovery.h"
 #include "device_identity.h"
 #include "eidolon_ui_types.h"
+#include "hub_activation_retry_core.h"
 #include "hub_config_store.h"
 #include "hub_discovery.h"
 #include "hub_onboarding_client.h"
@@ -45,11 +46,26 @@ void ProjectHubConfig(Application& app, HubConfigStatus status)
     }
 }
 
+ActivationAttemptOutcome ClassifyAttempt(esp_err_t err, const Esp32HubConfig& config)
+{
+    if (err == ESP_OK) {
+        return ActivationAttemptOutcome::Admitted;
+    }
+    // Only the lifecycle channel says a Claim is terminal. ESP_ERR_NOT_ALLOWED
+    // alone does not: the Authority answering 401/403 has rejected a request,
+    // not decided anything about this device, and showing its Owner "you were
+    // removed" for a rejected request points the person at the wrong problem.
+    if (err == ESP_ERR_NOT_ALLOWED && config.status == HubConfigStatus::Revoked) {
+        return ActivationAttemptOutcome::ClaimTerminal;
+    }
+    return ActivationAttemptOutcome::Retryable;
+}
+
 }  // namespace
 
 bool HubActivator::Run() {
     auto& app = Application::GetInstance();
-    int retry_delay = 10;
+    HubActivationRetryCore retry;
 
     const DeviceEraseCoreOutcome removal_recovery =
         DeviceBootRecovery::ResumePendingRemoval();
@@ -78,67 +94,82 @@ bool HubActivator::Run() {
         // a commissioning generation for the radio or projects stale Hub state
         // over the commissioning actor's UI. The network-connected handoff
         // starts a new ActivationTask after StationRouteReady.
-        if (CommissioningRuntime::GetInstance().IsInProgress()) {
+        if (retry.Evaluate(CommissioningRuntime::GetInstance().IsInProgress()) !=
+            ActivationStandDown::KeepAsking) {
             ESP_LOGI(TAG, "Commissioning owns the RadioLease; suspending Hub activation");
             return false;
         }
         app.SetEidolonServiceUi(ServicePhase::DiscoveringAuthority);
 
+        Esp32HubConfig config;
         AuthorityCandidateRecord txt;
         esp_err_t err = discovery.Discover(txt);
         if (err == ESP_OK) {
             app.SetEidolonServiceUi(ServicePhase::Registering);
-            Esp32HubConfig config;
             err = client.Run(txt, device_id, config);
-            if (err == ESP_OK) {
-                if (CommissioningRuntime::GetInstance().IsInProgress()) {
-                    ESP_LOGI(TAG, "Commissioning began during Hub handoff; deferring activation");
-                    return false;
-                }
-                if (store.SaveHubConfig(config) != ESP_OK) {
-                    // The Host already admitted this device and the credential is
-                    // in hand; only the cache of it failed. Refusing to continue
-                    // turned a full NVS partition into a device that could not be
-                    // used at all, when what it actually costs is re-activating on
-                    // the next boot instead of resuming offline.
-                    ESP_LOGW(TAG, "Hub activation could not be cached; using it for this session");
-                }
-
-                ProjectHubConfig(app, config.status);
-                return true;
-            }
         }
 
-        if (CommissioningRuntime::GetInstance().IsInProgress()) {
-            ESP_LOGI(TAG, "Commissioning owns the RadioLease; suspending Hub activation");
+        // A commissioning generation may have taken the radio while the attempt
+        // was in flight; its UI and its RadioLease outrank this result.
+        if (retry.Evaluate(CommissioningRuntime::GetInstance().IsInProgress()) !=
+            ActivationStandDown::KeepAsking) {
+            ESP_LOGI(TAG, "Commissioning began during Hub handoff; deferring activation");
             return false;
+        }
+
+        switch (retry.OnAttempt(ClassifyAttempt(err, config))) {
+        case ActivationStandDown::Admitted:
+            if (store.SaveHubConfig(config) != ESP_OK) {
+                // The Host already admitted this device and the credential is
+                // in hand; only the cache of it failed. Refusing to continue
+                // turned a full NVS partition into a device that could not be
+                // used at all, when what it actually costs is re-activating on
+                // the next boot instead of resuming offline.
+                ESP_LOGW(TAG, "Hub activation could not be cached; using it for this session");
+            }
+            ProjectHubConfig(app, config.status);
+            return true;
+
+        case ActivationStandDown::ClaimTerminal:
+            // Removal and revocation are deliberately terminal: the firmware
+            // does not silently resurrect a revoked lifecycle. Asking again
+            // cannot change the answer, so say what does — the person holding
+            // the device opens setup and claims it again.
+            ESP_LOGW(TAG, "Claim is terminal (%s); physical presence is required to rejoin",
+                     esp_err_to_name(err));
+            app.SetEidolonEnrollmentUi(EnrollmentPhase::Revoked);
+            app.SetEidolonServiceUi(ServicePhase::Unavailable);
+            app.SetEidolonRuntimeUi(RuntimePhase::RecoveryRequired,
+                                    "Removed from this Owner. Open setup to claim it again");
+            return false;
+
+        case ActivationStandDown::CommissioningOwnsRadio:
+            return false;
+
+        case ActivationStandDown::KeepAsking:
+            break;
         }
 
         // Keep asking. A Host that is switched off, a network still coming back,
         // a device nobody has set up yet — none of those are permanent, and
         // giving up after ten tries turned every one of them into a device that
-        // needed a power cycle to try again. What ends this loop is success, or
-        // the device being put to use another way.
+        // needed a power cycle to try again. What ends this loop is success, a
+        // commissioning generation taking the radio, or a terminal Claim.
+        const int retry_delay = retry.delay_seconds();
         char buffer[96];
         snprintf(buffer, sizeof(buffer), "Looking for the Hub again in %ds", retry_delay);
         app.SetEidolonServiceUi(ServicePhase::DiscoveringAuthority, buffer);
 
-        ESP_LOGW(TAG, "Hub activation failed (%s), retry in %ds", esp_err_to_name(err),
-                 retry_delay);
+        ESP_LOGW(TAG, "Hub activation failed (%s), attempt %d, retry in %ds",
+                 esp_err_to_name(err), retry.retryable_attempts(), retry_delay);
 
         for (int i = 0; i < retry_delay; ++i) {
             vTaskDelay(pdMS_TO_TICKS(1000));
-            if (CommissioningRuntime::GetInstance().IsInProgress()) {
+            if (retry.Evaluate(CommissioningRuntime::GetInstance().IsInProgress()) !=
+                ActivationStandDown::KeepAsking) {
                 ESP_LOGI(TAG, "Commissioning owns the RadioLease; suspending Hub activation");
                 return false;
             }
-            if (app.GetDeviceState() == kDeviceStateIdle) {
-                return false;
-            }
-        }
-        retry_delay = retry_delay * 2;
-        if (retry_delay > 120) {
-            retry_delay = 120;
         }
     }
 }

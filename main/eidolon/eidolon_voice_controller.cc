@@ -953,9 +953,19 @@ esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist)
     Esp32HubConfig fresh;
     esp_err_t err = client.Resume(OperationalDeviceInstanceId(), fresh);
     if (err == ESP_ERR_NOT_ALLOWED) {
-        // Hub rejected our signed identity (401/403). Stop bouncing on the same
-        // rejected key; show "awaiting re-approval" (admin must re-approve / the
-        // device must re-enroll). Recovers on a later successful fetch or reboot.
+        // Two different facts arrive as this one code. The Owner removing their
+        // device is a decision about this device, and the way back is setup.
+        // A 401/403 is one rejected request against a key the Authority did not
+        // accept, and the way back is re-approval. Telling a person the wrong
+        // one sends them to the wrong place.
+        if (fresh.status == HubConfigStatus::Revoked) {
+            ESP_LOGW(TAG, "Owner removed this device; setup is required to claim it again");
+            SetState(VoiceSessionState::Unauthorized, "claim_revoked");
+            return err;
+        }
+        // Stop bouncing on the same rejected key; show "awaiting re-approval"
+        // (admin must re-approve / the device must re-enroll). Recovers on a
+        // later successful fetch or reboot.
         ESP_LOGW(TAG, "Hub rejected device identity; awaiting re-approval");
         SetState(VoiceSessionState::Unauthorized, "hub_rejected_identity");
         return err;

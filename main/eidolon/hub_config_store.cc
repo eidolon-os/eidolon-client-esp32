@@ -373,6 +373,14 @@ bool HubConfigStore::ClearEnrollment() {
     return settings.Commit() == ESP_OK;
 }
 
+bool HubConfigStore::ClearActiveClaim() {
+    Settings settings(kNvsNamespace, true);
+    // Settings treats an absent key as an idempotent success and fail-stops on
+    // any other NVS erase error.
+    settings.EraseKey(kActiveClaimKey);
+    return settings.Commit() == ESP_OK;
+}
+
 bool HubConfigStore::StoreActiveClaim(const ActiveClaimState& state) {
     if (!state.valid() ||
         !JsonSafeUint(state.device_ref.owner_domain_generation) ||

@@ -21,6 +21,10 @@ public:
     bool ClearEnrollment() override;
     ClaimStoreLoadResult LoadActiveClaim(ActiveClaimState& out) override;
     bool StoreActiveClaim(const ActiveClaimState& value) override;
+    // Forgets a Claim this device can no longer use. The Claim is the only
+    // thing dropped: identity, Owner trust and calibration are untouched, so a
+    // device that forgets a dead Claim is still the same device asking again.
+    bool ClearActiveClaim();
 };
 
 }  // namespace eidolon

@@ -101,6 +101,36 @@ void AnUnboundedWindowHasNoDurationToAdvertiseAtAll()
                 .has_value());
 }
 
+// The state a removed device is parked in must be able to open setup, or the
+// screen telling its Owner to claim it again is asking for something the device
+// refuses to do — and the only remaining way back erases the identity that made
+// it the same device.
+void SetupOpensFromEveryStateAFailedActivationCanLeaveTheDeviceIn()
+{
+    assert(HubDeviceStateAllowsSetupOpen(kDeviceStateWifiConfiguring));
+    assert(HubDeviceStateAllowsSetupOpen(kDeviceStateActivating));
+    assert(HubDeviceStateAllowsSetupOpen(kDeviceStateStarting));
+}
+
+void SetupOpensFromAWorkingDevice()
+{
+    assert(HubDeviceStateAllowsSetupOpen(kDeviceStateIdle));
+    assert(HubDeviceStateAllowsSetupOpen(kDeviceStateListening));
+    assert(HubDeviceStateAllowsSetupOpen(kDeviceStateSpeaking));
+}
+
+// An OTA that is half written is the one thing a setup window must not
+// interrupt, and a device that has not finished deciding what it is has nothing
+// to hand over yet.
+void SetupStaysShutWhereOpeningItWouldBreakSomething()
+{
+    assert(!HubDeviceStateAllowsSetupOpen(kDeviceStateUpgrading));
+    assert(!HubDeviceStateAllowsSetupOpen(kDeviceStateUnknown));
+    assert(!HubDeviceStateAllowsSetupOpen(kDeviceStateConnecting));
+    assert(!HubDeviceStateAllowsSetupOpen(kDeviceStateAudioTesting));
+    assert(!HubDeviceStateAllowsSetupOpen(kDeviceStateFatalError));
+}
+
 }  // namespace
 
 int main()
@@ -113,5 +143,8 @@ int main()
     ADurationOutsideTheConfiguredRangeStillLeavesAUsableWindow();
     TheAdvertisedDurationSaysWhatTheDeviceWillActuallyDo();
     AnUnboundedWindowHasNoDurationToAdvertiseAtAll();
+    SetupOpensFromEveryStateAFailedActivationCanLeaveTheDeviceIn();
+    SetupOpensFromAWorkingDevice();
+    SetupStaysShutWhereOpeningItWouldBreakSomething();
     return 0;
 }

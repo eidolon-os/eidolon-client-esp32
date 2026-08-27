@@ -1,14 +1,19 @@
 #include "device_physical_recovery.h"
 
+#include "claim_recovery_core.h"
 #include "device_identity.h"
 #include "device_physical_recovery_core.h"
+#include "hub_config_store.h"
 #include "esp_idf_owner_data_erase_storage.h"
 
 #include <cJSON.h>
+#include <esp_log.h>
 #include <nvs.h>
 
 #include <array>
 #include <initializer_list>
+
+#define TAG "PhysicalRecovery"
 
 namespace eidolon {
 namespace {
@@ -158,9 +163,36 @@ bool DevicePhysicalRecovery::AuthorizeFromPhysicalPresence() {
     EspIdfDeviceEraseJournal removal;
     DeviceEraseJournalEntry terminal;
     const auto loaded = removal.Load(terminal);
-    if (loaded == DeviceEraseJournalLoadResult::NotFound) return true;
+    if (loaded == DeviceEraseJournalLoadResult::NotFound) {
+        return ClearRevokedClaimOnPhysicalPresence();
+    }
     if (loaded != DeviceEraseJournalLoadResult::Loaded) return false;
     return Run(terminal, true) == PhysicalRecoveryResult::Commissionable;
+}
+
+bool DevicePhysicalRecovery::ClearRevokedClaimOnPhysicalPresence() {
+    // A Claim the Owner revoked is terminal on purpose: the device may not
+    // resurrect it by asking again on its own. But it left the device with a
+    // Claim nothing could use and no way to give it up, so the only remaining
+    // way back was erasing NVS — which mints a new identity, and so returns a
+    // different device than the one the Owner removed.
+    //
+    // Physical presence is the authority this design already uses for handing a
+    // device to a Host, so it is the authority for giving up a Claim too. The
+    // Claim is all that is dropped: the identity stays, so the device that
+    // proposes again is the same device, and the Owner approves it as they did
+    // the first time.
+    HubConfigStore store;
+    ActiveClaimState claim;
+    const ClaimStoreLoadResult loaded = store.LoadActiveClaim(claim);
+    if (loaded == ClaimStoreLoadResult::StorageFailure) return false;
+    if (loaded != ClaimStoreLoadResult::Loaded) return true;
+    if (!PhysicalPresenceMayClearStoredClaim(claim)) return true;
+    if (!store.ClearActiveClaim() || !store.ClearEnrollment()) return false;
+    ESP_LOGW(TAG, "Physical presence gave up a revoked Claim; this device can be "
+                  "claimed again as %s",
+             claim.device_ref.device_instance_id.c_str());
+    return true;
 }
 
 bool DevicePhysicalRecovery::ResumeAuthorizedTerminal(

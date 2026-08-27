@@ -5,6 +5,7 @@
 
 #include <string>
 
+#include "claim_recovery_core.h"
 #include "device_claim_consumer_core.h"
 #include "device_manifest_assertion_core.h"
 #include "hub_types.h"
@@ -54,6 +55,25 @@ private:
         bool& activated,
         bool allow_reproposal,
         const char* reason);
+    // Ask the Authority whether the Owner left an instruction for this device
+    // and carry it out. `fenced` reports that a removal completed, so the
+    // operational runtime must not start.
+    esp_err_t ConsultOwnerInstruction(const ActiveClaimState& claim,
+                                      bool& fenced);
+    // Every path that knows this Claim was revoked ends here, so the Owner's
+    // erase instruction is collected on all of them.
+    esp_err_t StandDownRevoked(const ActiveClaimState& claim,
+                               Esp32HubConfig& out);
+    // Resume or start a Proposal and report where it landed. A Proposal that is
+    // not yet granted is pending-approval, not a failure.
+    esp_err_t ProposeFreshClaim(
+        const device_foundation::v1::OwnerDomainDescriptor& descriptor,
+        const std::string& device_id, ActiveClaimState& claim,
+        Esp32HubConfig& out);
+    static void LogDeadClaim(
+        ClaimUsability usability, const ActiveClaimState& claim,
+        const std::string& device_id,
+        const device_foundation::v1::OwnerDomainDescriptor& descriptor);
     esp_err_t RunAccepted(const device_foundation::v1::OwnerDomainDescriptor& descriptor,
                           const std::string& device_id,
                           Esp32HubConfig& out);

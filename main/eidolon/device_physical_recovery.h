@@ -13,6 +13,12 @@ public:
     // Boot may resume a transaction only after its authorization was durable.
     static bool ResumeAuthorizedTerminal(
         const DeviceEraseJournalEntry& terminal);
+
+private:
+    // The no-removal-journal branch of the physical-presence gesture: an Owner
+    // revocation is terminal without one, and this is how a person at the
+    // device gives that Claim up.
+    static bool ClearRevokedClaimOnPhysicalPresence();
 };
 
 }  // namespace eidolon

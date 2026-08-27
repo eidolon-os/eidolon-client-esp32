@@ -283,4 +283,28 @@ bool UiStateProjector::AllowsIntent(const EidolonRuntimeStatus& status, UiIntent
     }
 }
 
+bool UiStateProjector::IsConversationState(DeviceState state)
+{
+    return state == kDeviceStateConnecting || state == kDeviceStateListening ||
+           state == kDeviceStateSpeaking;
+}
+
+DeviceState UiStateProjector::ProjectLegacyDeviceState(
+    const EidolonRuntimeStatus& status, DeviceState current)
+{
+    if (status.conversation == ConversationPhase::Opening ||
+        status.conversation == ConversationPhase::Failed ||
+        status.service == ServicePhase::Reconnecting ||
+        status.service == ServicePhase::Connecting) {
+        return kDeviceStateConnecting;
+    }
+    if (status.conversation == ConversationPhase::Active) {
+        return status.turn == TurnPhase::AgentSpeaking ? kDeviceStateSpeaking
+                                                       : kDeviceStateListening;
+    }
+    // Nothing of this projection's own is running. Only a conversation it
+    // started is its to end; a lifecycle state belongs to the Application.
+    return IsConversationState(current) ? kDeviceStateIdle : current;
+}
+
 }  // namespace eidolon

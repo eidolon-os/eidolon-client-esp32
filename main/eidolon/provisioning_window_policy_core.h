@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 
+#include "device_state.h"
 #include "device_foundation_v1_generated.h"
 
 namespace eidolon {
@@ -72,6 +73,21 @@ ProvisioningWindowPolicy DecideProvisioningWindow(
 // unbounded.
 std::optional<device_foundation::v1::SetupWindowRemainingSeconds>
 AdvertisedWindowSeconds(const ProvisioningWindowPolicy& policy);
+
+// Which device states the physical-presence gesture may open setup from, in
+// HUB_MODE, where the commissioning actor owns the setup window.
+//
+// kDeviceStateWifiConfiguring does not mean that window is open. It is also
+// where Application parks a device whose activation just failed — including a
+// device the Owner removed, which is at that moment showing "open setup to
+// claim it again". Refusing the gesture there left that device with no way back
+// but an NVS erase, and an NVS erase mints a new device identity, so the device
+// the Owner removed is gone rather than reclaimed.
+//
+// Upgrading and the transient states stay refused: an OTA must not be
+// interrupted, and a device that has not finished deciding what it is has
+// nothing to hand over yet.
+bool HubDeviceStateAllowsSetupOpen(DeviceState state);
 
 }  // namespace eidolon
 

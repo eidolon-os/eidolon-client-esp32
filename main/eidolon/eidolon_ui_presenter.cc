@@ -193,17 +193,10 @@ void EidolonUiPresenter::Reapply()
 
 void EidolonUiPresenter::SyncLegacyDeviceState()
 {
-    DeviceState target = kDeviceStateIdle;
-    if (status_.conversation == ConversationPhase::Opening ||
-        status_.conversation == ConversationPhase::Failed ||
-        status_.service == ServicePhase::Reconnecting ||
-        status_.service == ServicePhase::Connecting) {
-        target = kDeviceStateConnecting;
-    } else if (status_.conversation == ConversationPhase::Active) {
-        target = status_.turn == TurnPhase::AgentSpeaking ? kDeviceStateSpeaking
-                                                          : kDeviceStateListening;
-    }
-    if (app_.GetDeviceState() != target) {
+    const DeviceState current = app_.GetDeviceState();
+    const DeviceState target =
+        UiStateProjector::ProjectLegacyDeviceState(status_, current);
+    if (current != target) {
         app_.SetDeviceState(target);
     }
 }

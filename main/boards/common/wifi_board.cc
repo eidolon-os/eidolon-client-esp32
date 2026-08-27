@@ -9,6 +9,7 @@
 #include "eidolon/commissioning_runtime.h"
 #include "eidolon/commissioning_transaction.h"
 #include "eidolon/device_physical_recovery.h"
+#include "eidolon/provisioning_window_policy_core.h"
 #endif
 
 #include <freertos/FreeRTOS.h>
@@ -244,17 +245,21 @@ void WifiBoard::EnterWifiConfigMode() {
         ESP_LOGE(TAG, "Physical recovery transaction did not converge");
         return;
     }
-#endif
 
+    // In HUB_MODE every permitted state does the same thing — hand the act to
+    // the commissioning actor — so one rule decides it, and that rule is pinned
+    // by tests rather than spelled out again here.
+    if (!eidolon::HubDeviceStateAllowsSetupOpen(state)) {
+        ESP_LOGE(TAG, "EnterWifiConfigMode called in device state %d, which cannot open setup", state);
+        return;
+    }
+    StartWifiConfigMode();
+    return;
+#else
     if (state == kDeviceStateSpeaking || state == kDeviceStateListening || state == kDeviceStateIdle) {
-#if !CONFIG_EIDOLON_HUB_MODE
         // Reset protocol (close audio channel, reset protocol)
         Application::GetInstance().ResetProtocol();
-#endif
 
-#if CONFIG_EIDOLON_HUB_MODE
-        StartWifiConfigMode();
-#else
         xTaskCreate([](void* arg) {
             auto* board = static_cast<WifiBoard*>(arg);
 
@@ -270,21 +275,16 @@ void WifiBoard::EnterWifiConfigMode() {
 
             vTaskDelete(NULL);
         }, "wifi_cfg_delay", 4096, this, 2, NULL);
-#endif
         return;
     }
 
-    // Activating is where a device sits while it looks for its Host and fails to
-    // be admitted — which is exactly when the person in front of it needs to
-    // hand it a different Host. Reopening the setup window is a physical act, so
-    // refusing it in that state left a device that could only be recovered by
-    // reflashing it.
     if (state != kDeviceStateStarting && state != kDeviceStateActivating) {
         ESP_LOGE(TAG, "EnterWifiConfigMode called in device state %d, which cannot open setup", state);
         return;
     }
 
     StartWifiConfigMode();
+#endif
 }
 
 bool WifiBoard::IsInWifiConfigMode() const {

@@ -45,4 +45,24 @@ AdvertisedWindowSeconds(const ProvisioningWindowPolicy& policy)
         policy.seconds);
 }
 
+bool HubDeviceStateAllowsSetupOpen(DeviceState state)
+{
+    switch (state) {
+    case kDeviceStateIdle:
+    case kDeviceStateListening:
+    case kDeviceStateSpeaking:
+    case kDeviceStateStarting:
+    case kDeviceStateActivating:
+    case kDeviceStateWifiConfiguring:
+        return true;
+    case kDeviceStateUnknown:
+    case kDeviceStateConnecting:
+    case kDeviceStateUpgrading:
+    case kDeviceStateAudioTesting:
+    case kDeviceStateFatalError:
+        return false;
+    }
+    return false;
+}
+
 }  // namespace eidolon
