@@ -20,6 +20,7 @@ namespace eidolon {
 // presenter's fully-resolved snapshot drives the face:
 //   - emotion  <- snapshot.emotion + connection/pairing overrides (the avatar's mood)
 //   - speech   <- projected transcript subtitle
+//   - mode     <- projected PTT / HALF / FULL label
 // A ~20ms LVGL timer runs avatar->update() so decorator/animation lifetimes advance.
 // The avatar engine is the ported StackChan renderer (LVGL 9 + smooth_ui_toolkit).
 class StackChanAvatarView : public EidolonView {
@@ -53,6 +54,7 @@ private:
 
     Display* display_ = nullptr;
     std::unique_ptr<stackchan::avatar::DefaultAvatar> avatar_;
+    lv_obj_t* mode_label_ = nullptr;
     lv_timer_t* update_timer_ = nullptr;
     // Emotion state as ints (the Emotion enum stays out of this header — the board TU
     // only sees a forward-declared DefaultAvatar). Render sets base_; PulseEmotion sets

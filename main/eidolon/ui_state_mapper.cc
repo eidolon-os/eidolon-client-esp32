@@ -102,12 +102,17 @@ void ResolveConversationPresentation(const EidolonRuntimeStatus& status,
     if (model.scene != UiScene::Conversation) {
         return;
     }
-    switch (status.turn) {
+    switch (model.turn) {
     case TurnPhase::Recording:
-    case TurnPhase::UserSpeaking:
         model.state_label = "REC";
         model.status_text = "Listening";
         model.detail_text = "Release to send";
+        model.emotion = "happy";
+        break;
+    case TurnPhase::UserSpeaking:
+        model.state_label = "LISTEN";
+        model.status_text = "Listening";
+        model.detail_text = "Listening...";
         model.emotion = "happy";
         break;
     case TurnPhase::Committing:
@@ -130,13 +135,13 @@ void ResolveConversationPresentation(const EidolonRuntimeStatus& status,
         break;
     case TurnPhase::Idle:
     default:
-        model.state_label = status.interaction_mode == InteractionMode::PushToTalk
+        model.state_label = IsPushToTalk(status.interaction_mode)
                                 ? "TALK"
                                 : "LISTEN";
-        model.status_text = status.interaction_mode == InteractionMode::PushToTalk
+        model.status_text = IsPushToTalk(status.interaction_mode)
                                 ? "Ready to talk"
                                 : "Listening";
-        model.detail_text = status.interaction_mode == InteractionMode::PushToTalk
+        model.detail_text = IsPushToTalk(status.interaction_mode)
                                 ? "Hold to talk"
                                 : "Listening...";
         break;
@@ -174,11 +179,11 @@ void ResolveActions(const EidolonRuntimeStatus& status, EidolonUiModel& model)
     case UiScene::Conversation:
         model.show_end_action = true;
         model.primary_enabled = true;
-        if (status.interaction_mode == InteractionMode::PushToTalk) {
-            model.primary_intent = status.turn == TurnPhase::Recording
+        if (IsPushToTalk(status.interaction_mode)) {
+            model.primary_intent = model.turn == TurnPhase::Recording
                                        ? UiIntent::CommitTalk
                                        : UiIntent::BeginTalk;
-            model.primary_label = status.turn == TurnPhase::Recording ? "REC" : "TALK";
+            model.primary_label = model.turn == TurnPhase::Recording ? "REC" : "TALK";
         } else {
             model.primary_intent = UiIntent::ToggleMicrophone;
             model.primary_label = status.mic_enabled ? "MIC" : "MUTE";
@@ -212,7 +217,8 @@ EidolonUiModel UiStateProjector::Project(const EidolonRuntimeStatus& status)
     EidolonUiModel model;
     model.scene = SelectScene(status);
     model.interaction_mode = status.interaction_mode;
-    model.turn = status.turn;
+    model.mode_label = InteractionModeLabel(status.interaction_mode);
+    model.turn = NormalizeTurnPhase(status.interaction_mode, status.turn);
     model.end_reason = status.end_reason;
     model.show_mute_icon = !status.mic_enabled;
     model.state_label = UiSceneLabel(model.scene);
@@ -268,15 +274,15 @@ bool UiStateProjector::AllowsIntent(const EidolonRuntimeStatus& status, UiIntent
         return model.show_end_action;
     case UiIntent::BeginTalk:
         return model.scene == UiScene::Conversation &&
-               status.interaction_mode == InteractionMode::PushToTalk &&
-               status.turn != TurnPhase::Recording;
+               IsPushToTalk(model.interaction_mode) &&
+               model.turn != TurnPhase::Recording;
     case UiIntent::CommitTalk:
         return model.scene == UiScene::Conversation &&
-               status.interaction_mode == InteractionMode::PushToTalk &&
-               status.turn == TurnPhase::Recording;
+               IsPushToTalk(model.interaction_mode) &&
+               model.turn == TurnPhase::Recording;
     case UiIntent::ToggleMicrophone:
         return model.scene == UiScene::Conversation &&
-               status.interaction_mode == InteractionMode::Streaming;
+               IsAutomaticEndpointing(model.interaction_mode);
     case UiIntent::None:
     default:
         return false;

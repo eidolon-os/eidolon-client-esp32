@@ -7,13 +7,25 @@
 
 namespace eidolon {
 
-// Flow D — push-to-talk (half-duplex) vs auto open-mic (full-duplex). Compile-time
-// per board via Kconfig; carried as a first-class snapshot field so the UI can show
-// it persistently (requirement: mode indicator always visible).
+// Device interaction mode. This mirrors the three-value wire contract exactly:
+// PTT has an explicit release boundary, while half/full duplex both use automatic
+// endpointing and differ in whether playback can be interrupted.
 enum class InteractionMode {
     PushToTalk,
-    Streaming,
+    HalfDuplex,
+    FullDuplex,
 };
+
+inline constexpr bool IsPushToTalk(InteractionMode mode)
+{
+    return mode == InteractionMode::PushToTalk;
+}
+
+inline constexpr bool IsAutomaticEndpointing(InteractionMode mode)
+{
+    return mode == InteractionMode::HalfDuplex ||
+           mode == InteractionMode::FullDuplex;
+}
 
 // Conversation turn / dialogue intent.
 enum class TurnPhase {
@@ -25,12 +37,28 @@ enum class TurnPhase {
     AgentSpeaking,
 };
 
+inline constexpr TurnPhase NormalizeTurnPhase(InteractionMode mode, TurnPhase phase)
+{
+    if (IsPushToTalk(mode)) {
+        // PTT recording/finalization is driven by the explicit client-control
+        // lifecycle. A streaming user-speaking packet is not authoritative.
+        return phase == TurnPhase::UserSpeaking ? TurnPhase::Idle : phase;
+    }
+    // Automatic endpointing has no local press/release lifecycle. Ignore any
+    // stale PTT-only state instead of projecting impossible controls or copy.
+    return phase == TurnPhase::Recording || phase == TurnPhase::Committing
+               ? TurnPhase::Idle
+               : phase;
+}
+
 inline InteractionMode CurrentInteractionMode()
 {
 #if CONFIG_EIDOLON_INTERACTION_MODE_PTT
     return InteractionMode::PushToTalk;
+#elif CONFIG_EIDOLON_INTERACTION_MODE_HALF_DUPLEX
+    return InteractionMode::HalfDuplex;
 #else
-    return InteractionMode::Streaming;
+    return InteractionMode::FullDuplex;
 #endif
 }
 

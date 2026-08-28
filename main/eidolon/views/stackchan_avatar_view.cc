@@ -65,6 +65,22 @@ void StackChanAvatarView::Build(const BuildContext& ctx)
     base_emotion_code_ = static_cast<int>(Emotion::Neutral);
     last_applied_code_ = static_cast<int>(Emotion::Neutral);
 
+    // This custom full-screen view bypasses the generic presenter chrome, so it
+    // owns a small mode overlay. The text itself is resolved by the shared
+    // projector; the board view only renders it.
+    mode_label_ = lv_label_create(ctx.parent);
+    if (ctx.font != nullptr) {
+        lv_obj_set_style_text_font(mode_label_, ctx.font, 0);
+    }
+    lv_obj_set_style_text_color(mode_label_, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_bg_color(mode_label_, lv_color_hex(0x111827), 0);
+    lv_obj_set_style_bg_opa(mode_label_, LV_OPA_60, 0);
+    lv_obj_set_style_pad_hor(mode_label_, 8, 0);
+    lv_obj_set_style_pad_ver(mode_label_, 3, 0);
+    lv_obj_set_style_radius(mode_label_, LV_RADIUS_CIRCLE, 0);
+    lv_obj_align(mode_label_, LV_ALIGN_TOP_MID, 0, 5);
+    lv_label_set_text(mode_label_, "");
+
     // Advance decorator/animation lifetimes. lv_timer callbacks run inside the
     // esp_lvgl_port task (which already holds the LVGL lock), so update() here
     // needs no extra guard.
@@ -120,6 +136,10 @@ void StackChanAvatarView::Render(const EidolonUiModel& model)
     // ApplyEmotion (here + on the 20ms timer) is the single place that calls setEmotion.
     base_emotion_code_ = static_cast<int>(emotion);
     ApplyEmotion();
+
+    if (mode_label_ != nullptr) {
+        lv_label_set_text(mode_label_, model.mode_label);
+    }
 
     if (model.scene == UiScene::Conversation && model.subtitle != nullptr &&
         model.subtitle[0] != '\0') {

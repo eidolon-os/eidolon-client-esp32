@@ -1,20 +1,12 @@
 #include "eidolon/views/amoled_206_ptt_view.h"
 
 #include "display.h"
-
 #include <esp_log.h>
 
 namespace eidolon {
 
 namespace {
 static constexpr const char* kTag = "Amoled206Ptt";
-
-// Mode badge text. ASCII on purpose: the 2.06 ships a subset CJK font (basic) that
-// lacks many glyphs, but full Latin renders. "PTT" / "LIVE" read unambiguously.
-const char* ModeBadgeText(InteractionMode mode)
-{
-    return mode == InteractionMode::PushToTalk ? "PTT" : "LIVE";
-}
 
 const char* RingLabelText(const EidolonUiModel& model)
 {
@@ -55,7 +47,7 @@ lv_color_t RingColor(const EidolonUiModel& model, lv_color_t accent_color, lv_co
         return live_color;
     case TurnPhase::Idle:
     default:
-        return model.interaction_mode == InteractionMode::PushToTalk ? idle_color : live_color;
+        return IsPushToTalk(model.interaction_mode) ? idle_color : live_color;
     }
 }
 
@@ -227,11 +219,11 @@ void Amoled206PttView::RenderModeBadge(const EidolonUiModel& model)
     if (mode_badge_label_ == nullptr || mode_badge_ == nullptr) {
         return;
     }
-    lv_color_t color = model.interaction_mode == InteractionMode::PushToTalk
+    lv_color_t color = IsPushToTalk(model.interaction_mode)
                            ? accent_color_
                            : live_color_;
     lv_obj_set_style_bg_color(mode_badge_, color, 0);
-    lv_label_set_text(mode_badge_label_, ModeBadgeText(model.interaction_mode));
+    lv_label_set_text(mode_badge_label_, model.mode_label);
 }
 
 void Amoled206PttView::RenderVoiceRing(const EidolonUiModel& model)

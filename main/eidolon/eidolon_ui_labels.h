@@ -6,6 +6,7 @@
 namespace eidolon {
 
 const char* EidolonBrandLabel();
+const char* InteractionModeLabel(InteractionMode mode);
 const char* UiSceneLabel(UiScene scene);
 const char* UiSceneStatus(UiScene scene);
 const char* UiSceneDetail(UiScene scene, EndReason end_reason = EndReason::None);

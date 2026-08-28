@@ -120,6 +120,7 @@ void TestConversationRequiresExplicitStart()
     status.interaction_mode = InteractionMode::PushToTalk;
     model = UiStateProjector::Project(status);
     assert(model.scene == UiScene::Conversation);
+    Expect(model.mode_label, "PTT");
     assert(model.primary_intent == UiIntent::BeginTalk);
     assert(UiStateProjector::AllowsIntent(status, UiIntent::BeginTalk));
 
@@ -127,6 +128,7 @@ void TestConversationRequiresExplicitStart()
     model = UiStateProjector::Project(status);
     assert(model.primary_intent == UiIntent::CommitTalk);
     Expect(model.state_label, "REC");
+    Expect(model.detail_text, "Release to send");
     assert(UiStateProjector::AllowsIntent(status, UiIntent::CommitTalk));
 }
 
@@ -134,10 +136,19 @@ void TestTurnAndModeProjection()
 {
     auto status = ReadyStatus();
     status.conversation = ConversationPhase::Active;
-    status.interaction_mode = InteractionMode::Streaming;
+    status.interaction_mode = InteractionMode::FullDuplex;
+
+    status.turn = TurnPhase::UserSpeaking;
+    auto model = UiStateProjector::Project(status);
+    Expect(model.mode_label, "FULL");
+    Expect(model.state_label, "LISTEN");
+    Expect(model.detail_text, "Listening...");
+    assert(model.primary_intent == UiIntent::ToggleMicrophone);
+    assert(UiStateProjector::AllowsIntent(status, UiIntent::ToggleMicrophone));
+    assert(!UiStateProjector::AllowsIntent(status, UiIntent::CommitTalk));
 
     status.turn = TurnPhase::AgentThinking;
-    auto model = UiStateProjector::Project(status);
+    model = UiStateProjector::Project(status);
     Expect(model.state_label, "THINK");
     assert(model.primary_intent == UiIntent::ToggleMicrophone);
 
@@ -151,6 +162,23 @@ void TestTurnAndModeProjection()
     model = UiStateProjector::Project(status);
     Expect(model.subtitle, "hello");
     Expect(model.subtitle_role, "assistant");
+
+    status.interaction_mode = InteractionMode::HalfDuplex;
+    status.turn = TurnPhase::UserSpeaking;
+    model = UiStateProjector::Project(status);
+    Expect(model.mode_label, "HALF");
+    Expect(model.state_label, "LISTEN");
+    Expect(model.detail_text, "Listening...");
+    assert(model.primary_intent == UiIntent::ToggleMicrophone);
+    assert(UiStateProjector::AllowsIntent(status, UiIntent::ToggleMicrophone));
+
+    // A stale PTT-only phase must not leak release instructions into an
+    // automatic endpointing UI.
+    status.turn = TurnPhase::Recording;
+    model = UiStateProjector::Project(status);
+    assert(model.turn == TurnPhase::Idle);
+    Expect(model.state_label, "LISTEN");
+    Expect(model.detail_text, "Listening...");
 }
 
 void TestEndReasonAndDetailOwnership()

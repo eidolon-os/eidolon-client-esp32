@@ -7,6 +7,19 @@ const char* EidolonBrandLabel()
     return "EIDOLON";
 }
 
+const char* InteractionModeLabel(InteractionMode mode)
+{
+    switch (mode) {
+    case InteractionMode::PushToTalk:
+        return "PTT";
+    case InteractionMode::HalfDuplex:
+        return "HALF";
+    case InteractionMode::FullDuplex:
+    default:
+        return "FULL";
+    }
+}
+
 const char* UiSceneLabel(UiScene scene)
 {
     switch (scene) {

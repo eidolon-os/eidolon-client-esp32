@@ -43,10 +43,13 @@ enum class UiSeverity {
 struct EidolonUiModel {
     UiScene scene = UiScene::Starting;
     UiSeverity severity = UiSeverity::Normal;
-    InteractionMode interaction_mode = InteractionMode::Streaming;
+    InteractionMode interaction_mode = CurrentInteractionMode();
     TurnPhase turn = TurnPhase::Idle;
     EndReason end_reason = EndReason::None;
     const char* state_label = "BOOT";
+    // Resolved by UiStateMapper::Project. Views consume this label directly so
+    // board-specific renderers never need to reinterpret the interaction mode.
+    const char* mode_label = "";
     const char* status_text = "";
     const char* detail_text = "";
     const char* subtitle = "";

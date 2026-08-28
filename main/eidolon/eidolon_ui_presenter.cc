@@ -132,6 +132,11 @@ void EidolonUiPresenter::OnAgentPhase(AgentPhase phase)
 
 void EidolonUiPresenter::OnPttTurnStatus(const std::string& outcome)
 {
+    if (!IsPushToTalk(status_.interaction_mode)) {
+        ESP_LOGW(TAG, "ignored PTT status in automatic mode outcome=%s",
+                 outcome.c_str());
+        return;
+    }
     if (outcome == "recording") {
         status_.turn = TurnPhase::Recording;
     } else if (outcome == "finalizing" || outcome == "committed") {
@@ -152,6 +157,11 @@ void EidolonUiPresenter::OnPresenceWakePhase(PresenceWakePhase phase)
 
 void EidolonUiPresenter::SetPttRecording(bool recording)
 {
+    if (!IsPushToTalk(status_.interaction_mode)) {
+        ESP_LOGW(TAG, "ignored local PTT state in automatic mode recording=%d",
+                 recording ? 1 : 0);
+        return;
+    }
     status_.turn = recording ? TurnPhase::Recording : TurnPhase::Committing;
     Reapply();
 }
@@ -217,7 +227,7 @@ void EidolonUiPresenter::ApplyModel(const EidolonUiModel& model)
     if (!display) {
         return;
     }
-    display->SetVoiceChrome(EidolonBrandLabel(), model.state_label, "EXIT",
+    display->SetVoiceChrome(model.mode_label, model.state_label, "EXIT",
                             model.show_end_action);
     display->SetEmotion(model.emotion);
     display->SetStatus(model.status_text);
