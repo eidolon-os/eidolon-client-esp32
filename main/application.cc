@@ -337,13 +337,14 @@ bool Application::SetDeviceState(DeviceState state) {
 }
 
 void Application::Initialize() {
-    // One-line build fingerprint (git commit / branch / LiveKit SDK), printed early
+    // One-line build fingerprint (git commit / branch / LiveKit SDK / ESP-IDF), printed early
     // and unconditionally on every boot so we can confirm exactly which firmware +
     // SDK the device is running — PROJECT_VER alone is a static "1.0.0".
     // eidolon-common.sh reads this back over serial after flashing to catch a
     // stale binary / wrong flash path / cached SDK.
-    ESP_LOGW(TAG, "EIDOLON-BUILDSTAMP git=%s sdk=%s branch=%s built=%s %s",
-             EIDOLON_BUILD_GIT, EIDOLON_BUILD_SDK, EIDOLON_BUILD_BRANCH, __DATE__, __TIME__);
+    ESP_LOGW(TAG, "EIDOLON-BUILDSTAMP git=%s sdk=%s idf=%s branch=%s built=%s %s",
+             EIDOLON_BUILD_GIT, EIDOLON_BUILD_SDK, EIDOLON_BUILD_IDF, EIDOLON_BUILD_BRANCH,
+             __DATE__, __TIME__);
     // Resolved device profile on the line right after it: which interaction mode
     // and which capture topology this image actually ended up with.
     eidolon::LogDeviceProfile(TAG);

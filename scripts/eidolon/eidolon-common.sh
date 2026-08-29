@@ -31,6 +31,124 @@ eidolon_stamp_gen()     { printf '%s/main/eidolon/eidolon_build_stamp.gen.h' "$1
 
 eidolon__info() { echo ">> [common] $*"; }
 eidolon__warn() { echo ">> [common] WARNING: $*" >&2; }
+eidolon__die()  { echo ">> [common] ERROR: $*" >&2; exit 1; }
+
+# ---- ESP-IDF toolchain selection -------------------------------------------
+#
+# The IDF version is a BOARD ATTRIBUTE. Every board script declares
+# BOARD_IDF_VERSION next to BOARD_TARGET, and this resolver honours it exactly.
+# It is deliberately NOT an ambient property of whichever shell you happen to
+# be in.
+#
+# This replaces five copy-pasted per-board resolvers that globbed
+# ~/.espressif/v*/esp-idf/export.sh and sorted DESCENDING, i.e. "use the newest
+# IDF installed". Installing a second IDF therefore silently re-pointed every
+# existing board at it from any shell that had not already sourced export.sh —
+# and a board built against the wrong toolchain fails in ways that look like
+# firmware bugs. So:
+#
+#   * resolution is keyed on the requested version and never falls back to a
+#     different one;
+#   * an already-exported IDF is reused only when it IS that version, otherwise
+#     the environment is scrubbed and the right one is loaded;
+#   * after loading, `idf.py --version` is VERIFIED against the request and the
+#     build is refused on a mismatch;
+#   * the resolved version is baked into the build stamp, so a wrong toolchain
+#     shows up in the first screen of serial output instead of being inferred
+#     from behaviour days later.
+#
+# Escape hatches, in the order they are consulted:
+#   EIDOLON_IDF_VERSION=6.1        override the REQUIREMENT (recorded, verified)
+#   EIDOLON_IDF_EXPORT=/x/export.sh  where an IDF lives (still verified)
+#   EIDOLON_IDF_PATH=/x/esp-idf      where an IDF lives (still verified)
+# There is deliberately no global idf.path file any more: one path cannot be
+# correct for boards that require different IDF versions.
+
+# Version of the idf.py currently on PATH, normalized to "5.5.4" ("" if none).
+eidolon_idf_current_version() {
+  command -v idf.py >/dev/null 2>&1 || { echo ""; return 0; }
+  idf.py --version 2>/dev/null | sed -n 's/.*[vV]\([0-9][0-9.]*\).*/\1/p' | head -1
+}
+
+eidolon__idf_export_candidates() {
+  local want="$1" home="${HOME:-}"
+  [[ -n "${EIDOLON_IDF_EXPORT:-}" ]] && printf '%s\n' "${EIDOLON_IDF_EXPORT}"
+  [[ -n "${EIDOLON_IDF_PATH:-}" ]] && printf '%s/export.sh\n' "${EIDOLON_IDF_PATH%/}"
+  if [[ -n "${home}" ]]; then
+    printf '%s\n' \
+      "${home}/.espressif/v${want}/esp-idf/export.sh" \
+      "${home}/esp/v${want}/esp-idf/export.sh" \
+      "${home}/esp/esp-idf-v${want}/export.sh" \
+      "${home}/esp-idf-v${want}/export.sh"
+  fi
+}
+
+# Resolve + export the IDF this board requires. Returns non-zero instead of
+# exiting, so callers that only probe (status displays) stay non-fatal.
+# On success EIDOLON_RESOLVED_IDF holds the verified version.
+eidolon_idf_ensure() {
+  local want="${EIDOLON_IDF_VERSION:-${1:-}}"
+  want="${want#v}"
+  if [[ -z "${want}" ]]; then
+    eidolon__warn "no IDF version requested; board script must set BOARD_IDF_VERSION"
+    return 1
+  fi
+
+  local current
+  current="$(eidolon_idf_current_version)"
+  if [[ "${current}" == "${want}" ]] && command -v ninja >/dev/null 2>&1; then
+    EIDOLON_RESOLVED_IDF="${current}"
+    export EIDOLON_RESOLVED_IDF
+    return 0
+  fi
+  if [[ -n "${current}" && "${current}" != "${want}" ]]; then
+    eidolon__info "ESP-IDF v${current} is exported but this board requires v${want}; switching"
+    unset IDF_PATH IDF_PYTHON_ENV_PATH ESP_IDF_VERSION
+  fi
+
+  local export_sh found=""
+  while IFS= read -r export_sh; do
+    [[ -f "${export_sh}" ]] || continue
+    found="${export_sh}"
+    eidolon__info "Loading ESP-IDF v${want}: ${export_sh}"
+    # export.sh is not written against `set -euo pipefail`; relax it for the
+    # source and restore exactly what the caller had, rather than assuming.
+    local __opts="$-"
+    set +eu
+    # shellcheck source=/dev/null
+    source "${export_sh}" >/dev/null
+    [[ "${__opts}" == *e* ]] && set -e
+    [[ "${__opts}" == *u* ]] && set -u
+    break
+  done < <(eidolon__idf_export_candidates "${want}" | awk '!seen[$0]++')
+
+  if [[ -z "${found}" ]]; then
+    eidolon__warn "ESP-IDF v${want} not found. Install it (Espressif IDE Manager puts it in ~/.espressif/v${want}/esp-idf) or set EIDOLON_IDF_PATH."
+    return 1
+  fi
+
+  current="$(eidolon_idf_current_version)"
+  if [[ "${current}" != "${want}" ]]; then
+    eidolon__warn "${found} exported ESP-IDF v${current:-<unknown>}, but this board requires v${want}."
+    return 1
+  fi
+  if ! command -v ninja >/dev/null 2>&1; then
+    eidolon__warn "ESP-IDF v${current} exported but ninja is missing; run its install.sh."
+    return 1
+  fi
+
+  EIDOLON_RESOLVED_IDF="${current}"
+  export EIDOLON_RESOLVED_IDF
+  eidolon__info "ESP-IDF v${current} ready (${IDF_PATH:-?})"
+  return 0
+}
+
+# Hard requirement: refuse to build rather than silently use another toolchain.
+eidolon_require_idf() {
+  local want="${EIDOLON_IDF_VERSION:-${1:-}}"
+  eidolon_idf_ensure "${1:-}" ||
+    eidolon__die "this board requires ESP-IDF v${want#v}; refusing to build against anything else. Install it, or set EIDOLON_IDF_VERSION to make the change explicit."
+}
 
 # Version currently pinned in main/idf_component.yml for livekit/livekit.
 eidolon_pinned_sdk() {
@@ -134,12 +252,15 @@ eidolon_sdk_sync() {
 
 # Bake git commit / branch / pinned SDK into a gitignored header the app includes.
 eidolon_write_build_stamp() {
-  local root="$1" gen git_desc branch sdk dirty
+  local root="$1" gen git_desc branch sdk dirty idf
   gen="$(eidolon_stamp_gen "${root}")"
   git_desc="$(git -C "${root}" rev-parse --short=9 HEAD 2>/dev/null || echo nogit)"
   branch="$(git -C "${root}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo nogit)"
   if [[ -n "$(git -C "${root}" status --porcelain 2>/dev/null)" ]]; then dirty="+dirty"; else dirty=""; fi
   sdk="$(eidolon_pinned_sdk "${root}")"
+  # The toolchain this image was actually compiled with. Verified by
+  # eidolon_idf_ensure, not guessed from the environment.
+  idf="${EIDOLON_RESOLVED_IDF:-$(eidolon_idf_current_version)}"
 
   mkdir -p "$(dirname "${gen}")"
   cat >"${gen}" <<EOF
@@ -148,15 +269,21 @@ eidolon_write_build_stamp() {
 #define EIDOLON_BUILD_GIT    "${git_desc}${dirty}"
 #define EIDOLON_BUILD_BRANCH "${branch}"
 #define EIDOLON_BUILD_SDK    "${sdk:-unknown}"
+#define EIDOLON_BUILD_IDF    "${idf:-unknown}"
 EOF
   # Expected fingerprint for post-flash verification.
-  printf 'git=%s%s branch=%s sdk=%s\n' "${git_desc}" "${dirty}" "${branch}" "${sdk:-unknown}" \
-    >"${root}/.eidolon_expected_stamp"
-  eidolon__info "Build stamp: git=${git_desc}${dirty} branch=${branch} sdk=${sdk:-unknown}"
+  printf 'git=%s%s branch=%s sdk=%s idf=%s\n' "${git_desc}" "${dirty}" "${branch}" \
+    "${sdk:-unknown}" "${idf:-unknown}" >"${root}/.eidolon_expected_stamp"
+  eidolon__info "Build stamp: git=${git_desc}${dirty} branch=${branch} sdk=${sdk:-unknown} idf=${idf:-unknown}"
 }
 
 # Prepare a build: call right before idf.py build/flash.
+#
+# The toolchain is resolved FIRST, on purpose. A build cannot be prepared
+# without knowing which IDF it targets, and the build stamp records that
+# version — resolving later would stamp "unknown" and defeat the check.
 eidolon_prepare_build() {
+  eidolon_require_idf "${2:-${BOARD_IDF_VERSION:-}}"
   eidolon_sdk_sync "$1"
   eidolon_write_build_stamp "$1"
 }
@@ -207,15 +334,18 @@ PY
 
   eidolon__info "Device reports: ${actual}"
   # Compare the git= and sdk= tokens against expected.
-  local exp_git exp_sdk act_git act_sdk
+  local exp_git exp_sdk exp_idf act_git act_sdk act_idf
   exp_git="$(sed -n 's/.*git=\([^ ]*\).*/\1/p' <<<"${expected}")"
   exp_sdk="$(sed -n 's/.*sdk=\([^ ]*\).*/\1/p' <<<"${expected}")"
+  exp_idf="$(sed -n 's/.*idf=\([^ ]*\).*/\1/p' <<<"${expected}")"
   act_git="$(sed -n 's/.*git=\([^ ]*\).*/\1/p' <<<"${actual}")"
   act_sdk="$(sed -n 's/.*sdk=\([^ ]*\).*/\1/p' <<<"${actual}")"
-  if [[ "${exp_git}" == "${act_git}" && "${exp_sdk}" == "${act_sdk}" ]]; then
-    eidolon__info "VERIFIED: device runs the just-built firmware (git=${act_git} sdk=${act_sdk})."
+  act_idf="$(sed -n 's/.*idf=\([^ ]*\).*/\1/p' <<<"${actual}")"
+  if [[ "${exp_git}" == "${act_git}" && "${exp_sdk}" == "${act_sdk}" &&
+        "${exp_idf}" == "${act_idf}" ]]; then
+    eidolon__info "VERIFIED: device runs the just-built firmware (git=${act_git} sdk=${act_sdk} idf=${act_idf})."
   else
-    eidolon__warn "MISMATCH: built git=${exp_git} sdk=${exp_sdk} but device git=${act_git} sdk=${act_sdk}."
-    eidolon__warn "The device is NOT running what you just built (stale flash / wrong path / cached SDK)."
+    eidolon__warn "MISMATCH: built git=${exp_git} sdk=${exp_sdk} idf=${exp_idf} but device git=${act_git} sdk=${act_sdk} idf=${act_idf}."
+    eidolon__warn "The device is NOT running what you just built (stale flash / wrong path / cached SDK / wrong toolchain)."
   fi
 }

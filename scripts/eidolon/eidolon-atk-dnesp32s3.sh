@@ -8,6 +8,7 @@
 #
 # Environment:
 #   EIDOLON_PORT        Serial port, for example /dev/cu.usbmodem1101
+#   EIDOLON_IDF_VERSION Override the ESP-IDF version this board requires
 #   EIDOLON_IDF_EXPORT Full path to ESP-IDF export.sh
 #   EIDOLON_IDF_PATH   ESP-IDF root directory
 #   IDF_PATH           ESP-IDF root directory
@@ -17,6 +18,7 @@ set -euo pipefail
 readonly BOARD_PATH="atk-dnesp32s3"
 readonly BOARD_NAME="atk-dnesp32s3"
 readonly BOARD_TARGET="esp32s3"
+readonly BOARD_IDF_VERSION="5.5.4"
 readonly BUILD_DIR="build/eidolon/atk-dnesp32s3"
 readonly SDKCONFIG_FILE="${BUILD_DIR}/sdkconfig.atk-dnesp32s3"
 readonly SDKCONFIG_OVERLAY="${BUILD_DIR}/sdkconfig.overlay.atk-dnesp32s3"
@@ -39,63 +41,19 @@ info() {
   echo ">> $*"
 }
 
+# ESP-IDF selection lives in eidolon-common.sh and is keyed on
+# BOARD_IDF_VERSION above: resolved by version, verified after export, and baked
+# into the build stamp. Never "whatever IDF happens to be newest on this box".
 idf_ready() {
   command -v idf.py >/dev/null 2>&1
 }
 
-idf_tools_ready() {
-  idf_ready && command -v ninja >/dev/null 2>&1 && [[ -n "${IDF_PYTHON_ENV_PATH:-}" ]]
-}
-
-idf_export_candidates() {
-  [[ -n "${EIDOLON_IDF_EXPORT:-}" ]] && echo "${EIDOLON_IDF_EXPORT}"
-
-  local cfg="${SCRIPT_DIR}/idf.path"
-  if [[ -f "${cfg}" ]]; then
-    local line
-    while IFS= read -r line || [[ -n "${line}" ]]; do
-      line="${line%%#*}"
-      line="${line#"${line%%[![:space:]]*}"}"
-      line="${line%"${line##*[![:space:]]}"}"
-      [[ -n "${line}" ]] && echo "${line%/}/export.sh"
-    done <"${cfg}"
-  fi
-
-  [[ -n "${EIDOLON_IDF_PATH:-}" ]] && echo "${EIDOLON_IDF_PATH%/}/export.sh"
-  [[ -n "${IDF_PATH:-}" ]] && echo "${IDF_PATH%/}/export.sh"
-
-  local home="${HOME:-}"
-  if [[ -n "${home}" ]]; then
-    shopt -s nullglob
-    local d
-    for d in "${home}"/.espressif/v*/esp-idf/export.sh; do
-      echo "${d}"
-    done | sort -t'/' -k6 -V -r
-    shopt -u nullglob
-    echo "${home}/esp/esp-idf/export.sh"
-    echo "${home}/esp-idf/export.sh"
-  fi
-}
-
 ensure_idf_env() {
-  if idf_tools_ready; then
-    return 0
-  fi
-
-  local export_sh
-  while IFS= read -r export_sh; do
-    [[ -f "${export_sh}" ]] || continue
-    info "Loading ESP-IDF: ${export_sh}"
-    # shellcheck source=/dev/null
-    source "${export_sh}"
-    idf_tools_ready && return 0
-  done < <(idf_export_candidates | awk '!seen[$0]++')
-
-  return 1
+  eidolon_idf_ensure "${BOARD_IDF_VERSION}"
 }
 
 require_idf() {
-  ensure_idf_env || die "ESP-IDF tools not ready. Set EIDOLON_IDF_PATH or source export.sh first."
+  eidolon_require_idf "${BOARD_IDF_VERSION}"
 }
 
 list_ports() {

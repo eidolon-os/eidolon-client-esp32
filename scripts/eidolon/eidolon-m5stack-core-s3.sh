@@ -17,10 +17,9 @@
 #   EIDOLON_IDF_PATH    ESP-IDF 根目录
 #   IDF_PATH            同上，官方变量名
 #
-# 可选：在本目录创建 idf.path，写入一行 ESP-IDF 根目录，例如：
-#   echo ~/.espressif/v5.5.4/esp-idf > scripts/eidolon/idf.path
-#
-# 未配置时自动查找：idf.path → ~/.espressif/v*/esp-idf（取最新版本）→ ~/esp/esp-idf
+# ESP-IDF 版本是板子的属性（下方 BOARD_IDF_VERSION），脚本按该版本精确查找、
+# 加载后校验 idf.py --version，不匹配就拒绝构建 —— 不会"挑最新的那个"。
+# 需要临时换版本时用 EIDOLON_IDF_VERSION=6.1 显式声明。
 
 set -euo pipefail
 
@@ -30,6 +29,7 @@ set -euo pipefail
 readonly BOARD_PATH="m5stack-core-s3"
 readonly BOARD_NAME="m5stack-core-s3"
 readonly BOARD_TARGET="esp32s3"
+readonly BOARD_IDF_VERSION="5.5.4"
 readonly BOARD_KCONFIG="CONFIG_BOARD_TYPE_M5STACK_CORE_S3=y"
 readonly PARTITION_CSV="partitions/v2/16m_eidolon.csv"
 readonly FLASH_SIZE="16MB"
@@ -70,110 +70,19 @@ info() {
   echo ">> $*"
 }
 
+# ESP-IDF selection lives in eidolon-common.sh and is keyed on
+# BOARD_IDF_VERSION above: resolved by version, verified after export, and baked
+# into the build stamp. Never "whatever IDF happens to be newest on this box".
 idf_ready() {
   command -v idf.py >/dev/null 2>&1
 }
 
-# Collect candidate export.sh paths (first match wins)
-_idf_export_candidates() {
-  if [[ -n "${EIDOLON_IDF_EXPORT:-}" ]]; then
-    echo "${EIDOLON_IDF_EXPORT}"
-  fi
-
-  local cfg="${SCRIPT_DIR}/idf.path"
-  if [[ -f "${cfg}" ]]; then
-    local line
-    while IFS= read -r line || [[ -n "${line}" ]]; do
-      line="${line%%#*}"
-      line="${line#"${line%%[![:space:]]*}"}"
-      line="${line%"${line##*[![:space:]]}"}"
-      [[ -n "${line}" ]] && echo "${line%/}/export.sh"
-    done <"${cfg}"
-  fi
-
-  local root=""
-  for root in "${EIDOLON_IDF_PATH:-}" "${IDF_PATH:-}"; do
-    [[ -n "${root}" ]] && echo "${root%/}/export.sh"
-  done
-
-  local home="${HOME:-}"
-  if [[ -n "${home}" ]]; then
-  # Espressif 官方安装器默认路径：~/.espressif/v5.5.4/esp-idf（优先用最新版本）
-    local d
-    shopt -s nullglob
-    local -a espressif_exports=()
-    for d in "${home}"/.espressif/v*/esp-idf/export.sh; do
-      espressif_exports+=("${d}")
-    done
-    if ((${#espressif_exports[@]} > 0)); then
-      local sorted
-      sorted="$(printf '%s\n' "${espressif_exports[@]}" | sort -t'/' -k6 -V -r)"
-      while IFS= read -r d; do
-        [[ -n "${d}" ]] && echo "${d}"
-      done <<<"${sorted}"
-    fi
-    shopt -u nullglob
-
-    echo "${home}/esp/esp-idf/export.sh"
-    echo "${home}/esp-idf/export.sh"
-    shopt -s nullglob
-    for d in "${home}"/esp/*/export.sh "${home}"/esp-idf-*/export.sh; do
-      echo "${d}"
-    done
-    shopt -u nullglob
-  fi
-}
-
-find_idf_export() {
-  local f
-  while IFS= read -r f; do
-    [[ -f "${f}" ]] || continue
-    echo "${f}"
-    return 0
-  done < <(_idf_export_candidates | awk '!seen[$0]++')
-  return 1
-}
-
-_source_idf_export() {
-  local export_sh="$1"
-  if [[ "${IDF_EXPORT_FILE:-}" == "${export_sh}" ]] && idf_ready; then
-    return 0
-  fi
-  echo ">> 加载 ESP-IDF: ${export_sh}"
-  # shellcheck source=/dev/null
-  source "${export_sh}"
-  IDF_EXPORT_FILE="${export_sh}"
-  idf_ready
-}
-
-# 在当前 shell 内 source export.sh（脚本子进程可继承环境）
 ensure_idf_env() {
-  local export_sh=""
-
-  # 显式配置（idf.path / EIDOLON_*）优先于 PATH 里已有的 idf.py
-  if [[ -f "${SCRIPT_DIR}/idf.path" || -n "${EIDOLON_IDF_EXPORT:-}" || -n "${EIDOLON_IDF_PATH:-}" ]]; then
-    if export_sh="$(find_idf_export)"; then
-      _source_idf_export "${export_sh}" && return 0
-    fi
-  fi
-
-  if idf_ready; then
-    return 0
-  fi
-
-  if ! export_sh="$(find_idf_export)"; then
-    return 1
-  fi
-
-  _source_idf_export "${export_sh}"
+  eidolon_idf_ensure "${BOARD_IDF_VERSION}"
 }
 
 require_idf() {
-  if ensure_idf_env; then
-    return 0
-  fi
-  die "未找到 ESP-IDF。请先执行: source ~/.espressif/v5.5.4/esp-idf/export.sh
-或: echo '\$HOME/.espressif/v5.5.4/esp-idf' > ${SCRIPT_DIR}/idf.path"
+  eidolon_require_idf "${BOARD_IDF_VERSION}"
 }
 
 menu_sep() {
@@ -848,14 +757,14 @@ show_banner() {
 
   if idf_ready; then
     if [[ -n "${IDF_PATH:-}" ]]; then
-      idf_status="已加载 (${IDF_PATH})"
+      idf_status="已加载 v${EIDOLON_RESOLVED_IDF:-?} (${IDF_PATH})"
     elif [[ -n "${IDF_EXPORT_FILE}" ]]; then
       idf_status="已加载 (${IDF_EXPORT_FILE})"
     else
       idf_status="已加载"
     fi
   else
-    idf_status="未找到 (~/.espressif/v*/esp-idf 或 idf.path)"
+    idf_status="未找到 (需要 v${BOARD_IDF_VERSION})"
   fi
 
   if [[ -n "${PORT}" ]]; then
@@ -1040,7 +949,7 @@ Commands:
   erase | clean | menuconfig | merge-bin
 
 ESP-IDF:
-  脚本会自动 source export.sh（默认 ~/.espressif/v*/esp-idf 取最新版）
+  本板要求 ESP-IDF v${BOARD_IDF_VERSION}，脚本按版本查找并校验后自动 source export.sh
 EOF
 }
 
@@ -1103,7 +1012,7 @@ main() {
   if [[ $# -eq 0 ]]; then
     if ! ensure_idf_env >/dev/null 2>&1; then
       echo "提示: 未自动找到 ESP-IDF，部分功能不可用。" >&2
-      echo "      可执行: echo '\$HOME/.espressif/v5.5.4/esp-idf' > ${SCRIPT_DIR}/idf.path" >&2
+      echo "      本板要求 ESP-IDF v${BOARD_IDF_VERSION}（预期在 ~/.espressif/v${BOARD_IDF_VERSION}/esp-idf）" >&2
       echo ""
     fi
     interactive_menu
