@@ -19,8 +19,8 @@
 #include <cJSON.h>
 #include <esp_log.h>
 #include <esp_random.h>
+#include "mbedtls_compat.h"
 #include <mbedtls/base64.h>
-#include <mbedtls/sha256.h>
 
 #include <ctime>
 #include <cstdint>

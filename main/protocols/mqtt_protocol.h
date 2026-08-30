@@ -3,10 +3,10 @@
 
 
 #include "protocol.h"
+#include "mbedtls_compat.h"
 #include <mqtt.h>
 #include <udp.h>
 #include <cJSON.h>
-#include <mbedtls/aes.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
 #include <esp_timer.h>

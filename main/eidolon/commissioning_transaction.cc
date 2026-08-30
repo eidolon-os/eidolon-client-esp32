@@ -1,4 +1,5 @@
 #include "commissioning_transaction.h"
+#include "mbedtls_compat.h"
 
 #include "hub_trust_store.h"
 #include "hub_types.h"
@@ -6,7 +7,6 @@
 #include <ssid_manager.h>
 
 #include <esp_log.h>
-#include <mbedtls/sha256.h>
 #include <nvs.h>
 
 #include <array>

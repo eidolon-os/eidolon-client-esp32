@@ -3,12 +3,11 @@
 #include "authority_locator_core.h"
 #include "hub_onboarding_protocol.h"
 
+#include "mbedtls_compat.h"
 #include <mbedtls/base64.h>
-#include <mbedtls/ecdsa.h>
 #include <mbedtls/oid.h>
 #include <mbedtls/pk.h>
 #include <mbedtls/private_access.h>
-#include <mbedtls/sha256.h>
 #include <mbedtls/x509_crt.h>
 
 #include <algorithm>
@@ -230,11 +229,23 @@ esp_err_t VerifyOwnerDomainDescriptor(
             result = mbedtls_mpi_read_binary(&s, signature.data() + 32, 32);
         }
         if (result == 0) {
+#if EIDOLON_MBEDTLS_LEGACY_PUBLIC
             const mbedtls_ecp_keypair* key = mbedtls_pk_ec(authority.pk);
             result = mbedtls_ecdsa_verify(
                 const_cast<mbedtls_ecp_group*>(&key->MBEDTLS_PRIVATE(grp)),
                 digest.data(), digest.size(),
                 &key->MBEDTLS_PRIVATE(Q), &r, &s);
+#else
+            // mbedtls 4 has no mbedtls_pk_ec: a pk context holds a PSA key id,
+            // not an mbedtls_ecp_keypair. The replacement is mbedtls_pk_verify,
+            // but it takes a DER-encoded signature while the descriptor carries
+            // raw r||s, so this is a conversion to write and test, not a rename.
+            //
+            // Until then, refuse. A verifier that cannot check a signature must
+            // report failure — never success — so an unverified authority
+            // descriptor is rejected rather than trusted.
+            result = MBEDTLS_ERR_PK_FEATURE_UNAVAILABLE;
+#endif
         }
         mbedtls_mpi_free(&s);
         mbedtls_mpi_free(&r);

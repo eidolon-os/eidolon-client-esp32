@@ -8,17 +8,11 @@
 
 #include <cJSON.h>
 #include <esp_random.h>
-#include <mbedtls/aes.h>
+#include "mbedtls_compat.h"
 #include <mbedtls/asn1.h>
 #include <mbedtls/base64.h>
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/ecdh.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/esp_mbedtls_random.h>
-#include <mbedtls/gcm.h>
 #include <mbedtls/md.h>
 #include <mbedtls/pk.h>
-#include <mbedtls/sha256.h>
 
 #include <array>
 #include <cstring>
@@ -115,11 +109,22 @@ std::vector<unsigned char> Bytes(const std::string& value) {
 
 bool Seed(mbedtls_entropy_context& entropy,
           mbedtls_ctr_drbg_context& random) {
+#if EIDOLON_MBEDTLS_LEGACY_PUBLIC
     mbedtls_entropy_init(&entropy);
+#else
+    // See device_identity.cc: mbedtls 4 has no standalone entropy module, so the
+    // DRBG is seeded from the hardware RNG this file already uses elsewhere.
+    (void)entropy;
+#endif
     mbedtls_ctr_drbg_init(&random);
     constexpr char personal[] = "eidolon-claim-grant";
     return mbedtls_ctr_drbg_seed(
-               &random, mbedtls_entropy_func, &entropy,
+               &random,
+#if EIDOLON_MBEDTLS_LEGACY_PUBLIC
+               mbedtls_entropy_func, &entropy,
+#else
+               eidolon_mbedtls_random, nullptr,
+#endif
                reinterpret_cast<const unsigned char*>(personal),
                sizeof(personal) - 1) == 0;
 }
@@ -170,7 +175,7 @@ bool SignPem(const std::string& pem, const std::string& canonical,
     if (!Seed(entropy, random)) return false;
     mbedtls_pk_context key;
     mbedtls_pk_init(&key);
-    int result = mbedtls_pk_parse_key(
+    int result = eidolon_pk_parse_key(
         &key, reinterpret_cast<const unsigned char*>(pem.c_str()),
         pem.size() + 1, nullptr, 0, mbedtls_ctr_drbg_random, &random);
     unsigned char digest[32] = {};
@@ -182,7 +187,7 @@ bool SignPem(const std::string& pem, const std::string& canonical,
             canonical.size(), digest, 0);
     }
     if (result == 0) {
-        result = mbedtls_pk_sign(
+        result = eidolon_pk_sign(
             &key, MBEDTLS_MD_SHA256, digest, sizeof(digest), der, sizeof(der),
             &der_size, mbedtls_ctr_drbg_random, &random);
     }
@@ -191,7 +196,7 @@ bool SignPem(const std::string& pem, const std::string& canonical,
     if (valid) signature = Base64Url(raw, sizeof(raw));
     mbedtls_pk_free(&key);
     mbedtls_ctr_drbg_free(&random);
-    mbedtls_entropy_free(&entropy);
+    EIDOLON_ENTROPY_FREE(&entropy);
     return valid && signature.size() == 86;
 }
 
@@ -266,6 +271,7 @@ bool EspIdfClaimGrantCrypto::EnsureEnrollmentMaterial() {
         if (!Seed(entropy, random)) return false;
         mbedtls_pk_context key;
         mbedtls_pk_init(&key);
+#if EIDOLON_MBEDTLS_LEGACY_PUBLIC
         int result = mbedtls_pk_setup(
             &key, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
         if (result == 0) {
@@ -273,12 +279,17 @@ bool EspIdfClaimGrantCrypto::EnsureEnrollmentMaterial() {
                 MBEDTLS_ECP_DP_SECP256R1, mbedtls_pk_ec(key),
                 mbedtls_ctr_drbg_random, &random);
         }
+#else
+        // Same removal as in device_identity.cc: no ecp_keypair inside a pk
+        // context on mbedtls 4. Awaiting the PSA port.
+        int result = MBEDTLS_ERR_PK_FEATURE_UNAVAILABLE;
+#endif
         unsigned char encoded[512] = {};
         if (result == 0) result = mbedtls_pk_write_key_pem(&key, encoded, sizeof(encoded));
         if (result == 0) pem = reinterpret_cast<const char*>(encoded);
         mbedtls_pk_free(&key);
         mbedtls_ctr_drbg_free(&random);
-        mbedtls_entropy_free(&entropy);
+        EIDOLON_ENTROPY_FREE(&entropy);
         if (result != 0 || pem.empty()) return false;
         Settings settings(kNamespace, true);
         if (settings.SetString(kHandoffPrivateKey, pem) != ESP_OK ||
@@ -286,9 +297,9 @@ bool EspIdfClaimGrantCrypto::EnsureEnrollmentMaterial() {
     }
     mbedtls_pk_context key;
     mbedtls_pk_init(&key);
-    const int parsed = mbedtls_pk_parse_key(
+    const int parsed = eidolon_pk_parse_key(
         &key, reinterpret_cast<const unsigned char*>(pem.c_str()),
-        pem.size() + 1, nullptr, 0, mbedtls_esp_random, nullptr);
+        pem.size() + 1, nullptr, 0, eidolon_mbedtls_random, nullptr);
     const bool valid = parsed == 0 &&
         PublicKeyFacts(key, handoff_public_key_, handoff_key_id_);
     mbedtls_pk_free(&key);
@@ -371,12 +382,20 @@ ClaimGrantUnsealResult EspIdfClaimGrantCrypto::OpenClaimGrant(
 
     mbedtls_pk_context recipient;
     mbedtls_pk_init(&recipient);
-    if (mbedtls_pk_parse_key(
+    if (eidolon_pk_parse_key(
             &recipient, reinterpret_cast<const unsigned char*>(pem.c_str()),
-            pem.size() + 1, nullptr, 0, mbedtls_esp_random, nullptr) != 0) {
+            pem.size() + 1, nullptr, 0, eidolon_mbedtls_random, nullptr) != 0) {
         mbedtls_pk_free(&recipient);
         return ClaimGrantUnsealResult::WireAuthUnavailable;
     }
+#if !EIDOLON_MBEDTLS_LEGACY_PUBLIC
+    // mbedtls 4: neither mbedtls_pk_ec nor mbedtls_ecdh_compute_shared exists.
+    // Fail closed — the caller already models "the wire authenticator is
+    // unavailable", so claiming refuses rather than proceeding with a shared
+    // secret that was never computed.
+    mbedtls_pk_free(&recipient);
+    return ClaimGrantUnsealResult::WireAuthUnavailable;
+#else
     mbedtls_ecp_keypair* pair = mbedtls_pk_ec(recipient);
     mbedtls_ecp_point ephemeral;
     mbedtls_ecp_point_init(&ephemeral);
@@ -388,7 +407,7 @@ ClaimGrantUnsealResult EspIdfClaimGrantCrypto::OpenClaimGrant(
         result = mbedtls_ecdh_compute_shared(
             &pair->MBEDTLS_PRIVATE(grp), &shared_mpi, &ephemeral,
             &pair->MBEDTLS_PRIVATE(d),
-            mbedtls_esp_random, nullptr);
+            eidolon_mbedtls_random, nullptr);
     }
     std::vector<unsigned char> shared(32, 0);
     if (result == 0) result = mbedtls_mpi_write_binary(&shared_mpi, shared.data(), shared.size());
@@ -438,6 +457,7 @@ ClaimGrantUnsealResult EspIdfClaimGrantCrypto::OpenClaimGrant(
         return ClaimGrantUnsealResult::AuthenticationRejected;
     }
     return ClaimGrantUnsealResult::Authenticated;
+#endif  // EIDOLON_MBEDTLS_LEGACY_PUBLIC
 }
 
 bool EspIdfClaimGrantCrypto::BuildOperationalKeyProof(
