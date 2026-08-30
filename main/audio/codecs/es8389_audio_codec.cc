@@ -6,13 +6,14 @@ static const char TAG[] = "Es8389AudioCodec";
 
 Es8389AudioCodec::Es8389AudioCodec(void* i2c_master_handle, i2c_port_t i2c_port, int input_sample_rate, int output_sample_rate,
     gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din,
-    gpio_num_t pa_pin, uint8_t es8389_addr, bool use_mclk, bool use_dac_reference) {
+    gpio_num_t pa_pin, uint8_t es8389_addr, bool use_mclk, bool use_dac_reference,
+    float input_gain_db) {
     duplex_ = true; // 是否双工
-    input_reference_ = use_dac_reference; // 右声道是 DAC 回灌的回声参考
+    input_reference_ = use_dac_reference; // 采集流中带 DAC 回灌的回声参考
     input_channels_ = use_dac_reference ? 2 : 1; // mic(+ref)
     input_sample_rate_ = input_sample_rate;
     output_sample_rate_ = output_sample_rate;
-    input_gain_ = 40;
+    input_gain_ = input_gain_db;
     pa_pin_ = pa_pin;
     CreateDuplexChannels(mclk, bclk, ws, dout, din);
 

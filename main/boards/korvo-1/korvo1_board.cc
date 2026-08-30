@@ -152,7 +152,8 @@ public:
             AUDIO_CODEC_PA_PIN,
             AUDIO_CODEC_ES8389_ADDR,
             AUDIO_CODEC_USE_MCLK,
-            AUDIO_INPUT_REFERENCE);
+            AUDIO_INPUT_REFERENCE,
+            AUDIO_CODEC_INPUT_GAIN_DB);
         return &audio_codec;
     }
 

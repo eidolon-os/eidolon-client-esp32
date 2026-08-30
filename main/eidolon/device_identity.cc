@@ -235,6 +235,12 @@ esp_err_t DeviceIdentity::LoadPublicKeyFromPrivateKey() {
         return ESP_FAIL;
     }
 
+    // device_instance_id is sha256 over SPKI DER, and three other implementations
+    // (SDK Python, mobile Dart, the contract pattern) derive it the same way. A PSA
+    // port must keep serialising through mbedtls_pk_write_pubkey_der — which mbedtls
+    // 4 still publishes — or re-wrap into SPKI first: psa_export_public_key returns a
+    // raw uncompressed point, and hashing that yields a different id for the same
+    // key, which Hub rejects with a 422 that names nothing.
     unsigned char der[256] = {};
     ret = mbedtls_pk_write_pubkey_der(&pk, der, sizeof(der));
     if (ret < 0) {

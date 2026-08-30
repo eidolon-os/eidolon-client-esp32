@@ -25,16 +25,17 @@ private:
     virtual int Write(const int16_t* data, int samples) override;
 
 public:
-    // use_dac_reference: the ES8389 can replace the right ADC channel with a
-    // copy of the DAC output, giving the AFE a real echo reference next to the
-    // mic (ADCL + DACR). The chip does this whenever no_dac_ref is false, which
-    // is the driver default — this flag is what tells the rest of the firmware
-    // that the second channel IS a reference, so the capture path is built as
-    // 1 mic + 1 ref ("MR") instead of dropping it. It costs the second mic.
+    // use_dac_reference: the ES8389 can add a copy of the DAC output to its
+    // capture stream, giving the AFE a real echo reference alongside the mics.
+    // The flag tells the rest of the firmware that the stream carries one, so
+    // the capture path is built as 1 mic + 1 reference ("MR").
     Es8389AudioCodec(void* i2c_master_handle, i2c_port_t i2c_port, int input_sample_rate, int output_sample_rate,
         gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din,
         gpio_num_t pa_pin, uint8_t es8389_addr, bool use_mclk = true,
-        bool use_dac_reference = false);
+        bool use_dac_reference = false,
+        // Analog mic gain in dB. 40 saturates a close-mic board driven at test
+        // volume; Espressif's own BSP for the S31-Korvo-1 uses 30.
+        float input_gain_db = 40.0f);
     virtual ~Es8389AudioCodec();
 
     virtual void SetOutputVolume(int volume) override;

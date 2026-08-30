@@ -13,13 +13,22 @@
 // dependency: pulling it in would drag esp_codec_dev ^1.5.9, esp_lvgl_adapter
 // and esp_video 2.2.0 against the versions the LiveKit stack pins here.
 
-#define AUDIO_INPUT_SAMPLE_RATE  24000
-#define AUDIO_OUTPUT_SAMPLE_RATE 24000
+// 16 kHz, not the 24 kHz the ESP-BOX-3 boards use. The ES8389 driver picks its
+// clock dividers from a table indexed by (MCLK ratio, sample rate), and 24 kHz
+// appears there exactly once — at a ratio of 800, i.e. a 19.2 MHz MCLK — which
+// no frame this firmware can produce will match, leaving the codec without
+// valid dividers.
+// 16 kHz has 22 entries and is what the AFE runs at anyway, so this also removes
+// a resampling step rather than adding one.
+#define AUDIO_INPUT_SAMPLE_RATE  16000
+#define AUDIO_OUTPUT_SAMPLE_RATE 16000
 
-// The ES8389 replaces the right ADC channel with a copy of the DAC output, so
-// capture is 1 mic + 1 echo reference — the same "MR" topology esp-box-3 gets
-// from its ES7210, and what afe_audio_processor derives its format string from.
-// The board carries two analog mics; enabling the reference costs the second.
+// The ES8389 can add a copy of the DAC output to its capture stream, giving the
+// AFE a real echo reference. Espressif's board definition for this hardware
+// (esp_boards/esp32_s31_korvo_1, adc_cfg.label) spells out the slot order:
+// [FL, FR, RE, NA] — mic 1, mic 2, reference, unused. Enabling it widens the
+// capture frame to four slots rather than substituting one, so the reference
+// costs neither microphone.
 #define AUDIO_INPUT_REFERENCE    true
 
 #define AUDIO_I2S_GPIO_MCLK GPIO_NUM_2
@@ -33,8 +42,15 @@
 #define AUDIO_CODEC_I2C_SCL_PIN  GPIO_NUM_1
 #define AUDIO_CODEC_ES8389_ADDR  ES8389_CODEC_DEFAULT_ADDR
 
-// The BSP drives the codec without MCLK even though the pin is routed. Follow
-// it: the codec is an I2S slave here and derives its clocks from BCLK.
+// Espressif's BSP for this board uses 30 dB. At 40 the mics saturate against
+// the on-board speakers at test volume — 29% of samples clipped to full scale.
+#define AUDIO_CODEC_INPUT_GAIN_DB 30.0f
+
+// No external MCLK, matching Espressif's board definition for this hardware
+// (esp_boards/esp32_s31_korvo_1: sys_cfg.no_mclk = true). This is not merely a
+// clock-source preference: es8389_set_fs() only computes the codec's dividers
+// when use_mclk is false, so asking the codec to take MCLK skips its sample
+// configuration entirely.
 #define AUDIO_CODEC_USE_MCLK     false
 
 // This board has no dedicated BOOT button on a GPIO. Its four keys sit on one
