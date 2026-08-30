@@ -25,9 +25,16 @@ private:
     virtual int Write(const int16_t* data, int samples) override;
 
 public:
+    // use_dac_reference: the ES8389 can replace the right ADC channel with a
+    // copy of the DAC output, giving the AFE a real echo reference next to the
+    // mic (ADCL + DACR). The chip does this whenever no_dac_ref is false, which
+    // is the driver default — this flag is what tells the rest of the firmware
+    // that the second channel IS a reference, so the capture path is built as
+    // 1 mic + 1 ref ("MR") instead of dropping it. It costs the second mic.
     Es8389AudioCodec(void* i2c_master_handle, i2c_port_t i2c_port, int input_sample_rate, int output_sample_rate,
         gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din,
-        gpio_num_t pa_pin, uint8_t es8389_addr, bool use_mclk = true);
+        gpio_num_t pa_pin, uint8_t es8389_addr, bool use_mclk = true,
+        bool use_dac_reference = false);
     virtual ~Es8389AudioCodec();
 
     virtual void SetOutputVolume(int volume) override;

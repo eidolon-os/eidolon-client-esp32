@@ -261,7 +261,10 @@ def collect_boards() -> list[BoardVariant]:
         board_path = cfg_path.parent.relative_to(BOARDS_DIR).as_posix()
         cfg = read_json(cfg_path)
         target = cfg.get("target")
-        if target not in ("esp32s3", "esp32p4"):
+        # Targets with an esp-sr AFE build. esp-sr 2.4.7 added esp32s31, which
+        # is where ESP32-S31-Korvo-1 lives; keep this in step with the
+        # USE_AUDIO_PROCESSOR "depends on" in main/Kconfig.projbuild.
+        if target not in ("esp32s3", "esp32p4", "esp32s31"):
             continue
         manufacturer = get_manufacturer(cfg)
         if not board_has_reference_hint(board_path):

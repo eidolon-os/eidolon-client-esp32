@@ -1,0 +1,35 @@
+{
+    "target": "esp32s31",
+    "builds": [
+        {
+            "name": "korvo-1",
+            "sdkconfig_append": [
+                "CONFIG_USE_AUDIO_PROCESSOR=y",
+                "CONFIG_USE_DEVICE_AEC=y",
+                "CONFIG_USE_SERVER_AEC=n",
+                "CONFIG_EIDOLON_DEVICE_AEC_AFE_MODE_LOW_COST=y",
+                "CONFIG_EIDOLON_HUB_MODE=y",
+                "CONFIG_EIDOLON_AUTO_JOIN_ON_ACTIVATION=n",
+                "CONFIG_EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN=y",
+                "CONFIG_EIDOLON_INTERACTION_MODE_PTT=n",
+                "CONFIG_EIDOLON_INTERACTION_MODE_HALF_DUPLEX=n",
+                "CONFIG_EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS=75000",
+                "CONFIG_USE_DEFAULT_MESSAGE_STYLE=y",
+                "CONFIG_USE_EMOTE_MESSAGE_STYLE=n",
+                "CONFIG_FLASH_DEFAULT_ASSETS=y",
+                "CONFIG_EIDOLON_WAKE_WORD_ENABLE=n",
+                "CONFIG_WAKE_WORD_DISABLED=y",
+                "CONFIG_EIDOLON_LIVEKIT_SPEAKER_VOLUME=70",
+                "CONFIG_PARTITION_TABLE_CUSTOM_FILENAME=\"partitions/v2/16m_eidolon.csv\"",
+                "CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y",
+                "CONFIG_LWIP_DNS_SUPPORT_MDNS_QUERIES=y",
+                "CONFIG_MDNS_MAX_SERVICES=10",
+                "CONFIG_MBEDTLS_SSL_DTLS_SRTP=y",
+                "CONFIG_MBEDTLS_SSL_PROTO_DTLS=y",
+                "CONFIG_MBEDTLS_X509_CREATE_C=y",
+                "CONFIG_MBEDTLS_X509_CRT_WRITE_C=y",
+                "CONFIG_MBEDTLS_PEM_WRITE_C=y"
+            ]
+        }
+    ]
+}

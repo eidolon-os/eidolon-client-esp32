@@ -6,10 +6,10 @@ static const char TAG[] = "Es8389AudioCodec";
 
 Es8389AudioCodec::Es8389AudioCodec(void* i2c_master_handle, i2c_port_t i2c_port, int input_sample_rate, int output_sample_rate,
     gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din,
-    gpio_num_t pa_pin, uint8_t es8389_addr, bool use_mclk) {
+    gpio_num_t pa_pin, uint8_t es8389_addr, bool use_mclk, bool use_dac_reference) {
     duplex_ = true; // 是否双工
-    input_reference_ = false; // 是否使用参考输入，实现回声消除
-    input_channels_ = 1; // 输入通道数
+    input_reference_ = use_dac_reference; // 右声道是 DAC 回灌的回声参考
+    input_channels_ = use_dac_reference ? 2 : 1; // mic(+ref)
     input_sample_rate_ = input_sample_rate;
     output_sample_rate_ = output_sample_rate;
     input_gain_ = 40;
@@ -45,6 +45,9 @@ Es8389AudioCodec::Es8389AudioCodec(void* i2c_master_handle, i2c_port_t i2c_port,
     es8389_cfg.use_mclk = use_mclk;
     es8389_cfg.hw_gain.pa_voltage = 5.0;
     es8389_cfg.hw_gain.codec_dac_voltage = 3.3;
+    // false keeps the chip's internal ADCL + DACR routing, i.e. the echo
+    // reference. Set it only when the second channel must stay a plain input.
+    es8389_cfg.no_dac_ref = !use_dac_reference;
     codec_if_ = es8389_codec_new(&es8389_cfg);
 
     assert(codec_if_ != NULL);

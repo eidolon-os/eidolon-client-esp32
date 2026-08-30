@@ -1,0 +1,29 @@
+# ESP32-S31 (ESP32-S31-Korvo-1). ESP-IDF 6.1 only: esp32s31 is a preview target
+# there and absent from 6.0.
+
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHMODE_DIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_USE_MALLOC=y
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
+
+# esp_peer compiles src/dtls_srtp_v6.c only on IDF >= 6, and that implementation
+# generates its own self-signed DTLS certificate. The IDF 5 path (dtls_srtp.c)
+# does not, which is why no ESP32-S3 board needs these.
+CONFIG_MBEDTLS_X509_CREATE_C=y
+CONFIG_MBEDTLS_X509_CRT_WRITE_C=y
+CONFIG_MBEDTLS_PEM_WRITE_C=y
+
+# The shared defaults keep the Wi-Fi RX buffers small (6/8) because they were
+# taken from an ESP32-C3 board that had to. This module has 16 MB of PSRAM, and
+# SPIRAM_TRY_ALLOCATE_WIFI_LWIP above raises the AMPDU RX block-ack window
+# default to 16 — which esp_wifi then rejects at compile time, since the window
+# may exceed neither the dynamic RX buffer count nor twice the static one.
+# Give this SoC buffers matched to the window instead of shrinking the window.
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=16
+CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=32
+CONFIG_ESP_WIFI_RX_BA_WIN=16
