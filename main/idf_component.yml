@@ -2,10 +2,26 @@
 dependencies:
   waveshare/esp_lcd_sh8601: 1.0.2
   espressif/esp_lcd_co5300: ^2.0.3
-  espressif/esp_lcd_ili9341: ==1.2.0
-  espressif/esp_lcd_gc9a01: ==2.0.1
+  # Pinned to versions that predate the esp_lcd_panel_dev_config_t field rename
+  # (rgb_endian/color_space -> rgb_ele_order), so they no longer compile on
+  # ESP-IDF 6. Each has a 2.x release that follows the rename, but ili9341 is
+  # esp-box-3's panel and the other two belong to boards not on this desk, so
+  # bumping them is a change that cannot be verified here. korvo-1 drives a
+  # raw RGB panel and needs none of them: keep them off this target until the
+  # affected boards can be tested against 2.x.
+  espressif/esp_lcd_ili9341:
+    version: "==1.2.0"
+    rules:
+    - if: "target not in [esp32s31]"
+  espressif/esp_lcd_gc9a01:
+    version: "==2.0.1"
+    rules:
+    - if: "target not in [esp32s31]"
   espressif/esp_lcd_st77916: ^1.0.1
-  espressif/esp_lcd_axs15231b: ^1.0.0
+  espressif/esp_lcd_axs15231b:
+    version: "^1.0.0"
+    rules:
+    - if: "target not in [esp32s31]"
 
   espressif/esp_lcd_st7701:
     version: ^1.1.4
@@ -16,10 +32,23 @@ dependencies:
     rules:
     - if: target in [esp32, esp32s2, esp32s3, esp32p4]
   espressif/esp_lcd_spd2010: ==1.0.2
-  espressif/esp_io_expander_tca9554: ==2.0.0
-  waveshare/custom_io_expander_ch32v003: ^1.0.0
+  # 2.0.0 includes driver/i2c_master.h without requiring esp_driver_i2c, which
+  # only worked while that header came from the monolithic driver component.
+  # ESP-IDF 6 split it out and 2.0.0 stopped compiling; 2.0.3 declares it.
+  espressif/esp_io_expander_tca9554: ^2.0.3
+  # Board hardware this target has no board for, and which does not compile on
+  # ESP-IDF 6 (driver/i2c_master.h moved into esp_driver_i2c; the esp_lcd panel
+  # config fields were renamed). korvo-1 drives a raw RGB panel with a GT1151,
+  # so none of it is reachable here.
+  waveshare/custom_io_expander_ch32v003:
+    version: "^1.0.0"
+    rules:
+    - if: "target not in [esp32s31]"
   espressif/esp_lcd_panel_io_additions: ^1.0.1
-  78/esp_lcd_nv3023: ~1.0.0
+  78/esp_lcd_nv3023:
+    version: "~1.0.0"
+    rules:
+    - if: "target not in [esp32s31]"
   78/esp-wifi-connect: ~3.1.3
   # Aligned with LiveKit SDK transitive deps (av_render 1.0.x).
   espressif/esp_audio_effects: ~1.3
@@ -66,9 +95,16 @@ dependencies:
     - if: target in [esp32s3]
   espressif/esp_lcd_touch_gt1151: ^1
   waveshare/esp_lcd_touch_cst9217: ^1.0.3
-  espressif/esp_lcd_touch_cst816s: ^1
+  espressif/esp_lcd_touch_cst816s:
+    version: "^1"
+    rules:
+    - if: "target not in [esp32s31]"
   lvgl/lvgl: ~9.5.0
-  esp_lvgl_port: ~2.7.2
+  # 2.7.x guards the whole RGB path behind CONFIG_IDF_TARGET_ESP32S3, so on any
+  # other RGB-capable target no vsync/bounce callback is registered and the
+  # first flush blocks forever on trans_sem — a hang, not an error. 2.9.0
+  # dropped that guard and checks only the IDF version.
+  esp_lvgl_port: ~2.9.0
   espressif/esp_io_expander_tca95xx_16bit: ^2.0.0
   espressif2022/image_player: ^1.1.1
   # 1.0.x is the first line on esp_emote_gfx 3.x, i.e. on esp_new_jpeg 1.x.
@@ -83,6 +119,10 @@ dependencies:
   # esp_emote_gfx 2.x pinned 0.6.* — which is why the emote stack moves too.
   espressif/esp_new_jpeg: ^1.0
   espressif/mdns: "^1.4.0"
+  # Replaces the in-tree wifi_provisioning component, which ESP-IDF 6 removed.
+  # Builds on IDF 5 as well, so this is the single provisioning path for the
+  # whole board matrix rather than a target-conditional one.
+  espressif/network_provisioning: "^1.2"
 
   # Our fork of livekit/client-sdk-esp32, pinned to a commit: managed_components/
   # is not tracked, so the fork is the only place a fix to this SDK survives.
@@ -117,7 +157,10 @@ dependencies:
     rules:
     - if: target in [esp32s3]
 
-  tny-robotics/sh1106-esp-idf: ^1.0.0
+  tny-robotics/sh1106-esp-idf:
+    version: "^1.0.0"
+    rules:
+    - if: "target not in [esp32s31]"
   espressif/esp_lcd_jd9365:
     version: '*'
     rules:
@@ -188,5 +231,11 @@ dependencies:
   ## Required IDF version
   idf:
     version: '>=5.5.2'
-  m5stack/m5ioe1: ^1.0.8
-  m5stack/m5pm1: ^1.0.5
+  m5stack/m5ioe1:
+    version: "^1.0.8"
+    rules:
+    - if: "target not in [esp32s31]"
+  m5stack/m5pm1:
+    version: "^1.0.5"
+    rules:
+    - if: "target not in [esp32s31]"
