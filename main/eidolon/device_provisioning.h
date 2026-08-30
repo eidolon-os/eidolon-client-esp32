@@ -10,7 +10,7 @@
 
 #include <esp_err.h>
 #include <esp_event.h>
-#include <wifi_provisioning/manager.h>
+#include <network_provisioning/manager.h>
 
 #include <vector>
 
@@ -109,7 +109,7 @@ private:
     // handshake authenticated against freed stack memory and every proof failed.
     std::vector<uint8_t> salt_;
     std::vector<uint8_t> verifier_;
-    wifi_prov_security2_params_t security_params_ = {};
+    network_prov_security2_params_t security_params_ = {};
     void* sta_netif_ = nullptr;
     void* ap_netif_ = nullptr;
     void* httpd_handle_ = nullptr;
