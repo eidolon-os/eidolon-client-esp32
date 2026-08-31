@@ -362,6 +362,7 @@ case "${cmd}" in
     ;;
   verify)
     PORT="$(detect_port)"
+    require_idf
     eidolon_verify_flashed "${PROJECT_ROOT}" "${PORT}"
     ;;
   -h|--help|help)

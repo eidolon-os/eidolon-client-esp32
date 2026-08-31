@@ -70,6 +70,18 @@ eidolon_idf_current_version() {
   idf.py --version 2>/dev/null | sed -n 's/.*[vV]\([0-9][0-9.]*\).*/\1/p' | head -1
 }
 
+# Python belonging to the resolved IDF environment. Serial verification must
+# use the board toolchain's interpreter because that environment owns pyserial;
+# accepting an ambient python3 makes verification host-dependent.
+eidolon_idf_python() {
+  local python="${IDF_PYTHON_ENV_PATH:-}/bin/python"
+  if [[ -z "${IDF_PYTHON_ENV_PATH:-}" || ! -x "${python}" ]]; then
+    eidolon__warn "resolved ESP-IDF Python is unavailable; run the board's IDF resolver before verification"
+    return 1
+  fi
+  printf '%s\n' "${python}"
+}
+
 eidolon__idf_export_candidates() {
   local want="$1" home="${HOME:-}"
   [[ -n "${EIDOLON_IDF_EXPORT:-}" ]] && printf '%s\n' "${EIDOLON_IDF_EXPORT}"
@@ -96,10 +108,15 @@ eidolon_idf_ensure() {
 
   local current
   current="$(eidolon_idf_current_version)"
-  if [[ "${current}" == "${want}" ]] && command -v ninja >/dev/null 2>&1; then
+  if [[ "${current}" == "${want}" ]] && command -v ninja >/dev/null 2>&1 &&
+     [[ -n "${IDF_PYTHON_ENV_PATH:-}" && -x "${IDF_PYTHON_ENV_PATH}/bin/python" ]]; then
     EIDOLON_RESOLVED_IDF="${current}"
     export EIDOLON_RESOLVED_IDF
     return 0
+  fi
+  if [[ "${current}" == "${want}" ]] &&
+     { [[ -z "${IDF_PYTHON_ENV_PATH:-}" ]] || [[ ! -x "${IDF_PYTHON_ENV_PATH}/bin/python" ]]; }; then
+    eidolon__info "ESP-IDF v${current} is on PATH without its Python environment; reloading the board toolchain"
   fi
   if [[ -n "${current}" && "${current}" != "${want}" ]]; then
     eidolon__info "ESP-IDF v${current} is exported but this board requires v${want}; switching"
@@ -294,13 +311,14 @@ eidolon_prepare_build() {
 # follow-up hint into a false successful flash.
 eidolon_verify_flashed() {
   local root="$1" port="$2" timeout="${3:-12}"
-  local expected="" actual=""
+  local expected="" actual="" verifier_python=""
   if [[ -f "${root}/.eidolon_expected_stamp" ]]; then
     expected="$(cat "${root}/.eidolon_expected_stamp")"
   fi
 
   eidolon__info "Verifying flashed firmware on ${port} (expected: ${expected:-<unknown>})"
-  actual="$(python3 - "${port}" "${timeout}" <<'PY' 2>/dev/null || true
+  verifier_python="$(eidolon_idf_python)" || return 1
+  actual="$("${verifier_python}" - "${port}" "${timeout}" <<'PY' 2>/dev/null || true
 import sys, time
 try:
     import serial
