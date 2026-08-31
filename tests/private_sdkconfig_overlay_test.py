@@ -22,7 +22,7 @@ def _write_overlay(path: Path, value: str, *, mode: int = 0o600) -> Path:
 def _run_validation(path: str) -> subprocess.CompletedProcess[str]:
     command = r'''
 source "$1"
-configure_private_sdkconfig_overlay
+eidolon_configure_private_sdkconfig_overlay "esp-box-3"
 write_overlay
 ensure_box3_sdkconfig
 idf_args
@@ -201,7 +201,7 @@ def test_replacing_source_after_validation_cannot_change_sealed_input(
     )
     command = r'''
 source "$1"
-configure_private_sdkconfig_overlay
+eidolon_configure_private_sdkconfig_overlay "esp-box-3"
 mv "$2" "$3"
 idf_args
 '''

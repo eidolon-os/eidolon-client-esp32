@@ -16,12 +16,7 @@
 // identifiers are explicitly not a stable interface. The exit is a port to PSA
 // Crypto, at which point this header and its includers disappear together.
 
-#if __has_include(<mbedtls/sha256.h>)
-#  define EIDOLON_MBEDTLS_LEGACY_PUBLIC 1
-#else
-#  define MBEDTLS_DECLARE_PRIVATE_IDENTIFIERS
-#  define EIDOLON_MBEDTLS_LEGACY_PUBLIC 0
-#endif
+#include "mbedtls_sha256_compat.h"
 
 #if EIDOLON_MBEDTLS_LEGACY_PUBLIC
 #  include <mbedtls/aes.h>
@@ -30,14 +25,12 @@
 #  include <mbedtls/ecdsa.h>
 #  include <mbedtls/entropy.h>
 #  include <mbedtls/gcm.h>
-#  include <mbedtls/sha256.h>
 #else
 #  include <mbedtls/private/aes.h>
 #  include <mbedtls/private/ctr_drbg.h>
 #  include <mbedtls/private/ecdsa.h>
 #  include <mbedtls/private/entropy.h>
 #  include <mbedtls/private/gcm.h>
-#  include <mbedtls/private/sha256.h>
 // pk keeps a public header, but MBEDTLS_PK_ECKEY, mbedtls_pk_setup and
 // mbedtls_pk_info_from_type moved into this one.
 #  include <mbedtls/private/pk_private.h>

@@ -3,21 +3,24 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-: "${IDF_PATH:?IDF_PATH is required; source the ESP-IDF export.sh first}"
-
 c_compiler="${CC:-cc}"
 cxx_compiler="${CXX:-c++}"
 test_dir="${TMPDIR:-/tmp}/eidolon_device_event_bus_tests"
+cjson_dir="$(pwd)/managed_components/espressif__cjson/cJSON"
+[[ -f "${cjson_dir}/cJSON.c" && -f "${cjson_dir}/cJSON.h" ]] || {
+  echo "error: the project-pinned cJSON component is unavailable" >&2
+  exit 1
+}
 mkdir -p "${test_dir}"
 
 "${c_compiler}" -std=c11 -Wall -Wextra -Werror \
-  -I "${IDF_PATH}/components/json/cJSON" \
-  -c "${IDF_PATH}/components/json/cJSON/cJSON.c" \
+  -I "${cjson_dir}" \
+  -c "${cjson_dir}/cJSON.c" \
   -o "${test_dir}/cJSON.o"
 
 "${cxx_compiler}" -std=c++17 -Wall -Wextra -Werror \
   -I main/eidolon \
-  -I "${IDF_PATH}/components/json/cJSON" \
+  -I "${cjson_dir}" \
   tests/device_event_bus_test.cc \
   main/eidolon/device_event_builder.cc \
   main/eidolon/device_event_bus.cc \

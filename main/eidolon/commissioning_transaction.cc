@@ -1,5 +1,5 @@
 #include "commissioning_transaction.h"
-#include "mbedtls_compat.h"
+#include "mbedtls_sha256_compat.h"
 
 #include "hub_trust_store.h"
 #include "hub_types.h"
