@@ -54,9 +54,19 @@
 #define AUDIO_CODEC_USE_MCLK     false
 
 // This board has no dedicated BOOT button on a GPIO. Its four keys sit on one
-// ADC ladder (GPIO42: 0.38 V / 0.82 V / 1.34 V / 1.87 V), which needs a driver
-// this project does not have yet. Nothing here maps to a plain GPIO button;
-// download mode is entered over USB (esptool --before usb_reset).
+// ADC ladder on GPIO42, read through AdcButton. Nothing here maps to a plain
+// GPIO button, so the GPIO entries below stay unconnected and download mode is
+// entered over USB (esptool --before usb_reset).
+//
+// Voltage centres come from Espressif's board definition for this board; the
+// windows are the +/-100 mV the other ADC-ladder boards in this repo use.
+#define BUTTON_ADC_UNIT           ADC_UNIT_1
+#define BUTTON_ADC_CHANNEL        ADC1_GPIO42_CHANNEL
+#define BUTTON_ADC_WINDOW_MV      100
+#define BUTTON_ADC_VOLUME_UP_MV   380
+#define BUTTON_ADC_VOLUME_DOWN_MV 820
+#define BUTTON_ADC_MODE_MV        1340
+#define BUTTON_ADC_SET_MV         1870
 #define BUILTIN_LED_GPIO        GPIO_NUM_NC
 #define BOOT_BUTTON_GPIO        GPIO_NUM_NC
 #define VOLUME_UP_BUTTON_GPIO   GPIO_NUM_NC

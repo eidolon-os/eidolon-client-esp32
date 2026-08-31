@@ -5,7 +5,12 @@
 #include "esp_lcd_touch.h"
 #include "esp_lcd_touch_gt1151.h"
 #include "application.h"
+#include "button.h"
+// The ADC-ladder key voltages in config.h name their channel through
+// ADC1_GPIO42_CHANNEL, which lives here rather than in button_adc.h.
+#include <soc/adc_channel.h>
 #include "config.h"
+#include "assets/lang_config.h"
 
 #include <esp_log.h>
 #include <esp_lcd_panel_ops.h>
@@ -26,6 +31,10 @@ private:
     i2c_master_bus_handle_t i2c_bus_ = nullptr;
     Display* display_ = nullptr;
     esp_lcd_touch_handle_t touch_ = nullptr;
+    AdcButton* set_button_ = nullptr;
+    AdcButton* mode_button_ = nullptr;
+    AdcButton* volume_up_button_ = nullptr;
+    AdcButton* volume_down_button_ = nullptr;
 
     void InitializeI2c() {
         i2c_master_bus_config_t i2c_bus_cfg = {
@@ -98,6 +107,69 @@ private:
 
     // Touch is not required for any Eidolon flow on this board, so a GT1151
     // that does not answer is logged and stepped over rather than fatal.
+    // The four keys share one ADC ladder, so each is a window around its
+    // centre rather than a pin. Every button passes a null adc_handle: the
+    // driver keeps one unit per ADC and the first device to ask creates it.
+    AdcButton* MakeAdcButton(int index, int centre_mv) {
+        button_adc_config_t cfg = {};
+        cfg.adc_handle = nullptr;
+        cfg.unit_id = BUTTON_ADC_UNIT;
+        cfg.adc_channel = BUTTON_ADC_CHANNEL;
+        cfg.button_index = index;
+        cfg.min = centre_mv - BUTTON_ADC_WINDOW_MV;
+        cfg.max = centre_mv + BUTTON_ADC_WINDOW_MV;
+        return new AdcButton(cfg);
+    }
+
+    void InitializeButtons() {
+        set_button_ = MakeAdcButton(0, BUTTON_ADC_SET_MV);
+        mode_button_ = MakeAdcButton(1, BUTTON_ADC_MODE_MV);
+        volume_up_button_ = MakeAdcButton(2, BUTTON_ADC_VOLUME_UP_MV);
+        volume_down_button_ = MakeAdcButton(3, BUTTON_ADC_VOLUME_DOWN_MV);
+
+        // SET stands in for the BOOT button the other boards use: a click while
+        // the device is still starting opens setup, which is the only way back
+        // into provisioning once credentials are committed. Long press keeps it
+        // reachable afterwards, since that boot window is short.
+        set_button_->OnClick([this]() {
+            auto& app = Application::GetInstance();
+            if (app.GetDeviceState() == kDeviceStateStarting) {
+                EnterWifiConfigMode();
+                return;
+            }
+            app.ToggleChatState();
+        });
+        set_button_->OnLongPress([this]() { EnterWifiConfigMode(); });
+
+#if CONFIG_USE_DEVICE_AEC
+        mode_button_->OnClick([this]() {
+            auto& app = Application::GetInstance();
+            if (app.GetDeviceState() == kDeviceStateIdle) {
+                app.SetAecMode(app.GetAecMode() == kAecOff ? kAecOnDeviceSide : kAecOff);
+            }
+        });
+#endif
+
+        volume_up_button_->OnClick([this]() { ChangeVolume(10); });
+        volume_up_button_->OnLongPress([this]() {
+            GetAudioCodec()->SetOutputVolume(100);
+            GetDisplay()->ShowNotification(Lang::Strings::MAX_VOLUME);
+        });
+        volume_down_button_->OnClick([this]() { ChangeVolume(-10); });
+        volume_down_button_->OnLongPress([this]() {
+            GetAudioCodec()->SetOutputVolume(0);
+            GetDisplay()->ShowNotification(Lang::Strings::MUTED);
+        });
+    }
+
+    void ChangeVolume(int delta) {
+        auto codec = GetAudioCodec();
+        int volume = codec->output_volume() + delta;
+        volume = volume < 0 ? 0 : (volume > 100 ? 100 : volume);
+        codec->SetOutputVolume(volume);
+        GetDisplay()->ShowNotification(Lang::Strings::VOLUME + std::to_string(volume));
+    }
+
     void InitializeTouch() {
         esp_lcd_panel_io_handle_t tp_io_handle = nullptr;
         esp_lcd_panel_io_i2c_config_t tp_io_config = ESP_LCD_TOUCH_IO_I2C_GT1151_CONFIG();
@@ -136,6 +208,7 @@ public:
         InitializeI2c();
         InitializeRgbDisplay();
         InitializeTouch();
+        InitializeButtons();
     }
 
     virtual AudioCodec* GetAudioCodec() override {
