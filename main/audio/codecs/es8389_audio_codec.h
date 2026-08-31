@@ -8,6 +8,7 @@
 #include <esp_codec_dev.h>
 #include <esp_codec_dev_defaults.h>
 #include <mutex>
+#include <vector>
 
 class Es8389AudioCodec : public AudioCodec {
 private:
@@ -17,6 +18,10 @@ private:
     const audio_codec_gpio_if_t* gpio_if_ = nullptr;
 
     gpio_num_t pa_pin_ = GPIO_NUM_NC;
+    // Set when playback feeds both DAC outputs; Write() then has to widen
+    // the mono stream to match.
+    bool output_stereo_ = false;
+    std::vector<int16_t> output_stereo_buffer_;
     std::mutex data_if_mutex_;
 
     void CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din);
