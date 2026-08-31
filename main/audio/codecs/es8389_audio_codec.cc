@@ -153,7 +153,13 @@ void Es8389AudioCodec::CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gp
                 .sample_rate_hz = (uint32_t)input_sample_rate_,
                 .clk_src = I2S_CLK_SRC_DEFAULT,
                 .ext_clk_freq_hz = 0,
-                .mclk_multiple = I2S_MCLK_MULTIPLE_256,
+                // Four 16-bit slots make a 64-cycle frame, so a 256x MCLK
+                // leaves an MCLK/BCLK ratio of 4 and the driver warns that a
+                // full-duplex TX slave needs at least 6 or "data might be
+                // sampled incorrectly". The codec runs off BCLK here
+                // (AUDIO_CODEC_USE_MCLK is false), so raising the multiple only
+                // moves the I2S peripheral's own clock out of that range.
+                .mclk_multiple = I2S_MCLK_MULTIPLE_512,
                 .bclk_div = 8,
             },
             .slot_cfg = {
