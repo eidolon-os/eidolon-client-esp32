@@ -39,4 +39,39 @@ actual="$(eidolon_installed_sdk "${fixture}")"
   exit 1
 }
 
+verify_root="${fixture}/verify"
+fake_bin="${fixture}/bin"
+mkdir -p "${verify_root}" "${fake_bin}"
+cat >"${verify_root}/.eidolon_expected_stamp" <<'EOF'
+git=abcdef123 branch=test sdk=1234567890abcdef idf=6.1
+EOF
+cat >"${fake_bin}/python3" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "${EIDOLON_TEST_ACTUAL:-}"
+EOF
+chmod +x "${fake_bin}/python3"
+
+matched="$(
+  EIDOLON_TEST_ACTUAL='EIDOLON-BUILDSTAMP git=abcdef123 branch=test sdk=1234567890abcdef idf=6.1' \
+    PATH="${fake_bin}:${PATH}" \
+    eidolon_verify_flashed "${verify_root}" /dev/test 0 2>&1
+)"
+[[ "${matched}" == *"VERIFIED:"* ]] || {
+  echo "matching build stamp was not accepted" >&2
+  exit 1
+}
+
+if EIDOLON_TEST_ACTUAL='' PATH="${fake_bin}:${PATH}" \
+  eidolon_verify_flashed "${verify_root}" /dev/test 0 >/dev/null 2>&1; then
+  echo "missing build stamp was accepted" >&2
+  exit 1
+fi
+
+if EIDOLON_TEST_ACTUAL='EIDOLON-BUILDSTAMP git=deadbeef0 branch=test sdk=1234567890abcdef idf=6.1' \
+  PATH="${fake_bin}:${PATH}" \
+  eidolon_verify_flashed "${verify_root}" /dev/test 0 >/dev/null 2>&1; then
+  echo "mismatched build stamp was accepted" >&2
+  exit 1
+fi
+
 echo "eidolon_common_test: PASS"

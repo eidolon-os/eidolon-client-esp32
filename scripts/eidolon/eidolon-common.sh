@@ -289,8 +289,9 @@ eidolon_prepare_build() {
 }
 
 # Read the EIDOLON-BUILDSTAMP boot line back over serial and diff vs expected.
-# Best-effort: resets the board, captures for a bounded time, degrades to a manual
-# hint if pyserial / the port is unavailable.
+# Resets the board and captures for a bounded time. Verification is a gate: an
+# unreadable or mismatched stamp returns non-zero instead of turning a manual
+# follow-up hint into a false successful flash.
 eidolon_verify_flashed() {
   local root="$1" port="$2" timeout="${3:-12}"
   local expected="" actual=""
@@ -329,7 +330,7 @@ PY
     eidolon__warn "Could not auto-read the build stamp (pyserial/port busy?)."
     eidolon__warn "Open a monitor and look for a line containing: EIDOLON-BUILDSTAMP"
     eidolon__warn "It must match: ${expected:-<unknown>}"
-    return 0
+    return 1
   fi
 
   eidolon__info "Device reports: ${actual}"
@@ -344,9 +345,11 @@ PY
   if [[ "${exp_git}" == "${act_git}" && "${exp_sdk}" == "${act_sdk}" &&
         "${exp_idf}" == "${act_idf}" ]]; then
     eidolon__info "VERIFIED: device runs the just-built firmware (git=${act_git} sdk=${act_sdk} idf=${act_idf})."
+    return 0
   else
     eidolon__warn "MISMATCH: built git=${exp_git} sdk=${exp_sdk} idf=${exp_idf} but device git=${act_git} sdk=${act_sdk} idf=${act_idf}."
     eidolon__warn "The device is NOT running what you just built (stale flash / wrong path / cached SDK / wrong toolchain)."
+    return 1
   fi
 }
 
