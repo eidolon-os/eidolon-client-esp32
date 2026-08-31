@@ -42,9 +42,11 @@
 // mbedtls_pk_info_from_type moved into this one.
 #  include <mbedtls/private/pk_private.h>
 // No mbedtls/private/ecdh.h: mbedtls 4 removed mbedtls_ecdh_compute_shared
-// outright rather than relocating it, so the one caller guards on
-// EIDOLON_MBEDTLS_LEGACY_PUBLIC instead of including anything here.
+// outright rather than relocating it. PSA key agreement replaces it below.
+#  include <psa/crypto.h>
 #endif
+
+#include <string.h>
 
 #include <esp_random.h>
 // pk.h stayed public in both versions; the wrappers below need its types
@@ -103,5 +105,195 @@ static inline int eidolon_pk_sign(mbedtls_pk_context* ctx, mbedtls_md_type_t md_
     (void)f_rng;
     (void)p_rng;
     return mbedtls_pk_sign(ctx, md_alg, hash, hash_len, sig, sig_size, sig_len);
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// Operations mbedtls 4 removed rather than relocated.
+//
+// Each one reaches the same result through the PSA interface that replaced it.
+// The mbedtls 3 branches are the previous call-site code moved here unchanged,
+// so the toolchain that ships on the esp32s3 boards keeps running exactly the
+// instructions it ran before.
+// ---------------------------------------------------------------------------
+
+// Generate the device's P-256 keypair into an empty pk context. The caller then
+// serialises it with mbedtls_pk_write_key_pem and stores the PEM in NVS, so the
+// key has to leave the PSA key store — hence PSA_KEY_USAGE_EXPORT. Losing this
+// key puts the device into a Hub 401 loop, so the two paths must produce the
+// same thing: a SECP256R1 pair whose PEM parses back and whose SPKI DER hashes
+// to the same device_instance_id.
+static inline int eidolon_pk_gen_p256(mbedtls_pk_context* pk,
+                                      mbedtls_ctr_drbg_context* drbg)
+{
+#if EIDOLON_MBEDTLS_LEGACY_PUBLIC
+    int ret = mbedtls_pk_setup(pk, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
+    if (ret != 0) {
+        return ret;
+    }
+    return mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_SECP256R1, mbedtls_pk_ec(*pk),
+                               mbedtls_ctr_drbg_random, drbg);
+#else
+    // PSA draws from the same hardware RNG the DRBG is seeded from, so the
+    // caller's DRBG has nothing left to contribute here.
+    (void)drbg;
+    psa_status_t status = psa_crypto_init();
+    if (status != PSA_SUCCESS) {
+        return (int)status;
+    }
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+    psa_set_key_type(&attributes, PSA_KEY_TYPE_ECC_KEY_PAIR(PSA_ECC_FAMILY_SECP_R1));
+    psa_set_key_bits(&attributes, 256);
+    psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_EXPORT | PSA_KEY_USAGE_SIGN_HASH);
+    psa_set_key_algorithm(&attributes, PSA_ALG_ECDSA(PSA_ALG_SHA_256));
+    mbedtls_svc_key_id_t key_id = MBEDTLS_SVC_KEY_ID_INIT;
+    status = psa_generate_key(&attributes, &key_id);
+    psa_reset_key_attributes(&attributes);
+    if (status != PSA_SUCCESS) {
+        return (int)status;
+    }
+    // The copy is independent of the PSA key, which is destroyed straight after:
+    // nothing should outlive this call inside the key store.
+    int ret = mbedtls_pk_copy_from_psa(key_id, pk);
+    psa_destroy_key(key_id);
+    return ret;
+#endif
+}
+
+// ECDSA signatures arrive as raw r||s on the wire; mbedtls_pk_verify wants DER.
+static inline int eidolon_ecdsa_raw_to_der(const unsigned char raw[64],
+                                           unsigned char* der, size_t der_size,
+                                           size_t* der_len)
+{
+    unsigned char body[72];
+    size_t body_len = 0;
+    for (int half = 0; half < 2; ++half) {
+        const unsigned char* value = raw + half * 32;
+        size_t offset = 0;
+        // DER integers carry no leading zero bytes, but never shrink to nothing.
+        while (offset < 31 && value[offset] == 0) {
+            ++offset;
+        }
+        const size_t length = 32 - offset;
+        // A leading bit of 1 would read as a negative integer without a pad byte.
+        const size_t pad = (value[offset] & 0x80) ? 1 : 0;
+        body[body_len++] = 0x02;
+        body[body_len++] = (unsigned char)(length + pad);
+        if (pad) {
+            body[body_len++] = 0x00;
+        }
+        memcpy(body + body_len, value + offset, length);
+        body_len += length;
+    }
+    if (der_size < body_len + 2) {
+        return MBEDTLS_ERR_PK_BUFFER_TOO_SMALL;
+    }
+    der[0] = 0x30;
+    der[1] = (unsigned char)body_len;
+    memcpy(der + 2, body, body_len);
+    *der_len = body_len + 2;
+    return 0;
+}
+
+// Verify a raw r||s P-256 signature over an already computed SHA-256 digest.
+static inline int eidolon_pk_verify_p256_raw(mbedtls_pk_context* pk,
+                                             const unsigned char* digest,
+                                             size_t digest_len,
+                                             const unsigned char raw[64])
+{
+#if EIDOLON_MBEDTLS_LEGACY_PUBLIC
+    mbedtls_mpi r;
+    mbedtls_mpi s;
+    mbedtls_mpi_init(&r);
+    mbedtls_mpi_init(&s);
+    int ret = mbedtls_mpi_read_binary(&r, raw, 32);
+    if (ret == 0) {
+        ret = mbedtls_mpi_read_binary(&s, raw + 32, 32);
+    }
+    if (ret == 0) {
+        const mbedtls_ecp_keypair* key = mbedtls_pk_ec(*pk);
+        ret = mbedtls_ecdsa_verify(
+            const_cast<mbedtls_ecp_group*>(&key->MBEDTLS_PRIVATE(grp)),
+            digest, digest_len, &key->MBEDTLS_PRIVATE(Q), &r, &s);
+    }
+    mbedtls_mpi_free(&s);
+    mbedtls_mpi_free(&r);
+    return ret;
+#else
+    unsigned char der[72];
+    size_t der_len = 0;
+    int ret = eidolon_ecdsa_raw_to_der(raw, der, sizeof(der), &der_len);
+    if (ret != 0) {
+        return ret;
+    }
+    return mbedtls_pk_verify(pk, MBEDTLS_MD_SHA256, digest, digest_len, der, der_len);
+#endif
+}
+
+// ECDH between the recipient's private key and a peer's uncompressed public
+// point, returning the shared x-coordinate and the recipient's own public point
+// — both of which the HPKE key schedule needs.
+static inline int eidolon_ecdh_p256(mbedtls_pk_context* key,
+                                    const unsigned char* peer, size_t peer_len,
+                                    unsigned char shared[32],
+                                    unsigned char point[65], size_t* point_len)
+{
+#if EIDOLON_MBEDTLS_LEGACY_PUBLIC
+    mbedtls_ecp_keypair* pair = mbedtls_pk_ec(*key);
+    mbedtls_ecp_point ephemeral;
+    mbedtls_ecp_point_init(&ephemeral);
+    mbedtls_mpi shared_mpi;
+    mbedtls_mpi_init(&shared_mpi);
+    int ret = mbedtls_ecp_point_read_binary(
+        &pair->MBEDTLS_PRIVATE(grp), &ephemeral, peer, peer_len);
+    if (ret == 0) {
+        ret = mbedtls_ecdh_compute_shared(
+            &pair->MBEDTLS_PRIVATE(grp), &shared_mpi, &ephemeral,
+            &pair->MBEDTLS_PRIVATE(d), eidolon_mbedtls_random, nullptr);
+    }
+    if (ret == 0) {
+        ret = mbedtls_mpi_write_binary(&shared_mpi, shared, 32);
+    }
+    if (ret == 0) {
+        ret = mbedtls_ecp_point_write_binary(
+            &pair->MBEDTLS_PRIVATE(grp), &pair->MBEDTLS_PRIVATE(Q),
+            MBEDTLS_ECP_PF_UNCOMPRESSED, point_len, point, 65);
+    }
+    mbedtls_mpi_free(&shared_mpi);
+    mbedtls_ecp_point_free(&ephemeral);
+    return ret;
+#else
+    psa_status_t status = psa_crypto_init();
+    if (status != PSA_SUCCESS) {
+        return (int)status;
+    }
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+    int ret = mbedtls_pk_get_psa_attributes(key, PSA_KEY_USAGE_DERIVE, &attributes);
+    if (ret != 0) {
+        psa_reset_key_attributes(&attributes);
+        return ret;
+    }
+    psa_set_key_algorithm(&attributes, PSA_ALG_ECDH);
+    mbedtls_svc_key_id_t key_id = MBEDTLS_SVC_KEY_ID_INIT;
+    ret = mbedtls_pk_import_into_psa(key, &attributes, &key_id);
+    psa_reset_key_attributes(&attributes);
+    if (ret != 0) {
+        return ret;
+    }
+    // psa_raw_key_agreement returns the x-coordinate, which is what
+    // mbedtls_ecdh_compute_shared produced as well.
+    size_t shared_len = 0;
+    status = psa_raw_key_agreement(PSA_ALG_ECDH, key_id, peer, peer_len,
+                                   shared, 32, &shared_len);
+    psa_destroy_key(key_id);
+    if (status != PSA_SUCCESS) {
+        return (int)status;
+    }
+    if (shared_len != 32) {
+        return MBEDTLS_ERR_PK_BAD_INPUT_DATA;
+    }
+    // PSA's public key export format for an EC key is the uncompressed point,
+    // the same 65 bytes mbedtls_ecp_point_write_binary produced.
+    return mbedtls_pk_write_pubkey_psa(key, point, 65, point_len);
 #endif
 }

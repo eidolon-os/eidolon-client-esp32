@@ -177,22 +177,7 @@ esp_err_t DeviceIdentity::CreateKeypair() {
 
     mbedtls_pk_context pk;
     mbedtls_pk_init(&pk);
-#if EIDOLON_MBEDTLS_LEGACY_PUBLIC
-    int ret = mbedtls_pk_setup(&pk, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
-    if (ret == 0) {
-        ret = mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_SECP256R1, mbedtls_pk_ec(pk),
-                                  mbedtls_ctr_drbg_random, &ctr_drbg);
-    }
-#else
-    // mbedtls 4 removed mbedtls_pk_ec, and not by relocating it: a pk context no
-    // longer holds an mbedtls_ecp_keypair at all. It stores a PSA key id, and EC
-    // keys are generated with psa_generate_key. That is a port of how this
-    // device's identity key is created and stored — the one key whose loss puts
-    // the device into a Hub 401 loop — so it is not being done as a side effect
-    // of a board bring-up. Until it is written and checked against vectors from
-    // the mbedtls 3 path, this build cannot mint an identity.
-    int ret = MBEDTLS_ERR_PK_FEATURE_UNAVAILABLE;
-#endif
+    int ret = eidolon_pk_gen_p256(&pk, &ctr_drbg);
     if (ret != 0) {
         ESP_LOGE(TAG, "P-256 key generation failed: -0x%04x", -ret);
         mbedtls_pk_free(&pk);

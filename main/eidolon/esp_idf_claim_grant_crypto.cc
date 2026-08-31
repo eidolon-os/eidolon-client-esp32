@@ -271,19 +271,7 @@ bool EspIdfClaimGrantCrypto::EnsureEnrollmentMaterial() {
         if (!Seed(entropy, random)) return false;
         mbedtls_pk_context key;
         mbedtls_pk_init(&key);
-#if EIDOLON_MBEDTLS_LEGACY_PUBLIC
-        int result = mbedtls_pk_setup(
-            &key, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
-        if (result == 0) {
-            result = mbedtls_ecp_gen_key(
-                MBEDTLS_ECP_DP_SECP256R1, mbedtls_pk_ec(key),
-                mbedtls_ctr_drbg_random, &random);
-        }
-#else
-        // Same removal as in device_identity.cc: no ecp_keypair inside a pk
-        // context on mbedtls 4. Awaiting the PSA port.
-        int result = MBEDTLS_ERR_PK_FEATURE_UNAVAILABLE;
-#endif
+        int result = eidolon_pk_gen_p256(&key, &random);
         unsigned char encoded[512] = {};
         if (result == 0) result = mbedtls_pk_write_key_pem(&key, encoded, sizeof(encoded));
         if (result == 0) pem = reinterpret_cast<const char*>(encoded);
@@ -388,40 +376,12 @@ ClaimGrantUnsealResult EspIdfClaimGrantCrypto::OpenClaimGrant(
         mbedtls_pk_free(&recipient);
         return ClaimGrantUnsealResult::WireAuthUnavailable;
     }
-#if !EIDOLON_MBEDTLS_LEGACY_PUBLIC
-    // mbedtls 4: neither mbedtls_pk_ec nor mbedtls_ecdh_compute_shared exists.
-    // Fail closed — the caller already models "the wire authenticator is
-    // unavailable", so claiming refuses rather than proceeding with a shared
-    // secret that was never computed.
-    mbedtls_pk_free(&recipient);
-    return ClaimGrantUnsealResult::WireAuthUnavailable;
-#else
-    mbedtls_ecp_keypair* pair = mbedtls_pk_ec(recipient);
-    mbedtls_ecp_point ephemeral;
-    mbedtls_ecp_point_init(&ephemeral);
-    mbedtls_mpi shared_mpi;
-    mbedtls_mpi_init(&shared_mpi);
-    int result = mbedtls_ecp_point_read_binary(
-        &pair->MBEDTLS_PRIVATE(grp), &ephemeral, enc.data(), enc.size());
-    if (result == 0) {
-        result = mbedtls_ecdh_compute_shared(
-            &pair->MBEDTLS_PRIVATE(grp), &shared_mpi, &ephemeral,
-            &pair->MBEDTLS_PRIVATE(d),
-            eidolon_mbedtls_random, nullptr);
-    }
     std::vector<unsigned char> shared(32, 0);
-    if (result == 0) result = mbedtls_mpi_write_binary(&shared_mpi, shared.data(), shared.size());
     unsigned char recipient_point_buffer[65] = {};
     size_t recipient_point_size = 0;
-    if (result == 0) {
-        result = mbedtls_ecp_point_write_binary(
-            &pair->MBEDTLS_PRIVATE(grp), &pair->MBEDTLS_PRIVATE(Q),
-            MBEDTLS_ECP_PF_UNCOMPRESSED,
-            &recipient_point_size, recipient_point_buffer,
-            sizeof(recipient_point_buffer));
-    }
-    mbedtls_mpi_free(&shared_mpi);
-    mbedtls_ecp_point_free(&ephemeral);
+    int result = eidolon_ecdh_p256(&recipient, enc.data(), enc.size(),
+                                   shared.data(), recipient_point_buffer,
+                                   &recipient_point_size);
     mbedtls_pk_free(&recipient);
     if (result != 0 || recipient_point_size != 65) {
         return ClaimGrantUnsealResult::AuthenticationRejected;
@@ -457,7 +417,6 @@ ClaimGrantUnsealResult EspIdfClaimGrantCrypto::OpenClaimGrant(
         return ClaimGrantUnsealResult::AuthenticationRejected;
     }
     return ClaimGrantUnsealResult::Authenticated;
-#endif  // EIDOLON_MBEDTLS_LEGACY_PUBLIC
 }
 
 bool EspIdfClaimGrantCrypto::BuildOperationalKeyProof(
