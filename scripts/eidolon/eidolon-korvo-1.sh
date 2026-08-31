@@ -10,6 +10,11 @@
 #   EIDOLON_PORT         Serial port, e.g. /dev/cu.usbserial-110
 #   EIDOLON_IDF_VERSION  Override the ESP-IDF version this board requires
 #   EIDOLON_IDF_PATH / EIDOLON_IDF_EXPORT   Where an ESP-IDF lives
+#   EIDOLON_PRIVATE_SDKCONFIG_OVERLAY Absolute path to a private setup-secret
+#                        overlay, outside the repository, mode 0600, holding
+#                        exactly CONFIG_EIDOLON_ADMISSION_SETUP_SECRET_HEX.
+#                        Without it the board builds and flashes but cannot be
+#                        admitted by a Hub.
 
 set -euo pipefail
 
@@ -27,6 +32,9 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 BUILD_DIR="${PROJECT_ROOT}/${PUBLIC_BUILD_DIR}"
 SDKCONFIG_FILE="${BUILD_DIR}/sdkconfig.korvo-1"
 SDKCONFIG_OVERLAY="${BUILD_DIR}/sdkconfig.overlay.korvo-1"
+# Set by eidolon_configure_private_sdkconfig_overlay when the caller supplies a
+# setup secret; empty means an ordinary public build.
+PRIVATE_SDKCONFIG_OVERLAY=""
 PORT="${EIDOLON_PORT:-}"
 
 # shellcheck source=/dev/null
@@ -141,6 +149,10 @@ idf_args() {
     "${PROJECT_ROOT}/sdkconfig.defaults.${BOARD_TARGET}"
     "${SDKCONFIG_OVERLAY}"
   )
+  # Last, so the private setup secret wins over any public default.
+  if [[ -n "${PRIVATE_SDKCONFIG_OVERLAY}" ]]; then
+    defaults+=("${PRIVATE_SDKCONFIG_OVERLAY}")
+  fi
   local joined="" file
   for file in "${defaults[@]}"; do
     [[ -f "${file}" ]] || continue
@@ -160,6 +172,11 @@ idf_args() {
 run_idf() {
   require_idf
   write_overlay
+  if [[ -n "${PRIVATE_SDKCONFIG_OVERLAY}" ]]; then
+    # Never let a previous private build pin a stale setup secret; the validated
+    # overlay stays the only source.
+    rm -f "${SDKCONFIG_FILE}"
+  fi
   local -a base_args=()
   while IFS= read -r arg; do base_args+=("${arg}"); done < <(idf_args)
   (cd "${PROJECT_ROOT}" && idf.py "${base_args[@]}" "$@")
@@ -186,6 +203,8 @@ EOF
 if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
   return 0
 fi
+
+eidolon_configure_private_sdkconfig_overlay "korvo-1"
 
 cmd="${1:-build}"
 case "${cmd}" in

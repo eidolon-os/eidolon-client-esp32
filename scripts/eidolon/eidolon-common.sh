@@ -349,3 +349,154 @@ PY
     eidolon__warn "The device is NOT running what you just built (stale flash / wrong path / cached SDK / wrong toolchain)."
   fi
 }
+
+# ---------------------------------------------------------------------------
+# Private setup-secret overlay.
+#
+# Development Admission needs CONFIG_EIDOLON_ADMISSION_SETUP_SECRET_HEX, and the
+# secret must never live in the repository. The caller points
+# EIDOLON_PRIVATE_SDKCONFIG_OVERLAY at a 0600 file outside the tree holding
+# exactly that one setting; it is validated, sealed into a 0700 build directory
+# and handed to IDF from there, so a rename after validation cannot swap the
+# secret that reaches Kconfig.
+#
+# Without it a board builds and flashes perfectly and then fails only once it
+# reaches a Hub, with "Development Admission setup secret is not provisioned"
+# and ESP_ERR_NOT_SUPPORTED. This lived in the esp-box-3 script alone, which is
+# why every other board hit that wall.
+#
+# On success it redirects BUILD_DIR, SDKCONFIG_FILE and SDKCONFIG_OVERLAY into
+# the private directory and sets PRIVATE_SDKCONFIG_OVERLAY; callers add that to
+# SDKCONFIG_DEFAULTS last. With the variable unset it returns immediately and
+# the public build directory is used unchanged.
+# ---------------------------------------------------------------------------
+eidolon_stat_uid() {
+  if stat -f '%u' "$1" >/dev/null 2>&1; then
+    stat -f '%u' "$1"
+  else
+    stat -c '%u' "$1"
+  fi
+}
+
+eidolon_stat_mode() {
+  if stat -f '%Lp' "$1" >/dev/null 2>&1; then
+    stat -f '%Lp' "$1"
+  else
+    stat -c '%a' "$1"
+  fi
+}
+
+eidolon_stat_identity() {
+  if stat -f '%d:%i' "$1" >/dev/null 2>&1; then
+    stat -f '%d:%i' "$1"
+  else
+    stat -c '%d:%i' "$1"
+  fi
+}
+
+eidolon_canonical_existing_path() {
+  local input="$1"
+  local directory base
+  directory="$(cd "$(dirname "${input}")" && pwd -P)"
+  base="$(basename "${input}")"
+  printf '%s/%s\n' "${directory}" "${base}"
+}
+
+eidolon_configure_private_sdkconfig_overlay() {
+  local board="$1"
+  local requested="${EIDOLON_PRIVATE_SDKCONFIG_OVERLAY:-}"
+  [[ -n "${requested}" ]] || return 0
+
+  [[ "${requested}" == /* ]] ||
+    die "EIDOLON_PRIVATE_SDKCONFIG_OVERLAY must be an absolute path"
+  local requested_parent resolved_parent
+  requested_parent="$(dirname "${requested}")"
+  [[ -d "${requested_parent}" && ! -L "${requested_parent}" ]] ||
+    die "private sdkconfig overlay parent must be a non-symlink directory"
+  resolved_parent="$(cd "${requested_parent}" && pwd -P)"
+  [[ "${requested_parent}" == "${resolved_parent}" ]] ||
+    die "private sdkconfig overlay parent must not traverse symlinks"
+  [[ "$(eidolon_stat_uid "${resolved_parent}")" == "$(id -u)" ]] ||
+    die "private sdkconfig overlay parent must be owned by the calling user"
+  [[ "$(eidolon_stat_mode "${resolved_parent}")" == "700" ]] ||
+    die "private sdkconfig overlay parent permissions must be 0700"
+
+  [[ -f "${requested}" && ! -L "${requested}" ]] ||
+    die "private sdkconfig overlay must be a regular, non-symlink file"
+
+  local resolved file_uid file_mode file_size setting identity_before identity_after
+  resolved="$(eidolon_canonical_existing_path "${requested}")"
+  case "${resolved}" in
+    "${PROJECT_ROOT}"|"${PROJECT_ROOT}"/*)
+      die "private sdkconfig overlay must be outside the repository"
+      ;;
+  esac
+
+  file_uid="$(eidolon_stat_uid "${resolved}")"
+  [[ "${file_uid}" == "$(id -u)" ]] ||
+    die "private sdkconfig overlay must be owned by the calling user"
+  file_mode="$(eidolon_stat_mode "${resolved}")"
+  [[ "${file_mode}" == "600" ]] ||
+    die "private sdkconfig overlay permissions must be 0600"
+  identity_before="$(eidolon_stat_identity "${resolved}")"
+  file_size="$(wc -c <"${resolved}" | tr -d '[:space:]')"
+  [[ "${file_size}" =~ ^[0-9]+$ ]] &&
+    ((file_size > 0 && file_size <= 256)) ||
+    die "private sdkconfig overlay has an invalid size"
+
+  setting="$(cat "${resolved}")"
+  identity_after="$(eidolon_stat_identity "${resolved}")"
+  [[ "${identity_before}" == "${identity_after}" ]] ||
+    die "private sdkconfig overlay changed during validation"
+  [[ "${setting}" =~ ^CONFIG_EIDOLON_ADMISSION_SETUP_SECRET_HEX=\"[0-9a-f]{64}\"$ ]] ||
+    die "private sdkconfig overlay must contain exactly the supported setup-secret setting"
+  local setting_size="${#setting}"
+  ((file_size == setting_size || file_size == setting_size + 1)) ||
+    die "private sdkconfig overlay must contain exactly one setting line"
+
+  local private_root="${resolved}.build"
+  if [[ -e "${private_root}" ]]; then
+    [[ -d "${private_root}" && ! -L "${private_root}" ]] ||
+      die "private build root must be a non-symlink directory"
+    [[ "$(eidolon_stat_uid "${private_root}")" == "$(id -u)" ]] ||
+      die "private build root must be owned by the calling user"
+  fi
+  local private_build="${private_root}/${board}"
+  if [[ -e "${private_build}" ]]; then
+    [[ -d "${private_build}" && ! -L "${private_build}" ]] ||
+      die "private build directory must be a non-symlink directory"
+    [[ "$(eidolon_stat_uid "${private_build}")" == "$(id -u)" ]] ||
+      die "private build directory must be owned by the calling user"
+  fi
+  (umask 077; mkdir -p "${private_build}")
+  chmod 0700 "${private_root}" "${private_build}"
+  [[ "$(eidolon_stat_uid "${resolved_parent}")" == "$(id -u)" &&
+     "$(eidolon_stat_mode "${resolved_parent}")" == "700" &&
+     ! -L "${resolved_parent}" ]] ||
+    die "private sdkconfig overlay parent changed during validation"
+  [[ "$(eidolon_stat_uid "${private_root}")" == "$(id -u)" &&
+     "$(eidolon_stat_mode "${private_root}")" == "700" &&
+     ! -L "${private_root}" ]] ||
+    die "private build root failed secure revalidation"
+  [[ "$(eidolon_stat_uid "${private_build}")" == "$(id -u)" &&
+     "$(eidolon_stat_mode "${private_build}")" == "700" &&
+     ! -L "${private_build}" ]] ||
+    die "private build directory failed secure revalidation"
+
+  # IDF reads this sealed snapshot, not the caller path. A rename after
+  # validation therefore cannot change the secret that reaches Kconfig.
+  local sealed_overlay="${private_root}/sdkconfig.private.${board}"
+  local sealed_temporary="${sealed_overlay}.tmp.$$"
+  (umask 077; printf '%s\n' "${setting}" >"${sealed_temporary}")
+  chmod 0600 "${sealed_temporary}"
+  mv "${sealed_temporary}" "${sealed_overlay}"
+  [[ -f "${sealed_overlay}" && ! -L "${sealed_overlay}" &&
+     "$(eidolon_stat_uid "${sealed_overlay}")" == "$(id -u)" &&
+     "$(eidolon_stat_mode "${sealed_overlay}")" == "600" ]] ||
+    die "sealed private sdkconfig overlay failed secure revalidation"
+
+  PRIVATE_SDKCONFIG_OVERLAY="${sealed_overlay}"
+  BUILD_DIR="${private_build}"
+  SDKCONFIG_FILE="${BUILD_DIR}/sdkconfig.${board}"
+  SDKCONFIG_OVERLAY="${BUILD_DIR}/sdkconfig.overlay.${board}"
+}
