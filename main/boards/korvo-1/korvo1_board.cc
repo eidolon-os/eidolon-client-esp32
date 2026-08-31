@@ -31,6 +31,7 @@ private:
     i2c_master_bus_handle_t i2c_bus_ = nullptr;
     Display* display_ = nullptr;
     esp_lcd_touch_handle_t touch_ = nullptr;
+    adc_oneshot_unit_handle_t button_adc_ = nullptr;
     AdcButton* set_button_ = nullptr;
     AdcButton* mode_button_ = nullptr;
     AdcButton* volume_up_button_ = nullptr;
@@ -110,22 +111,31 @@ private:
     // The four keys share one ADC ladder, so each is a window around its
     // centre rather than a pin. Every button passes a null adc_handle: the
     // driver keeps one unit per ADC and the first device to ask creates it.
-    AdcButton* MakeAdcButton(int index, int centre_mv) {
+    AdcButton* MakeAdcButton(int index, int min_mv, int max_mv) {
         button_adc_config_t cfg = {};
-        cfg.adc_handle = nullptr;
+        cfg.adc_handle = &button_adc_;
         cfg.unit_id = BUTTON_ADC_UNIT;
         cfg.adc_channel = BUTTON_ADC_CHANNEL;
         cfg.button_index = index;
-        cfg.min = centre_mv - BUTTON_ADC_WINDOW_MV;
-        cfg.max = centre_mv + BUTTON_ADC_WINDOW_MV;
+        cfg.min = min_mv;
+        cfg.max = max_mv;
         return new AdcButton(cfg);
     }
 
     void InitializeButtons() {
-        set_button_ = MakeAdcButton(0, BUTTON_ADC_SET_MV);
-        mode_button_ = MakeAdcButton(1, BUTTON_ADC_MODE_MV);
-        volume_up_button_ = MakeAdcButton(2, BUTTON_ADC_VOLUME_UP_MV);
-        volume_down_button_ = MakeAdcButton(3, BUTTON_ADC_VOLUME_DOWN_MV);
+        // The unit is ours so the ladder can be read back directly; the button
+        // driver still configures the channel, and its attenuation is what any
+        // reading has to agree with.
+        adc_oneshot_unit_init_cfg_t adc_cfg = {};
+        adc_cfg.unit_id = BUTTON_ADC_UNIT;
+        ESP_ERROR_CHECK(adc_oneshot_new_unit(&adc_cfg, &button_adc_));
+
+        set_button_ = MakeAdcButton(0, BUTTON_ADC_SET_MIN_MV, BUTTON_ADC_SET_MAX_MV);
+        mode_button_ = MakeAdcButton(1, BUTTON_ADC_MODE_MIN_MV, BUTTON_ADC_MODE_MAX_MV);
+        volume_up_button_ =
+            MakeAdcButton(2, BUTTON_ADC_VOL_UP_MIN_MV, BUTTON_ADC_VOL_UP_MAX_MV);
+        volume_down_button_ =
+            MakeAdcButton(3, BUTTON_ADC_VOL_DOWN_MIN_MV, BUTTON_ADC_VOL_DOWN_MAX_MV);
 
         // SET stands in for the BOOT button the other boards use: a click while
         // the device is still starting opens setup, which is the only way back
@@ -160,7 +170,9 @@ private:
             GetAudioCodec()->SetOutputVolume(0);
             GetDisplay()->ShowNotification(Lang::Strings::MUTED);
         });
+
     }
+
 
     void ChangeVolume(int delta) {
         auto codec = GetAudioCodec();

@@ -58,15 +58,29 @@
 // GPIO button, so the GPIO entries below stay unconnected and download mode is
 // entered over USB (esptool --before usb_reset).
 //
-// Voltage centres come from Espressif's board definition for this board; the
-// windows are the +/-100 mV the other ADC-ladder boards in this repo use.
-#define BUTTON_ADC_UNIT           ADC_UNIT_1
-#define BUTTON_ADC_CHANNEL        ADC1_GPIO42_CHANNEL
-#define BUTTON_ADC_WINDOW_MV      100
-#define BUTTON_ADC_VOLUME_UP_MV   380
-#define BUTTON_ADC_VOLUME_DOWN_MV 820
-#define BUTTON_ADC_MODE_MV        1340
-#define BUTTON_ADC_SET_MV         1870
+// The windows below are measured on the board, not taken from Espressif's table.
+// Two things make that table unusable here: this chip has no software ADC
+// calibration, so the button driver converts with its own esp32s31
+// approximation and every reading lands low; and the ladder runs the opposite
+// way round from the order the table lists. Setting SET from the documented
+// 1870 mV put its window nowhere near the 272 mV the key actually produces, so
+// nothing ever fired.
+//
+//   SET 272 · MODE 765 · VOLUME_DOWN 1242 · VOLUME_UP 1647 (mV)
+//
+// Idle reads a steady 0 mV, so the lowest window can start well clear of it.
+// The boundaries are the midpoints between neighbours: as much tolerance as the
+// ladder allows without two keys overlapping.
+#define BUTTON_ADC_UNIT             ADC_UNIT_1
+#define BUTTON_ADC_CHANNEL          ADC1_GPIO42_CHANNEL
+#define BUTTON_ADC_SET_MIN_MV       150
+#define BUTTON_ADC_SET_MAX_MV       518
+#define BUTTON_ADC_MODE_MIN_MV      518
+#define BUTTON_ADC_MODE_MAX_MV      1003
+#define BUTTON_ADC_VOL_DOWN_MIN_MV  1003
+#define BUTTON_ADC_VOL_DOWN_MAX_MV  1444
+#define BUTTON_ADC_VOL_UP_MIN_MV    1444
+#define BUTTON_ADC_VOL_UP_MAX_MV    1900
 #define BUILTIN_LED_GPIO        GPIO_NUM_NC
 #define BOOT_BUTTON_GPIO        GPIO_NUM_NC
 #define VOLUME_UP_BUTTON_GPIO   GPIO_NUM_NC
