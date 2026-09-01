@@ -1096,6 +1096,7 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/claim_grant_hpke_schedule.cc"
         "eidolon/device_identity.cc"
         "eidolon/esp_idf_claim_grant_crypto.cc"
+        "eidolon/esp_peer_hmac_sha1_override.c"
         "eidolon/eidolon_lvgl_theme.cc"
         "eidolon/fonts/font_eidolon_ui_30.c"
         "eidolon/eidolon_ui_labels.cc"
@@ -1286,6 +1287,15 @@ target_compile_definitions(${COMPONENT_LIB}
                     PRIVATE BOARD_TYPE=\"${BOARD_TYPE}\" BOARD_NAME=\"${BOARD_NAME}\"
                     PRIVATE BUILTIN_TEXT_FONT=${BUILTIN_TEXT_FONT} BUILTIN_ICON_FONT=${BUILTIN_ICON_FONT}
                     )
+
+# esp_peer's IDF v6 HMAC-SHA1 helper zeroes the MAC when mbedtls_md_hmac()
+# fails, and tells no one, so a failed allocation turns into STUN messages
+# signed with twenty zero bytes and a peer connection that dies every 30s. Route
+# the ICE agent's only call site to the allocation-free implementation in
+# eidolon/esp_peer_hmac_sha1_override.c, which explains the whole fault in full.
+if(CONFIG_IDF_TARGET_ESP32S31)
+    target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--wrap=utils_get_hmac_sha1")
+endif()
 
 # Add generation rules
 add_custom_command(
