@@ -13,6 +13,7 @@ Es8389AudioCodec::Es8389AudioCodec(void* i2c_master_handle, i2c_port_t i2c_port,
     input_reference_ = use_dac_reference; // 采集流中带 DAC 回灌的回声参考
     input_channels_ = use_dac_reference ? 2 : 1; // mic(+ref)
     output_stereo_ = use_dac_reference;
+    output_channels_ = output_stereo_ ? 2 : 1;
     input_sample_rate_ = input_sample_rate;
     output_sample_rate_ = output_sample_rate;
     input_gain_ = input_gain_db;
@@ -257,10 +258,10 @@ void Es8389AudioCodec::EnableOutput(bool enable) {
         return;
     }
     if (enable) {
-        // Both DAC outputs are wired to their own NS4150 power amplifier, so
-        // playback claims the pair. Driving slot 0 alone left the other amplifier
-        // fed with silence: the reference tap still saw the audio, so the capture
-        // side looked healthy while the board stayed quiet.
+        // Each DAC output drives its own NS4150 on this board — the schematic
+        // takes ES_LOUTP/N and ES_ROUTP/N to separate amplifiers — so playback
+        // claims the pair. Driving slot 0 alone feeds one of them silence.
+        // Espressif's board definition states the same as dac_channel_mask "11".
         esp_codec_dev_sample_info_t fs = {
             .bits_per_sample = 16,
             .channel = (uint8_t)(output_stereo_ ? 2 : 1),

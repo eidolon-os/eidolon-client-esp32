@@ -199,7 +199,8 @@ static esp_err_t build_capturer(AudioCodec* codec)
     return esp_capture_open(&cfg, &s_capturer);
 }
 
-static esp_err_t build_renderer(esp_codec_dev_handle_t play_handle, uint32_t output_sample_rate)
+static esp_err_t build_renderer(esp_codec_dev_handle_t play_handle, uint32_t output_sample_rate,
+                                int output_channels)
 {
     i2s_render_cfg_t i2s_cfg = {
         .play_handle = play_handle,
@@ -223,9 +224,14 @@ static esp_err_t build_renderer(esp_codec_dev_handle_t play_handle, uint32_t out
         return ESP_FAIL;
     }
 
+    // The renderer holds the codec's raw esp_codec_dev handle and opens it
+    // itself, so nothing it writes passes through AudioCodec::Write. A board
+    // whose playback frame is not simply mono has to say so here or the
+    // renderer will never learn it: korvo-1 carries playback on two DAC
+    // channels, one amplifier each, and a mono frame reaches only the first.
     av_render_audio_frame_info_t frame_info = {};
     frame_info.sample_rate = output_sample_rate;
-    frame_info.channel = 1;
+    frame_info.channel = static_cast<uint8_t>(output_channels);
     frame_info.bits_per_sample = 16;
     av_render_set_fixed_frame_info(s_av_renderer, &frame_info);
     return ESP_OK;
@@ -270,7 +276,11 @@ extern "C" esp_err_t eidolon_livekit_board_init(void)
     s_last_playback_us = 0;
     s_recent_capture_rms_ppm = 0;
     s_recent_playback_rms_ppm = 0;
-    ESP_RETURN_ON_ERROR(build_renderer(play, output_sample_rate), TAG, "renderer");
+    const int output_channels = codec && codec->output_channels() > 0
+                                    ? codec->output_channels()
+                                    : 1;
+    ESP_RETURN_ON_ERROR(build_renderer(play, output_sample_rate, output_channels), TAG,
+                        "renderer");
 
     if (codec) {
         ESP_LOGI(TAG, "LiveKit board media ready (input=%d Hz, output=%d Hz)",
