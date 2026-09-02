@@ -11,13 +11,14 @@ namespace eidolon {
 
 namespace {
 constexpr const char* TAG = "EidolonCredential";
-// The operational key's own namespace. Colocation is the invariant, not a
-// convenience: see the header.
-constexpr const char* kNamespace = "eidolon_id";
-constexpr const char* kBaseIdKey = "base_id";
-constexpr const char* kVoucherKey = "voucher";
-constexpr const char* kVoucherJtiKey = "voucher_jti";
-constexpr const char* kVoucherExpKey = "voucher_exp";
+// Colocation is the invariant, not a convenience: see the header, which also
+// publishes these names so the two operations that end this identity erase all
+// of it.
+constexpr const char* kNamespace = kCommissioningCredentialNamespace;
+constexpr const char* kBaseIdKey = kCommissioningCredentialKeys[0];
+constexpr const char* kVoucherKey = kCommissioningCredentialKeys[1];
+constexpr const char* kVoucherJtiKey = kCommissioningCredentialKeys[2];
+constexpr const char* kVoucherExpKey = kCommissioningCredentialKeys[3];
 }  // namespace
 
 EspIdfCommissioningCredentialStore&

@@ -4,6 +4,7 @@
 #include "device_identity.h"
 #include "device_physical_recovery_core.h"
 #include "hub_config_store.h"
+#include "esp_idf_commissioning_credential_store.h"
 #include "esp_idf_owner_data_erase_storage.h"
 
 #include <cJSON.h>
@@ -12,6 +13,7 @@
 
 #include <array>
 #include <initializer_list>
+#include <vector>
 
 #define TAG "PhysicalRecovery"
 
@@ -98,8 +100,7 @@ public:
     }
 };
 
-bool EraseKeys(const char* name_space,
-               const std::initializer_list<const char*>& keys) {
+bool EraseKeys(const char* name_space, const std::vector<const char*>& keys) {
     nvs_handle_t handle = 0;
     esp_err_t result = nvs_open(name_space, NVS_READWRITE, &handle);
     if (result == ESP_ERR_NVS_NOT_FOUND) return true;
@@ -120,10 +121,20 @@ public:
         // This is an explicit allowlist. Factory identity, RF/audio/display
         // calibration and the protected RemovalJournal are never namespaces or
         // keys in this list.
+        // The operational identity goes whole: the private key and the base
+        // identity issued to it. Clearing only the key minted a fresh key
+        // beside a retained base identity — a half identity B3/R23 declare
+        // unrepresentable, and one the Authority can only answer 401 to,
+        // forever. The credential's key names come from the store that owns
+        // them rather than being restated here.
+        std::vector<const char*> identity_keys{"p256_priv"};
+        for (const char* key : kCommissioningCredentialKeys) {
+            identity_keys.push_back(key);
+        }
         const bool cleared =
             EraseKeys("eidolon", {"config", "enrollment", "active_claim"}) &&
             EraseKeys("eidolon_claim", {"handoff_priv"}) &&
-            EraseKeys("eidolon_id", {"p256_priv"});
+            EraseKeys(kCommissioningCredentialNamespace, identity_keys);
         if (cleared) {
             DeviceIdentity::GetInstance().ForgetCachedKeyAfterPhysicalRecovery();
         }

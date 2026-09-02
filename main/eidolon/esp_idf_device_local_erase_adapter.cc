@@ -1,5 +1,7 @@
 #include "esp_idf_device_local_erase_adapter.h"
 
+#include "esp_idf_commissioning_credential_store.h"
+
 #include <algorithm>
 #include <set>
 
@@ -155,9 +157,20 @@ OwnerDataErasePlan EspIdfDeviceLocalEraseAdapter::BuildErasePlan(
     // ACK before invoking FinalizeOwnerState, then this target rotates the
     // operational principal without ever exposing a premature success.
     if (credentials) {
+        // The whole operational identity, not half of it. The private key and
+        // the base identity issued to that key are one thing kept in one
+        // namespace; erasing only the key left the Body holding a lineage it
+        // could no longer demonstrate, which is the state B3/R23 forbid. The
+        // key names come from the store that owns them, so a key added there
+        // is erased here without this line being touched.
+        std::vector<std::string> identity_keys{"p256_priv"};
+        for (const char* key : kCommissioningCredentialKeys) {
+            identity_keys.emplace_back(key);
+        }
         plan.targets.push_back(NvsKeys(
-            "operational-device-identity", kOwnerCredentials, "", "eidolon_id",
-            {"p256_priv"}, true, true));
+            "operational-device-identity", kOwnerCredentials, "",
+            kCommissioningCredentialNamespace, std::move(identity_keys),
+            true, true));
     }
     plan.valid = true;
     return plan;

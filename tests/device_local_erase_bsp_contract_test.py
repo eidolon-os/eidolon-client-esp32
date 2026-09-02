@@ -22,6 +22,30 @@ def main() -> None:
         assert preserved in partition_text
         assert f'"{preserved}"' in policy_text
 
+    # B3/R23: the base identity and the operational key it was issued to are
+    # one identity, kept in one namespace, and both operations that end that
+    # identity must end all of it. Naming only the private key left a Body
+    # holding a lineage it could no longer demonstrate, and the Authority can
+    # answer such a Body nothing but 401, forever. Neither eraser may restate
+    # the key names: they come from the store that owns them, so a key added
+    # there is erased by both without either being edited.
+    credential_header = (
+        ROOT / "main/eidolon/esp_idf_commissioning_credential_store.h"
+    ).read_text()
+    recovery_text = (ROOT / "main/eidolon/device_physical_recovery.cc").read_text()
+    for key in ('"base_id"', '"voucher"', '"voucher_jti"', '"voucher_exp"'):
+        assert key in credential_header, key
+        for eraser, name in (
+            (policy_text, "the Owner's remote erase"),
+            (recovery_text, "physical recovery"),
+        ):
+            assert key not in eraser, f"{name} restates {key} instead of using the store's"
+    for eraser in (policy_text, recovery_text):
+        assert "kCommissioningCredentialKeys" in eraser
+        assert "kCommissioningCredentialNamespace" in eraser
+        assert '"eidolon_id"' not in eraser
+        assert '"p256_priv"' in eraser
+
     assert "nvs_flash_erase" not in storage_text
     assert "erase_flash" not in storage_text
     assert "esp_partition_erase_range" in storage_text
