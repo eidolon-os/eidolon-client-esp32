@@ -24,14 +24,6 @@ Rfc3339DeadlineState EvaluateRfc3339Deadline(
     int64_t now_utc_millis,
     int64_t minimum_trusted_utc_millis);
 
-// The fail-closed reading: anything but a trusted, unexpired deadline is
-// treated as expired. Correct where the deadline authorizes something
-// destructive; wrong where it decides whether to keep trying, because a device
-// with no trusted clock would then be permanently unable to finish.
-bool IsRfc3339DeadlineExpired(const std::string& deadline,
-                              int64_t now_utc_millis,
-                              int64_t minimum_trusted_utc_millis);
-
 }  // namespace eidolon
 
 #endif  // EIDOLON_RFC3339_UTC_H_

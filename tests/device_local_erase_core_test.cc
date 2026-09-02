@@ -17,6 +17,7 @@ using eidolon::DeviceLocalEraseCore;
 using eidolon::device_foundation::v1::DeviceLocalEraseCommand;
 using eidolon::device_foundation::v1::DeviceLocalEraseResult;
 using eidolon::device_foundation::v1::DeviceRef;
+using eidolon::Rfc3339DeadlineState;
 
 namespace {
 
@@ -88,10 +89,12 @@ public:
 
 class Clock final : public DeviceEraseClockPort {
 public:
-    bool DeadlineExpired(const std::string&) const override { return expired; }
+    Rfc3339DeadlineState DeadlineState(const std::string&) const override {
+        return state;
+    }
     uint64_t MonotonicTime() const override { return monotonic; }
 
-    bool expired = false;
+    Rfc3339DeadlineState state = Rfc3339DeadlineState::Live;
     uint64_t monotonic = 1234;
 };
 
@@ -195,9 +198,16 @@ void DeadlineAndOldGenerationNeverReachTheAdapter() {
     DeviceLocalEraseCore core(Ref(8), journal, adapter, clock, signer);
     assert(core.Handle(Command(7), "sha256:" + std::string(64, '3')).result ==
            DeviceEraseCoreResult::StaleGeneration);
-    clock.expired = true;
+    clock.state = Rfc3339DeadlineState::Expired;
     assert(core.Handle(Command(8), "sha256:" + std::string(64, '4')).result ==
            DeviceEraseCoreResult::Expired);
+    // A clock this device cannot trust is not a deadline that has passed. Both
+    // refuse to erase; only one of them says the instruction is finished, and
+    // saying that about a week-long deadline left a removed Body refusing its
+    // own erase on every boot, before its clock had had a chance to sync.
+    clock.state = Rfc3339DeadlineState::Unknown;
+    assert(core.Handle(Command(8), "sha256:" + std::string(64, '5')).result ==
+           DeviceEraseCoreResult::ClockUntrusted);
     assert(adapter.prepare_calls == 0);
     assert(adapter.finalize_calls == 0);
 }
@@ -277,7 +287,7 @@ void DestructiveResumeCrossesDeadlineForSameOperation() {
     assert(journal.value.phase == DeviceEraseJournalPhase::Erasing);
     assert(journal.value.has_staged_ack);
 
-    clock.expired = true;
+    clock.state = Rfc3339DeadlineState::Expired;
     adapter.finalize_outcome = {DeviceEraseAdapterResult::Erased, "ERASED"};
     DeviceLocalEraseCore restarted(Ref(), journal, adapter, clock, signer);
     const auto resumed = restarted.Handle(Command(), fingerprint);
@@ -300,7 +310,7 @@ void BootResumeUsesDurableCommandWithoutRedelivery() {
     assert(first.Handle(Command(), fingerprint).result ==
            DeviceEraseCoreResult::RetryableStorageFailure);
 
-    clock.expired = true;
+    clock.state = Rfc3339DeadlineState::Expired;
     adapter.finalize_outcome = {DeviceEraseAdapterResult::Erased, "ERASED"};
     DeviceLocalEraseCore rebooted(Ref(), journal, adapter, clock, signer);
     const auto resumed = rebooted.ResumePending();

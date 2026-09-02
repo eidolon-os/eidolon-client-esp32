@@ -16,7 +16,12 @@ public:
     // therefore fail closed as expired and require authenticated redelivery.
     // DeviceLocalEraseCore ignores this answer only after the durable Erasing
     // point of no return, where forward resume is mandatory.
-    bool DeadlineExpired(const std::string&) const override { return true; }
+    // Boot recovery only ever resumes a destructive transaction already in
+    // progress, which the core evaluates before it consults a deadline. There
+    // is no clock here to answer with.
+    Rfc3339DeadlineState DeadlineState(const std::string&) const override {
+        return Rfc3339DeadlineState::Unknown;
+    }
     uint64_t MonotonicTime() const override {
         return static_cast<uint64_t>(esp_timer_get_time() / 1000);
     }

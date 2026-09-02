@@ -218,6 +218,14 @@ DeviceDeliveryConsumerOutcome DeviceDeliveryConsumerCore::Handle(
         return Rejected(attempt, DeviceDeliveryConsumerResult::RejectedExpired,
                         "DEADLINE_EXPIRED");
     }
+    if (erased.result == DeviceEraseCoreResult::ClockUntrusted) {
+        // Ask again, do not decide. Answering "expired" here is what made a
+        // week-long deadline unusable to a device that had simply not synced
+        // its clock yet — the Authority kept re-arming the delivery and this
+        // side kept refusing it in words that said it never could.
+        return Rejected(attempt, DeviceDeliveryConsumerResult::RetryableFailure,
+                        "CLOCK_UNTRUSTED");
+    }
     if (erased.result == DeviceEraseCoreResult::IdempotencyConflict ||
         erased.result == DeviceEraseCoreResult::OperationConflict) {
         return Rejected(attempt, DeviceDeliveryConsumerResult::RejectedInvalidContract,

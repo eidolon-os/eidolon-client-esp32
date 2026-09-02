@@ -131,12 +131,4 @@ Rfc3339DeadlineState EvaluateRfc3339Deadline(
                                             : Rfc3339DeadlineState::Live;
 }
 
-bool IsRfc3339DeadlineExpired(const std::string& deadline,
-                              int64_t now_utc_millis,
-                              int64_t minimum_trusted_utc_millis) {
-    return EvaluateRfc3339Deadline(
-               deadline, now_utc_millis, minimum_trusted_utc_millis) !=
-           Rfc3339DeadlineState::Live;
-}
-
 }  // namespace eidolon

@@ -72,9 +72,11 @@ public:
 
 class Clock final : public DeviceEraseClockPort {
 public:
-    bool DeadlineExpired(const std::string&) const override { return expired; }
+    Rfc3339DeadlineState DeadlineState(const std::string&) const override {
+        return state;
+    }
     uint64_t MonotonicTime() const override { return 1234; }
-    bool expired = false;
+    Rfc3339DeadlineState state = Rfc3339DeadlineState::Live;
 };
 
 class Signer final : public DeviceEraseAckSignerPort {
@@ -169,10 +171,20 @@ void OldGenerationAndExpiredDeliveryFailClosed() {
     assert(stale.adapter.prepare_calls == 0);
 
     Fixture expired;
-    expired.clock.expired = true;
+    expired.clock.state = Rfc3339DeadlineState::Expired;
     const auto late = expired.delivery.Handle(Envelope());
     assert(late.result == DeviceDeliveryConsumerResult::RejectedExpired);
+    assert(late.acceptance.adapter_code == "DEADLINE_EXPIRED");
     assert(expired.adapter.prepare_calls == 0);
+
+    // The Authority re-arms a retryable refusal and gives up on an expired
+    // one, so a device that only lacks a trusted clock has to say which it is.
+    Fixture unsynced;
+    unsynced.clock.state = Rfc3339DeadlineState::Unknown;
+    const auto unknown = unsynced.delivery.Handle(Envelope());
+    assert(unknown.result == DeviceDeliveryConsumerResult::RetryableFailure);
+    assert(unknown.acceptance.adapter_code == "CLOCK_UNTRUSTED");
+    assert(unsynced.adapter.prepare_calls == 0);
 }
 
 void EnvelopePayloadMismatchAndUnknownFieldsAreRejected() {

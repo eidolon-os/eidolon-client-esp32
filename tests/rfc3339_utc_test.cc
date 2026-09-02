@@ -4,7 +4,6 @@
 #include <cstdint>
 
 using eidolon::EvaluateRfc3339Deadline;
-using eidolon::IsRfc3339DeadlineExpired;
 using eidolon::Rfc3339DeadlineState;
 using eidolon::ParseRfc3339UtcMillis;
 
@@ -53,15 +52,12 @@ void InvalidDatesZonesAndTrailingDataFailClosed() {
     }
 }
 
-void DeadlineComparisonAndUntrustedClockFailClosed() {
+void DeadlineComparisonIsInclusiveOfTheInstantItNames() {
     const int64_t due = Parse("2026-08-30T00:00:00.500Z");
-    assert(!IsRfc3339DeadlineExpired(
-        "2026-08-30T00:00:00.500Z", due - 1, 0));
-    assert(IsRfc3339DeadlineExpired(
-        "2026-08-30T00:00:00.500Z", due, 0));
-    assert(IsRfc3339DeadlineExpired("invalid", due - 1, 0));
-    assert(IsRfc3339DeadlineExpired(
-        "2026-08-30T00:00:00.500Z", 1000, 2000));
+    assert(EvaluateRfc3339Deadline("2026-08-30T00:00:00.500Z", due - 1, 0) ==
+           Rfc3339DeadlineState::Live);
+    assert(EvaluateRfc3339Deadline("2026-08-30T00:00:00.500Z", due, 0) ==
+           Rfc3339DeadlineState::Expired);
 }
 
 void AnUnreadableDeadlineIsNotAnExpiredOne() {
@@ -87,7 +83,7 @@ int main() {
     EpochAndOffsetsAreTimezoneIndependent();
     LeapYearAndCenturyRulesAreCorrect();
     InvalidDatesZonesAndTrailingDataFailClosed();
-    DeadlineComparisonAndUntrustedClockFailClosed();
+    DeadlineComparisonIsInclusiveOfTheInstantItNames();
     AnUnreadableDeadlineIsNotAnExpiredOne();
     return 0;
 }

@@ -590,14 +590,25 @@ esp_err_t HubOnboardingClient::StandDownRevoked(const ActiveClaimState& claim,
     // device, and it was no longer listening.
     bool fenced = false;
     const esp_err_t err = ConsultOwnerInstruction(claim, fenced);
-    if (err != ESP_OK) return err;
     if (fenced) return ESP_ERR_NOT_ALLOWED;
-
-    // No instruction. The Owner's decision still stands, and this device does
-    // not undo it by asking again on its own; the way back is a person at the
-    // device, which the screen says and the setup gesture performs.
-    ESP_LOGW(TAG, "Claim was revoked by the Owner and no erase instruction is "
-                  "pending; physical presence is required to claim it again");
+    if (err != ESP_OK) {
+        // Collecting the instruction failed. That is worth saying and worth
+        // retrying, but it is not in doubt that this Claim was revoked — and
+        // returning this error instead of the verdict is what put "waiting for
+        // approval" on the screen of a Body nobody can approve, while the
+        // Authority re-armed a delivery it could not execute. The verdict is
+        // reported; the instruction is collected again on the next attempt.
+        ESP_LOGW(TAG, "Owner instruction could not be collected (%s); reporting "
+                      "the revocation anyway", esp_err_to_name(err));
+    } else {
+        // No instruction. The Owner's decision still stands, and this device
+        // does not undo it by asking again on its own; the way back is a
+        // person at the device, which the screen says and the setup gesture
+        // performs.
+        ESP_LOGW(TAG, "Claim was revoked by the Owner and no erase instruction "
+                      "is pending; physical presence is required to claim it "
+                      "again");
+    }
     return ESP_ERR_NOT_ALLOWED;
 }
 
@@ -677,11 +688,21 @@ esp_err_t HubOnboardingClient::RunAccepted(
     if (MayConsultOwnerInstruction(usability)) {
         bool fenced = false;
         const esp_err_t err = ConsultOwnerInstruction(active_claim, fenced);
-        if (err != ESP_OK) return err;
         if (fenced) {
             out = {};
             out.status = HubConfigStatus::Revoked;
             return ESP_ERR_NOT_ALLOWED;
+        }
+        if (err != ESP_OK) {
+            // Collected before any local verdict is acted on — but its failure
+            // is not a verdict either, and returning it here stopped this
+            // device from ever asking the Authority about its own Claim. A
+            // Body whose Claim had been revoked then sat on "waiting for
+            // approval", because the one call that would have told it so came
+            // after this line.
+            ESP_LOGW(TAG, "Owner instruction could not be collected (%s); "
+                          "asking the Authority about this Claim anyway",
+                     esp_err_to_name(err));
         }
     }
 

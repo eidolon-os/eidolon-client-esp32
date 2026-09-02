@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "rfc3339_utc.h"
 #include "device_foundation_v1_generated.h"
 
 namespace eidolon {
@@ -80,7 +81,14 @@ public:
 class DeviceEraseClockPort {
 public:
     virtual ~DeviceEraseClockPort() = default;
-    virtual bool DeadlineExpired(const std::string& rfc3339_deadline) const = 0;
+
+    // Three answers, not two. A device whose wall clock is not yet trusted
+    // cannot say whether a deadline has passed, and collapsing that into
+    // "expired" told the Authority something terminal about an instruction
+    // that is merely unreadable right now — which is what left a removed Body
+    // refusing its own erase on every boot, before its clock had synced.
+    virtual Rfc3339DeadlineState DeadlineState(
+        const std::string& rfc3339_deadline) const = 0;
     virtual uint64_t MonotonicTime() const = 0;
 };
 
@@ -97,6 +105,9 @@ enum class DeviceEraseCoreResult {
     IdempotencyConflict,
     StaleGeneration,
     Expired,
+    // The deadline is unreadable from here: this device's clock is not
+    // trustworthy yet. Retryable, and deliberately not Expired.
+    ClockUntrusted,
     RetryableStorageFailure,
     OperationConflict,
     StorageFailure,

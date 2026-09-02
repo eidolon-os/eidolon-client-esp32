@@ -166,8 +166,14 @@ DeviceEraseCoreOutcome DeviceLocalEraseCore::Handle(
     }
     const bool destructive_resume =
         journal_present && stored.phase == DeviceEraseJournalPhase::Erasing;
-    if (!destructive_resume && clock_.DeadlineExpired(command.deadline)) {
-        return {DeviceEraseCoreResult::Expired, false, {}};
+    if (!destructive_resume) {
+        const Rfc3339DeadlineState deadline = clock_.DeadlineState(command.deadline);
+        if (deadline == Rfc3339DeadlineState::Unknown) {
+            return {DeviceEraseCoreResult::ClockUntrusted, false, {}};
+        }
+        if (deadline == Rfc3339DeadlineState::Expired) {
+            return {DeviceEraseCoreResult::Expired, false, {}};
+        }
     }
 
     DeviceEraseJournalEntry entry = stored;

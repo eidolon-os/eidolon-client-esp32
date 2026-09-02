@@ -10,6 +10,7 @@
 #include "rfc3339_utc.h"
 
 #include <cJSON.h>
+#include <esp_log.h>
 #include <esp_random.h>
 #include <esp_timer.h>
 #include <mbedtls/base64.h>
@@ -20,6 +21,8 @@
 
 namespace eidolon {
 namespace {
+
+constexpr const char* TAG = "DeviceControlDelivery";
 
 std::string Quote(const std::string& value) {
     cJSON* item = cJSON_CreateString(value.c_str());
@@ -63,16 +66,19 @@ std::string RandomNonce() {
 
 class OperationalClock final : public DeviceEraseClockPort {
 public:
-    bool DeadlineExpired(const std::string& deadline) const override {
+    Rfc3339DeadlineState DeadlineState(
+        const std::string& deadline) const override {
         timeval current{};
-        if (gettimeofday(&current, nullptr) != 0) return true;
+        if (gettimeofday(&current, nullptr) != 0) {
+            return Rfc3339DeadlineState::Unknown;
+        }
         const int64_t now_millis =
             static_cast<int64_t>(current.tv_sec) * 1000 +
             current.tv_usec / 1000;
-        // TLS validation already requires wall-clock synchronization. An
-        // untrusted clock must not authorize a destructive command.
-        return IsRfc3339DeadlineExpired(
-            deadline, now_millis, 1704067200000LL);
+        // An untrusted clock must not authorize a destructive command. It also
+        // must not condemn one: this returns Unknown, and the core turns that
+        // into "ask me again", not into a deadline that has passed.
+        return EvaluateRfc3339Deadline(deadline, now_millis, 1704067200000LL);
     }
     uint64_t MonotonicTime() const override {
         return static_cast<uint64_t>(esp_timer_get_time() / 1000);
@@ -157,9 +163,17 @@ esp_err_t DeviceControlDeliveryClient::PollAndExecute(
     DeviceDeliveryConsumerCore delivery(erase, fingerprint);
     const DeviceDeliveryConsumerOutcome outcome = delivery.Handle(response.body);
     if (!outcome.has_evidence) {
-        return outcome.result == DeviceDeliveryConsumerResult::AcceptedWithoutEvidence
-                   ? ESP_OK
-                   : ESP_FAIL;
+        if (outcome.result == DeviceDeliveryConsumerResult::AcceptedWithoutEvidence) {
+            return ESP_OK;
+        }
+        // The core already decided why, in one word, and this used to throw it
+        // away. An Owner instruction that cannot be executed then looked like
+        // an unexplained ESP_FAIL, while the Authority went on re-arming a
+        // delivery nobody could see being refused.
+        ESP_LOGW(TAG, "Owner instruction refused: %s (attempt %s)",
+                 outcome.acceptance.adapter_code.c_str(),
+                 outcome.acceptance.delivery_attempt_id.c_str());
+        return ESP_FAIL;
     }
 
     HubHttpResponse acknowledged;
