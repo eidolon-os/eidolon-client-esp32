@@ -401,6 +401,15 @@ class Device:
         authorized door and produces the same advertising lines, so a capture
         that contains one is not evidence either way, and this says so by
         refusing to read it rather than by passing.
+
+        Deliberately NOT evidence: `State: activating -> wifi_configuring`. It
+        reads like the device opening setup and is not — provisioning_window_
+        policy_core.h says so at the source: that state is also where
+        Application parks a device whose activation just failed, which is
+        exactly where a correctly behaving removed device sits while it shows
+        REMOVED. Reading it as a window makes the fixed firmware fail this
+        check. Only advertising counts, because only advertising is the thing
+        D8 forbids.
         """
 
         if "EnterWifiConfigMode called" in log:
@@ -658,7 +667,12 @@ def check_removal_is_terminal(
     # 10, 20, 40 then 80 seconds, and the verdict it is being watched for
     # arrives on one of those attempts, not on the first.
     log = device.capture(260, run.evidence / "after-removal.log")
-    if Device.says(log, "Removed from this Owner. Open setup to claim it again"):
+    # The stable half of the line. What follows it is the way back, and that
+    # wording is expected to move — it now names the gesture ("press and hold
+    # the button") rather than "open setup", because a removed device may no
+    # longer open setup for itself. Matching the whole sentence made this
+    # checkpoint fail on the very firmware that fixed the thing it checks.
+    if Device.says(log, "Removed from this Owner"):
         run.record(
             "F-020", "the device says it was removed", PASS,
             "screen reached REMOVED, not 'waiting for approval'",
@@ -718,20 +732,6 @@ def check_removal_is_terminal(
             "F-020", "the Owner's erase instruction was carried out", FAIL,
             "the Hub recorded no erase operation for this device",
         )
-
-    # D8, and §1's "re-provisioning is not re-claiming": a device must never
-    # open a commissioning window because its network went away. Only physical
-    # presence or an authenticated admin may open a bounded one. An erase takes
-    # the Wi-Fi profile with it, which is precisely the condition D8 names.
-    opened_itself = Device.says(log, "State: activating -> wifi_configuring") or Device.says(
-        log, "Awaiting setup indefinitely"
-    )
-    run.record(
-        "F-020", "it did not open its own commissioning window", FAIL if opened_itself else PASS,
-        "the device advertised setup with nobody present (D8)"
-        if opened_itself
-        else "no window opened without physical presence",
-    )
 
     run.record(
         "F-020", "and it comes back on the same base identity", NEEDS_HAND,

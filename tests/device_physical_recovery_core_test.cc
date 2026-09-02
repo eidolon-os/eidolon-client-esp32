@@ -177,6 +177,57 @@ void PhysicalPresenceIsWhatUnblocksSetup() {
         core.ConsumedTerminal(Terminal())));
 }
 
+// The second removal on the same hardware. Measured 2026-09-02: the box-3 had
+// already been recovered once (erase_db6d…, 06480c8b -> 191468d4), and every
+// long press after its second erase (erase_be053c…, ACKed 14:05:59) returned
+// InvalidTerminal — the finished record from the first recovery was still the
+// only thing in the slot, and it can never match a newer terminal.
+
+DeviceEraseJournalEntry SecondTerminal() {
+    DeviceEraseJournalEntry value = Terminal();
+    value.operation_id = "erase-new-2";
+    value.device_ref.device_instance_id = "device-instance-second";
+    value.staged_ack.operation_id = value.operation_id;
+    value.staged_ack.device_ref = value.device_ref;
+    value.staged_ack.device_signature = "signed-second-terminal";
+    return value;
+}
+
+void ASecondRemovalIsStillRecoverable() {
+    Journal journal;
+    Identity identity;
+    DevicePhysicalRecoveryCore core(journal, identity);
+    assert(core.AuthorizeAndRun(Terminal(), true) ==
+           PhysicalRecoveryResult::Commissionable);
+
+    // The first recovery minted this device's current identity; the second
+    // erase is a terminal for THAT identity, so nothing about it matches the
+    // record left behind.
+    identity.next = "device-instance-third";
+    assert(core.AuthorizeAndRun(SecondTerminal(), true) ==
+           PhysicalRecoveryResult::Commissionable);
+    assert(core.ConsumedTerminal(SecondTerminal()));
+    // And the finished first record is gone rather than lingering to veto a
+    // third: it described a transaction that is over.
+    assert(!core.ConsumedTerminal(Terminal()));
+}
+
+void ARebootStillCannotStartOneOnItsOwn() {
+    // The mismatch is permission to write only for the button. A resume that
+    // treated it as permission would let a reboot mint the very capability
+    // physical presence exists to provide.
+    Journal journal;
+    Identity identity;
+    DevicePhysicalRecoveryCore core(journal, identity);
+    assert(core.AuthorizeAndRun(Terminal(), true) ==
+           PhysicalRecoveryResult::Commissionable);
+    const int stores = journal.stores;
+    assert(core.Resume(SecondTerminal()) ==
+           PhysicalRecoveryResult::InvalidTerminal);
+    assert(journal.stores == stores);
+    assert(!core.ConsumedTerminal(SecondTerminal()));
+}
+
 }  // namespace
 
 int main() {
@@ -189,4 +240,6 @@ int main() {
     AHalfFinishedRemovalBlocksSetup();
     AnUnreadableJournalBlocksSetup();
     PhysicalPresenceIsWhatUnblocksSetup();
+    ASecondRemovalIsStillRecoverable();
+    ARebootStillCannotStartOneOnItsOwn();
 }

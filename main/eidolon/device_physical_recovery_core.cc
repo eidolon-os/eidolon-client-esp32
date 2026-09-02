@@ -55,17 +55,35 @@ PhysicalRecoveryResult DevicePhysicalRecoveryCore::AuthorizeAndRun(
     if (loaded == PhysicalRecoveryLoadResult::StorageFailure) {
         return PhysicalRecoveryResult::StorageFailure;
     }
-    if (loaded == PhysicalRecoveryLoadResult::NotFound) {
+    // A record that does not describe the terminal in hand is a record of a
+    // different transaction — a previous removal this device already recovered
+    // from — and it is not evidence about this one. It used to be read as one,
+    // and the answer it gave was always no: every second removal on the same
+    // hardware refused physical presence with InvalidTerminal, forever, because
+    // the finished record's operation_id, old instance and terminal signature
+    // can never match the new terminal's. There is exactly one slot, so the
+    // stale entry is not merely unhelpful; it is the veto.
+    //
+    // Who may write over it is the whole question, and the two callers differ:
+    // a person holding the button is the authority this design uses to start a
+    // recovery, so they may start a fresh one over a finished one. A boot
+    // resume may not — it carries no authorization of its own, and treating a
+    // mismatch as permission to begin is how a reboot would mint the capability
+    // the button is there to provide.
+    const bool describes_this_terminal =
+        loaded == PhysicalRecoveryLoadResult::Loaded && Matches(record, terminal);
+    if (!describes_this_terminal) {
         if (!physical_presence) {
-            return PhysicalRecoveryResult::PhysicalPresenceRequired;
+            return loaded == PhysicalRecoveryLoadResult::NotFound
+                       ? PhysicalRecoveryResult::PhysicalPresenceRequired
+                       : PhysicalRecoveryResult::InvalidTerminal;
         }
+        record = PhysicalRecoveryRecord{};
         record.operation_id = terminal.operation_id;
         record.old_device_instance_id = terminal.device_ref.device_instance_id;
         record.terminal_signature = terminal.staged_ack.device_signature;
         record.phase = PhysicalRecoveryPhase::Authorized;
         if (!journal_.Store(record)) return PhysicalRecoveryResult::StorageFailure;
-    } else if (!Matches(record, terminal)) {
-        return PhysicalRecoveryResult::InvalidTerminal;
     }
     return Run(terminal, record);
 }
