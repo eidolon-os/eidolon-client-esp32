@@ -618,7 +618,10 @@ def check_removal_is_terminal(
         ("sha256:" + instance.removeprefix("device-instance-"),),
     )[0][0]
 
-    log = device.capture(150, run.evidence / "after-removal.log")
+    # Long enough to outlast the activation retry ladder. The device backs off
+    # 10, 20, 40 then 80 seconds, and the verdict it is being watched for
+    # arrives on one of those attempts, not on the first.
+    log = device.capture(260, run.evidence / "after-removal.log")
     if Device.says(log, "Removed from this Owner. Open setup to claim it again"):
         run.record(
             "F-020", "the device says it was removed", PASS,
@@ -662,9 +665,25 @@ def check_removal_is_terminal(
             "the Hub recorded no erase operation for this device",
         )
 
+    # D8, and §1's "re-provisioning is not re-claiming": a device must never
+    # open a commissioning window because its network went away. Only physical
+    # presence or an authenticated admin may open a bounded one. An erase takes
+    # the Wi-Fi profile with it, which is precisely the condition D8 names.
+    opened_itself = Device.says(log, "State: activating -> wifi_configuring") or Device.says(
+        log, "Awaiting setup indefinitely"
+    )
+    run.record(
+        "F-020", "it did not open its own commissioning window", FAIL if opened_itself else PASS,
+        "the device advertised setup with nobody present (D8)"
+        if opened_itself
+        else "no window opened without physical presence",
+    )
+
     run.record(
         "F-020", "and it comes back on the same base identity", NEEDS_HAND,
-        "opening setup again needs a long press on the device's own button",
+        "an erased device needs physical presence to consume its terminal erase "
+        "evidence (DevicePhysicalRecovery::AuthorizeFromPhysicalPresence), which "
+        "mints a fresh identity — so it does not come back on the same one",
     )
     run.record(
         "F-017", "an erased device is a new device", NEEDS_HAND,
