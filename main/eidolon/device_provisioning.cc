@@ -325,7 +325,15 @@ esp_err_t DeviceProvisioningService::StartOwnedHttpServer()
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.max_uri_handlers =
         CommissioningTransportEndpointBudget::kRequiredUriHandlers;
-    config.max_open_sockets = 1;
+    // One Controller at a time, but not one socket at a time. A phone that
+    // comes back for a second visit in the same window — which it must, since
+    // it cannot reach the Host while it is on this access point — opens a new
+    // connection before the kernel has reaped the old one. With a single slot
+    // the new connection evicted the handshake it had just started, and the
+    // phone saw "unexpected end of stream" on its first request. Three slots
+    // give the overlap room; LRU purge still keeps a stale peer from holding
+    // the window.
+    config.max_open_sockets = 3;
     config.lru_purge_enable = true;
     const esp_err_t err = httpd_start(
         reinterpret_cast<httpd_handle_t*>(&httpd_handle_), &config);
