@@ -21,36 +21,40 @@ std::string DeviceInstanceIdFromSpkiSha256Hex(const std::string& hex) {
     return identity ? identity->value() : std::string{};
 }
 
-std::string DevelopmentCommissioningHmacInput(
-    const std::string& hardware_lookup_id,
-    const std::string& device_instance_id,
-    const std::string& owner_domain_id,
-    const std::string& nonce) {
-    std::string result = hardware_lookup_id;
-    result.push_back('\0');
-    result += device_instance_id;
-    result.push_back('\0');
-    result += owner_domain_id;
-    result.push_back('\0');
-    result += nonce;
-    return result;
-}
-
-std::string DevelopmentHardwareEvidenceDocument(
-    const std::string& hardware_lookup_id,
+std::string BaseIdentityEvidenceDocument(
+    const std::string& device_base_id,
     const std::string& device_instance_id,
     const std::string& operational_public_key) {
-    if (!EvidenceAtom(hardware_lookup_id) ||
+    if (!EvidenceAtom(device_base_id) ||
         !EvidenceAtom(device_instance_id) ||
         !EvidenceAtom(operational_public_key)) {
         return {};
     }
     // Keys are RFC 8785/JCS lexical order and values need no escaping after the
     // restricted identifier check above.
-    return "{\"device_instance_id\":\"" + device_instance_id +
-        "\",\"hardware_lookup_id\":\"" + hardware_lookup_id +
+    return "{\"device_base_id\":\"" + device_base_id +
+        "\",\"device_instance_id\":\"" + device_instance_id +
         "\",\"operational_public_key\":\"" + operational_public_key +
         "\",\"profile_id\":\"eidolon-trust-p256-hpke-v1\"}";
+}
+
+std::string EnrolledBaseKeyDocument(
+    const std::string& device_base_id,
+    const std::string& device_instance_id,
+    const std::string& owner_domain_id,
+    const std::string& nonce) {
+    if (!EvidenceAtom(device_base_id) ||
+        !EvidenceAtom(device_instance_id) ||
+        !EvidenceAtom(owner_domain_id) ||
+        !EvidenceAtom(nonce)) {
+        return {};
+    }
+    return
+        "{\"contract\":\"eidolon.device-foundation.enrolled-base-key-v1\""
+        ",\"device_base_id\":\"" + device_base_id +
+        "\",\"device_instance_id\":\"" + device_instance_id +
+        "\",\"nonce\":\"" + nonce +
+        "\",\"owner_domain_id\":\"" + owner_domain_id + "\"}";
 }
 
 }  // namespace eidolon

@@ -305,11 +305,12 @@ DeviceClaimConsumerOutcome DeviceClaimConsumerCore::RecordProposal(
         ExactObject(hardware, 3) && ExactObject(manifest, 4) &&
         ExactObject(commissioning, 3) && ExactObject(handoff, 2) &&
         ExactObject(operational, 2) &&
-        (Text(hardware, "scheme") == "manufacturer-p256" ||
-         Text(hardware, "scheme") == "dev-self-signed-p256") &&
+        (Text(hardware, "scheme") == "hub-issued-base-p256" ||
+         Text(hardware, "scheme") == "manufacturer-attestation-p256") &&
         Bounded(Text(hardware, "evidence"), 16, 65536) &&
-        Text(commissioning, "scheme") ==
-            "protocomm-security2-srp6a-aes256gcm" &&
+        (Text(commissioning, "scheme") ==
+             "hub-issued-commissioning-voucher-v1" ||
+         Text(commissioning, "scheme") == "enrolled-base-key-v1") &&
         Bounded(Text(commissioning, "proof"), 16, 4096) &&
         Bounded(Text(commissioning, "nonce"), 16, 256) &&
         cJSON_IsObject(cJSON_GetObjectItemCaseSensitive(manifest, "document")) &&

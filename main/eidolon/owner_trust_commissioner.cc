@@ -32,6 +32,21 @@ OwnerTrustCommissioningOutcome OwnerTrustCommissioner::Commission(
         return {OwnerTrustCommissioningCode::Invalid, {}};
     }
 
+    // Standing is stored before trust because the reverse order can leave a
+    // device that trusts an Owner Domain and has no way to introduce itself to
+    // it — a state whose only symptom is a device that never appears in the
+    // approval queue and never says why.
+    if (!handover.commissioning_voucher.empty()) {
+        CommissioningCredential credential;
+        if (!ParseCommissioningVoucher(handover.commissioning_voucher,
+                                       credential)) {
+            return {OwnerTrustCommissioningCode::Unsupported, {}};
+        }
+        if (!credentials_.Save(credential)) {
+            return {OwnerTrustCommissioningCode::StorageUnavailable, {}};
+        }
+    }
+
     OwnerTrustBundle bundle;
     bundle.owner_domain_id = handover.owner_domain_id;
     bundle.owner_domain_descriptor_json =

@@ -12,6 +12,7 @@ read -r -a cjson_flags <<<"$(pkg-config --cflags --libs libcjson)"
   -I main \
   tests/owner_trust_commissioner_test.cc \
   main/eidolon/owner_trust_commissioner.cc \
+  main/eidolon/commissioning_credential.cc \
   main/eidolon/device_provisioning_protocol.cc \
   main/eidolon/hub_onboarding_protocol.cc \
   main/eidolon/hub_txt_parser.cc \

@@ -4,7 +4,7 @@
 
 int main() {
     const std::string digest =
-        "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3";
+        "410376c9d5dc88022d04b4f31b1e035453ba0c2226887e019fb33a23dca2cbc7";
     const std::string first =
         eidolon::DeviceInstanceIdFromSpkiSha256Hex(digest);
     const std::string rebooted =
@@ -12,20 +12,25 @@ int main() {
     assert(first == "device-instance-" + digest);
     assert(rebooted == first);
     assert(eidolon::DeviceInstanceIdFromSpkiSha256Hex("ABC").empty());
-    const std::string input = eidolon::DevelopmentCommissioningHmacInput(
-        "box-3-golden", first, "owner-domain_01",
-        "commissioning-nonce-golden");
-    std::string expected = "box-3-golden";
-    expected.push_back('\0');
-    expected += first;
-    expected.push_back('\0');
-    expected += "owner-domain_01";
-    expected.push_back('\0');
-    expected += "commissioning-nonce-golden";
-    assert(input == expected);
+
+    // The base identity is the Hub's to mint, so the device never builds one;
+    // what it builds is the document proving it holds the key that identity was
+    // bound to. Both strings are the contract vector's, not this test's idea of
+    // them.
+    const std::string base_id = "device-base-4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b";
     const std::string public_key =
-        "p256-spki:MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEaxfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpZP40Li_hp_m47n60p8D54WK84zV2sxXs7LtkBoN79R9Q";
-    assert(eidolon::DevelopmentHardwareEvidenceDocument(
-        "box-3-golden", first, public_key) ==
-        "{\"device_instance_id\":\"device-instance-5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3\",\"hardware_lookup_id\":\"box-3-golden\",\"operational_public_key\":\"p256-spki:MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEaxfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpZP40Li_hp_m47n60p8D54WK84zV2sxXs7LtkBoN79R9Q\",\"profile_id\":\"eidolon-trust-p256-hpke-v1\"}");
+        "p256-spki:MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEiJhOVtn9mNBt6RSX2zTRLaqeOqzYF-QBB_-ta4MbD0Uacc_T9j4rNfZGNPhseW0U5L5FGsdNfSvzCq-66O9BXw";
+    assert(eidolon::BaseIdentityEvidenceDocument(base_id, first, public_key) ==
+        "{\"device_base_id\":\"device-base-4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b\",\"device_instance_id\":\"device-instance-410376c9d5dc88022d04b4f31b1e035453ba0c2226887e019fb33a23dca2cbc7\",\"operational_public_key\":\"p256-spki:MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEiJhOVtn9mNBt6RSX2zTRLaqeOqzYF-QBB_-ta4MbD0Uacc_T9j4rNfZGNPhseW0U5L5FGsdNfSvzCq-66O9BXw\",\"profile_id\":\"eidolon-trust-p256-hpke-v1\"}");
+
+    // Continuing one Claim lifecycle without a Controller present.
+    assert(eidolon::EnrolledBaseKeyDocument(
+        base_id, first, "owner-domain_01", "commissioning-nonce-golden-enrolled") ==
+        "{\"contract\":\"eidolon.device-foundation.enrolled-base-key-v1\",\"device_base_id\":\"device-base-4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b\",\"device_instance_id\":\"device-instance-410376c9d5dc88022d04b4f31b1e035453ba0c2226887e019fb33a23dca2cbc7\",\"nonce\":\"commissioning-nonce-golden-enrolled\",\"owner_domain_id\":\"owner-domain_01\"}");
+
+    // A value that could not be a base identity, an instance id or a key is not
+    // quietly encoded: the document is empty, and the caller refuses to enroll.
+    assert(eidolon::BaseIdentityEvidenceDocument(
+        "device-base-\" or 1=1", first, public_key).empty());
+    assert(eidolon::EnrolledBaseKeyDocument(base_id, first, "", "n").empty());
 }

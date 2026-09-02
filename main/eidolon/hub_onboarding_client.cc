@@ -4,7 +4,9 @@
 
 #include "authority_locator.h"
 #include "claim_recovery_core.h"
+#include "commissioning_credential.h"
 #include "device_identity.h"
+#include "esp_idf_commissioning_credential_store.h"
 #include "device_manifest_assertion_core.h"
 #include "device_control_delivery_client.h"
 #include "esp_idf_claim_grant_crypto.h"
@@ -31,6 +33,17 @@
 #define TAG "HubOnboarding"
 
 namespace eidolon {
+
+namespace {
+// Seconds since the epoch, or zero before SNTP has ever run. Zero is a real
+// answer here and not an error: a device with no trusted clock still has to be
+// able to introduce itself, so the Hub — which does know the time — decides
+// whether a voucher has expired.
+int64_t DeviceUnixTime() {
+    const std::time_t now = std::time(nullptr);
+    return now > 1600000000 ? static_cast<int64_t>(now) : 0;
+}
+}  // namespace
 
 namespace {
 
@@ -754,25 +767,62 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
         // HardwareIdentityPort. A self assertion is never a production fallback.
         return ESP_ERR_NOT_SUPPORTED;
 #else
-        const std::string hardware_lookup_id = SystemInfo::GetMacAddress();
-        const std::string handoff_public_key = crypto.HandoffPublicKey();
-        const std::string operational_public_key = crypto.OperationalPublicKey();
-        const std::string nonce = StableToken(
-            "commissioning|" + handoff_public_key + "|" +
-                descriptor.owner_domain_id,
-            18);
-        std::string commissioning_proof;
-        if (nonce.empty() || hardware_lookup_id.empty() ||
-            !crypto.BuildDevelopmentCommissioningProof(
-                hardware_lookup_id, device_id, descriptor.owner_domain_id, nonce,
-                commissioning_proof)) {
+        // Nothing in this firmware image says which unit this is. What lets a
+        // Body ask to be admitted is what a person gave it while standing in
+        // front of it: a base identity the Hub minted and a one-shot voucher
+        // bound to the key below. A device that has neither has not been
+        // commissioned, and saying so is the whole of the correct behaviour —
+        // it must not invent an identity to get past this point.
+        CommissioningCredential credential;
+        EspIdfCommissioningCredentialStore& credentials =
+            EspIdfCommissioningCredentialStore::GetInstance();
+        if (!credentials.Load(credential)) {
             ESP_LOGE(TAG,
-                     "Development Admission setup secret is not provisioned");
+                     "No commissioning credential; this device has not been "
+                     "commissioned into an Owner Domain");
             return ESP_ERR_NOT_SUPPORTED;
         }
-        const std::string evidence_document =
-            DevelopmentHardwareEvidenceDocument(
-                hardware_lookup_id, device_id, operational_public_key);
+        const std::string handoff_public_key = crypto.HandoffPublicKey();
+        const std::string operational_public_key = crypto.OperationalPublicKey();
+        std::string proof_scheme;
+        std::string commissioning_proof;
+        std::string nonce;
+        switch (StandingFor(credential, DeviceUnixTime())) {
+        case CommissioningStanding::Voucher:
+            proof_scheme = "hub-issued-commissioning-voucher-v1";
+            commissioning_proof = credential.voucher;
+            nonce = credential.voucher_jti;
+            break;
+        case CommissioningStanding::EnrolledBaseKey:
+        case CommissioningStanding::Expired: {
+            // The base identity is still ours; only the standing to make a
+            // *first* Proposal ran out. Continuing is the Hub's call to
+            // refuse — a device that erased its own credential here would
+            // have destroyed the only thing that lets it come back as itself.
+            proof_scheme = "enrolled-base-key-v1";
+            nonce = StableToken(
+                "enrolled|" + credential.device_base_id + "|" +
+                    descriptor.owner_domain_id,
+                18);
+            const std::string document = EnrolledBaseKeyDocument(
+                credential.device_base_id, device_id,
+                descriptor.owner_domain_id, nonce);
+            if (document.empty() ||
+                DeviceIdentity::GetInstance().SignCanonical(
+                    document, commissioning_proof) != ESP_OK) {
+                return ESP_FAIL;
+            }
+            break;
+        }
+        case CommissioningStanding::None:
+            ESP_LOGE(TAG, "Commissioning credential is incomplete");
+            return ESP_ERR_NOT_SUPPORTED;
+        }
+        if (commissioning_proof.empty() || nonce.empty()) {
+            return ESP_ERR_NOT_SUPPORTED;
+        }
+        const std::string evidence_document = BaseIdentityEvidenceDocument(
+            credential.device_base_id, device_id, operational_public_key);
         std::string evidence_signature;
         if (evidence_document.empty() ||
             DeviceIdentity::GetInstance().SignCanonical(
@@ -801,12 +851,12 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
             ",\"requested_owner_domain_id\":" +
                 Quote(descriptor.owner_domain_id) +
             ",\"hardware_identity_evidence\":{" +
-                std::string("\"scheme\":\"dev-self-signed-p256\",\"evidence\":") +
+                std::string("\"scheme\":\"hub-issued-base-p256\",\"evidence\":") +
                 Quote(hardware_evidence) + ",\"evidence_digest\":" +
                 Quote(hardware_digest) + "}" +
-            ",\"commissioning_proof\":{" +
-                std::string("\"scheme\":\"protocomm-security2-srp6a-aes256gcm\",\"proof\":") +
-                Quote(commissioning_proof) + ",\"nonce\":" + Quote(nonce) + "}" +
+            ",\"commissioning_proof\":{\"scheme\":" + Quote(proof_scheme) +
+                ",\"proof\":" + Quote(commissioning_proof) +
+                ",\"nonce\":" + Quote(nonce) + "}" +
             ",\"manifest\":{" +
                 std::string("\"manifest_id\":") + Quote(BOARD_NAME) +
                 ",\"revision\":1,\"digest\":" +

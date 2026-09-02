@@ -41,24 +41,6 @@ std::string Hex(const unsigned char* bytes, size_t size) {
     return result;
 }
 
-bool DecodeHex(const std::string& encoded, std::vector<unsigned char>& out) {
-    if (encoded.size() < 32 || encoded.size() % 2 != 0) return false;
-    out.resize(encoded.size() / 2);
-    const auto nibble = [](char value) -> int {
-        if (value >= '0' && value <= '9') return value - '0';
-        if (value >= 'a' && value <= 'f') return value - 'a' + 10;
-        if (value >= 'A' && value <= 'F') return value - 'A' + 10;
-        return -1;
-    };
-    for (size_t index = 0; index < out.size(); ++index) {
-        const int high = nibble(encoded[index * 2]);
-        const int low = nibble(encoded[index * 2 + 1]);
-        if (high < 0 || low < 0) return false;
-        out[index] = static_cast<unsigned char>((high << 4) | low);
-    }
-    return true;
-}
-
 std::string Base64Url(const unsigned char* bytes, size_t size) {
     size_t capacity = 4 * ((size + 2) / 3) + 1;
     std::string result(capacity, '\0');
@@ -312,29 +294,6 @@ std::string EspIdfClaimGrantCrypto::OperationalKeyId() const {
     return fingerprint.rfind("p256:", 0) == 0
         ? "sha256:" + fingerprint.substr(5)
         : std::string{};
-}
-
-bool EspIdfClaimGrantCrypto::BuildDevelopmentCommissioningProof(
-    const std::string& hardware_lookup_id,
-    const std::string& device_instance_id, const std::string& owner_domain_id,
-    const std::string& nonce, std::string& proof) const {
-#ifdef CONFIG_EIDOLON_PROVISIONING_MANUFACTURER_BOUND
-    (void)hardware_lookup_id;
-    (void)device_instance_id;
-    (void)owner_domain_id;
-    (void)nonce;
-    proof.clear();
-    return false;
-#else
-    std::vector<unsigned char> secret;
-    if (!DecodeHex(CONFIG_EIDOLON_ADMISSION_SETUP_SECRET_HEX, secret)) return false;
-    const std::string message = DevelopmentCommissioningHmacInput(
-        hardware_lookup_id, device_instance_id, owner_domain_id, nonce);
-    std::array<unsigned char, 32> digest{};
-    if (!HmacSha256(secret, Bytes(message), digest)) return false;
-    proof = Base64Url(digest.data(), digest.size());
-    return proof.size() == 43;
-#endif
 }
 
 bool EspIdfClaimGrantCrypto::SignWithHandoff(

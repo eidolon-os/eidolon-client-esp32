@@ -130,7 +130,7 @@
           "additionalProperties": false,
           "required": ["scheme", "evidence", "evidence_digest"],
           "properties": {
-            "scheme": { "enum": ["manufacturer-p256", "dev-self-signed-p256"] },
+            "scheme": { "enum": ["hub-issued-base-p256", "manufacturer-attestation-p256"] },
             "evidence": { "type": "string", "minLength": 16, "maxLength": 65536 },
             "evidence_digest": {
               "$ref": "../common/schemas.schema.json#/$defs/Sha256Digest"
@@ -142,7 +142,7 @@
           "additionalProperties": false,
           "required": ["scheme", "proof", "nonce"],
           "properties": {
-            "scheme": { "const": "protocomm-security2-srp6a-aes256gcm" },
+            "scheme": { "enum": ["hub-issued-commissioning-voucher-v1", "enrolled-base-key-v1"] },
             "proof": { "type": "string", "minLength": 16, "maxLength": 4096 },
             "nonce": { "type": "string", "minLength": 16, "maxLength": 256 }
           }

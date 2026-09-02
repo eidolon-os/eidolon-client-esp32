@@ -15,8 +15,6 @@
 #   EIDOLON_OWNER_PRESENCE_VOICE_WAKE Enable owner-confirmed voice join: y/n (default y)
 #   EIDOLON_BOX3_RADAR_THRESHOLD_DELTA Radar threshold: 0-1023, larger is nearer (default 450)
 #   EIDOLON_RUNTIME_DIAGNOSTICS       Strong stack guards/watchpoint: y/n (default n)
-#   EIDOLON_PRIVATE_SDKCONFIG_OVERLAY Absolute path to a private setup-secret
-#                                      overlay (strict validation; see usage)
 #   IDF_PATH                           ESP-IDF root directory
 
 set -euo pipefail
@@ -32,7 +30,6 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 BUILD_DIR="${PROJECT_ROOT}/${PUBLIC_BUILD_DIR}"
 SDKCONFIG_FILE="${BUILD_DIR}/sdkconfig.esp-box-3"
 SDKCONFIG_OVERLAY="${BUILD_DIR}/sdkconfig.overlay.esp-box-3"
-PRIVATE_SDKCONFIG_OVERLAY=""
 PORT="${EIDOLON_PORT:-}"
 OWNER_PRESENCE_VOICE_WAKE="${EIDOLON_OWNER_PRESENCE_VOICE_WAKE:-y}"
 RADAR_THRESHOLD_DELTA="${EIDOLON_BOX3_RADAR_THRESHOLD_DELTA:-450}"
@@ -66,136 +63,6 @@ die() {
 
 info() {
   echo ">> $*"
-}
-
-stat_uid() {
-  if stat -f '%u' "$1" >/dev/null 2>&1; then
-    stat -f '%u' "$1"
-  else
-    stat -c '%u' "$1"
-  fi
-}
-
-stat_mode() {
-  if stat -f '%Lp' "$1" >/dev/null 2>&1; then
-    stat -f '%Lp' "$1"
-  else
-    stat -c '%a' "$1"
-  fi
-}
-
-stat_identity() {
-  if stat -f '%d:%i' "$1" >/dev/null 2>&1; then
-    stat -f '%d:%i' "$1"
-  else
-    stat -c '%d:%i' "$1"
-  fi
-}
-
-canonical_existing_path() {
-  local input="$1"
-  local directory base
-  directory="$(cd "$(dirname "${input}")" && pwd -P)"
-  base="$(basename "${input}")"
-  printf '%s/%s\n' "${directory}" "${base}"
-}
-
-configure_private_sdkconfig_overlay() {
-  local requested="${EIDOLON_PRIVATE_SDKCONFIG_OVERLAY:-}"
-  [[ -n "${requested}" ]] || return 0
-
-  [[ "${requested}" == /* ]] ||
-    die "EIDOLON_PRIVATE_SDKCONFIG_OVERLAY must be an absolute path"
-  local requested_parent resolved_parent
-  requested_parent="$(dirname "${requested}")"
-  [[ -d "${requested_parent}" && ! -L "${requested_parent}" ]] ||
-    die "private sdkconfig overlay parent must be a non-symlink directory"
-  resolved_parent="$(cd "${requested_parent}" && pwd -P)"
-  [[ "${requested_parent}" == "${resolved_parent}" ]] ||
-    die "private sdkconfig overlay parent must not traverse symlinks"
-  [[ "$(stat_uid "${resolved_parent}")" == "$(id -u)" ]] ||
-    die "private sdkconfig overlay parent must be owned by the calling user"
-  [[ "$(stat_mode "${resolved_parent}")" == "700" ]] ||
-    die "private sdkconfig overlay parent permissions must be 0700"
-
-  [[ -f "${requested}" && ! -L "${requested}" ]] ||
-    die "private sdkconfig overlay must be a regular, non-symlink file"
-
-  local resolved file_uid file_mode file_size setting identity_before identity_after
-  resolved="$(canonical_existing_path "${requested}")"
-  case "${resolved}" in
-    "${PROJECT_ROOT}"|"${PROJECT_ROOT}"/*)
-      die "private sdkconfig overlay must be outside the repository"
-      ;;
-  esac
-
-  file_uid="$(stat_uid "${resolved}")"
-  [[ "${file_uid}" == "$(id -u)" ]] ||
-    die "private sdkconfig overlay must be owned by the calling user"
-  file_mode="$(stat_mode "${resolved}")"
-  [[ "${file_mode}" == "600" ]] ||
-    die "private sdkconfig overlay permissions must be 0600"
-  identity_before="$(stat_identity "${resolved}")"
-  file_size="$(wc -c <"${resolved}" | tr -d '[:space:]')"
-  [[ "${file_size}" =~ ^[0-9]+$ ]] &&
-    ((file_size > 0 && file_size <= 256)) ||
-    die "private sdkconfig overlay has an invalid size"
-
-  setting="$(cat "${resolved}")"
-  identity_after="$(stat_identity "${resolved}")"
-  [[ "${identity_before}" == "${identity_after}" ]] ||
-    die "private sdkconfig overlay changed during validation"
-  [[ "${setting}" =~ ^CONFIG_EIDOLON_ADMISSION_SETUP_SECRET_HEX=\"[0-9a-f]{64}\"$ ]] ||
-    die "private sdkconfig overlay must contain exactly the supported setup-secret setting"
-  local setting_size="${#setting}"
-  ((file_size == setting_size || file_size == setting_size + 1)) ||
-    die "private sdkconfig overlay must contain exactly one setting line"
-
-  local private_root="${resolved}.build"
-  if [[ -e "${private_root}" ]]; then
-    [[ -d "${private_root}" && ! -L "${private_root}" ]] ||
-      die "private build root must be a non-symlink directory"
-    [[ "$(stat_uid "${private_root}")" == "$(id -u)" ]] ||
-      die "private build root must be owned by the calling user"
-  fi
-  local private_build="${private_root}/esp-box-3"
-  if [[ -e "${private_build}" ]]; then
-    [[ -d "${private_build}" && ! -L "${private_build}" ]] ||
-      die "private build directory must be a non-symlink directory"
-    [[ "$(stat_uid "${private_build}")" == "$(id -u)" ]] ||
-      die "private build directory must be owned by the calling user"
-  fi
-  (umask 077; mkdir -p "${private_build}")
-  chmod 0700 "${private_root}" "${private_build}"
-  [[ "$(stat_uid "${resolved_parent}")" == "$(id -u)" &&
-     "$(stat_mode "${resolved_parent}")" == "700" &&
-     ! -L "${resolved_parent}" ]] ||
-    die "private sdkconfig overlay parent changed during validation"
-  [[ "$(stat_uid "${private_root}")" == "$(id -u)" &&
-     "$(stat_mode "${private_root}")" == "700" &&
-     ! -L "${private_root}" ]] ||
-    die "private build root failed secure revalidation"
-  [[ "$(stat_uid "${private_build}")" == "$(id -u)" &&
-     "$(stat_mode "${private_build}")" == "700" &&
-     ! -L "${private_build}" ]] ||
-    die "private build directory failed secure revalidation"
-
-  # IDF reads this sealed snapshot, not the caller path. A rename after
-  # validation therefore cannot change the secret that reaches Kconfig.
-  local sealed_overlay="${private_root}/sdkconfig.private.esp-box-3"
-  local sealed_temporary="${sealed_overlay}.tmp.$$"
-  (umask 077; printf '%s\n' "${setting}" >"${sealed_temporary}")
-  chmod 0600 "${sealed_temporary}"
-  mv "${sealed_temporary}" "${sealed_overlay}"
-  [[ -f "${sealed_overlay}" && ! -L "${sealed_overlay}" &&
-     "$(stat_uid "${sealed_overlay}")" == "$(id -u)" &&
-     "$(stat_mode "${sealed_overlay}")" == "600" ]] ||
-    die "sealed private sdkconfig overlay failed secure revalidation"
-
-  PRIVATE_SDKCONFIG_OVERLAY="${sealed_overlay}"
-  BUILD_DIR="${private_build}"
-  SDKCONFIG_FILE="${BUILD_DIR}/sdkconfig.esp-box-3"
-  SDKCONFIG_OVERLAY="${BUILD_DIR}/sdkconfig.overlay.esp-box-3"
 }
 
 # ESP-IDF selection lives in eidolon-common.sh and is keyed on
@@ -389,9 +256,6 @@ idf_args() {
     "${PROJECT_ROOT}/sdkconfig.defaults.${BOARD_TARGET}"
     "${SDKCONFIG_OVERLAY}"
   )
-  if [[ -n "${PRIVATE_SDKCONFIG_OVERLAY}" ]]; then
-    defaults+=("${PRIVATE_SDKCONFIG_OVERLAY}")
-  fi
   local joined=""
   local file
   for file in "${defaults[@]}"; do
@@ -412,12 +276,6 @@ idf_args() {
 run_idf() {
   require_idf
   write_overlay
-  if [[ -n "${PRIVATE_SDKCONFIG_OVERLAY}" ]]; then
-    # Never let a previous private build pin a stale setup secret. The current
-    # validated overlay remains the only source; generated sdkconfig stays in
-    # the repository-external 0700 build directory.
-    rm -f "${SDKCONFIG_FILE}"
-  fi
   ensure_box3_sdkconfig
   local -a base_args=()
   while IFS= read -r arg; do
@@ -450,12 +308,6 @@ Environment:
                                Unitless AT581X threshold; larger is nearer
   EIDOLON_RUNTIME_DIAGNOSTICS=n
                                Enable reproducible strong stack diagnostics
-  EIDOLON_PRIVATE_SDKCONFIG_OVERLAY=/absolute/private/path
-                               Optional HIL-only file. It must be outside this
-                               repository in a caller-owned 0700 real directory,
-                               be caller-owned and mode 0600, and contain exactly
-                               one 64-lowercase-hex setup-secret setting. Its
-                               sealed build directory is external and 0700.
 EOF
 }
 
@@ -463,7 +315,6 @@ if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
   return 0
 fi
 
-configure_private_sdkconfig_overlay
 
 cmd="${1:-build}"
 case "${cmd}" in

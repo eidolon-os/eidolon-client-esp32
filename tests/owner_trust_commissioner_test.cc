@@ -9,6 +9,8 @@ namespace {
 using eidolon::OwnerTrustBundle;
 using eidolon::OwnerTrustCommissioner;
 using eidolon::OwnerTrustCommissioningCode;
+using eidolon::CommissioningCredential;
+using eidolon::CommissioningCredentialStorePort;
 using eidolon::OwnerTrustStorePort;
 using eidolon::OwnerTrustStoreResult;
 using eidolon::OwnerTrustVerifierPort;
@@ -32,17 +34,45 @@ std::string Descriptor(const std::string& owner = "owner-domain_01")
            "\"signature\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"}";
 }
 
+// The voucher a Host signs during a commissioning a person is present for.
+// Taken from the contract vector rather than shaped here: what this test is
+// for is that the device stores what the Host actually sends.
+constexpr const char* kVoucher =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJiYXNlX2lkZW50aXR5X3Byb3ZlbmFuY2UiOiJtaW50ZWQiLCJkZXZpY2VfYmFzZV9pZCI6ImRldmljZS1iYXNlLTRmM2I0ZjNiNGYzYjRmM2I0ZjNiNGYzYjRmM2I0ZjNiNGYzYjRmM2I0ZjNiNGYzYjRmM2I0ZjNiNGYzYjRmM2IiLCJleHAiOjE3ODgwMDAwMDAsImp0aSI6Imp0aS0wZjNhOTFjNGQyNWI0N2U4YTYwMzFmN2M4YjlkMmU1MCIsIm9wZXJhdGlvbmFsX3Nwa2lfc2hhMjU2Ijoic2hhMjU2OjQxMDM3NmM5ZDVkYzg4MDIyZDA0YjRmMzFiMWUwMzU0NTNiYTBjMjIyNjg4N2UwMTlmYjMzYTIzZGNhMmNiYzciLCJvd25lcl9kb21haW5faWQiOiJvd25lci1kb21haW5fMDEiLCJwdXJwb3NlIjoiZWlkb2xvbi1jb21taXNzaW9uaW5nLXZvdWNoZXItdjEifQ.YIf3fLCusRuqO7zKksG7gJYsa8rzZF4RIzOUBo45HZY";
+constexpr const char* kDeviceBaseId =
+    "device-base-4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b";
+
 std::string Handover(
     const std::string& envelope_owner = "owner-domain_01",
-    const std::string& descriptor_owner = "owner-domain_01")
+    const std::string& descriptor_owner = "owner-domain_01",
+    const std::string& voucher = kVoucher)
 {
+    const std::string credential =
+        voucher.empty()
+            ? std::string()
+            : ",\"commissioning_voucher\":\"" + voucher + "\"";
     return std::string("{\"contract_version\":\"1\",\"owner_domain_id\":\"") +
            envelope_owner + "\",\"owner_domain_descriptor\":" +
            Descriptor(descriptor_owner) +
            ",\"owner_root_certificate\":\"" + kCertificateInJson +
            "\",\"authority_signing_certificate\":\"" +
-           kCertificateInJson + "\"}";
+           kCertificateInJson + "\"" + credential + "}";
 }
+
+class FakeCredentials final : public CommissioningCredentialStorePort {
+public:
+    bool accepted = true;
+    int calls = 0;
+    CommissioningCredential stored;
+
+    bool Save(const CommissioningCredential& credential) override
+    {
+        ++calls;
+        if (!accepted) return false;
+        stored = credential;
+        return true;
+    }
+};
 
 class FakeVerifier final : public OwnerTrustVerifierPort {
 public:
@@ -86,7 +116,8 @@ void AcceptsOnlyAfterVerifyAndDurableStore()
 {
     FakeVerifier verifier;
     FakeStore store;
-    OwnerTrustCommissioner commissioner(verifier, store);
+    FakeCredentials credentials;
+    OwnerTrustCommissioner commissioner(verifier, store, credentials);
     const auto result = commissioner.Commission(Handover(), 7, [] { return true; });
     assert(result.code == OwnerTrustCommissioningCode::Staged);
     assert(result.owner_domain_id == "owner-domain_01");
@@ -95,13 +126,62 @@ void AcceptsOnlyAfterVerifyAndDurableStore()
     assert(store.stored.owner_domain_id == "owner-domain_01");
     assert(store.staged_generation == 7);
     assert(store.stored.owner_domain_descriptor_json == Descriptor());
+    // Standing and trust arrive together, and standing is stored first: a
+    // device that trusted an Owner Domain but could not introduce itself to it
+    // would sit silent, and the only symptom would be an approval queue that
+    // never shows it.
+    assert(credentials.calls == 1);
+    assert(credentials.stored.device_base_id == kDeviceBaseId);
+    assert(credentials.stored.voucher == kVoucher);
+}
+
+void ReCommissioningWithoutAVoucherLeavesTheIdentityAlone()
+{
+    // Pointing an already known Body at a new network changes nothing about
+    // who it is, so no voucher is sent and none is stored.
+    FakeVerifier verifier;
+    FakeStore store;
+    FakeCredentials credentials;
+    OwnerTrustCommissioner commissioner(verifier, store, credentials);
+    const auto result = commissioner.Commission(
+        Handover("owner-domain_01", "owner-domain_01", ""), 7, [] { return true; });
+    assert(result.code == OwnerTrustCommissioningCode::Staged);
+    assert(credentials.calls == 0);
+    assert(store.calls == 1);
+}
+
+void RefusesToTrustAnOwnerItCannotIntroduceItselfTo()
+{
+    FakeVerifier verifier;
+    FakeStore store;
+    FakeCredentials credentials;
+    credentials.accepted = false;
+    OwnerTrustCommissioner commissioner(verifier, store, credentials);
+    assert(commissioner.Commission(Handover(), 7, [] { return true; }).code ==
+           OwnerTrustCommissioningCode::StorageUnavailable);
+    assert(store.calls == 0);
+}
+
+void RefusesAVoucherItCannotRead()
+{
+    FakeVerifier verifier;
+    FakeStore store;
+    FakeCredentials credentials;
+    OwnerTrustCommissioner commissioner(verifier, store, credentials);
+    assert(commissioner.Commission(
+               Handover("owner-domain_01", "owner-domain_01", "not-a-voucher"),
+               7, [] { return true; }).code ==
+           OwnerTrustCommissioningCode::Unsupported);
+    assert(credentials.calls == 0);
+    assert(store.calls == 0);
 }
 
 void RejectsMalformedAndCrossOwnerBundlesBeforeCrypto()
 {
     FakeVerifier verifier;
     FakeStore store;
-    OwnerTrustCommissioner commissioner(verifier, store);
+    FakeCredentials credentials;
+    OwnerTrustCommissioner commissioner(verifier, store, credentials);
     assert(commissioner.Commission("{}", 7, [] { return true; }).code ==
            OwnerTrustCommissioningCode::Unsupported);
     assert(commissioner.Commission(
@@ -117,7 +197,8 @@ void RejectsInvalidSignatureWithoutWriting()
     FakeVerifier verifier;
     verifier.accepted = false;
     FakeStore store;
-    OwnerTrustCommissioner commissioner(verifier, store);
+    FakeCredentials credentials;
+    OwnerTrustCommissioner commissioner(verifier, store, credentials);
     assert(commissioner.Commission(Handover(), 7, [] { return true; }).code ==
            OwnerTrustCommissioningCode::Invalid);
     assert(verifier.calls == 1);
@@ -128,7 +209,8 @@ void GenerationFenceAppliesBeforeWorkAndAtCommit()
 {
     FakeVerifier verifier;
     FakeStore store;
-    OwnerTrustCommissioner commissioner(verifier, store);
+    FakeCredentials credentials;
+    OwnerTrustCommissioner commissioner(verifier, store, credentials);
     bool current = false;
     assert(commissioner.Commission(Handover(), 7, [&] { return current; }).code ==
            OwnerTrustCommissioningCode::Stale);
@@ -148,7 +230,8 @@ void StorageFailureIsNotReportedAsAccepted()
     FakeVerifier verifier;
     FakeStore store;
     store.result = OwnerTrustStoreResult::Unavailable;
-    OwnerTrustCommissioner commissioner(verifier, store);
+    FakeCredentials credentials;
+    OwnerTrustCommissioner commissioner(verifier, store, credentials);
     assert(commissioner.Commission(Handover(), 7, [] { return true; }).code ==
            OwnerTrustCommissioningCode::StorageUnavailable);
 }
@@ -158,6 +241,9 @@ void StorageFailureIsNotReportedAsAccepted()
 int main()
 {
     AcceptsOnlyAfterVerifyAndDurableStore();
+    ReCommissioningWithoutAVoucherLeavesTheIdentityAlone();
+    RefusesToTrustAnOwnerItCannotIntroduceItselfTo();
+    RefusesAVoucherItCannotRead();
     RejectsMalformedAndCrossOwnerBundlesBeforeCrypto();
     RejectsInvalidSignatureWithoutWriting();
     GenerationFenceAppliesBeforeWorkAndAtCommit();

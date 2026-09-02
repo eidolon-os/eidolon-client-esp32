@@ -1,25 +1,25 @@
 {
-  "sdk_commit": "6a62e2f762637d9bff0103fdcbe7e5f6e45a310e",
+  "sdk_commit": "bc754c162362ed9326d7e18d80b7e9d86db28ce1",
   "files": [
     {
       "source": "contracts/device_foundation/v1/generated/cpp/device_foundation_v1_generated.h",
       "target": "main/eidolon/device_foundation_v1_generated.h",
-      "sha256": "92884e38056e4889bc67afdca00961f49fae80ed1d9c161485a7f5c0cccb4c27"
+      "sha256": "76527f1a7f1dd4c246034ae305990db0f706ebf53cacee2771b95a40ffe3341d"
     },
     {
       "source": "contracts/device_foundation/v1/common/schemas.schema.json",
       "target": "tests/fixtures/device_foundation_v1/common.schemas.schema.json",
-      "sha256": "fe9af35a6cba5318c9d6b208721688ae06c18a31450a8885794f8dd6db12af38"
+      "sha256": "6a17524d2d63071f5ee878c1b54462041d4d614e6a9a2059dc1ed446e55fe1d3"
     },
     {
       "source": "contracts/device_foundation/v1/admission/schemas.schema.json",
       "target": "tests/fixtures/device_foundation_v1/admission.schemas.schema.json",
-      "sha256": "21030d1431efcc6e0a0a901fa83b21429ab157457f7d52d48b9e54483ca14936"
+      "sha256": "02189d8e6850e3dc76d93e81b3bb53320d3dc9175b9e0f3e20a9e6650b9c08cc"
     },
     {
       "source": "contracts/device_foundation/v1/examples/valid/admission.json",
       "target": "tests/fixtures/device_foundation_v1/admission.valid.json",
-      "sha256": "8b1b47ca48f34467180213e0bf8086c714fc4a1db0c5b83b74fe78962fdeda2b"
+      "sha256": "c53d5c97c43fa6c7541b6c47a7af1590ba7f01b7b439f93eeeff641f0d42d02e"
     },
     {
       "source": "contracts/device_foundation/v1/golden/claim-grant-aad.json",
@@ -54,12 +54,12 @@
     {
       "source": "contracts/device_foundation/v1/golden/setup-descriptor.json",
       "target": "tests/fixtures/device_foundation_v1/setup-descriptor.json",
-      "sha256": "fb8a600f9eda52f489fb49c9bfd37144078fbe8f1498e711b71a77e67559c540"
+      "sha256": "3a66bcf529d3822fc4778cd5fcc07d1cd6233e962f5bad07161e24594c991870"
     },
     {
-      "source": "contracts/device_foundation/v1/golden/development-commissioning-identity.json",
-      "target": "tests/fixtures/device_foundation_v1/development-commissioning-identity.json",
-      "sha256": "cf9e43b30f18d6c4ab2839a78abf6f4bde52da65c232b4cb40d0b79954e288bb"
+      "source": "contracts/device_foundation/v1/golden/commissioning-voucher.json",
+      "target": "tests/fixtures/device_foundation_v1/commissioning-voucher.json",
+      "sha256": "53072e86b2592f8cd2aa6d1e49e1a8bbb2079bbd0dd1014fa763ccd1ebc65a65"
     }
   ]
 }

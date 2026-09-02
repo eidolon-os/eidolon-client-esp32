@@ -1,0 +1,91 @@
+{
+  "vector_id": "DF-ADMISSION-COMMISSIONING-VOUCHER-001",
+  "supersedes": "DF-PH2-REJOIN-IDENTITY-001 (development-commissioning-identity.json)",
+  "why": "The device carries no factory identity material. Its base identity is minted by the Hub during commissioning, delivered over the Controller-witnessed session, and bound one-to-one to the operational key the device generated itself. One firmware image is therefore valid for every unit, and no Hub-side per-device registry exists to drift from it.",
+  "device_operational_scalar_hex": "3456789abcdef123456789abcdef12",
+  "operational_public_key": "p256-spki:MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEiJhOVtn9mNBt6RSX2zTRLaqeOqzYF-QBB_-ta4MbD0Uacc_T9j4rNfZGNPhseW0U5L5FGsdNfSvzCq-66O9BXw",
+  "operational_spki_sha256": "sha256:410376c9d5dc88022d04b4f31b1e035453ba0c2226887e019fb33a23dca2cbc7",
+  "device_instance_id": "device-instance-410376c9d5dc88022d04b4f31b1e035453ba0c2226887e019fb33a23dca2cbc7",
+  "device_base_id": "device-base-4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b",
+  "base_identity_provenance": "minted",
+  "hardware_identity_derivation_input_utf8_with_nul_separator": "eidolon-hardware-identity-v1\u0000device-base-4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b",
+  "hardware_identity_ref": "hardware-d6b2e54014f5310d5cd8461824c2455a83f4c89c9b55ed0b73b4f5166cf414b4",
+  "software_body_device_base_id": "software-body-a71ca71ca71ca71ca71ca71ca71ca71ca71ca71c",
+  "software_body_hardware_identity_derivation_input_utf8_with_nul_separator": "eidolon-hardware-identity-v1\u0000software-body-a71ca71ca71ca71ca71ca71ca71ca71ca71ca71c",
+  "software_body_hardware_identity_ref": "hardware-aac576f8d44ab0b0b66b4689fb94e1a3832832b796138265b1b81bb544f5d0cc",
+  "evidence_scheme": "hub-issued-base-p256",
+  "evidence_document": {
+    "device_base_id": "device-base-4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b",
+    "device_instance_id": "device-instance-410376c9d5dc88022d04b4f31b1e035453ba0c2226887e019fb33a23dca2cbc7",
+    "operational_public_key": "p256-spki:MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEiJhOVtn9mNBt6RSX2zTRLaqeOqzYF-QBB_-ta4MbD0Uacc_T9j4rNfZGNPhseW0U5L5FGsdNfSvzCq-66O9BXw",
+    "profile_id": "eidolon-trust-p256-hpke-v1"
+  },
+  "evidence_canonical_utf8": "{\"device_base_id\":\"device-base-4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b\",\"device_instance_id\":\"device-instance-410376c9d5dc88022d04b4f31b1e035453ba0c2226887e019fb33a23dca2cbc7\",\"operational_public_key\":\"p256-spki:MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEiJhOVtn9mNBt6RSX2zTRLaqeOqzYF-QBB_-ta4MbD0Uacc_T9j4rNfZGNPhseW0U5L5FGsdNfSvzCq-66O9BXw\",\"profile_id\":\"eidolon-trust-p256-hpke-v1\"}",
+  "evidence_signature_encoding": "ES256 raw r||s, 64 bytes, base64url without padding",
+  "evidence_signature": "tZIn-z0UR67XQ8eGaUjwgJukoItQkG64PcXLQ-KzdEKLIunSV_P3XX0A6j6r3wOWKENr59iKG7j7qI9vQ8EmCw",
+  "wire_evidence": "{\"device_base_id\":\"device-base-4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b\",\"device_instance_id\":\"device-instance-410376c9d5dc88022d04b4f31b1e035453ba0c2226887e019fb33a23dca2cbc7\",\"operational_public_key\":\"p256-spki:MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEiJhOVtn9mNBt6RSX2zTRLaqeOqzYF-QBB_-ta4MbD0Uacc_T9j4rNfZGNPhseW0U5L5FGsdNfSvzCq-66O9BXw\",\"profile_id\":\"eidolon-trust-p256-hpke-v1\"}.tZIn-z0UR67XQ8eGaUjwgJukoItQkG64PcXLQ-KzdEKLIunSV_P3XX0A6j6r3wOWKENr59iKG7j7qI9vQ8EmCw",
+  "evidence_digest": "sha256:c8c3ae3c95b48047839d00da63f5a51157825fd1c06126238ff1be9c30a2baf5",
+  "owner_domain_id": "owner-domain_01",
+  "voucher": {
+    "scheme": "hub-issued-commissioning-voucher-v1",
+    "signing_key_derivation": "HKDF-SHA256(host management secret, salt=none, info=\"eidolon-commissioning-voucher-v1\", L=32)",
+    "host_management_secret_hex": "6f776e65722d646f6d61696e2d6d616e6167656d656e742d7365637265742d31",
+    "signing_key_hex": "b2fd440da35841b023ee435af461c97e21a7361c7cd3f6a2812c42b6df596b95",
+    "header": {
+      "alg": "HS256",
+      "typ": "JWT"
+    },
+    "header_canonical_utf8": "{\"alg\":\"HS256\",\"typ\":\"JWT\"}",
+    "claims": {
+      "base_identity_provenance": "minted",
+      "device_base_id": "device-base-4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b",
+      "exp": 1788000000,
+      "jti": "jti-0f3a91c4d25b47e8a6031f7c8b9d2e50",
+      "operational_spki_sha256": "sha256:410376c9d5dc88022d04b4f31b1e035453ba0c2226887e019fb33a23dca2cbc7",
+      "owner_domain_id": "owner-domain_01",
+      "purpose": "eidolon-commissioning-voucher-v1"
+    },
+    "claims_canonical_utf8": "{\"base_identity_provenance\":\"minted\",\"device_base_id\":\"device-base-4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b\",\"exp\":1788000000,\"jti\":\"jti-0f3a91c4d25b47e8a6031f7c8b9d2e50\",\"operational_spki_sha256\":\"sha256:410376c9d5dc88022d04b4f31b1e035453ba0c2226887e019fb33a23dca2cbc7\",\"owner_domain_id\":\"owner-domain_01\",\"purpose\":\"eidolon-commissioning-voucher-v1\"}",
+    "signing_input": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJiYXNlX2lkZW50aXR5X3Byb3ZlbmFuY2UiOiJtaW50ZWQiLCJkZXZpY2VfYmFzZV9pZCI6ImRldmljZS1iYXNlLTRmM2I0ZjNiNGYzYjRmM2I0ZjNiNGYzYjRmM2I0ZjNiNGYzYjRmM2I0ZjNiNGYzYjRmM2I0ZjNiNGYzYjRmM2IiLCJleHAiOjE3ODgwMDAwMDAsImp0aSI6Imp0aS0wZjNhOTFjNGQyNWI0N2U4YTYwMzFmN2M4YjlkMmU1MCIsIm9wZXJhdGlvbmFsX3Nwa2lfc2hhMjU2Ijoic2hhMjU2OjQxMDM3NmM5ZDVkYzg4MDIyZDA0YjRmMzFiMWUwMzU0NTNiYTBjMjIyNjg4N2UwMTlmYjMzYTIzZGNhMmNiYzciLCJvd25lcl9kb21haW5faWQiOiJvd25lci1kb21haW5fMDEiLCJwdXJwb3NlIjoiZWlkb2xvbi1jb21taXNzaW9uaW5nLXZvdWNoZXItdjEifQ",
+    "compact": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJiYXNlX2lkZW50aXR5X3Byb3ZlbmFuY2UiOiJtaW50ZWQiLCJkZXZpY2VfYmFzZV9pZCI6ImRldmljZS1iYXNlLTRmM2I0ZjNiNGYzYjRmM2I0ZjNiNGYzYjRmM2I0ZjNiNGYzYjRmM2I0ZjNiNGYzYjRmM2I0ZjNiNGYzYjRmM2IiLCJleHAiOjE3ODgwMDAwMDAsImp0aSI6Imp0aS0wZjNhOTFjNGQyNWI0N2U4YTYwMzFmN2M4YjlkMmU1MCIsIm9wZXJhdGlvbmFsX3Nwa2lfc2hhMjU2Ijoic2hhMjU2OjQxMDM3NmM5ZDVkYzg4MDIyZDA0YjRmMzFiMWUwMzU0NTNiYTBjMjIyNjg4N2UwMTlmYjMzYTIzZGNhMmNiYzciLCJvd25lcl9kb21haW5faWQiOiJvd25lci1kb21haW5fMDEiLCJwdXJwb3NlIjoiZWlkb2xvbi1jb21taXNzaW9uaW5nLXZvdWNoZXItdjEifQ.YIf3fLCusRuqO7zKksG7gJYsa8rzZF4RIzOUBo45HZY",
+    "jti": "jti-0f3a91c4d25b47e8a6031f7c8b9d2e50",
+    "expires_at_unix": 1788000000,
+    "nonce_rule": "commissioning_proof.nonce MUST equal the voucher jti"
+  },
+  "enrolled_base_key": {
+    "scheme": "enrolled-base-key-v1",
+    "when": "Continuation inside one Claim lifecycle: resume, retry after the voucher was consumed or expired, grant re-issue, reconnect. Never a way back into the queue for a Rejected or Revoked base identity.",
+    "signing_document": {
+      "contract": "eidolon.device-foundation.enrolled-base-key-v1",
+      "device_base_id": "device-base-4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b",
+      "device_instance_id": "device-instance-410376c9d5dc88022d04b4f31b1e035453ba0c2226887e019fb33a23dca2cbc7",
+      "nonce": "commissioning-nonce-golden-enrolled",
+      "owner_domain_id": "owner-domain_01"
+    },
+    "canonical_utf8": "{\"contract\":\"eidolon.device-foundation.enrolled-base-key-v1\",\"device_base_id\":\"device-base-4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b\",\"device_instance_id\":\"device-instance-410376c9d5dc88022d04b4f31b1e035453ba0c2226887e019fb33a23dca2cbc7\",\"nonce\":\"commissioning-nonce-golden-enrolled\",\"owner_domain_id\":\"owner-domain_01\"}",
+    "proof": "IuTJWreb7nIOzqcSvQ_RLBsI9wMetVm2qUQCJu3lHO8OkE427Qv7sFFk1bpL7HXrUgTVl_amJmGvQqGAs3gy5Q",
+    "nonce": "commissioning-nonce-golden-enrolled"
+  },
+  "must_be_refused": [
+    {
+      "case": "voucher bound to another operational key",
+      "why": "operational_spki_sha256 in the claims is the whole binding"
+    },
+    {
+      "case": "voucher replayed after its jti was consumed",
+      "why": "the jti ledger is persistent and survives Hub restart"
+    },
+    {
+      "case": "device reports a device_base_id the Hub never issued",
+      "why": "only an issued base identity may enter hardware_identity_ref"
+    },
+    {
+      "case": "second base identity offered for an already bound operational key",
+      "why": "base id and operational key are one-to-one, checked at issue and at verify"
+    },
+    {
+      "case": "enrolled-base-key-v1 presented by a Revoked or Rejected base identity",
+      "why": "re-entry requires a fresh Controller-witnessed voucher"
+    }
+  ]
+}

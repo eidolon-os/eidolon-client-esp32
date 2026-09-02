@@ -16,6 +16,13 @@
       "maxLength": 80,
       "pattern": "^device-instance-[0-9a-f]{64}$"
     },
+    "DeviceBaseId": {
+      "description": "A Body's permanent base identity inside one Owner Domain, always issued by the Hub during commissioning and never asserted by the device. 'device-base-' carries 32 CSPRNG bytes minted for a hardware Body; 'software-body-' carries the Host's derivation from an authenticated controller_id. A device that reports a base id the Hub did not issue is refused rather than recorded: an unverifiable self-report used to become permanent history through hardware_identity_ref.",
+      "oneOf": [
+        { "type": "string", "pattern": "^device-base-[0-9a-f]{64}$" },
+        { "type": "string", "pattern": "^software-body-[0-9a-f]{40}$" }
+      ]
+    },
     "OwnerDomainId": {
       "type": "string",
       "minLength": 3,
@@ -671,6 +678,10 @@
           "description": "Absent when this offer does not end. A device nobody has claimed keeps advertising until it is claimed, cancelled or powered off, so it has no duration to name; the absence is the whole of that answer.",
           "$ref": "#/$defs/SetupWindowRemainingSeconds"
         },
+        "device_base_id": {
+          "description": "The base identity this device already holds, if any. Absent on a device that has never been commissioned, or one whose storage was erased — which is the same thing now, and is why this is stated rather than assumed. It is forwarded to the Host and never believed on the device's word: the Host re-signs it only when Hub confirms it issued that identity to this device's key, and mints a new one otherwise. Without it a Body the Owner removed could only come back as a stranger, losing the Claim generation fence that its old lineage carried.",
+          "$ref": "#/$defs/DeviceBaseId"
+        },
         "trust": {
           "enum": [
             "development-tofu",
@@ -689,6 +700,7 @@
         "methods",
         "network_bearers",
         "physical_presence",
+        "base_identity_source",
         "attestation_schemes",
         "secure_storage_level",
         "monotonic_counter",
@@ -754,13 +766,20 @@
           },
           "uniqueItems": true
         },
+        "base_identity_source": {
+          "description": "Where this Body's permanent base identity comes from. 'hub-issued' is the V1 answer for every Body: the device carries no factory identity material at all, so one firmware image is valid for every unit of that model.",
+          "enum": [
+            "hub-issued",
+            "manufacturer-attested"
+          ]
+        },
         "attestation_schemes": {
+          "description": "Manufacturer proof of which physical board this is. Empty is the honest value when there is no factory: the base identity answers who the Body is inside this Owner Domain, and it must never be presented as evidence about the hardware.",
           "type": "array",
-          "minItems": 1,
+          "minItems": 0,
           "items": {
             "enum": [
-              "manufacturer-p256",
-              "dev-self-signed-p256"
+              "manufacturer-attestation-p256"
             ]
           },
           "uniqueItems": true

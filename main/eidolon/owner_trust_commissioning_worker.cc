@@ -4,6 +4,7 @@
 #include "device_provisioning_protocol.h"
 #include "device_identity.h"
 #include "hub_trust_store.h"
+#include "esp_idf_commissioning_credential_store.h"
 #include "owner_trust_commissioner.h"
 #include "system_info.h"
 
@@ -82,7 +83,9 @@ void Release(Request* request)
 struct Runtime {
     Esp32OwnerTrustVerifier verifier;
     OwnerTrustStore store;
-    OwnerTrustCommissioner commissioner{verifier, store};
+    EspIdfCommissioningCredentialStore& credentials =
+        EspIdfCommissioningCredentialStore::GetInstance();
+    OwnerTrustCommissioner commissioner{verifier, store, credentials};
     QueueHandle_t queue = nullptr;
     TaskHandle_t task = nullptr;
     std::atomic<uint32_t> active_generation{0};

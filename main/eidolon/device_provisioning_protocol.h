@@ -52,6 +52,12 @@ struct TrustHandover {
     std::string owner_domain_descriptor_json;
     std::string owner_root_certificate_pem;
     std::string authority_signing_certificate_pem;
+    // Optional. Present when this commissioning is meant to give the device
+    // standing to ask for admission — which is every first setup, and every
+    // return after the Owner removed or rejected it. Absent when a Body that
+    // is already known is only being pointed at a new network, because nothing
+    // about its identity is changing.
+    std::string commissioning_voucher;
 };
 
 // Adapter callbacks use the same limit before allocating/copying input. Keep a

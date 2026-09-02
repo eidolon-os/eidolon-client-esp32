@@ -21,12 +21,12 @@
         "device_instance_candidate_id": "device-instance-1aa0ad0054afc2f841e72ddbadb37e06f52b5c7621679bbe60fe3aa4c461c594",
         "requested_owner_domain_id": "owner-domain_01",
         "hardware_identity_evidence": {
-          "scheme": "manufacturer-p256",
+          "scheme": "hub-issued-base-p256",
           "evidence": "bWFudWZhY3R1cmVyLWNoYWlu",
           "evidence_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
         },
         "commissioning_proof": {
-          "scheme": "protocomm-security2-srp6a-aes256gcm",
+          "scheme": "hub-issued-commissioning-voucher-v1",
           "proof": "c3JwNmEtcHJvb2YtYnl0ZXM",
           "nonce": "bm9uY2Utbm9uY2Utbm9uY2U"
         },

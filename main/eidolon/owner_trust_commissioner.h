@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <string>
 
+#include "commissioning_credential.h"
 #include "device_foundation_v1_generated.h"
 
 namespace eidolon {
@@ -34,6 +35,19 @@ enum class OwnerTrustStoreResult {
     Invalid,
     Stale,
     Unavailable,
+};
+
+// Where the standing this commissioning grants is kept.
+//
+// Deliberately not the Owner trust store: the base identity has to live with
+// the operational key it is bound to, so that erasing one erases the other. A
+// device holding a base identity it can no longer prove is a Body claiming a
+// lineage it cannot demonstrate, and that state must not be reachable.
+class CommissioningCredentialStorePort {
+public:
+    virtual ~CommissioningCredentialStorePort() = default;
+
+    virtual bool Save(const CommissioningCredential& credential) = 0;
 };
 
 // The store must make the verified bundle durable but not operationally
@@ -68,8 +82,9 @@ struct OwnerTrustCommissioningOutcome {
 class OwnerTrustCommissioner {
 public:
     OwnerTrustCommissioner(OwnerTrustVerifierPort& verifier,
-                           OwnerTrustStorePort& store)
-        : verifier_(verifier), store_(store) {}
+                           OwnerTrustStorePort& store,
+                           CommissioningCredentialStorePort& credentials)
+        : verifier_(verifier), store_(store), credentials_(credentials) {}
 
     OwnerTrustCommissioningOutcome Commission(
         const std::string& wire_payload,
@@ -79,6 +94,7 @@ public:
 private:
     OwnerTrustVerifierPort& verifier_;
     OwnerTrustStorePort& store_;
+    CommissioningCredentialStorePort& credentials_;
 };
 
 }  // namespace eidolon

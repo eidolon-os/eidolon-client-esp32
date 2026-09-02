@@ -25,10 +25,10 @@ std::string CreateEnrollment() {
         "\"device_instance_candidate_id\":\"device_01\"," +
         "\"requested_owner_domain_id\":\"owner-domain_01\"," +
         "\"hardware_identity_evidence\":{" +
-        "\"scheme\":\"manufacturer-p256\",\"evidence\":\"bWFudWZhY3R1cmVyLWNoYWlu\"," +
+        "\"scheme\":\"hub-issued-base-p256\",\"evidence\":\"bWFudWZhY3R1cmVyLWNoYWlu\"," +
         "\"evidence_digest\":\"" + kHardwareDigest + "\"}," +
         "\"commissioning_proof\":{" +
-        "\"scheme\":\"protocomm-security2-srp6a-aes256gcm\"," +
+        "\"scheme\":\"hub-issued-commissioning-voucher-v1\"," +
         "\"proof\":\"c3JwNmEtcHJvb2YtYnl0ZXM\",\"nonce\":\"bm9uY2Utbm9uY2Utbm9uY2U\"}," +
         "\"manifest\":{\"manifest_id\":\"manifest_01\",\"revision\":2," +
         "\"digest\":\"" + kManifestDigest + "\",\"document\":{\"endpoints\":[]}}," +
