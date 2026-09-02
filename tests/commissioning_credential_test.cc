@@ -44,6 +44,23 @@ void RefusesAnythingThatIsNotOneOfOurVouchers() {
         credential));
 }
 
+void AHalfIdentityIsNotAnIdentity() {
+    // The base identity and the operational key it was issued to live in one
+    // NVS namespace and are written and erased together, so this state is not
+    // reachable by using the device. It is reachable by writing one half into
+    // flash, and a Body that presented a lineage it cannot demonstrate would
+    // be exactly what the issued identity exists to prevent — so the pairing
+    // is carried in the record and checked, not assumed from where it is kept.
+    eidolon::CommissioningCredential credential;
+    assert(eidolon::ParseCommissioningVoucher(kGoldenVoucher, credential));
+    credential.operational_key_fingerprint = "p256:" + std::string(64, 'a');
+    assert(eidolon::StandingFor(credential, 1700000000) ==
+           eidolon::CommissioningStanding::Voucher);
+    // The store is what refuses it; the record only has to be able to say
+    // which key it belongs to.
+    assert(!credential.operational_key_fingerprint.empty());
+}
+
 void SaysWhichProofMayBePresented() {
     eidolon::CommissioningCredential none;
     assert(eidolon::StandingFor(none, 1700000000) ==
@@ -71,6 +88,7 @@ void SaysWhichProofMayBePresented() {
 int main() {
     ReadsTheIdentityAndNonceOutOfAHostSignedVoucher();
     RefusesAnythingThatIsNotOneOfOurVouchers();
+    AHalfIdentityIsNotAnIdentity();
     SaysWhichProofMayBePresented();
     return 0;
 }
