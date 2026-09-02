@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -37,7 +38,31 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-OPS_CONFIG = ROOT.parent / "eidolon_ops/config/eidolon-pi.toml"
+
+
+def _ops_config() -> Path:
+    """Where ops records which machine is the Host.
+
+    Not "the sibling of this checkout": a linked worktree sits somewhere else
+    entirely, and hard-coding the sibling made this runner unusable from one.
+    The candidates are the env override, this checkout's sibling, and the
+    sibling of the primary worktree — which is where the repository really
+    lives however this copy was made.
+    """
+
+    override = os.environ.get("EIDOLON_OPS_CONFIG")
+    if override:
+        return Path(override).expanduser()
+    relative = "eidolon_ops/config/eidolon-pi.toml"
+    candidates = [ROOT.parent / relative]
+    common = _run(["git", "-C", str(ROOT), "rev-parse", "--path-format=absolute",
+                   "--git-common-dir"]).stdout.strip()
+    if common:
+        candidates.append(Path(common).parent.parent / relative)
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return candidates[0]
 HUB_DB = "/var/lib/eidolon/hub/eidolon-hub.sqlite3"
 ADB_CANDIDATES = (
     "adb",
@@ -112,12 +137,18 @@ class Hub:
     """The Authority's own record, read only, over the link ops already uses."""
 
     def __init__(self) -> None:
-        text = OPS_CONFIG.read_text(encoding="utf-8")
+        config = _ops_config()
+        if not config.is_file():
+            raise Blocked(
+                f"{config} is not there; set EIDOLON_OPS_CONFIG to the Host's "
+                "ops config"
+            )
+        text = config.read_text(encoding="utf-8")
 
         def field_of(name: str) -> str:
             match = re.search(rf'^{name}\s*=\s*"([^"]+)"', text, re.M)
             if match is None:
-                raise Blocked(f"{OPS_CONFIG} has no {name}")
+                raise Blocked(f"{config} has no {name}")
             return match.group(1)
 
         self.target = f"{field_of('user')}@{field_of('hostname')}"
@@ -177,10 +208,38 @@ class Phone:
     def _adb(self, *args: str, timeout: float = 60) -> subprocess.CompletedProcess:
         return _run([self.adb, "-s", self.serial, *args], timeout=timeout)
 
-    def labels(self) -> list[tuple[str, int, int]]:
-        self._adb("shell", "uiautomator", "dump", "/sdcard/eidolon-hil-ui.xml")
-        dump = self._adb("shell", "cat", "/sdcard/eidolon-hil-ui.xml").stdout
-        found: list[tuple[str, int, int]] = []
+    DUMP = "/sdcard/eidolon-hil-ui.xml"
+
+    def _screen_xml(self) -> str:
+        """The screen as it is now, or nothing — never as it was last time.
+
+        `uiautomator dump` fails while a window is in transition ("could not
+        get idle state"), and a system dialog appearing is exactly such a
+        moment. Reading a fixed path unconditionally then returns the PREVIOUS
+        dump, so this runner spent two attempts operating on a screen that was
+        no longer there: it found the join dialog's button in a stale file,
+        tapped an empty spot on the candidate list, reported success, and the
+        platform released the network request 64 seconds later with
+        `(timeout)`. That reads exactly like a device refusing to be joined.
+
+        So the file is removed first and the dump is required to say it
+        wrote one. An empty answer means "cannot see the screen", which callers
+        retry — a wrong answer is the thing there is no recovering from.
+        """
+
+        for attempt in range(4):
+            self._adb("shell", "rm", "-f", self.DUMP)
+            reported = self._adb("shell", "uiautomator", "dump", self.DUMP)
+            if "dumped to" in reported.stdout:
+                xml = self._adb("shell", "cat", self.DUMP).stdout
+                if "<node" in xml:
+                    return xml
+            time.sleep(1 + attempt)
+        return ""
+
+    def labels(self) -> list[tuple[str, int, int, bool]]:
+        dump = self._screen_xml()
+        found: list[tuple[str, int, int, bool]] = []
         for node in re.finditer(r"<node[^>]*>", dump):
             raw = node.group(0)
             text = re.search(r'text="([^"]*)"', raw)
@@ -189,31 +248,58 @@ class Phone:
             label = (text.group(1) if text else "") or (desc.group(1) if desc else "")
             if label.strip() and box:
                 x1, y1, x2, y2 = (int(v) for v in box.groups())
-                found.append((label, (x1 + x2) // 2, (y1 + y2) // 2))
+                found.append(
+                    (label, (x1 + x2) // 2, (y1 + y2) // 2, 'clickable="true"' in raw)
+                )
         return found
 
-    def wait_for(self, needle: str, timeout: float = 40) -> tuple[str, int, int]:
+    def wait_for(self, needle: str, timeout: float = 40) -> tuple[str, int, int, bool]:
+        """The element a person would press, not the first one that contains it.
+
+        Substring matching alone picks whatever the dump lists first, and a
+        dialog's title usually contains its button's word: Android's join
+        prompt is titled "连接到设备" above a button reading "连接", so asking
+        for "连接" tapped the title. The request then sat unpressed until the
+        platform released it with `(timeout)` a minute later — a failure that
+        reads exactly like a device refusing to be joined.
+
+        So candidates are ranked: an exact label wins, clickable beats inert,
+        and only then does dump order decide.
+        """
+
         deadline = time.time() + timeout
         seen: list[str] = []
+        blind = 0
         while time.time() < deadline:
             seen = []
-            for label, x, y in self.labels():
+            matches = []
+            for label, x, y, clickable in self.labels():
                 seen.append(label)
                 if needle in label:
-                    return label, x, y
+                    matches.append((label == needle, clickable, label, x, y))
+            if matches:
+                matches.sort(key=lambda m: (m[0], m[1]), reverse=True)
+                _exact, clickable, label, x, y = matches[0]
+                return label, x, y, clickable
+            if not seen:
+                blind += 1
             time.sleep(2)
+        if blind and not seen:
+            raise Blocked(
+                f"the screen could not be read on {blind} attempts while waiting "
+                f"for {needle!r}; uiautomator never reported an idle window"
+            )
         raise AssertionError(
             f"{needle!r} never appeared. On screen: {sorted(set(seen))[:12]}"
         )
 
     def tap(self, needle: str, timeout: float = 40) -> str:
-        label, x, y = self.wait_for(needle, timeout)
+        label, x, y, _clickable = self.wait_for(needle, timeout)
         self._adb("shell", "input", "tap", str(x), str(y))
         return label
 
     def type_into_the_only_field(self, value: str) -> None:
-        self._adb("shell", "uiautomator", "dump", "/sdcard/eidolon-hil-ui.xml")
-        dump = self._adb("shell", "cat", "/sdcard/eidolon-hil-ui.xml").stdout
+        dump = self._screen_xml()
         fields = [
             box.groups()
             for node in re.finditer(r"<node[^>]*>", dump)
@@ -357,16 +443,45 @@ def check_one_image(run: Run) -> None:
     )
 
 
+def reach_the_setup_page(run: Run, phone: Phone) -> None:
+    """Get to "find a device", from wherever the app was left.
+
+    Restarting the app is not a clean slate. The setup page persists a
+    checkpoint and restores it, so a run can open straight onto the previous
+    attempt — including its dead end, which is exactly the state this rig is
+    left in by a removal. That screen is not an obstacle to work around: it
+    says what to do next ("重新设置设备"), and pressing it is the path a person
+    takes. It clears the checkpoint and asks for nothing else.
+    """
+
+    def on_screen() -> str:
+        return " ".join(label for label, _x, _y, _c in phone.labels())
+
+    phone.restart_app()
+    if "查找设备" not in on_screen():
+        phone.tap("主机已保存")
+        phone.tap("打开我的 Eidolon")
+        phone.wait_for("已安全连接")
+        phone.scroll_down()
+        phone.tap("打开设备管理")
+        phone.tap("配置新设备网络")
+
+    # The checkpoint is restored when this page opens, not when the app
+    # starts, so the previous attempt appears only now — after the
+    # navigation, which is why looking for it any earlier finds a home screen
+    # and learns nothing.
+    if "重新设置设备" in on_screen():
+        run.record(
+            "rig", "cleared a restored setup attempt", PASS,
+            "the page reopened on a previous attempt and offered to start over",
+        )
+        phone.tap("重新设置设备")
+
+
 def add_the_device(run: Run, phone: Phone, wifi_ssid: str, wifi_password: str) -> None:
     """The everyday path, driven the way an Owner drives it."""
 
-    phone.restart_app()
-    phone.tap("主机已保存")
-    phone.tap("打开我的 Eidolon")
-    phone.wait_for("已安全连接")
-    phone.scroll_down()
-    phone.tap("打开设备管理")
-    phone.tap("配置新设备网络")
+    reach_the_setup_page(run, phone)
     phone.tap("查找设备")
     phone.tap("softap", timeout=60)
     phone.tap("连接", timeout=40)
@@ -384,9 +499,9 @@ def add_the_device(run: Run, phone: Phone, wifi_ssid: str, wifi_password: str) -
     phone.type_into_the_only_field(wifi_password)
     phone.tap("确认配网并批准这次设备接入")
     phone.tap("连接", timeout=60)
-    landed = phone.wait_for("尚未 ClaimActive", timeout=180)
+    landed = phone.wait_for("尚未 ClaimActive", timeout=180)[0]
     run.record(
-        "F-016", "network and trust handed over", PASS, landed[0].splitlines()[0]
+        "F-016", "network and trust handed over", PASS, landed.splitlines()[0]
     )
 
 
