@@ -117,6 +117,66 @@ void OldIdentityOrOperationCannotReuseArchive() {
     assert(core.Resume(other) == PhysicalRecoveryResult::InvalidTerminal);
 }
 
+// The advertising decision. D8: a device may not open its own commissioning
+// window; §1 item 10: only physical presence or an authenticated admin may.
+// These pin the fact that decision consults, which is not the trust store.
+
+void NothingRemovedDoesNotBlockSetup() {
+    DeviceEraseJournalEntry none;
+    assert(!RemovalJournalBlocksCommissioning(
+        DeviceEraseJournalLoadResult::NotFound, none, false));
+}
+
+void AnUnconsumedRemovalBlocksSetup() {
+    // The measured failure: the erase is finished and acknowledged, the trust
+    // store is empty, and the Claim path still refuses. No window here.
+    assert(RemovalJournalBlocksCommissioning(
+        DeviceEraseJournalLoadResult::Loaded, Terminal(), false));
+    auto archived = Terminal();
+    archived.phase = DeviceEraseJournalPhase::ArchivedTerminal;
+    assert(RemovalJournalBlocksCommissioning(
+        DeviceEraseJournalLoadResult::Loaded, archived, false));
+}
+
+void AHalfFinishedRemovalBlocksSetup() {
+    for (auto phase : {DeviceEraseJournalPhase::Accepted,
+                       DeviceEraseJournalPhase::Staging,
+                       DeviceEraseJournalPhase::Erasing}) {
+        auto entry = Terminal();
+        entry.phase = phase;
+        // There is no terminal to consume yet, so no gesture can have consumed
+        // one. The second argument being true must not change the answer.
+        assert(RemovalJournalBlocksCommissioning(
+            DeviceEraseJournalLoadResult::Loaded, entry, false));
+        assert(RemovalJournalBlocksCommissioning(
+            DeviceEraseJournalLoadResult::Loaded, entry, true));
+    }
+}
+
+void AnUnreadableJournalBlocksSetup() {
+    DeviceEraseJournalEntry unread;
+    assert(RemovalJournalBlocksCommissioning(
+        DeviceEraseJournalLoadResult::StorageFailure, unread, false));
+    assert(RemovalJournalBlocksCommissioning(
+        DeviceEraseJournalLoadResult::StorageFailure, Terminal(), true));
+}
+
+void PhysicalPresenceIsWhatUnblocksSetup() {
+    // Same device, same journal, one long press apart: the gesture runs the
+    // recovery transaction, and only then may this device advertise.
+    Journal journal;
+    Identity identity;
+    DevicePhysicalRecoveryCore core(journal, identity);
+    assert(RemovalJournalBlocksCommissioning(
+        DeviceEraseJournalLoadResult::Loaded, Terminal(),
+        core.ConsumedTerminal(Terminal())));
+    assert(core.AuthorizeAndRun(Terminal(), true) ==
+           PhysicalRecoveryResult::Commissionable);
+    assert(!RemovalJournalBlocksCommissioning(
+        DeviceEraseJournalLoadResult::Loaded, Terminal(),
+        core.ConsumedTerminal(Terminal())));
+}
+
 }  // namespace
 
 int main() {
@@ -124,4 +184,9 @@ int main() {
     PhysicalPresenceRotatesIdentityAndArchivesEvidence();
     EveryCommittedPhaseResumesAfterCrash();
     OldIdentityOrOperationCannotReuseArchive();
+    NothingRemovedDoesNotBlockSetup();
+    AnUnconsumedRemovalBlocksSetup();
+    AHalfFinishedRemovalBlocksSetup();
+    AnUnreadableJournalBlocksSetup();
+    PhysicalPresenceIsWhatUnblocksSetup();
 }

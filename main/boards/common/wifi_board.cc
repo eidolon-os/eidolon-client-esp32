@@ -9,6 +9,7 @@
 #include "eidolon/commissioning_runtime.h"
 #include "eidolon/commissioning_transaction.h"
 #include "eidolon/device_physical_recovery.h"
+#include "eidolon/eidolon_runtime_status.h"
 #include "eidolon/provisioning_window_policy_core.h"
 #endif
 
@@ -187,6 +188,44 @@ void WifiBoard::OnWifiConnectTimeout(void* arg) {
 
 void WifiBoard::StartWifiConfigMode() {
 #if CONFIG_EIDOLON_HUB_MODE
+    // The rule, stated once, where every request for a window passes:
+    //
+    //   A device may open a commissioning window only when it is commissionable,
+    //   and the RemovalJournal is the fact that decides that — consulted here,
+    //   before the window opens, not later by the Claim that fails.
+    //
+    // The two automatic callers that reach this boundary — a boot with no
+    // network profile, and a connect timeout — are exactly forbidden path D8:
+    // a network that went away must not widen the takeover surface. An Owner
+    // erase takes the network with it, so after a remote erase both of them
+    // fire, and the window-bounding decision downstream reads an empty trust
+    // store and calls this a device with nothing to give away. It is not: the
+    // same erase left a RemovalJournal that refuses every Claim, so the window
+    // it opened could only ever end in one — an operator handed their Wi-Fi and
+    // their Host to a device that could not register, and a Controller stalled
+    // on the last step.
+    //
+    // §1 item 10: rejoining is not re-provisioning. Only physical presence or an
+    // authenticated admin may open a window, and physical presence arrives here
+    // through EnterWifiConfigMode, which consumes the removal terminal first —
+    // so by the time it reaches this line the journal no longer blocks and one
+    // check covers both doors.
+    //
+    // Deliberately not the other repair: advertising anyway with "physical
+    // recovery required" written into the setup descriptor, so the Controller
+    // could explain the dead end. That is a better dead end and still a window
+    // open with nobody present, which is the thing D8 forbids. What explains
+    // the dead end instead is the device's own screen, set here, and a phone
+    // that simply does not find a device it must not be offered.
+    if (eidolon::DevicePhysicalRecovery::RemovalBlocksCommissioning()) {
+        ESP_LOGE(TAG,
+                 "Refusing to open setup: a removal on record is still terminal. "
+                 "Long-press BOOT to rejoin");
+        Application::GetInstance().SetEidolonRuntimeUi(
+            eidolon::RuntimePhase::RecoveryRequired,
+            "Removed from this Owner. Press and hold the button to claim it again");
+        return;
+    }
     // This is an intent boundary. Identity, radio, transport, persistence and
     // user-visible state are all owned by the commissioning actor.
     if (!eidolon::CommissioningRuntime::GetInstance().RequestOpen()) {

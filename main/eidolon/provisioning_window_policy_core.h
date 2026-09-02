@@ -14,8 +14,17 @@ namespace eidolon {
 // therefore in what an open setup offer can cost.
 enum class ProvisioningWindowTrigger {
     // This device holds no commissioned Owner Domain: factory state, or an
-    // Owner erase that returned it there. It has no trust material, no Claim
-    // and no network to lose, and nobody has yet told it who it belongs to.
+    // Owner erase whose removal a person has since consumed at the device. It
+    // has no trust material, no Claim and no network to lose, and nobody has
+    // yet told it who it belongs to.
+    //
+    // "An erase returned it here" is only half the story, and believing that
+    // half is what opened a window on a device nobody was standing at. Between
+    // the erase and the button press the trust store is empty and the device is
+    // still un-claimable, because the RemovalJournal outlives the erase. That
+    // window never reaches this decision: WifiBoard::StartWifiConfigMode
+    // refuses to ask for one while the journal stands (D8, §1 item 10), so
+    // every trigger this enum names is one a person authorized.
     NeverCommissioned,
     // A commissioned device reopened setup on the physical-presence gesture.
     // It holds Owner trust material, so the open offer is the one thing that

@@ -2,6 +2,30 @@
 
 namespace eidolon {
 
+bool RemovalJournalBlocksCommissioning(
+    DeviceEraseJournalLoadResult loaded,
+    const DeviceEraseJournalEntry& entry,
+    bool terminal_consumed_by_physical_recovery) {
+    switch (loaded) {
+    case DeviceEraseJournalLoadResult::NotFound:
+        // Nothing was ever removed from this device. Factory state, and the
+        // state a device is in for its whole ordinary life.
+        return false;
+    case DeviceEraseJournalLoadResult::StorageFailure:
+        return true;
+    case DeviceEraseJournalLoadResult::Loaded:
+        break;
+    }
+    // Before the terminal there is no evidence to consume: the erase is still
+    // running, or stopped partway. Either way this device is mid-removal, and
+    // mid-removal is not a device that may offer itself to a new Owner.
+    if (entry.phase != DeviceEraseJournalPhase::DurableTerminal &&
+        entry.phase != DeviceEraseJournalPhase::ArchivedTerminal) {
+        return true;
+    }
+    return !terminal_consumed_by_physical_recovery;
+}
+
 bool DevicePhysicalRecoveryCore::ValidTerminal(
     const DeviceEraseJournalEntry& terminal) {
     return (terminal.phase == DeviceEraseJournalPhase::DurableTerminal ||

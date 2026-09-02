@@ -7,6 +7,11 @@ namespace eidolon {
 
 class DevicePhysicalRecovery {
 public:
+    // Read-only. Answers the one question the advertising decision has to ask
+    // before it opens a setup window: is there a removal on record that only
+    // physical presence may consume? Changes nothing, so it is safe to call
+    // from the intent boundary on every request.
+    static bool RemovalBlocksCommissioning();
     // Called only from the explicit long-press path. If there is no removal
     // terminal it is a no-op; otherwise it durably authorizes and runs rejoin.
     static bool AuthorizeFromPhysicalPresence();

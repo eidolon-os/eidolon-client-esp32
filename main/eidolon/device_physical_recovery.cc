@@ -159,6 +159,23 @@ PhysicalRecoveryResult Run(const DeviceEraseJournalEntry& terminal,
 
 }  // namespace
 
+bool DevicePhysicalRecovery::RemovalBlocksCommissioning() {
+    EspIdfDeviceEraseJournal removal;
+    DeviceEraseJournalEntry terminal;
+    const auto loaded = removal.Load(terminal);
+    RecoveryJournal journal;
+    RecoveryIdentity identity;
+    const DevicePhysicalRecoveryCore core(journal, identity);
+    const bool blocks = RemovalJournalBlocksCommissioning(
+        loaded, terminal, core.ConsumedTerminal(terminal));
+    if (blocks) {
+        ESP_LOGW(TAG,
+                 "A removal on record still blocks commissioning; only a long "
+                 "press on this device can open setup again");
+    }
+    return blocks;
+}
+
 bool DevicePhysicalRecovery::AuthorizeFromPhysicalPresence() {
     EspIdfDeviceEraseJournal removal;
     DeviceEraseJournalEntry terminal;

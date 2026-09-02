@@ -381,6 +381,42 @@ class Device:
     def says(log: str, needle: str) -> bool:
         return needle in log
 
+    @staticmethod
+    def opened_its_own_setup_window(log: str) -> str | None:
+        """D8: did this device offer itself for setup with nobody present?
+
+        Forbidden path D8 in docs/设备与Body/设备生命周期状态机与恢复边.md, and
+        §1 item 10 says the same rule in words: 重新配网不等于重新认领 — a
+        window may be opened only by physical presence or an authenticated
+        admin, because a network that goes away must not widen the takeover
+        surface. An Owner erase takes the network with it, so a device that
+        treats "no network" as "open setup" reopens itself every time it is
+        removed.
+
+        Returns the line that proves it, or None. It is a pure function of the
+        log, so `python3 -c` over a captured serial log answers this without
+        the rig — which is how the fix was checked before the board was free.
+
+        Only the device's own automatic paths count. The long press is the
+        authorized door and produces the same advertising lines, so a capture
+        that contains one is not evidence either way, and this says so by
+        refusing to read it rather than by passing.
+        """
+
+        if "EnterWifiConfigMode called" in log:
+            raise Blocked(
+                "the capture contains a long press, which is the authorized way "
+                "to open setup; this checkpoint needs a capture of the device "
+                "left alone after a removal"
+            )
+        window = re.compile(
+            r"^.*(Awaiting setup indefinitely|Awaiting setup for \d+ seconds"
+            r"|Confirmed state=advertising).*$",
+            re.M,
+        )
+        match = window.search(log)
+        return match.group(0).strip() if match else None
+
 
 # --------------------------------------------------------------------------
 # checkpoints, named by the plan's own case ids
@@ -633,6 +669,24 @@ def check_removal_is_terminal(
             "F-020", "the device says it was removed", FAIL,
             "never reached the removal verdict"
             + (f"; last refusal was {reason.group(1)}" if reason else ""),
+        )
+
+    try:
+        opened = Device.opened_its_own_setup_window(log)
+    except Blocked as why:
+        # One checkpoint the capture cannot answer is not a reason to abandon
+        # the rest of the stage, which is why this is caught here.
+        run.record(
+            "F-020", "it did not open its own commissioning window", BLOCKED,
+            str(why),
+        )
+    else:
+        run.record(
+            "F-020", "it did not open its own commissioning window",
+            FAIL if opened else PASS,
+            f"D8: a removed device advertised with nobody present — {opened}"
+            if opened
+            else "no advertising after the removal; rejoining waits for a long press",
         )
 
     after = hub.query(

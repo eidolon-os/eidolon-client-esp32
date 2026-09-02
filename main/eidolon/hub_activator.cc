@@ -133,14 +133,18 @@ bool HubActivator::Run() {
         case ActivationStandDown::ClaimTerminal:
             // Removal and revocation are deliberately terminal: the firmware
             // does not silently resurrect a revoked lifecycle. Asking again
-            // cannot change the answer, so say what does — the person holding
-            // the device opens setup and claims it again.
+            // cannot change the answer, so say what does — and say it as the
+            // gesture, not as "open setup". The device cannot open setup for
+            // itself here, and it must not: WifiBoard::StartWifiConfigMode
+            // refuses while the RemovalJournal stands. A person holding the
+            // button is the only thing that changes this answer.
             ESP_LOGW(TAG, "Claim is terminal (%s); physical presence is required to rejoin",
                      esp_err_to_name(err));
             app.SetEidolonEnrollmentUi(EnrollmentPhase::Revoked);
             app.SetEidolonServiceUi(ServicePhase::Unavailable);
-            app.SetEidolonRuntimeUi(RuntimePhase::RecoveryRequired,
-                                    "Removed from this Owner. Open setup to claim it again");
+            app.SetEidolonRuntimeUi(
+                RuntimePhase::RecoveryRequired,
+                "Removed from this Owner. Press and hold the button to claim it again");
             return false;
 
         case ActivationStandDown::CommissioningOwnsRadio:

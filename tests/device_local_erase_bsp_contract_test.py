@@ -15,6 +15,7 @@ def main() -> None:
     cmake_text = (ROOT / "main/CMakeLists.txt").read_text()
     boot_text = (ROOT / "main/eidolon/hub_activator.cc").read_text()
     claim_store_text = (ROOT / "main/eidolon/hub_config_store.cc").read_text()
+    setup_text = (ROOT / "main/boards/common/wifi_board.cc").read_text()
 
     assert "owner_trust,data, nvs" in partition_text
     for preserved in ("phy_init", "otadata", "ota_0", "ota_1", "assets"):
@@ -37,6 +38,15 @@ def main() -> None:
     discovery = boot_text.index("HubDiscovery discovery")
     assert resume < discovery
     assert "AllowsClaimOrRuntime" in boot_text
+
+    # D8 / §1 item 10: the window-opening decision consults the RemovalJournal
+    # BEFORE it asks for a window, not afterwards through the Claim that fails.
+    # Both automatic doors into setup — a boot with no network profile, and a
+    # connect timeout — go through StartWifiConfigMode, so the order of these
+    # two lines is the whole guarantee.
+    blocks = setup_text.index("RemovalBlocksCommissioning()")
+    request = setup_text.index("CommissioningRuntime::GetInstance().RequestOpen()")
+    assert blocks < request
     assert 'kEnrollmentJournalKey = "enrollment"' in claim_store_text
     assert 'kActiveClaimKey = "active_claim"' in claim_store_text
     assert '"onboarding"' not in claim_store_text
