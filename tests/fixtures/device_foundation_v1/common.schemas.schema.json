@@ -678,10 +678,6 @@
           "description": "Absent when this offer does not end. A device nobody has claimed keeps advertising until it is claimed, cancelled or powered off, so it has no duration to name; the absence is the whole of that answer.",
           "$ref": "#/$defs/SetupWindowRemainingSeconds"
         },
-        "device_base_id": {
-          "description": "The base identity this device already holds, if any. Absent on a device that has never been commissioned, or one whose storage was erased — which is the same thing now, and is why this is stated rather than assumed. It is forwarded to the Host and never believed on the device's word: the Host re-signs it only when Hub confirms it issued that identity to this device's key, and mints a new one otherwise. Without it a Body the Owner removed could only come back as a stranger, losing the Claim generation fence that its old lineage carried.",
-          "$ref": "#/$defs/DeviceBaseId"
-        },
         "trust": {
           "enum": [
             "development-tofu",

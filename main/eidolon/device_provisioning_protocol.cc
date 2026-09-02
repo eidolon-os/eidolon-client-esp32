@@ -114,15 +114,6 @@ std::string BuildSetupDescriptorJson(
     // bytes and nothing else has to be trusted to keep the two in step.
     cJSON_AddStringToObject(root, Keys::kContractVersion,
                             device_foundation::v1::kSetupDescriptorContractVersion);
-    // Canonical order puts the base identity before the instance id, and these
-    // bytes are compared against the golden vector byte for byte. Stated only
-    // when this device holds one: absent is the honest answer for a device that
-    // has never been commissioned and for one whose storage was erased — the
-    // same statement now, because nothing survives an erase to say otherwise.
-    if (!descriptor.device_base_id.empty()) {
-        cJSON_AddStringToObject(root, Keys::kDeviceBaseId,
-                                descriptor.device_base_id.c_str());
-    }
     cJSON_AddStringToObject(root, Keys::kDeviceId, descriptor.device_id.c_str());
     cJSON_AddStringToObject(root, Keys::kDeviceKind, descriptor.device_kind.c_str());
     cJSON_AddStringToObject(root, Keys::kDisplayName, descriptor.display_name.c_str());

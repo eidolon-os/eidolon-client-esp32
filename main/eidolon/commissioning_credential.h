@@ -22,13 +22,6 @@ namespace eidolon {
 // prove it is itself but still claims a lineage.
 struct CommissioningCredential {
     std::string device_base_id;
-    // The operational key this identity was issued to, as this device spells
-    // its own fingerprint. Stored so the pairing can be *checked* rather than
-    // assumed: colocation makes "identity without its key" unreachable by
-    // normal use, and this makes it unusable even when something abnormal
-    // wrote one half — a Body claiming a lineage it cannot demonstrate is the
-    // state the whole design exists to prevent.
-    std::string operational_key_fingerprint;
     std::string voucher;      // empty once spent or expired
     std::string voucher_jti;  // the nonce a voucher-backed Proposal must carry
     int64_t voucher_expires_at_unix = 0;

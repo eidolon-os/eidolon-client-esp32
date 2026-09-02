@@ -88,10 +88,7 @@ def main() -> None:
     assert keys is not None
     declared = set(re.findall(r'"([a-z][a-z0-9_]*)"', keys.group(1)))
     assert declared == set(setup["required_fields"]) | set(setup["optional_fields"])
-    # Two absences, each meaning something: no duration is an offer that does
-    # not end, and no base identity is a device that has never been
-    # commissioned — or one that was erased, which is now the same statement.
-    assert setup["optional_fields"] == ["device_base_id", "expires_in_seconds"]
+    assert setup["optional_fields"] == ["expires_in_seconds"]
     # There is no constructor that could produce the sentinel this contract
     # used to ship, so the header must keep refusing it rather than clamping.
     assert "FromPositiveSeconds" in header

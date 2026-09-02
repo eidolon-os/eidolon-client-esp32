@@ -12,7 +12,6 @@
     "trust"
   ],
   "optional_fields": [
-    "device_base_id",
     "expires_in_seconds"
   ],
   "trust_values": [
@@ -28,11 +27,10 @@
       "identity_fingerprint": "p256:591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
       "session_id": "setup_session_01",
       "expires_in_seconds": 600,
-      "trust": "manufacturer-bound",
-      "device_base_id": "device-base-4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b"
+      "trust": "manufacturer-bound"
     },
-    "canonical_utf8": "{\"contract_version\":\"1\",\"device_base_id\":\"device-base-4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b\",\"device_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"device_kind\":\"atk-dnesp32s3\",\"display_name\":\"Eidolon atk-dnesp32s3\",\"expires_in_seconds\":600,\"identity_fingerprint\":\"p256:591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"session_id\":\"setup_session_01\",\"trust\":\"manufacturer-bound\"}",
-    "canonical_sha256": "sha256:b5716efa6bd3feced6115ddb0fef8449e8539b021e23170f6abf4b4e3db7dc3d"
+    "canonical_utf8": "{\"contract_version\":\"1\",\"device_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"device_kind\":\"atk-dnesp32s3\",\"display_name\":\"Eidolon atk-dnesp32s3\",\"expires_in_seconds\":600,\"identity_fingerprint\":\"p256:591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"session_id\":\"setup_session_01\",\"trust\":\"manufacturer-bound\"}",
+    "canonical_sha256": "sha256:103cfa3c0c02b9d3b2d0c8082de1f38b027de49ed7289df70238e8d09f394a35"
   },
   "no_deadline": {
     "descriptor": {

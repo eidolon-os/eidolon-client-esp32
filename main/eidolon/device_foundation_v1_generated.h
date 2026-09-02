@@ -134,7 +134,6 @@ inline constexpr const char* kSetupDescriptorContractVersion = "1";
 struct SetupDescriptorKeys {
     static constexpr const char* kContractVersion = "contract_version";
     static constexpr const char* kDeviceId = "device_id";
-    static constexpr const char* kDeviceBaseId = "device_base_id";
     static constexpr const char* kDeviceKind = "device_kind";
     static constexpr const char* kDisplayName = "display_name";
     static constexpr const char* kExpiresInSeconds = "expires_in_seconds";
@@ -156,11 +155,6 @@ struct SetupDescriptor {
     // nobody has claimed keeps advertising until it is claimed, cancelled or
     // powered off, and so has no duration to name.
     std::optional<SetupWindowRemainingSeconds> expires_in;
-    // The base identity this device already holds. Empty on a device that has
-    // never been commissioned, and on one whose storage was erased — which is
-    // now the same statement, because nothing survives an erase to say
-    // otherwise. The device states it; only Hub can confirm it.
-    std::string device_base_id;
     SetupDescriptorTrust trust = SetupDescriptorTrust::DevelopmentTofu;
 };
 

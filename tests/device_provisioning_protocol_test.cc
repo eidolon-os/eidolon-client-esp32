@@ -62,14 +62,6 @@ SetupDescriptor DescriptorFromVector(const cJSON* descriptor)
     value.display_name = VectorString(descriptor, "display_name");
     value.identity_fingerprint = VectorString(descriptor, "identity_fingerprint");
     value.session_id = VectorString(descriptor, "session_id");
-    // Optional in the contract, so optional here: the no-deadline shape is a
-    // device that has never been commissioned and states none.
-    const cJSON* base_id =
-        cJSON_GetObjectItemCaseSensitive(descriptor, "device_base_id");
-    value.device_base_id =
-        cJSON_IsString(base_id) && base_id->valuestring != nullptr
-            ? base_id->valuestring
-            : std::string();
     const cJSON* expires =
         cJSON_GetObjectItemCaseSensitive(descriptor, "expires_in_seconds");
     value.expires_in = cJSON_IsNumber(expires)

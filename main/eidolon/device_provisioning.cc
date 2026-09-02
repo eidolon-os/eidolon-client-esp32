@@ -2,8 +2,6 @@
 
 #include "device_identity.h"
 #include "device_provisioning_protocol.h"
-#include "commissioning_credential.h"
-#include "esp_idf_commissioning_credential_store.h"
 #include "owner_trust_commissioning_worker.h"
 #include "system_info.h"
 
@@ -176,14 +174,6 @@ esp_err_t DeviceProvisioningService::HandleDescriptor(uint32_t, const uint8_t*, 
     descriptor.identity_fingerprint = DeviceIdentity::GetInstance().Fingerprint();
     descriptor.session_id = self.session_id_;
     descriptor.expires_in = AdvertisedWindowSeconds(self.window_);
-    // What this device would come back as. A Body the Owner removed keeps its
-    // base identity, so saying it here is what lets the Host re-sign the same
-    // one instead of minting a stranger — and the Host asks Hub before it
-    // believes any of it.
-    CommissioningCredential credential;
-    if (EspIdfCommissioningCredentialStore::GetInstance().Load(credential)) {
-        descriptor.device_base_id = credential.device_base_id;
-    }
     // This build carries a shared development secret unless it was given a
     // per-device one, and says so rather than letting the controller assume.
 #ifdef CONFIG_EIDOLON_PROVISIONING_MANUFACTURER_BOUND

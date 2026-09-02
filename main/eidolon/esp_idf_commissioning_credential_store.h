@@ -15,12 +15,6 @@ public:
     static EspIdfCommissioningCredentialStore& GetInstance();
 
     bool Save(const CommissioningCredential& credential) override;
-
-    // Empty unless this device still holds the key the identity was issued to.
-    // A stored identity whose fingerprint does not match the operational key in
-    // hand is discarded rather than presented: the Hub would refuse it anyway,
-    // and the refusal it would give ("no matching issued binding") says nothing
-    // about which half went missing.
     bool Load(CommissioningCredential& out) const;
 
     // Called once a voucher has been exchanged for a Proposal. The base identity
