@@ -29,7 +29,26 @@ protected:
     void TryWifiConnect();
 
     /**
-     * Enter WiFi configuration mode
+     * Open setup because the firmware decided to, with nobody present: a boot
+     * that found no network profile, or CONNECT_TIMEOUT_SEC of Station failing
+     * to associate.
+     *
+     * This is the gated door, and StartWifiConfigMode is not. Under HUB_MODE a
+     * request nobody made may not open a window on a device that already has
+     * an Owner — forbidden path D8 — so both automatic callers come through
+     * here, and a board that wants setup on a button must call
+     * EnterWifiConfigMode, which is the physical-presence door.
+     */
+    void OpenSetupWithoutAnyonePresent();
+
+    /**
+     * Enter WiFi configuration mode.
+     *
+     * The act itself, not a decision about whether it may happen: the caller
+     * is asserting that somebody authorized this. EnterWifiConfigMode is the
+     * physical-presence door and is what a board's button or touch gesture
+     * should call; two boards (m5stack-core-s3, m5stack-stackchan) call this
+     * directly instead, which is a pre-existing gap, not a pattern to copy.
      */
     void StartWifiConfigMode();
 

@@ -10,6 +10,7 @@
 #include "eidolon/commissioning_transaction.h"
 #include "eidolon/device_physical_recovery.h"
 #include "eidolon/eidolon_runtime_status.h"
+#include "eidolon/hub_trust_store.h"
 #include "eidolon/provisioning_window_policy_core.h"
 #endif
 
@@ -109,7 +110,7 @@ void WifiBoard::TryWifiConnect() {
         // No SSID configured, enter config mode
         // Wait for the board version to be shown
         vTaskDelay(pdMS_TO_TICKS(1500));
-        StartWifiConfigMode();
+        OpenSetupWithoutAnyonePresent();
     }
 }
 
@@ -173,16 +174,71 @@ void WifiBoard::SetNetworkEventCallback(NetworkEventCallback callback) {
 
 void WifiBoard::OnWifiConnectTimeout(void* arg) {
     auto* board = static_cast<WifiBoard*>(arg);
-    ESP_LOGW(TAG, "WiFi connection timeout, entering config mode");
+    ESP_LOGW(TAG, "WiFi connection timeout");
 
 #if CONFIG_EIDOLON_HUB_MODE
     // The timeout expresses intent only. StopStation belongs to the
-    // commissioning actor's AcquireCommissioningRadioLease action.
-    board->StartWifiConfigMode();
+    // commissioning actor's AcquireCommissioningRadioLease action — and on a
+    // commissioned device the request below is refused, so Station is left
+    // running and keeps scanning with backoff, which is how the network is
+    // allowed to come back on its own.
+    board->OpenSetupWithoutAnyonePresent();
 #else
     WifiManager::GetInstance().StopStation();
-    board->StartWifiConfigMode();
+    board->OpenSetupWithoutAnyonePresent();
 #endif
+}
+
+void WifiBoard::OpenSetupWithoutAnyonePresent() {
+#if CONFIG_EIDOLON_HUB_MODE
+    // The second half of the D8 rule, and the half the removal fix deliberately
+    // left open:
+    //
+    //   A device that already has an Owner may not open a setup window because
+    //   its network went away. That is a network fault, and a network fault
+    //   projects recovery_required — it never widens the takeover surface.
+    //
+    // Forbidden path D8 (docs/设备与Body/设备生命周期状态机与恢复边.md, line 110):
+    // 连不上网络后自动开设置窗口 → 只进入 NetworkRecoveryRequired；物理在场或已认证
+    // 管理员才能开有界窗口. §6.3 and §6.4 repeat it for the network and
+    // commissioning planes: 网络故障只产生 recovery_required，不会自动进入 open.
+    //
+    // Without this, a router that rebooted, a Wi-Fi password somebody changed,
+    // or anyone able to take the network away for sixty seconds made a
+    // commissioned device advertise itself for setup with nobody in the room.
+    // The window was bounded, which is not the point: a bounded offer is still
+    // an offer, and the attacker chooses when it opens.
+    //
+    // The trust store decides it, read through the same function as the
+    // window-bounding decision — a device cannot be commissioned enough to get
+    // a bounded window and uncommissioned enough to open one for itself. A
+    // device with no commissioned Owner Domain keeps the old behaviour, because
+    // that is the out-of-the-box path and refusing there would leave a board
+    // that cannot be set up at all.
+    //
+    // Refusing is not giving up. Station keeps scanning on its own backoff, so
+    // §6.3's other exit edge is live — 网络自行恢复后由设备证据回到 connected — and
+    // the phase projected here says exactly that: still connecting. Not
+    // RecoveryRequired, which in this firmware means a person must act before
+    // anything can change, and is the true thing to say about a removal but a
+    // false thing to say about a router that will be back in a minute. The way
+    // in for a network that really did change is the gesture, which the detail
+    // names because nothing else on screen does.
+    if (eidolon::AutomaticSetupOpenIsForbidden(
+            eidolon::ProvisioningWindowTriggerFor(
+                eidolon::OwnerTrustStore().CommissionedOwnerDomainId()))) {
+        ESP_LOGW(TAG,
+                 "Refusing to open setup: this device has an Owner and cannot "
+                 "reach its network; network_recovery_required (D8). Still "
+                 "retrying Wi-Fi; long-press to set up a different network");
+        Application::GetInstance().SetEidolonRuntimeUi(
+            eidolon::RuntimePhase::NetworkConnecting,
+            "Cannot reach your Wi-Fi. Still trying - press and hold the button "
+            "to set up a different network");
+        return;
+    }
+#endif
+    StartWifiConfigMode();
 }
 
 
@@ -194,16 +250,17 @@ void WifiBoard::StartWifiConfigMode() {
     //   and the RemovalJournal is the fact that decides that — consulted here,
     //   before the window opens, not later by the Claim that fails.
     //
-    // The two automatic callers that reach this boundary — a boot with no
-    // network profile, and a connect timeout — are exactly forbidden path D8:
-    // a network that went away must not widen the takeover surface. An Owner
-    // erase takes the network with it, so after a remote erase both of them
-    // fire, and the window-bounding decision downstream reads an empty trust
-    // store and calls this a device with nothing to give away. It is not: the
-    // same erase left a RemovalJournal that refuses every Claim, so the window
-    // it opened could only ever end in one — an operator handed their Wi-Fi and
-    // their Host to a device that could not register, and a Controller stalled
-    // on the last step.
+    // The two automatic callers — a boot with no network profile, and a connect
+    // timeout — now arrive through OpenSetupWithoutAnyonePresent, which turns
+    // them away on a device that has an Owner (forbidden path D8). They still
+    // reach this line on a device that has none, and that is the case this
+    // check exists for: an Owner erase takes the network with it, so after a
+    // remote erase both of them fire, and the window-bounding decision
+    // downstream reads an empty trust store and calls this a device with
+    // nothing to give away. It is not — the same erase left a RemovalJournal
+    // that refuses every Claim, so the window it opened could only ever end in
+    // one: an operator handed their Wi-Fi and their Host to a device that could
+    // not register, and a Controller stalled on the last step.
     //
     // §1 item 10: rejoining is not re-provisioning. Only physical presence or an
     // authenticated admin may open a window, and physical presence arrives here

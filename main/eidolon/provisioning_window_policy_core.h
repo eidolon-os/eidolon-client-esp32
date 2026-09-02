@@ -23,12 +23,17 @@ enum class ProvisioningWindowTrigger {
     // the erase and the button press the trust store is empty and the device is
     // still un-claimable, because the RemovalJournal outlives the erase. That
     // window never reaches this decision: WifiBoard::StartWifiConfigMode
-    // refuses to ask for one while the journal stands (D8, §1 item 10), so
-    // every trigger this enum names is one a person authorized.
+    // refuses to ask for one while the journal stands (D8, §1 item 10).
     NeverCommissioned,
     // A commissioned device reopened setup on the physical-presence gesture.
     // It holds Owner trust material, so the open offer is the one thing that
     // could hand it to somebody else.
+    //
+    // The name is a claim about how this trigger is reached, and what makes it
+    // true is that the device's automatic doors can no longer produce it: they
+    // ask AutomaticSetupOpenIsForbidden first, so a router that rebooted is
+    // turned away. What remains are the gestures a person performs at the
+    // device.
     OwnerPresenceReopen,
 };
 
@@ -53,6 +58,32 @@ struct ProvisioningWindowBounds {
 // belongs to nobody.
 ProvisioningWindowTrigger ProvisioningWindowTriggerFor(
     const std::string& commissioned_owner_domain_id);
+
+// Whether a setup window that no person asked for may open on this device.
+//
+// Forbidden path D8 in docs/设备与Body/设备生命周期状态机与恢复边.md:
+// 连不上网络后自动开设置窗口 → 只进入 NetworkRecoveryRequired；物理在场或已认证
+// 管理员才能开有界窗口. §6.3 and §6.4 say it twice more: 网络故障只产生
+// recovery_required，不会自动进入 open.
+//
+// Why the trust store is the fact that decides it. A device with no
+// commissioned Owner Domain has nothing to give away and nobody to ask, and
+// its automatic window is the only way it can ever be set up: refusing there
+// would leave a board out of the box that cannot be set up at all. A device
+// that holds Owner trust has everything to give away, and a router that
+// rebooted or a Wi-Fi password somebody changed is not its Owner asking for
+// anything. Reading the two as one act is what turns taking the network away
+// — an unplugged router, a deauth, a jammer — into a way to make the device
+// offer itself to whoever is nearby, which is why D8 is a forbidden path and
+// not a preference.
+//
+// This reads the same fact through the same function as the window-bounding
+// decision, so a device cannot be commissioned enough to be given a bounded
+// window and uncommissioned enough to open one for itself. Refusing is not
+// giving up on the network: the caller leaves Station retrying, which is
+// §6.3's other exit edge — 网络自行恢复后由设备证据回到 connected — and the
+// physical-presence gesture is the first one.
+bool AutomaticSetupOpenIsForbidden(ProvisioningWindowTrigger trigger);
 
 // A bounded window protects a commissioned device from being taken over by
 // whoever is nearby, and the physical gesture that opened it is the Owner

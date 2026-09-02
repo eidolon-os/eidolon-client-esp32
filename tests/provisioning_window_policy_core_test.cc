@@ -16,6 +16,45 @@ void AnEmptyTrustStoreMeansThisDeviceBelongsToNobodyYet()
            ProvisioningWindowTrigger::OwnerPresenceReopen);
 }
 
+// Forbidden path D8: 连不上网络后自动开设置窗口 → 只进入 NetworkRecoveryRequired；
+// 物理在场或已认证管理员才能开有界窗口. The two automatic doors into setup — a boot
+// that found no network profile, and sixty seconds of Station failing — ask this
+// before they ask for a window.
+
+void ADeviceNobodyHasClaimedYetStillOpensItsOwnWindow()
+{
+    // The out-of-the-box path, and the reason this is not simply "never open a
+    // window automatically": refusing here would leave a new board with no way
+    // to be set up at all.
+    assert(!AutomaticSetupOpenIsForbidden(
+        ProvisioningWindowTrigger::NeverCommissioned));
+}
+
+void ACommissionedDeviceMayNotOpenAWindowBecauseItsNetworkWentAway()
+{
+    // A router that rebooted, a Wi-Fi password somebody changed, or anyone able
+    // to take the network away for a minute is not this device's Owner asking
+    // for anything. A bounded offer is still an offer, and whoever caused the
+    // outage chooses when it opens.
+    assert(AutomaticSetupOpenIsForbidden(
+        ProvisioningWindowTrigger::OwnerPresenceReopen));
+}
+
+void OneFactDecidesBothOrTheyCanDisagreeAboutTheSameDevice()
+{
+    // "May this device open a window by itself" and "must that window be
+    // bounded" are the same question about the trust store, asked twice. If
+    // they ever read it differently, a device could be commissioned enough to
+    // be given a bounded window and uncommissioned enough to open one with
+    // nobody present — which is exactly the shape of the failure D8 names.
+    for (const std::string& owner : {std::string{}, std::string("owner-domain-7f3a")}) {
+        const ProvisioningWindowTrigger trigger =
+            ProvisioningWindowTriggerFor(owner);
+        assert(AutomaticSetupOpenIsForbidden(trigger) ==
+               DecideProvisioningWindow(trigger, 600).bounded);
+    }
+}
+
 void AFactoryDeviceKeepsOfferingItselfUntilSomebodyClaimsIt()
 {
     const ProvisioningWindowPolicy policy = DecideProvisioningWindow(
@@ -136,6 +175,9 @@ void SetupStaysShutWhereOpeningItWouldBreakSomething()
 int main()
 {
     AnEmptyTrustStoreMeansThisDeviceBelongsToNobodyYet();
+    ADeviceNobodyHasClaimedYetStillOpensItsOwnWindow();
+    ACommissionedDeviceMayNotOpenAWindowBecauseItsNetworkWentAway();
+    OneFactDecidesBothOrTheyCanDisagreeAboutTheSameDevice();
     AFactoryDeviceKeepsOfferingItselfUntilSomebodyClaimsIt();
     AnUnboundedWindowIgnoresTheConfiguredDurationEntirely();
     AnOwnerReopeningSetupGetsTheConfiguredBoundedWindow();

@@ -10,6 +10,23 @@ ProvisioningWindowTrigger ProvisioningWindowTriggerFor(
                : ProvisioningWindowTrigger::OwnerPresenceReopen;
 }
 
+bool AutomaticSetupOpenIsForbidden(ProvisioningWindowTrigger trigger)
+{
+    switch (trigger) {
+    case ProvisioningWindowTrigger::NeverCommissioned:
+        // The out-of-the-box path. There is no Owner to protect and no other
+        // way in, so this window is the product working.
+        return false;
+    case ProvisioningWindowTrigger::OwnerPresenceReopen:
+        // D8. The network is what went away; the Owner did not.
+        return true;
+    }
+    // A trigger this core does not name is not evidence of a device with
+    // nothing to protect, and the two mistakes do not cost the same: refusing
+    // costs a button press, opening offers the device to whoever is nearby.
+    return true;
+}
+
 ProvisioningWindowPolicy DecideProvisioningWindow(
     ProvisioningWindowTrigger trigger, int configured_window_seconds)
 {
