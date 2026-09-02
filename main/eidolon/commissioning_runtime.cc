@@ -88,6 +88,13 @@ void Release(TrustActorRequest* request)
 
 struct RuntimeState {
     CommissioningOrchestratorCore core;
+    // Guards the queue/task handles and the retirement decision together. The
+    // actor retires itself from inside its own loop while other tasks — the
+    // BOOT gesture, the no-profile auto-open, Wi-Fi and provisioning callbacks
+    // — may be posting to that same queue. Deciding to leave and accepting new
+    // work have to be one atomic choice, or a message lands in a queue that is
+    // being deleted.
+    std::mutex lifecycle;
     QueueHandle_t queue = nullptr;
     TaskHandle_t task = nullptr;
     std::atomic<uint32_t> visible_generation{0};
@@ -124,15 +131,24 @@ std::string RandomToken(size_t length)
     return token;
 }
 
-bool Enqueue(RuntimeMessage* message)
+// Caller holds state.lifecycle. A null queue means the actor has retired and
+// nobody has asked for a new window yet; the message is refused rather than
+// posted into a handle that no longer exists.
+bool EnqueueLocked(RuntimeState& state, RuntimeMessage* message)
 {
-    RuntimeState& state = State();
     if (message == nullptr || state.queue == nullptr ||
         xQueueSend(state.queue, &message, 0) != pdTRUE) {
         delete message;
         return false;
     }
     return true;
+}
+
+bool Enqueue(RuntimeMessage* message)
+{
+    RuntimeState& state = State();
+    std::lock_guard<std::mutex> lock(state.lifecycle);
+    return EnqueueLocked(state, message);
 }
 
 bool Enqueue(CommissioningEventType type, uint32_t generation = 0,
@@ -569,6 +585,39 @@ void Apply(RuntimeState& state, const CommissioningEvent& event)
     for (const auto& action : actions) Execute(state, action);
 }
 
+// True once this generation is over and nothing is waiting to start another.
+// Idle is reached by exactly three routes — a failure before any transport or
+// radio lease existed, a restore that finished, and a committed act whose new
+// Station route came back — and every one of them has already run the
+// transport's single cleanup path. So Idle is not merely "not busy": it is the
+// point at which this actor owns nothing.
+//
+// The queue check is not belt-and-braces. An erased device re-opens its own
+// window with nobody touching the BOOT key, so "returned to Idle" and "nobody
+// wants commissioning" are genuinely different questions, and only the second
+// one permits leaving.
+bool MayRetire(RuntimeState& state)
+{
+    return state.core.state() == CommissioningRuntimeState::Idle &&
+           uxQueueMessagesWaiting(state.queue) == 0;
+}
+
+// Returns true once the actor has released its queue and may delete itself.
+bool RetireIfIdle(RuntimeState& state)
+{
+    if (!MayRetire(state)) return false;
+    std::lock_guard<std::mutex> lock(state.lifecycle);
+    // Re-decide under the lock. RequestOpen() takes it across BOTH ensuring the
+    // actor exists and posting OpenRequested, so a window asked for since the
+    // check above is already visible here as a queued message.
+    if (!MayRetire(state)) return false;
+    QueueHandle_t queue = state.queue;
+    state.queue = nullptr;
+    state.task = nullptr;
+    vQueueDelete(queue);
+    return true;
+}
+
 void Actor(void*)
 {
     RuntimeState& state = State();
@@ -593,6 +642,7 @@ void Actor(void*)
             Apply(state, trust_event);
             xSemaphoreGive(request->completed);
             Release(request);  // actor reference
+            if (RetireIfIdle(state)) break;
             continue;
         }
         if (message->event.type == CommissioningEventType::NetworkCandidateReceived) {
@@ -601,12 +651,20 @@ void Actor(void*)
             state.candidate_id = message->event.candidate_id;
         }
         Apply(state, message->event);
+        // The safe point: the event is applied and every action it produced has
+        // run, so the actor holds nothing but its own stack.
+        if (RetireIfIdle(state)) break;
     }
+    ESP_LOGI(TAG,
+             "Commissioning actor retired; %u bytes of internal RAM returned to "
+             "the heap the LiveKit engine has to build itself out of",
+             static_cast<unsigned>(kRuntimeStackBytes));
+    vTaskDelete(nullptr);
 }
 
-bool EnsureActor()
+// Caller holds state.lifecycle.
+bool EnsureActorLocked(RuntimeState& state)
 {
-    RuntimeState& state = State();
     if (state.queue == nullptr) {
         state.queue = xQueueCreate(kQueueDepth, sizeof(RuntimeMessage*));
         if (state.queue == nullptr) return false;
@@ -631,7 +689,25 @@ CommissioningRuntime& CommissioningRuntime::GetInstance()
 
 bool CommissioningRuntime::RequestOpen()
 {
-    return EnsureActor() && Enqueue(CommissioningEventType::OpenRequested);
+    RuntimeState& state = State();
+    // One lock across both halves. Splitting them would let the actor decide to
+    // retire between the task existing and the request reaching its queue, and
+    // the gesture would be swallowed by a queue on its way to being deleted.
+    std::lock_guard<std::mutex> lock(state.lifecycle);
+    // Build the request BEFORE the actor exists. An actor created for a request
+    // that then fails to arrive would block on an empty queue forever, and
+    // because retirement is only ever decided after receiving a message, it
+    // could never leave — 16 KiB stranded by the very failure path meant to
+    // report that memory was short.
+    auto* message = new (std::nothrow) RuntimeMessage;
+    if (message == nullptr) return false;
+    message->event.type = CommissioningEventType::OpenRequested;
+    message->event.generation = 0;
+    if (!EnsureActorLocked(state)) {
+        delete message;
+        return false;
+    }
+    return EnqueueLocked(state, message);
 }
 
 bool CommissioningRuntime::RequestCancel()

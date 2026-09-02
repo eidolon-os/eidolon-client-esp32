@@ -675,8 +675,10 @@ void DeviceProvisioningService::CleanupTransport(uint32_t generation)
         cleanup.CanReleaseNetworkInterfaces(wifi_driver_stopped)) {
         ReleaseNetifs();
     }
+    bool owner_trust_worker_retired = !cleanup.owner_trust_worker;
     if (cleanup.owner_trust_worker) {
-        OwnerTrustCommissioningWorker::GetInstance().Deactivate(generation);
+        owner_trust_worker_retired =
+            OwnerTrustCommissioningWorker::GetInstance().Deactivate(generation);
     }
 
     if (!cleanup.CanReleaseNetworkInterfaces(wifi_driver_stopped)) {
@@ -695,8 +697,20 @@ void DeviceProvisioningService::CleanupTransport(uint32_t generation)
     transport_generation_.store(0, std::memory_order_release);
     resources_.CompleteCleanup(generation);
     cleanup_in_progress_.store(false, std::memory_order_release);
-    ESP_LOGI(TAG, "Provisioning generation %lu stopped and released",
-             static_cast<unsigned long>(generation));
+    // Say which of the two happened. Cleanup completes either way — refusing to
+    // publish TransportStopped over a resident worker would strand the whole
+    // generation, and a device that never enrolls is a far worse outcome than
+    // 12 KiB held for one boot. But this generation did not release everything
+    // it owned, and the line a reader reaches for must not claim it did.
+    if (owner_trust_worker_retired) {
+        ESP_LOGI(TAG, "Provisioning generation %lu stopped and released",
+                 static_cast<unsigned long>(generation));
+    } else {
+        ESP_LOGW(TAG,
+                 "Provisioning generation %lu stopped, but its Owner trust "
+                 "worker stayed resident: internal RAM was not fully returned",
+                 static_cast<unsigned long>(generation));
+    }
     if (events_.transport_stopped) {
         events_.transport_stopped(generation);
     }

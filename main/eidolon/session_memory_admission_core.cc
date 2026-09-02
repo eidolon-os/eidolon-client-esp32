@@ -129,6 +129,13 @@ bool SessionMemoryRetryLedger::RecordRefusal(
     ++consecutive_refusals_;
     last_verdict_ = JudgeSessionMemory(heap, requirement);
     last_contiguous_shortfall_ = ContiguousShortfallBytes(heap, requirement);
+    // Name the number that decided this refusal, not the one that happens to be
+    // easiest to reach. JudgeSessionMemory tests the total first, so an
+    // Exhausted verdict says nothing about contiguity and its contiguous
+    // shortfall is routinely zero.
+    last_binding_shortfall_ = last_verdict_ == SessionMemoryVerdict::Exhausted
+                                  ? TotalShortfallBytes(heap, requirement)
+                                  : last_contiguous_shortfall_;
 
     if (last_verdict_ == SessionMemoryVerdict::Exhausted) {
         // Nothing to wait for: the working set is larger than the internal heap.
@@ -161,6 +168,7 @@ void SessionMemoryRetryLedger::Reset()
     attempts_since_progress_ = 0;
     best_largest_free_block_ = 0;
     last_contiguous_shortfall_ = 0;
+    last_binding_shortfall_ = 0;
     last_verdict_ = SessionMemoryVerdict::Sufficient;
 }
 

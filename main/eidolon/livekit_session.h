@@ -43,7 +43,11 @@ public:
     bool InternalMemoryCeilingReached() const { return memory_ledger_.ceiling_reached(); }
     std::size_t InternalMemoryShortfallBytes() const
     {
-        return memory_ledger_.last_contiguous_shortfall();
+        return memory_ledger_.last_binding_shortfall();
+    }
+    const char* InternalMemoryVerdictName() const
+    {
+        return SessionMemoryVerdictName(memory_ledger_.last_verdict());
     }
 
     // An edge that legitimately changes the device's situation — network

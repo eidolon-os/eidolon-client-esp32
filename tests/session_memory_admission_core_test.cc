@@ -186,6 +186,69 @@ void TestSuccessClearsTheLedger()
     assert(ledger.RecordRefusal(Snapshot(total * 2, needed - 100, 12), req));
 }
 
+// The box-3 field failure of 2026-09-02 reported "short_by=0 bytes" on a device
+// that was 5001 bytes short, because the abandon path printed the CONTIGUOUS
+// shortfall for an EXHAUSTED heap — and an exhausted heap has no contiguous
+// shortfall, by construction. The reader of that log went looking for
+// fragmentation that was never there. The ledger therefore has to carry the
+// number that decided the refusal, not just the one it computed first.
+void TestExhaustionReportsTheTotalShortfallNotZero()
+{
+    const auto req = eidolon::LiveKitEngineInternalMemoryRequirement();
+    // The real numbers from that boot: total short, contiguous perfectly fine.
+    InternalHeapSnapshot heap;
+    heap.free_bytes = 14711;
+    heap.largest_free_block = 9728;
+    heap.free_blocks = 6;
+
+    assert(eidolon::JudgeSessionMemory(heap, req) == SessionMemoryVerdict::Exhausted);
+    assert(eidolon::ContiguousShortfallBytes(heap, req) == 0);
+
+    SessionMemoryRetryLedger ledger;
+    ledger.RecordRefusal(heap, req);
+    assert(ledger.last_contiguous_shortfall() == 0);
+    assert(ledger.last_binding_shortfall() ==
+           eidolon::TotalShortfallBytes(heap, req));
+    assert(ledger.last_binding_shortfall() == 5001);
+}
+
+// For a fragmented heap the deciding number IS the contiguous one, so the same
+// accessor has to answer differently rather than always reaching for the total.
+void TestFragmentationReportsTheContiguousShortfall()
+{
+    const auto req = eidolon::LiveKitEngineInternalMemoryRequirement();
+    InternalHeapSnapshot heap;
+    heap.free_bytes = TotalRequirement(req) + 4096;  // total is fine
+    heap.largest_free_block = 7680;                  // no hole big enough
+    heap.free_blocks = 12;
+
+    assert(eidolon::JudgeSessionMemory(heap, req) == SessionMemoryVerdict::Fragmented);
+
+    SessionMemoryRetryLedger ledger;
+    ledger.RecordRefusal(heap, req);
+    assert(ledger.last_binding_shortfall() ==
+           eidolon::ContiguousShortfallBytes(heap, req));
+    assert(ledger.last_binding_shortfall() > 0);
+}
+
+// A room that got built ends the run of refusals, and the reported shortfall has
+// to go with it — a stale "short by N" outliving the shortage is the same class
+// of lie as reporting the wrong one.
+void TestResetClearsTheReportedShortfall()
+{
+    const auto req = eidolon::LiveKitEngineInternalMemoryRequirement();
+    InternalHeapSnapshot heap;
+    heap.free_bytes = 14711;
+    heap.largest_free_block = 9728;
+    heap.free_blocks = 6;
+
+    SessionMemoryRetryLedger ledger;
+    ledger.RecordRefusal(heap, req);
+    assert(ledger.last_binding_shortfall() > 0);
+    ledger.Reset();
+    assert(ledger.last_binding_shortfall() == 0);
+}
+
 // Whatever the device does about it, a person reads the log first, so the
 // verdict has to have a name in it.
 void TestVerdictsAreNamed()
@@ -212,5 +275,8 @@ int main()
     TestTinyImprovementIsNotProgress();
     TestSuccessClearsTheLedger();
     TestVerdictsAreNamed();
+    TestExhaustionReportsTheTotalShortfallNotZero();
+    TestFragmentationReportsTheContiguousShortfall();
+    TestResetClearsTheReportedShortfall();
     return 0;
 }

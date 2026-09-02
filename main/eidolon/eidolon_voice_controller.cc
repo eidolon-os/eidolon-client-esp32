@@ -1310,9 +1310,10 @@ void EidolonVoiceController::ScheduleChannelReconnect(const char* reason)
             SetState(VoiceSessionState::Error, "channel_internal_memory_exhausted");
             ESP_LOGE(TAG,
                      "[lifecycle] channel reconnect abandoned reason=%s cause=internal_memory "
-                     "short_by=%u bytes — this will not clear on its own; see the [mem] ledger "
-                     "above for what is holding internal RAM",
+                     "verdict=%s short_by=%u bytes — this will not clear on its own; see the "
+                     "[mem] ledger above for what is holding internal RAM",
                      reason ? reason : "disconnect",
+                     session_.InternalMemoryVerdictName(),
                      static_cast<unsigned>(session_.InternalMemoryShortfallBytes()));
         }
         return;

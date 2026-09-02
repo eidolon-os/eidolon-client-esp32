@@ -113,6 +113,15 @@ public:
     void Reset();
 
     bool ceiling_reached() const { return ceiling_reached_; }
+    // The shortfall that actually decided the refusal: the total for an
+    // exhausted heap, the largest contiguous block for a fragmented one. These
+    // are different numbers and reporting the wrong one is not a cosmetic slip
+    // — an exhausted heap has no contiguous shortfall by construction, so a
+    // caller printing last_contiguous_shortfall() tells the reader a device
+    // that is genuinely short of RAM is "short by 0 bytes". That line sent the
+    // first reader of this failure looking for fragmentation that was never
+    // there.
+    std::size_t last_binding_shortfall() const { return last_binding_shortfall_; }
     bool retry_worthwhile() const { return !ceiling_reached_; }
     int consecutive_refusals() const { return consecutive_refusals_; }
     int attempts_since_progress() const { return attempts_since_progress_; }
@@ -126,6 +135,7 @@ private:
     int attempts_since_progress_ = 0;
     std::size_t best_largest_free_block_ = 0;
     std::size_t last_contiguous_shortfall_ = 0;
+    std::size_t last_binding_shortfall_ = 0;
     SessionMemoryVerdict last_verdict_ = SessionMemoryVerdict::Sufficient;
 };
 

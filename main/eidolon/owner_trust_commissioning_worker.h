@@ -17,7 +17,13 @@ public:
     static OwnerTrustCommissioningWorker& GetInstance();
 
     esp_err_t Activate(uint32_t transport_generation);
-    void Deactivate(uint32_t transport_generation);
+    // Asks the worker to retire and waits, bounded, for it to reach a safe
+    // point. Returns false if it did not: the task is then still resident and
+    // its internal RAM has NOT come back, which the caller must not record as a
+    // completed release. Retirement is cooperative because this task is often
+    // inside X.509 verification or an NVS commit, where an external delete
+    // would cost far more than the stack it reclaims.
+    bool Deactivate(uint32_t transport_generation);
 
     esp_err_t Submit(uint32_t transport_generation,
                      const uint8_t* payload,
