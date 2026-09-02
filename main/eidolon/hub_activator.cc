@@ -73,9 +73,16 @@ bool HubActivator::Run() {
         ESP_LOGE(TAG,
                  "RemovalJournal blocks Claim/runtime until recovery is terminal result=%d",
                  static_cast<int>(removal_recovery.result));
+        // Name the gesture, because this is the screen the person is actually
+        // looking at. The Claim-terminal path below says the same sentence, but
+        // it is not reached on a device the journal already stopped here — and
+        // "recovery required" on its own tells somebody standing at the device
+        // that something is wrong without telling them the one thing that
+        // fixes it. Setup no longer opens by itself, by design, so the button
+        // is not a hint; it is the only way back.
         app.SetEidolonRuntimeUi(
             RuntimePhase::RecoveryRequired,
-            "Device removal recovery required");
+            "Removed from this Owner. Press and hold the button to claim it again");
         return false;
     }
 
