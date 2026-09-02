@@ -1,6 +1,7 @@
 #ifndef EIDOLON_HUB_PINNED_HTTP_H_
 #define EIDOLON_HUB_PINNED_HTTP_H_
 
+#include <cstdint>
 #include <string>
 
 #include <esp_err.h>
@@ -19,6 +20,16 @@ namespace eidolon {
 struct HubHttpResponse {
     int status = 0;
     std::string body;
+    // What the Hub's own clock read when it answered, from this response's
+    // `Date` header, or zero when it did not state a time this device can read.
+    //
+    // A device in HUB_MODE has no other trusted reading: nothing in that build
+    // ever sets the system clock, so `gettimeofday` answers 1970 for the whole
+    // life of the boot. The Hub is the party that issues deadlines, this
+    // response arrived over the certificate the device was commissioned with,
+    // and so the Hub's own clock is the one reading a deadline it wrote can be
+    // judged against. Zero means "no answer", never "the epoch".
+    int64_t hub_utc_millis = 0;
 };
 
 // Perform `method` against `url`, requiring the server to present a certificate

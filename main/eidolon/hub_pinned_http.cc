@@ -1,6 +1,7 @@
 #include "hub_pinned_http.h"
 
 #include "host_resolution_core.h"
+#include "http_date_utc.h"
 
 #include "system_info.h"
 
@@ -14,6 +15,10 @@
 #include <lwip/sockets.h>
 #include <lwip/tcpip.h>
 
+#include <strings.h>
+
+#include <cstdint>
+
 #define TAG "HubHttp"
 
 namespace eidolon {
@@ -25,6 +30,28 @@ namespace {
 // is the largest and stays well under this. A response that exceeds it is not
 // something this firmware knows how to consume.
 constexpr size_t kMaxResponseBytes = 32 * 1024;
+
+// Records what the Hub said the time was, for the caller that has to judge one
+// of the Hub's own deadlines. Nothing else in this response can supply it: the
+// header is gone by the time the body is read, and this device's own wall clock
+// is never set in this build.
+esp_err_t CaptureHubDate(esp_http_client_event_t* event)
+{
+    if (event == nullptr || event->event_id != HTTP_EVENT_ON_HEADER ||
+        event->user_data == nullptr || event->header_key == nullptr ||
+        event->header_value == nullptr ||
+        strcasecmp(event->header_key, "Date") != 0) {
+        return ESP_OK;
+    }
+    int64_t stated = 0;
+    if (!ParseHttpDateUtcMillis(event->header_value, stated)) {
+        ESP_LOGW(TAG, "Hub stated a Date this device cannot read: %s",
+                 event->header_value);
+        return ESP_OK;
+    }
+    *static_cast<int64_t*>(event->user_data) = stated;
+    return ESP_OK;
+}
 
 esp_http_client_method_t MethodFor(const std::string& method)
 {
@@ -129,6 +156,10 @@ esp_err_t HubHttpRequest(const std::string& method,
     // until the device is rebooted. Keep the logical URI/Host/SNI unchanged and
     // bind only this transport adapter to the address family it actually serves.
     config.addr_type = HTTP_ADDR_TYPE_INET;
+    // Kept across the whole call: the handler fires while headers are parsed,
+    // and `out` outlives every one of those.
+    config.event_handler = CaptureHubDate;
+    config.user_data = &out.hub_utc_millis;
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
     if (client == nullptr) {

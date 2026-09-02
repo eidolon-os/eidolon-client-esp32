@@ -16,8 +16,8 @@
 #include <mbedtls/base64.h>
 #include <mbedtls/sha256.h>
 
+#include <cstdint>
 #include <cstdio>
-#include <sys/time.h>
 
 namespace eidolon {
 namespace {
@@ -64,25 +64,38 @@ std::string RandomNonce() {
     return encoded;
 }
 
+// The clock the Owner's instruction is judged against: the Authority's own, as
+// stated by the very response that delivered the instruction.
+//
+// Reading `gettimeofday` here is what turned a retryable refusal into a
+// permanent one. A HUB_MODE build never sets the system clock — the Xiaozhi
+// version check is the only caller of `settimeofday` in this firmware and that
+// path is compiled out — so the local wall clock answers 1970 for the whole
+// life of the boot, on every boot. "Ask me again once time is trusted" was
+// therefore waiting for something that was never going to arrive, and a
+// week-long deadline stayed unreadable until the Hub gave up. The time is
+// collected in the same round trip as the command instead, which leaves no
+// window between learning it and using it.
 class OperationalClock final : public DeviceEraseClockPort {
 public:
+    explicit OperationalClock(int64_t hub_utc_millis)
+        : hub_utc_millis_(hub_utc_millis) {}
+
     Rfc3339DeadlineState DeadlineState(
         const std::string& deadline) const override {
-        timeval current{};
-        if (gettimeofday(&current, nullptr) != 0) {
-            return Rfc3339DeadlineState::Unknown;
-        }
-        const int64_t now_millis =
-            static_cast<int64_t>(current.tv_sec) * 1000 +
-            current.tv_usec / 1000;
         // An untrusted clock must not authorize a destructive command. It also
-        // must not condemn one: this returns Unknown, and the core turns that
-        // into "ask me again", not into a deadline that has passed.
-        return EvaluateRfc3339Deadline(deadline, now_millis, 1704067200000LL);
+        // must not condemn one: a Hub that stated no readable time leaves this
+        // Unknown, and the core turns that into "ask me again", not into a
+        // deadline that has passed.
+        return EvaluateRfc3339Deadline(deadline, hub_utc_millis_,
+                                       1704067200000LL);
     }
     uint64_t MonotonicTime() const override {
         return static_cast<uint64_t>(esp_timer_get_time() / 1000);
     }
+
+private:
+    int64_t hub_utc_millis_ = 0;
 };
 
 class Sha256Fingerprint final : public DeviceDeliveryFingerprintPort {
@@ -120,7 +133,18 @@ esp_err_t DeviceControlDeliveryClient::PollAndExecute(
     const OwnerTrustBundle& trust,
     bool& removal_completed) {
     removal_completed = false;
-    if (!claim.valid() || claim.state != ActiveClaimLocalState::Active) {
+    // A revoked Claim is still this device's own Claim, and revoked is the one
+    // state in which an erase instruction is likely to exist. Requiring Active
+    // here refused the question in exactly the situation it exists to ask: the
+    // caller that reaches this on the removal path holds a Claim it has already
+    // recorded as revoked, so every consult from a removed device answered
+    // ESP_ERR_INVALID_STATE without a request ever leaving the board. What this
+    // device may ask about is decided by MayConsultOwnerInstruction, which
+    // admits a revoked Claim and says why; what it may be told is decided by
+    // the Authority, against the operational key this request is signed with.
+    // The Claim still has to be a readable one, which `valid()` covers for both
+    // states.
+    if (!claim.valid()) {
         return ESP_ERR_INVALID_STATE;
     }
     auto& identity = DeviceIdentity::GetInstance();
@@ -155,7 +179,9 @@ esp_err_t DeviceControlDeliveryClient::PollAndExecute(
     EspIdfDeviceEraseJournal journal;
     EspIdfOwnerDataEraseStorage storage;
     EspIdfDeviceLocalEraseAdapter adapter(storage);
-    OperationalClock clock;
+    // The deadline this device is about to judge was written by the Hub that
+    // just answered, and the answer says when that was.
+    OperationalClock clock(response.hub_utc_millis);
     DeviceIdentityEraseAckSigner signer;
     Sha256Fingerprint fingerprint;
     DeviceLocalEraseCore erase(
@@ -170,9 +196,10 @@ esp_err_t DeviceControlDeliveryClient::PollAndExecute(
         // away. An Owner instruction that cannot be executed then looked like
         // an unexplained ESP_FAIL, while the Authority went on re-arming a
         // delivery nobody could see being refused.
-        ESP_LOGW(TAG, "Owner instruction refused: %s (attempt %s)",
+        ESP_LOGW(TAG, "Owner instruction refused: %s (attempt %s, hub time %lld)",
                  outcome.acceptance.adapter_code.c_str(),
-                 outcome.acceptance.delivery_attempt_id.c_str());
+                 outcome.acceptance.delivery_attempt_id.c_str(),
+                 static_cast<long long>(response.hub_utc_millis));
         return ESP_FAIL;
     }
 
