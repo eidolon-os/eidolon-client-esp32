@@ -95,6 +95,159 @@
         }
       }
     },
+    "DeviceCapabilityManifest": {
+      "description": "The document a ManifestRef refers to: a device's own declaration of what it can do. This fixes the document's shape and its vocabulary, and deliberately nothing else. 'kind', 'direction' and the field set are vocabulary facts, checkable without knowing whether a Channel exists, whether a deployment runs a media transport, or whether this device should be given an agent - all of which remain the Channel Authority's to decide. Before this definition existed the document was typed '{\"type\": \"object\"}' at both entry points, so the earliest a wrong shape could be refused was at provisioning, after the Owner had already spent an irrevocable approval, and the refusal was recorded as a binding still pending. 'codecs' is optional because no consumer reads a codec value; it was the one field with the power to refuse a device and no reader to justify it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "title",
+        "properties",
+        "actions",
+        "events",
+        "media"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "\\S"
+        },
+        "properties": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "schema",
+              "observable",
+              "writable"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "\\S"
+              },
+              "schema": {
+                "type": "object"
+              },
+              "observable": {
+                "type": "boolean"
+              },
+              "writable": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "actions": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "version",
+              "input_schema",
+              "output_schema",
+              "idempotent"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "\\S"
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "input_schema": {
+                "type": "object"
+              },
+              "output_schema": {
+                "type": "object"
+              },
+              "idempotent": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "events": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "data_schema"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "\\S"
+              },
+              "data_schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "media": {
+          "description": "What this Body can carry. An empty array is a legal declaration - a Body with no voice is a product question, not a wire-shape question, and refusing one here would burn that decision into a contract four repositories share. What an empty array must not do is quietly succeed, and that is enforced where the vocabulary lives: no adapter carries a media-less channel unless it says it does.",
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "direction"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "audio",
+                  "video"
+                ]
+              },
+              "direction": {
+                "enum": [
+                  "publish",
+                  "subscribe",
+                  "bidirectional"
+                ]
+              },
+              "codecs": {
+                "type": "array",
+                "maxItems": 32,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "\\S"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "BodyTargetRef": {
       "type": "object",
       "additionalProperties": false,

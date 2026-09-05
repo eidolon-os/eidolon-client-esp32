@@ -119,20 +119,82 @@ void TestDescriptorWithoutItsOwnRouteIsRejected()
     assert(!eidolon::ParseOwnerDomainDescriptor(plaintext_route, parsed, canonical));
 }
 
+// The canonical Manifest vectors, synced byte-for-byte from the SDK by
+// scripts/sync_device_foundation_v1.py. This test used to assert against the
+// bytes restated inside it, and a copy is a second authority: a field the
+// contract gained, renamed, or changed the vocabulary of left this suite green
+// while every device built a document the Authority would refuse — and the
+// admission entry refuses one now, so that device would not enrol at all.
+std::string ReadDeviceManifestVector()
+{
+    std::ifstream file("tests/fixtures/device_foundation_v1/device-manifest.json");
+    assert(file.is_open());
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
+
+// What this build says about turn taking, read back out of what it produced.
+// It follows the compile-time profile and nothing else, so it is also what
+// decides which vectors this build has to be byte-identical to.
+std::string CompiledInteractionMode(const std::string& manifest)
+{
+    cJSON* root = cJSON_ParseWithLength(manifest.data(), manifest.size());
+    assert(cJSON_IsObject(root));
+    const cJSON* properties = cJSON_GetObjectItemCaseSensitive(root, "properties");
+    assert(cJSON_IsArray(properties));
+    std::string mode;
+    const cJSON* property = nullptr;
+    cJSON_ArrayForEach(property, properties) {
+        const cJSON* name = cJSON_GetObjectItemCaseSensitive(property, "name");
+        if (!cJSON_IsString(name) || std::string(name->valuestring) != "interaction_mode") {
+            continue;
+        }
+        const cJSON* schema = cJSON_GetObjectItemCaseSensitive(property, "schema");
+        const cJSON* value = cJSON_GetObjectItemCaseSensitive(schema, "const");
+        assert(cJSON_IsString(value));
+        mode = value->valuestring;
+    }
+    cJSON_Delete(root);
+    return mode;
+}
+
 void TestCanonicalManifest()
 {
-    const std::string manifest =
-        eidolon::BuildDeviceManifestJson("esp32-s3-touch-amoled-2.06", /*has_camera=*/false);
+    const std::string raw = ReadDeviceManifestVector();
+    cJSON* vector = cJSON_ParseWithLength(raw.data(), raw.size());
+    assert(cJSON_IsObject(vector));
+    const cJSON* cases = cJSON_GetObjectItemCaseSensitive(vector, "cases");
+    assert(cJSON_IsArray(cases));
+
     // A device states its turn-taking as an immutable property, so the Provider
-    // reads a fact rather than guessing one. The value follows this build's
-    // compile-time profile — half duplex here, pinned by tests/stubs/sdkconfig.h.
-    assert(manifest ==
-           "{\"actions\":[],\"events\":[],\"media\":[{\"codecs\":[\"opus\"],"
-           "\"direction\":\"bidirectional\",\"kind\":\"audio\"}],"
-           "\"properties\":[{\"name\":\"interaction_mode\",\"observable\":false,"
-           "\"schema\":{\"const\":\"half_duplex\",\"type\":\"string\"},"
-           "\"writable\":false}],"
-           "\"schema_version\":1,\"title\":\"esp32-s3-touch-amoled-2.06\"}");
+    // reads a fact rather than guessing one. Half duplex here, pinned by
+    // tests/stubs/sdkconfig.h.
+    const std::string mode =
+        CompiledInteractionMode(eidolon::BuildDeviceManifestJson("probe", /*has_camera=*/false));
+    assert(mode == "half_duplex");
+
+    int matched = 0;
+    const cJSON* item = nullptr;
+    cJSON_ArrayForEach(item, cases) {
+        const cJSON* declared = cJSON_GetObjectItemCaseSensitive(item, "interaction_mode");
+        assert(cJSON_IsString(declared));
+        if (mode != declared->valuestring) {
+            continue;
+        }
+        const cJSON* board = cJSON_GetObjectItemCaseSensitive(item, "board_name");
+        const cJSON* camera = cJSON_GetObjectItemCaseSensitive(item, "has_camera");
+        const cJSON* bytes = cJSON_GetObjectItemCaseSensitive(item, "canonical_utf8");
+        assert(cJSON_IsString(board) && cJSON_IsBool(camera) && cJSON_IsString(bytes));
+        assert(eidolon::BuildDeviceManifestJson(board->valuestring, cJSON_IsTrue(camera)) ==
+               bytes->valuestring);
+        ++matched;
+    }
+    // Silence is not agreement. A vector file this build matches nothing in
+    // would leave the producer entirely unchecked with this test still green,
+    // which is the failure mode the inlined copy had.
+    assert(matched == 2);
+    cJSON_Delete(vector);
 }
 
 void TestActiveClaimConfigurationAndProviderBinding()

@@ -155,7 +155,7 @@
             "manifest_id": { "$ref": "../common/schemas.schema.json#/$defs/Identifier" },
             "revision": { "type": "integer", "minimum": 1 },
             "digest": { "$ref": "../common/schemas.schema.json#/$defs/Sha256Digest" },
-            "document": { "type": "object" }
+            "document": { "$ref": "../common/schemas.schema.json#/$defs/DeviceCapabilityManifest" }
           }
         },
         "handoff_key": {

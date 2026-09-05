@@ -1,0 +1,40 @@
+{
+  "description": "What a board's own BuildDeviceManifestJson must emit, byte for byte. The producer used to be checked against bytes restated inside its own test, so a field the contract gained or renamed left that suite green while every device built a document the entry would refuse. `canonical_utf8` is RFC 8785 over the same document `DeviceCapabilityManifest` admits; `interaction_mode` is the build's compile-time profile, which is why one board appears more than once.",
+  "cases": [
+    {
+      "board_name": "esp32-s3-touch-amoled-2.06",
+      "has_camera": false,
+      "interaction_mode": "half_duplex",
+      "canonical_utf8": "{\"actions\":[],\"events\":[],\"media\":[{\"codecs\":[\"opus\"],\"direction\":\"bidirectional\",\"kind\":\"audio\"}],\"properties\":[{\"name\":\"interaction_mode\",\"observable\":false,\"schema\":{\"const\":\"half_duplex\",\"type\":\"string\"},\"writable\":false}],\"schema_version\":1,\"title\":\"esp32-s3-touch-amoled-2.06\"}",
+      "digest": "sha256:31f7d2a97fd3f1980db53c81a0a724cf1451109d9600d99009966301bea64bcc"
+    },
+    {
+      "board_name": "esp32-s3-touch-amoled-2.06",
+      "has_camera": true,
+      "interaction_mode": "half_duplex",
+      "canonical_utf8": "{\"actions\":[],\"events\":[],\"media\":[{\"codecs\":[\"opus\"],\"direction\":\"bidirectional\",\"kind\":\"audio\"},{\"codecs\":[\"h264\"],\"direction\":\"publish\",\"kind\":\"video\"}],\"properties\":[{\"name\":\"interaction_mode\",\"observable\":false,\"schema\":{\"const\":\"half_duplex\",\"type\":\"string\"},\"writable\":false}],\"schema_version\":1,\"title\":\"esp32-s3-touch-amoled-2.06\"}",
+      "digest": "sha256:c91f5c653aa8aa10a96bb6699876f37894bc9c81f52611325fe98e322e9b698c"
+    },
+    {
+      "board_name": "eidolon-box3",
+      "has_camera": false,
+      "interaction_mode": "full_duplex",
+      "canonical_utf8": "{\"actions\":[],\"events\":[],\"media\":[{\"codecs\":[\"opus\"],\"direction\":\"bidirectional\",\"kind\":\"audio\"}],\"properties\":[{\"name\":\"interaction_mode\",\"observable\":false,\"schema\":{\"const\":\"full_duplex\",\"type\":\"string\"},\"writable\":false}],\"schema_version\":1,\"title\":\"eidolon-box3\"}",
+      "digest": "sha256:d5b07f20d5af172cec863b9cbafd66b6772e1b9bd2ef72d1aa606667b1a4d209"
+    },
+    {
+      "board_name": "eidolon-box3",
+      "has_camera": true,
+      "interaction_mode": "full_duplex",
+      "canonical_utf8": "{\"actions\":[],\"events\":[],\"media\":[{\"codecs\":[\"opus\"],\"direction\":\"bidirectional\",\"kind\":\"audio\"},{\"codecs\":[\"h264\"],\"direction\":\"publish\",\"kind\":\"video\"}],\"properties\":[{\"name\":\"interaction_mode\",\"observable\":false,\"schema\":{\"const\":\"full_duplex\",\"type\":\"string\"},\"writable\":false}],\"schema_version\":1,\"title\":\"eidolon-box3\"}",
+      "digest": "sha256:0c883ad7fe84a08fcc83b789c7dd44026459740150b39635053b44d1b7de4515"
+    },
+    {
+      "board_name": "eidolon-box3-ptt",
+      "has_camera": false,
+      "interaction_mode": "ptt",
+      "canonical_utf8": "{\"actions\":[],\"events\":[],\"media\":[{\"codecs\":[\"opus\"],\"direction\":\"bidirectional\",\"kind\":\"audio\"}],\"properties\":[{\"name\":\"interaction_mode\",\"observable\":false,\"schema\":{\"const\":\"ptt\",\"type\":\"string\"},\"writable\":false}],\"schema_version\":1,\"title\":\"eidolon-box3-ptt\"}",
+      "digest": "sha256:5d61e7938969c4f54fd59212a3cd1e76e289edab07aee5dda6c7cede0321f646"
+    }
+  ]
+}

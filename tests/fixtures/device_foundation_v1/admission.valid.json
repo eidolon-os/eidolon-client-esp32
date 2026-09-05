@@ -34,7 +34,39 @@
           "manifest_id": "manifest_01",
           "revision": 2,
           "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-          "document": { "endpoints": [] }
+          "document": {
+            "actions": [],
+            "events": [],
+            "media": [
+              {
+                "codecs": [
+                  "opus"
+                ],
+                "direction": "bidirectional",
+                "kind": "audio"
+              },
+              {
+                "codecs": [
+                  "h264"
+                ],
+                "direction": "publish",
+                "kind": "video"
+              }
+            ],
+            "properties": [
+              {
+                "name": "interaction_mode",
+                "observable": false,
+                "schema": {
+                  "const": "full_duplex",
+                  "type": "string"
+                },
+                "writable": false
+              }
+            ],
+            "schema_version": 1,
+            "title": "eidolon-box3"
+          }
         },
         "handoff_key": {
           "scheme": "DHKEM-P256-HKDF-SHA256",
@@ -75,8 +107,12 @@
           "revision": 2,
           "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
         },
-        "initial_assignment_intent": { "companion_id": "companion_01" },
-        "initial_capability_policy_refs": ["policy_minimum"]
+        "initial_assignment_intent": {
+          "companion_id": "companion_01"
+        },
+        "initial_capability_policy_refs": [
+          "policy_minimum"
+        ]
       }
     },
     {
@@ -90,7 +126,9 @@
           "principal_id": "controller_01",
           "principal_type": "controller",
           "owner_domain_id": "owner-domain_01",
-          "granted_scopes": ["device.claim.approve"],
+          "granted_scopes": [
+            "device.claim.approve"
+          ],
           "authentication_strength": "hardware-backed"
         },
         "decided_at": "2026-08-18T00:02:00Z",
@@ -130,7 +168,11 @@
             "proposal_revision": 2,
             "device_instance_id": "device-instance-3164c593258209d757654dbd421d2bd9732fe088bce70d8c90be15dd98b587ba",
             "hardware_evidence_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
-            "manifest_ref": {"manifest_id": "manifest_01", "revision": 2, "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"},
+            "manifest_ref": {
+              "manifest_id": "manifest_01",
+              "revision": 2,
+              "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+            },
             "owner_domain_id": "owner-domain_01",
             "owner_domain_generation": 3,
             "claim_generation": 2,
@@ -180,7 +222,11 @@
         "device_instance_candidate_id": "device-instance-3164c593258209d757654dbd421d2bd9732fe088bce70d8c90be15dd98b587ba",
         "requested_owner_domain_id": "owner-domain_01",
         "hardware_evidence_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
-        "manifest_ref": {"manifest_id": "manifest_01", "revision": 2, "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"},
+        "manifest_ref": {
+          "manifest_id": "manifest_01",
+          "revision": 2,
+          "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+        },
         "handoff_key_id": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
         "created_at": "2026-08-18T00:00:00Z",
         "expires_at": "2026-08-18T00:15:00Z"
@@ -194,10 +240,22 @@
         "decision_id": "decision_01",
         "enrollment_id": "enrollment_01",
         "decision": "approve",
-        "actor": {"principal_id": "controller_01", "principal_type": "controller", "owner_domain_id": "owner-domain_01", "granted_scopes": ["device.claim.approve"], "authentication_strength": "hardware-backed"},
+        "actor": {
+          "principal_id": "controller_01",
+          "principal_type": "controller",
+          "owner_domain_id": "owner-domain_01",
+          "granted_scopes": [
+            "device.claim.approve"
+          ],
+          "authentication_strength": "hardware-backed"
+        },
         "target_owner_domain_id": "owner-domain_01",
         "target_business_owner_id": "owner_01",
-        "reviewed_manifest_ref": {"manifest_id": "manifest_01", "revision": 2, "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"},
+        "reviewed_manifest_ref": {
+          "manifest_id": "manifest_01",
+          "revision": 2,
+          "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+        },
         "expected_proposal_revision": 1,
         "decided_at": "2026-08-18T00:02:00Z"
       }
@@ -207,13 +265,25 @@
       "schema": "https://contracts.eidolon.live/device-foundation/v1/admission/schemas.schema.json",
       "definition": "ClaimGrant",
       "value": {
-        "grant_id": "grant_01", "enrollment_id": "enrollment_01",
-        "device_ref": {"device_instance_id": "device-instance-3164c593258209d757654dbd421d2bd9732fe088bce70d8c90be15dd98b587ba", "owner_domain_id": "owner-domain_01", "owner_domain_generation": 3, "claim_generation": 2, "trust_epoch": 1},
-        "manifest_ref": {"manifest_id": "manifest_01", "revision": 2, "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"},
+        "grant_id": "grant_01",
+        "enrollment_id": "enrollment_01",
+        "device_ref": {
+          "device_instance_id": "device-instance-3164c593258209d757654dbd421d2bd9732fe088bce70d8c90be15dd98b587ba",
+          "owner_domain_id": "owner-domain_01",
+          "owner_domain_generation": 3,
+          "claim_generation": 2,
+          "trust_epoch": 1
+        },
+        "manifest_ref": {
+          "manifest_id": "manifest_01",
+          "revision": 2,
+          "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+        },
         "approval_decision_id": "decision_01",
         "handoff_key_id": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
         "operational_key_id": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
-        "issued_at": "2026-08-18T00:02:00Z", "expires_at": "2026-08-18T00:12:00Z"
+        "issued_at": "2026-08-18T00:02:00Z",
+        "expires_at": "2026-08-18T00:12:00Z"
       }
     },
     {
@@ -221,8 +291,15 @@
       "schema": "https://contracts.eidolon.live/device-foundation/v1/admission/schemas.schema.json",
       "definition": "GrantAck",
       "value": {
-        "enrollment_id": "enrollment_01", "grant_id": "grant_01",
-        "device_ref": {"device_instance_id": "device-instance-3164c593258209d757654dbd421d2bd9732fe088bce70d8c90be15dd98b587ba", "owner_domain_id": "owner-domain_01", "owner_domain_generation": 3, "claim_generation": 2, "trust_epoch": 1},
+        "enrollment_id": "enrollment_01",
+        "grant_id": "grant_01",
+        "device_ref": {
+          "device_instance_id": "device-instance-3164c593258209d757654dbd421d2bd9732fe088bce70d8c90be15dd98b587ba",
+          "owner_domain_id": "owner-domain_01",
+          "owner_domain_generation": 3,
+          "claim_generation": 2,
+          "trust_epoch": 1
+        },
         "acknowledged_at": "2026-08-18T00:05:00Z"
       }
     },
@@ -231,10 +308,22 @@
       "schema": "https://contracts.eidolon.live/device-foundation/v1/admission/schemas.schema.json",
       "definition": "ClaimRecord",
       "value": {
-        "device_ref": {"device_instance_id": "device-instance-3164c593258209d757654dbd421d2bd9732fe088bce70d8c90be15dd98b587ba", "owner_domain_id": "owner-domain_01", "owner_domain_generation": 3, "claim_generation": 2, "trust_epoch": 1},
+        "device_ref": {
+          "device_instance_id": "device-instance-3164c593258209d757654dbd421d2bd9732fe088bce70d8c90be15dd98b587ba",
+          "owner_domain_id": "owner-domain_01",
+          "owner_domain_generation": 3,
+          "claim_generation": 2,
+          "trust_epoch": 1
+        },
         "business_owner_id": "owner_01",
-        "manifest_ref": {"manifest_id": "manifest_01", "revision": 2, "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"},
-        "state": "active", "revision": 1, "updated_at": "2026-08-18T00:05:00Z"
+        "manifest_ref": {
+          "manifest_id": "manifest_01",
+          "revision": 2,
+          "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+        },
+        "state": "active",
+        "revision": 1,
+        "updated_at": "2026-08-18T00:05:00Z"
       }
     }
   ]

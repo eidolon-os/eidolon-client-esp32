@@ -1,5 +1,5 @@
 {
-  "sdk_commit": "c55de60",
+  "sdk_commit": "c66b990",
   "files": [
     {
       "source": "contracts/device_foundation/v1/generated/cpp/device_foundation_v1_generated.h",
@@ -9,17 +9,17 @@
     {
       "source": "contracts/device_foundation/v1/common/schemas.schema.json",
       "target": "tests/fixtures/device_foundation_v1/common.schemas.schema.json",
-      "sha256": "ceb3fa657e6b1fd96e23f663687da4c6a995a2d05626a536d7a3e1c88aac0f03"
+      "sha256": "b56737aa2e28bca9946c60b8e446d0dd588f8b0390e533d6d80c951e1af5431e"
     },
     {
       "source": "contracts/device_foundation/v1/admission/schemas.schema.json",
       "target": "tests/fixtures/device_foundation_v1/admission.schemas.schema.json",
-      "sha256": "02189d8e6850e3dc76d93e81b3bb53320d3dc9175b9e0f3e20a9e6650b9c08cc"
+      "sha256": "f40799897a4f888f4c2f18099928086cc65e6c0209979ecfc1cd0a1a3a6a6125"
     },
     {
       "source": "contracts/device_foundation/v1/examples/valid/admission.json",
       "target": "tests/fixtures/device_foundation_v1/admission.valid.json",
-      "sha256": "c53d5c97c43fa6c7541b6c47a7af1590ba7f01b7b439f93eeeff641f0d42d02e"
+      "sha256": "6b9227ac6ffe9efe6c4ae1ffab8aa1999cce2185b2b3b6c06fb0e111b5997c52"
     },
     {
       "source": "contracts/device_foundation/v1/golden/claim-grant-aad.json",
@@ -55,6 +55,11 @@
       "source": "contracts/device_foundation/v1/golden/setup-descriptor.json",
       "target": "tests/fixtures/device_foundation_v1/setup-descriptor.json",
       "sha256": "fb8a600f9eda52f489fb49c9bfd37144078fbe8f1498e711b71a77e67559c540"
+    },
+    {
+      "source": "contracts/device_foundation/v1/golden/device-manifest.json",
+      "target": "tests/fixtures/device_foundation_v1/device-manifest.json",
+      "sha256": "b5b2a4fd23b64b21da3ca2331479d003a0cdc84c719846b86553d1770b65e2a1"
     },
     {
       "source": "contracts/device_foundation/v1/golden/commissioning-voucher.json",
