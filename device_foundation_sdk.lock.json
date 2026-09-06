@@ -1,5 +1,5 @@
 {
-  "sdk_commit": "c66b990",
+  "sdk_commit": "c66b990fe490f53a38dd529a264e2fe8188de988",
   "files": [
     {
       "source": "contracts/device_foundation/v1/generated/cpp/device_foundation_v1_generated.h",
