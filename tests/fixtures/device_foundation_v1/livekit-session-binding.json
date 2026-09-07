@@ -66,10 +66,12 @@
           "channels": 1
         }
       }
-    },
+    }
+  ],
+  "may_refuse": [
     {
       "case_id": "DF-LIVEKIT-SESSION-BINDING-SAMPLE-RATE-OUT-OF-RANGE",
-      "why": "Outside the range a Body in this system opens a capture at. A rate accepted and then not honoured is silence with nothing reporting it.",
+      "why": "Outside the range a Body that owns its capture can open one at. Such a Body may refuse; a Body whose transport negotiates the format must not, because refusing there denies a channel it would have served.",
       "binding": {
         "schema_version": 2,
         "session": {
@@ -86,7 +88,7 @@
     },
     {
       "case_id": "DF-LIVEKIT-SESSION-BINDING-THREE-CHANNELS",
-      "why": "Mono or stereo. There is no third thing a Body knows how to play.",
+      "why": "Mono or stereo, on the same terms as the rate above.",
       "binding": {
         "schema_version": 2,
         "session": {
@@ -101,5 +103,6 @@
         }
       }
     }
-  ]
+  ],
+  "must_not_claim_unapplied_audio": "A Body that does not configure its capture from `audio` must not expose those values as if it had. The phone answered 16000 from an accessor nothing set, and that is what made the gap look closed for as long as it did."
 }

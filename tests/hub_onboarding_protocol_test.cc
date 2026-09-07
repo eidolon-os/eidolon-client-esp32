@@ -212,24 +212,27 @@ void TestLiveKitBindingMatchesTheGoldenVector()
     assert(parsed.channels ==
            cJSON_GetObjectItemCaseSensitive(audio, "channels")->valueint);
 
-    // And every document the vector says must be refused. Accepting one is not
-    // a parse error on this device: it is a room it joins holding a value it
-    // cannot honour, which nothing downstream reports either.
-    const cJSON* refusals =
-        cJSON_GetObjectItemCaseSensitive(vector, "must_refuse");
-    assert(cJSON_IsArray(refusals));
+    // Every document the vector says must be refused, and every one it says
+    // may be. This board owns its capture — it feeds PCM into the transport
+    // itself — so it is on the side of `may_refuse` that does refuse, and that
+    // is worth pinning: a Body whose transport negotiates the audio format
+    // must not refuse those, and this one is not that Body.
     int refused = 0;
-    const cJSON* item = nullptr;
-    cJSON_ArrayForEach(item, refusals) {
-        const cJSON* document =
-            cJSON_GetObjectItemCaseSensitive(item, "binding");
-        assert(cJSON_IsObject(document));
-        char* encoded = cJSON_PrintUnformatted(document);
-        assert(encoded != nullptr);
-        eidolon::Esp32HubConfig rejected;
-        assert(!eidolon::ParseLiveKitBinding(encoded, rejected));
-        cJSON_free(encoded);
-        ++refused;
+    for (const char* list : {"must_refuse", "may_refuse"}) {
+        const cJSON* refusals = cJSON_GetObjectItemCaseSensitive(vector, list);
+        assert(cJSON_IsArray(refusals));
+        const cJSON* item = nullptr;
+        cJSON_ArrayForEach(item, refusals) {
+            const cJSON* document =
+                cJSON_GetObjectItemCaseSensitive(item, "binding");
+            assert(cJSON_IsObject(document));
+            char* encoded = cJSON_PrintUnformatted(document);
+            assert(encoded != nullptr);
+            eidolon::Esp32HubConfig rejected;
+            assert(!eidolon::ParseLiveKitBinding(encoded, rejected));
+            cJSON_free(encoded);
+            ++refused;
+        }
     }
     // Silence is not agreement: an empty list would leave the refusals
     // entirely unchecked with this test still green.
