@@ -1,0 +1,34 @@
+{
+  "vector_id": "DF-DEVICE-CONTROL-MANIFEST-ASSERTION-PROOF-001",
+  "description": "What a device signs to tell the Authority what it can do. The signed member is the Manifest's digest, not the document, so the signature cannot carry from one set of capabilities to another; the digest here is the one golden/device-manifest.json publishes for esp32-s3-touch-amoled-2.06 without a camera, so the assertion and the document it asserts move together.",
+  "signing_key": "operational",
+  "signature_algorithm": "ES256",
+  "signature_encoding": "64-byte-r-concat-s-base64url-no-padding",
+  "document": {
+    "device_ref": {
+      "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+      "owner_domain_id": "owner-domain_01",
+      "owner_domain_generation": 3,
+      "claim_generation": 7,
+      "trust_epoch": 4
+    },
+    "manifest_digest": "sha256:31f7d2a97fd3f1980db53c81a0a724cf1451109d9600d99009966301bea64bcc",
+    "nonce": "bWFuaWZlc3QtYXNzZXJ0aW9uLW5vbmNl",
+    "operation_type": "device-control.manifest-assert"
+  },
+  "canonical_utf8": "{\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"manifest_digest\":\"sha256:31f7d2a97fd3f1980db53c81a0a724cf1451109d9600d99009966301bea64bcc\",\"nonce\":\"bWFuaWZlc3QtYXNzZXJ0aW9uLW5vbmNl\",\"operation_type\":\"device-control.manifest-assert\"}",
+  "canonical_sha256": "sha256:ae32d8a5053062f6736b185e881ebd013395692b06be0dc0c6c0a3b2ee1d67fa",
+  "public_key_spki": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEtnQCGRdqvyj-Y1o_EBErJSYZ4OmMXMBvHHsrdJXtgy_gDjPYMJ-J5VHTsSCcdKyH1xQb-nYni36ZYVJ-f_82xQ",
+  "key_id": "sha256:591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+  "signature": "7nEPMf8l1X5aPLtOVpmONMOCtzI2xhPfr4eQfpVleizAYPvNnxJ1n8XIuR7gI-5lGS7DbGMGCOirPneBmQpJmA",
+  "mutate_each_field_must_fail": [
+    "device_ref.claim_generation",
+    "device_ref.device_instance_id",
+    "device_ref.owner_domain_generation",
+    "device_ref.owner_domain_id",
+    "device_ref.trust_epoch",
+    "manifest_digest",
+    "nonce",
+    "operation_type"
+  ]
+}

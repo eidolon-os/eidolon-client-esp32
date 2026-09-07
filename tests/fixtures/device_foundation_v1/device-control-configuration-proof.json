@@ -1,0 +1,32 @@
+{
+  "vector_id": "DF-DEVICE-CONTROL-CONFIGURATION-PROOF-001",
+  "description": "What a device signs to ask the Authority what it should be — the request behind `configuration:pull`, and so the edge that hands a Body its channel. Until this vector the rule lived in a Python dict in the Authority, a hand-concatenated string in the firmware, and an inline map in the phone, with nothing comparing the three. A device that spelled it differently would hold an active Claim and never be given a room, which is a state the product already cannot tell apart from waiting.",
+  "signing_key": "operational",
+  "signature_algorithm": "ES256",
+  "signature_encoding": "64-byte-r-concat-s-base64url-no-padding",
+  "document": {
+    "device_ref": {
+      "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+      "owner_domain_id": "owner-domain_01",
+      "owner_domain_generation": 3,
+      "claim_generation": 7,
+      "trust_epoch": 4
+    },
+    "nonce": "Y29uZmlndXJhdGlvbi1ub25jZQ",
+    "operation_type": "device-control.configuration"
+  },
+  "canonical_utf8": "{\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"nonce\":\"Y29uZmlndXJhdGlvbi1ub25jZQ\",\"operation_type\":\"device-control.configuration\"}",
+  "canonical_sha256": "sha256:61bb54e9a7177078a991c68924eb29ade0a6aa7eda42545797a6ca58ba58c232",
+  "public_key_spki": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEtnQCGRdqvyj-Y1o_EBErJSYZ4OmMXMBvHHsrdJXtgy_gDjPYMJ-J5VHTsSCcdKyH1xQb-nYni36ZYVJ-f_82xQ",
+  "key_id": "sha256:591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+  "signature": "vnSAYqELAGnDzzM2iZvCu5qfJz9PrhUHiPmO5my6tHtAgnXQdnzDECgWHJNJVdkjJFJGzHDBw8rHvMIh8Z56Kw",
+  "mutate_each_field_must_fail": [
+    "device_ref.claim_generation",
+    "device_ref.device_instance_id",
+    "device_ref.owner_domain_generation",
+    "device_ref.owner_domain_id",
+    "device_ref.trust_epoch",
+    "nonce",
+    "operation_type"
+  ]
+}

@@ -1,5 +1,8 @@
 #include "hub_onboarding_client.h"
 
+#include "device_claim_consumer_core.h"
+#include "device_control_proof_documents.h"
+
 #include "board.h"
 
 #include "authority_locator.h"
@@ -113,43 +116,6 @@ std::string Quote(const std::string& value)
     const std::string encoded = PrintJson(item);
     cJSON_Delete(item);
     return encoded;
-}
-
-std::string DeviceRefCanonicalJson(
-    const device_foundation::v1::DeviceRef& ref)
-{
-    return std::string("{\"claim_generation\":") +
-           std::to_string(ref.claim_generation) +
-           ",\"device_instance_id\":" + Quote(ref.device_instance_id) +
-           ",\"owner_domain_generation\":" +
-           std::to_string(ref.owner_domain_generation) +
-           ",\"owner_domain_id\":" + Quote(ref.owner_domain_id.value) +
-           ",\"trust_epoch\":" + std::to_string(ref.trust_epoch) + "}";
-}
-
-std::string ConfigurationProofDocument(
-    const device_foundation::v1::DeviceRef& ref,
-    const std::string& nonce)
-{
-    return std::string("{\"device_ref\":") + DeviceRefCanonicalJson(ref) +
-           ",\"nonce\":" + Quote(nonce) +
-           ",\"operation_type\":\"device-control.configuration\"}";
-}
-
-// The document a device signs to assert its own Manifest. Keys are emitted in
-// the order RFC 8785 sorts them, as everywhere else this device signs. The
-// content is bound by its digest, which the Authority recomputes from the
-// document it receives — so this signature cannot carry from one set of
-// declared capabilities to another.
-std::string ManifestAssertionProofDocument(
-    const device_foundation::v1::DeviceRef& ref,
-    const std::string& manifest_digest,
-    const std::string& nonce)
-{
-    return std::string("{\"device_ref\":") + DeviceRefCanonicalJson(ref) +
-           ",\"manifest_digest\":" + Quote(manifest_digest) +
-           ",\"nonce\":" + Quote(nonce) +
-           ",\"operation_type\":\"device-control.manifest-assert\"}";
 }
 
 cJSON* DeviceRefJson(const device_foundation::v1::DeviceRef& ref)
@@ -405,7 +371,8 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
     const std::string public_key = identity.DeviceControlPublicKey();
     std::string signature;
     err = identity.SignCanonical(
-        ConfigurationProofDocument(claim.device_ref, nonce), signature);
+        device_control::ConfigurationProofJson(claim.device_ref, nonce),
+        signature);
     if (err != ESP_OK || nonce.empty() || public_key.empty() ||
         signature.size() != 86) {
         return ESP_FAIL;
@@ -488,7 +455,7 @@ void HubOnboardingClient::ReconcileDeclaredManifest(
     const std::string public_key = identity.DeviceControlPublicKey();
     std::string signature;
     if (identity.SignCanonical(
-            ManifestAssertionProofDocument(
+            device_control::ManifestAssertionProofJson(
                 claim.device_ref, manifest_digest, nonce),
             signature) != ESP_OK ||
         nonce.empty() || public_key.empty() || signature.size() != 86) {
@@ -498,7 +465,8 @@ void HubOnboardingClient::ReconcileDeclaredManifest(
     const std::string body =
         std::string("{\"contract\":\"eidolon.device-foundation.manifest-assertion\"") +
         ",\"contract_version\":\"1.0\"" +
-        ",\"device_ref\":" + DeviceRefCanonicalJson(claim.device_ref) +
+        ",\"device_ref\":" +
+            DeviceClaimConsumerCore::DeviceRefJson(claim.device_ref) +
         ",\"manifest\":{\"manifest_id\":" + Quote(BOARD_NAME) +
             ",\"revision\":" + std::to_string(plan.revision) +
             ",\"digest\":" + Quote(manifest_digest) +
