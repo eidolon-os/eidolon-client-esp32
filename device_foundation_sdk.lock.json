@@ -1,5 +1,5 @@
 {
-  "sdk_commit": "47b76a83738a90e9788c3b54cdbf0df15857b5c9",
+  "sdk_commit": "fee6a6e55ac2ac5a4f6c50ec1575cda5985b3c3c",
   "files": [
     {
       "source": "contracts/device_foundation/v1/generated/cpp/device_foundation_v1_generated.h",
@@ -64,7 +64,7 @@
     {
       "source": "contracts/device_foundation/v1/golden/commissioning-voucher.json",
       "target": "tests/fixtures/device_foundation_v1/commissioning-voucher.json",
-      "sha256": "53072e86b2592f8cd2aa6d1e49e1a8bbb2079bbd0dd1014fa763ccd1ebc65a65"
+      "sha256": "af23b3321c5a302f8334469212d2ecf1a0534424725a75649f93ab0dd47edc2a"
     },
     {
       "source": "contracts/device_foundation/v1/golden/claim-grant-collection-proof.json",
@@ -90,6 +90,11 @@
       "source": "contracts/device_foundation/v1/golden/device-control-manifest-assertion-proof.json",
       "target": "tests/fixtures/device_foundation_v1/device-control-manifest-assertion-proof.json",
       "sha256": "29e31d28b3ccbe5cbc077f7804f0c24cc62ff30fd30f56774e2baebfe1e54fd5"
+    },
+    {
+      "source": "contracts/device_foundation/v1/golden/device-control-configuration-response.json",
+      "target": "tests/fixtures/device_foundation_v1/device-control-configuration-response.json",
+      "sha256": "2d2b442c3200b022fc99f7aec0a75f3d0039088ce8da3637da825291b44f45cf"
     }
   ]
 }

@@ -1,0 +1,196 @@
+{
+  "vector_id": "DF-DEVICE-CONTROL-CONFIGURATION-RESPONSE-001",
+  "description": "What `configuration:pull` answers, and what a Body must conclude from each answer. The outer object had no contract while four implementations read or wrote it; `body_state` is here because `lifecycle_state` and the presence of a channel are separate facts, and reading approved-with-no-channel as a failure is a Body giving up on an enrolment that is fine.",
+  "schema": "https://contracts.eidolon.live/device-foundation/v1/device-control/schemas.schema.json#/$defs/DeviceConfigurationResult",
+  "request_nonce": "Y29uZmlndXJhdGlvbi1ub25jZQ",
+  "device_ref": {
+    "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+    "owner_domain_id": "owner-domain_01",
+    "owner_domain_generation": 3,
+    "claim_generation": 7,
+    "trust_epoch": 4
+  },
+  "body_states": [
+    "active",
+    "awaiting-channel",
+    "revoked"
+  ],
+  "cases": [
+    {
+      "case_id": "DF-DEVICE-CONTROL-CONFIGURATION-ACTIVE",
+      "body_state": "active",
+      "why": "A Claim the Authority holds and a channel the Channel has answered for.",
+      "response": {
+        "operation": "device-control.configuration",
+        "nonce": "Y29uZmlndXJhdGlvbi1ub25jZQ",
+        "device_ref": {
+          "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+          "owner_domain_id": "owner-domain_01",
+          "owner_domain_generation": 3,
+          "claim_generation": 7,
+          "trust_epoch": 4
+        },
+        "lifecycle_state": "approved",
+        "channels": [
+          {
+            "channel_id": "chan-0f3a91c4d25b47e8a603",
+            "purpose": "device-session",
+            "kinds": [
+              "audio"
+            ],
+            "binding_format": "application/vnd.eidolon.livekit-session+json;v=2",
+            "issued_at_ms": 1788000000000,
+            "expires_at_ms": 1788001800000,
+            "opaque_binding": "eyJhdWRpbyI6eyJjaGFubmVscyI6MSwic2FtcGxlX3JhdGUiOjE2MDAwfSwic2NoZW1hX3ZlcnNpb24iOjIsInNlc3Npb24iOnsiaWRlbnRpdHkiOiJkZXZpY2UtaW5zdGFuY2UtNTkxZDdjNjJkMGJjNzM4Mzc2OTM1Zjc3ZmYyYWNkNTQ3MmJiZWU2NDIwN2E3NjVkZjAzYWY2ZDYyNDBjMDdkYyIsInJvb21fbmFtZSI6ImVpZG9sb24tZGV2aWNlLTlmMWMwYTRkMmI2ZThmM2E1YzdkMWUwNCIsInNlcnZlcl91cmwiOiJ3c3M6Ly9saXZla2l0Lm93bmVyLnRlc3Q6Nzg4MCIsInRva2VuIjoiZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SnBjM01pT2lKQlVFbGxlR0Z0Y0d4bElpd2ljM1ZpSWpvaVpHVjJhV05sSWl3aWRtbGtaVzhpT25zaWNtOXZiU0k2SW1WNFlXMXdiR1VpZlgwLldtOXVNVjl6YVdkdVlYUjFjbVZmY0d4aFkyVm9iMnhrWlhKZlptOXlYMkVnZG1sbGQyVnkifX0="
+          }
+        ],
+        "manifest": {
+          "manifest_id": "manifest_01",
+          "revision": 1,
+          "digest": "sha256:31f7d2a97fd3f1980db53c81a0a724cf1451109d9600d99009966301bea64bcc"
+        }
+      },
+      "canonical_utf8": "{\"channels\":[{\"binding_format\":\"application/vnd.eidolon.livekit-session+json;v=2\",\"channel_id\":\"chan-0f3a91c4d25b47e8a603\",\"expires_at_ms\":1788001800000,\"issued_at_ms\":1788000000000,\"kinds\":[\"audio\"],\"opaque_binding\":\"eyJhdWRpbyI6eyJjaGFubmVscyI6MSwic2FtcGxlX3JhdGUiOjE2MDAwfSwic2NoZW1hX3ZlcnNpb24iOjIsInNlc3Npb24iOnsiaWRlbnRpdHkiOiJkZXZpY2UtaW5zdGFuY2UtNTkxZDdjNjJkMGJjNzM4Mzc2OTM1Zjc3ZmYyYWNkNTQ3MmJiZWU2NDIwN2E3NjVkZjAzYWY2ZDYyNDBjMDdkYyIsInJvb21fbmFtZSI6ImVpZG9sb24tZGV2aWNlLTlmMWMwYTRkMmI2ZThmM2E1YzdkMWUwNCIsInNlcnZlcl91cmwiOiJ3c3M6Ly9saXZla2l0Lm93bmVyLnRlc3Q6Nzg4MCIsInRva2VuIjoiZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SnBjM01pT2lKQlVFbGxlR0Z0Y0d4bElpd2ljM1ZpSWpvaVpHVjJhV05sSWl3aWRtbGtaVzhpT25zaWNtOXZiU0k2SW1WNFlXMXdiR1VpZlgwLldtOXVNVjl6YVdkdVlYUjFjbVZmY0d4aFkyVm9iMnhrWlhKZlptOXlYMkVnZG1sbGQyVnkifX0=\",\"purpose\":\"device-session\"}],\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"lifecycle_state\":\"approved\",\"manifest\":{\"digest\":\"sha256:31f7d2a97fd3f1980db53c81a0a724cf1451109d9600d99009966301bea64bcc\",\"manifest_id\":\"manifest_01\",\"revision\":1},\"nonce\":\"Y29uZmlndXJhdGlvbi1ub25jZQ\",\"operation\":\"device-control.configuration\"}",
+      "canonical_sha256": "sha256:ff601e06b5488ef76ac93a5ba7fc0ce6d1d6dc78233bd0a3a33b17531551fda4"
+    },
+    {
+      "case_id": "DF-DEVICE-CONTROL-CONFIGURATION-APPROVED-AWAITING-CHANNEL",
+      "body_state": "awaiting-channel",
+      "why": "Approved, and no channel yet. Not an error and not a revocation: the Authority holds the Claim and the Channel has not answered. A Body that treats this as failure abandons an enrolment that is fine, and one that treats it as active joins a room that does not exist.",
+      "response": {
+        "operation": "device-control.configuration",
+        "nonce": "Y29uZmlndXJhdGlvbi1ub25jZQ",
+        "device_ref": {
+          "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+          "owner_domain_id": "owner-domain_01",
+          "owner_domain_generation": 3,
+          "claim_generation": 7,
+          "trust_epoch": 4
+        },
+        "lifecycle_state": "approved",
+        "channels": [],
+        "manifest": {
+          "manifest_id": "manifest_01",
+          "revision": 1,
+          "digest": "sha256:31f7d2a97fd3f1980db53c81a0a724cf1451109d9600d99009966301bea64bcc"
+        }
+      },
+      "canonical_utf8": "{\"channels\":[],\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"lifecycle_state\":\"approved\",\"manifest\":{\"digest\":\"sha256:31f7d2a97fd3f1980db53c81a0a724cf1451109d9600d99009966301bea64bcc\",\"manifest_id\":\"manifest_01\",\"revision\":1},\"nonce\":\"Y29uZmlndXJhdGlvbi1ub25jZQ\",\"operation\":\"device-control.configuration\"}",
+      "canonical_sha256": "sha256:576150ecd3a53aa2523525bd56d0550253f6a70e3910eb88caf83b2932821122"
+    },
+    {
+      "case_id": "DF-DEVICE-CONTROL-CONFIGURATION-REVOKED",
+      "body_state": "revoked",
+      "why": "Terminal. The absence of a channel here means something different from the case above, which is the whole reason both are in this vector.",
+      "response": {
+        "operation": "device-control.configuration",
+        "nonce": "Y29uZmlndXJhdGlvbi1ub25jZQ",
+        "device_ref": {
+          "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+          "owner_domain_id": "owner-domain_01",
+          "owner_domain_generation": 3,
+          "claim_generation": 7,
+          "trust_epoch": 4
+        },
+        "lifecycle_state": "revoked",
+        "channels": []
+      },
+      "canonical_utf8": "{\"channels\":[],\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"lifecycle_state\":\"revoked\",\"nonce\":\"Y29uZmlndXJhdGlvbi1ub25jZQ\",\"operation\":\"device-control.configuration\"}",
+      "canonical_sha256": "sha256:853ffef4794eba5fa21474bd234adc9dc2b27c7ba5f2c04c6f0786a732e72367"
+    }
+  ],
+  "must_refuse": [
+    {
+      "case_id": "DF-DEVICE-CONTROL-CONFIGURATION-WRONG-OPERATION",
+      "why": "An answer to another question is not an answer to this one.",
+      "response": {
+        "operation": "device-control.manifest-assert",
+        "nonce": "Y29uZmlndXJhdGlvbi1ub25jZQ",
+        "device_ref": {
+          "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+          "owner_domain_id": "owner-domain_01",
+          "owner_domain_generation": 3,
+          "claim_generation": 7,
+          "trust_epoch": 4
+        },
+        "lifecycle_state": "approved",
+        "channels": []
+      }
+    },
+    {
+      "case_id": "DF-DEVICE-CONTROL-CONFIGURATION-UNKNOWN-LIFECYCLE",
+      "why": "A state this vocabulary does not define. Guessing which of the two it resembles is how a Body grants itself voice on an unknown status.",
+      "response": {
+        "operation": "device-control.configuration",
+        "nonce": "Y29uZmlndXJhdGlvbi1ub25jZQ",
+        "device_ref": {
+          "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+          "owner_domain_id": "owner-domain_01",
+          "owner_domain_generation": 3,
+          "claim_generation": 7,
+          "trust_epoch": 4
+        },
+        "lifecycle_state": "pending",
+        "channels": []
+      }
+    },
+    {
+      "case_id": "DF-DEVICE-CONTROL-CONFIGURATION-CHANNEL-ALREADY-EXPIRED",
+      "why": "A grant with no life left is not a grant. Accepting it spends the reconnect budget on a room that will refuse the token.",
+      "response": {
+        "operation": "device-control.configuration",
+        "nonce": "Y29uZmlndXJhdGlvbi1ub25jZQ",
+        "device_ref": {
+          "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+          "owner_domain_id": "owner-domain_01",
+          "owner_domain_generation": 3,
+          "claim_generation": 7,
+          "trust_epoch": 4
+        },
+        "lifecycle_state": "approved",
+        "channels": [
+          {
+            "channel_id": "chan-0f3a91c4d25b47e8a603",
+            "purpose": "device-session",
+            "kinds": [
+              "audio"
+            ],
+            "binding_format": "application/vnd.eidolon.livekit-session+json;v=2",
+            "issued_at_ms": 1788000000000,
+            "expires_at_ms": 0,
+            "opaque_binding": "eyJhdWRpbyI6eyJjaGFubmVscyI6MSwic2FtcGxlX3JhdGUiOjE2MDAwfSwic2NoZW1hX3ZlcnNpb24iOjIsInNlc3Npb24iOnsiaWRlbnRpdHkiOiJkZXZpY2UtaW5zdGFuY2UtNTkxZDdjNjJkMGJjNzM4Mzc2OTM1Zjc3ZmYyYWNkNTQ3MmJiZWU2NDIwN2E3NjVkZjAzYWY2ZDYyNDBjMDdkYyIsInJvb21fbmFtZSI6ImVpZG9sb24tZGV2aWNlLTlmMWMwYTRkMmI2ZThmM2E1YzdkMWUwNCIsInNlcnZlcl91cmwiOiJ3c3M6Ly9saXZla2l0Lm93bmVyLnRlc3Q6Nzg4MCIsInRva2VuIjoiZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SnBjM01pT2lKQlVFbGxlR0Z0Y0d4bElpd2ljM1ZpSWpvaVpHVjJhV05sSWl3aWRtbGtaVzhpT25zaWNtOXZiU0k2SW1WNFlXMXdiR1VpZlgwLldtOXVNVjl6YVdkdVlYUjFjbVZmY0d4aFkyVm9iMnhrWlhKZlptOXlYMkVnZG1sbGQyVnkifX0="
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "DF-DEVICE-CONTROL-CONFIGURATION-CHANNEL-WITHOUT-A-BINDING",
+      "why": "A channel entry that carries no binding says a channel exists and withholds how to reach it, which is worse than saying there is none.",
+      "response": {
+        "operation": "device-control.configuration",
+        "nonce": "Y29uZmlndXJhdGlvbi1ub25jZQ",
+        "device_ref": {
+          "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+          "owner_domain_id": "owner-domain_01",
+          "owner_domain_generation": 3,
+          "claim_generation": 7,
+          "trust_epoch": 4
+        },
+        "lifecycle_state": "approved",
+        "channels": [
+          {
+            "channel_id": "chan-0f3a91c4d25b47e8a603",
+            "purpose": "device-session",
+            "kinds": [
+              "audio"
+            ],
+            "binding_format": "application/vnd.eidolon.livekit-session+json;v=2",
+            "issued_at_ms": 1788000000000,
+            "expires_at_ms": 1788001800000,
+            "opaque_binding": ""
+          }
+        ]
+      }
+    }
+  ]
+}

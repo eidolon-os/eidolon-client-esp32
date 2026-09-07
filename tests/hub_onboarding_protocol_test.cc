@@ -275,6 +275,97 @@ void TestCanonicalManifest()
     cJSON_Delete(vector);
 }
 
+// The configuration response vector. Distinct from the inline bodies in
+// TestActiveClaimConfigurationAndProviderBinding below, and both should stay:
+// those probe what this parser tolerates (a manifest it has never seen, the
+// retired two-room shape), while this one pins what the Authority actually
+// emits and what a Body must conclude from it. The conclusion is the part worth
+// pinning — `lifecycle_state` and the presence of a channel are separate facts,
+// and reading approved-with-no-channel as failure abandons an enrolment that is
+// fine.
+std::string ReadConfigurationResponseVector()
+{
+    std::ifstream file(
+        "tests/fixtures/device_foundation_v1/device-control-configuration-response.json");
+    assert(file.is_open());
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
+
+eidolon::ActiveClaimState ClaimFrom(const cJSON* device_ref)
+{
+    eidolon::ActiveClaimState claim;
+    claim.device_ref.device_instance_id =
+        cJSON_GetObjectItemCaseSensitive(device_ref, "device_instance_id")->valuestring;
+    claim.device_ref.owner_domain_id.value =
+        cJSON_GetObjectItemCaseSensitive(device_ref, "owner_domain_id")->valuestring;
+    claim.device_ref.owner_domain_generation = static_cast<uint64_t>(
+        cJSON_GetObjectItemCaseSensitive(device_ref, "owner_domain_generation")->valuedouble);
+    claim.device_ref.claim_generation = static_cast<uint64_t>(
+        cJSON_GetObjectItemCaseSensitive(device_ref, "claim_generation")->valuedouble);
+    claim.device_ref.trust_epoch = static_cast<uint64_t>(
+        cJSON_GetObjectItemCaseSensitive(device_ref, "trust_epoch")->valuedouble);
+    return claim;
+}
+
+void TestConfigurationResponseMatchesTheGoldenVector()
+{
+    const std::string raw = ReadConfigurationResponseVector();
+    cJSON* vector = cJSON_ParseWithLength(raw.data(), raw.size());
+    assert(cJSON_IsObject(vector));
+    const std::string nonce =
+        cJSON_GetObjectItemCaseSensitive(vector, "request_nonce")->valuestring;
+    const eidolon::ActiveClaimState claim =
+        ClaimFrom(cJSON_GetObjectItemCaseSensitive(vector, "device_ref"));
+
+    int accepted = 0;
+    const cJSON* item = nullptr;
+    cJSON_ArrayForEach(item, cJSON_GetObjectItemCaseSensitive(vector, "cases")) {
+        const std::string body_state =
+            cJSON_GetObjectItemCaseSensitive(item, "body_state")->valuestring;
+        const std::string body =
+            cJSON_GetObjectItemCaseSensitive(item, "canonical_utf8")->valuestring;
+        HubConfigStatus status = HubConfigStatus::PendingApproval;
+        eidolon::HubChannelAssignment assignment;
+        eidolon::AcceptedManifestRef accepted_manifest;
+        assert(eidolon::ParseDeviceConfigurationResponse(
+            body, nonce, claim, status, assignment, accepted_manifest));
+        if (body_state == "active") {
+            assert(status == HubConfigStatus::Active);
+            assert(!assignment.opaque_binding.empty());
+        } else if (body_state == "awaiting-channel") {
+            // The one that matters. Not revoked, not an error: the Authority
+            // holds the Claim and the Channel has not answered yet.
+            assert(status == HubConfigStatus::WaitingBinding);
+            assert(assignment.opaque_binding.empty());
+        } else {
+            assert(body_state == "revoked");
+            assert(status == HubConfigStatus::Revoked);
+        }
+        ++accepted;
+    }
+    // Silence is not agreement: a vector that lost the awaiting-channel case
+    // would leave the distinction this test exists for entirely unchecked.
+    assert(accepted == 3);
+
+    int refused = 0;
+    cJSON_ArrayForEach(item, cJSON_GetObjectItemCaseSensitive(vector, "must_refuse")) {
+        const cJSON* document = cJSON_GetObjectItemCaseSensitive(item, "response");
+        char* encoded = cJSON_PrintUnformatted(document);
+        assert(encoded != nullptr);
+        HubConfigStatus status = HubConfigStatus::PendingApproval;
+        eidolon::HubChannelAssignment assignment;
+        eidolon::AcceptedManifestRef accepted_manifest;
+        assert(!eidolon::ParseDeviceConfigurationResponse(
+            encoded, nonce, claim, status, assignment, accepted_manifest));
+        cJSON_free(encoded);
+        ++refused;
+    }
+    assert(refused == 4);
+    cJSON_Delete(vector);
+}
+
 void TestActiveClaimConfigurationAndProviderBinding()
 {
     HubConfigStatus status = HubConfigStatus::Active;
@@ -411,6 +502,7 @@ int main()
     TestDescriptorWithoutItsOwnRouteIsRejected();
     TestCanonicalManifest();
     TestLiveKitBindingMatchesTheGoldenVector();
+    TestConfigurationResponseMatchesTheGoldenVector();
     TestActiveClaimConfigurationAndProviderBinding();
     TestFinishedProposalIsRecognizedOnlyFromTheAuthoritysOwnWords();
     TestOperationalKeyIsPresentedInTheFormTheClaimRecords();

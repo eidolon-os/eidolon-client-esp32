@@ -50,7 +50,31 @@
     "compact": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJiYXNlX2lkZW50aXR5X3Byb3ZlbmFuY2UiOiJtaW50ZWQiLCJkZXZpY2VfYmFzZV9pZCI6ImRldmljZS1iYXNlLTRmM2I0ZjNiNGYzYjRmM2I0ZjNiNGYzYjRmM2I0ZjNiNGYzYjRmM2I0ZjNiNGYzYjRmM2I0ZjNiNGYzYjRmM2IiLCJleHAiOjE3ODgwMDAwMDAsImp0aSI6Imp0aS0wZjNhOTFjNGQyNWI0N2U4YTYwMzFmN2M4YjlkMmU1MCIsIm9wZXJhdGlvbmFsX3Nwa2lfc2hhMjU2Ijoic2hhMjU2OjQxMDM3NmM5ZDVkYzg4MDIyZDA0YjRmMzFiMWUwMzU0NTNiYTBjMjIyNjg4N2UwMTlmYjMzYTIzZGNhMmNiYzciLCJvd25lcl9kb21haW5faWQiOiJvd25lci1kb21haW5fMDEiLCJwdXJwb3NlIjoiZWlkb2xvbi1jb21taXNzaW9uaW5nLXZvdWNoZXItdjEifQ.YIf3fLCusRuqO7zKksG7gJYsa8rzZF4RIzOUBo45HZY",
     "jti": "jti-0f3a91c4d25b47e8a6031f7c8b9d2e50",
     "expires_at_unix": 1788000000,
-    "nonce_rule": "commissioning_proof.nonce MUST equal the voucher jti"
+    "nonce_rule": "commissioning_proof.nonce MUST equal the voucher jti",
+    "claim_names": [
+      "base_identity_provenance",
+      "device_base_id",
+      "exp",
+      "jti",
+      "operational_spki_sha256",
+      "owner_domain_id",
+      "purpose"
+    ]
+  },
+  "voucher_derived_from_controller": {
+    "why": "The second accepted base_identity_provenance. The Hub re-signs a base identity it already issued to this very key, which is what lets a removed Body come back as itself rather than as a stranger. A verifier that accepted only `minted` would refuse every such return with no suite going red.",
+    "claims": {
+      "base_identity_provenance": "derived-from-controller",
+      "device_base_id": "device-base-4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b",
+      "exp": 1788000000,
+      "jti": "jti-7b2c48e05d9f14a3c6b28e70f1d5a394",
+      "operational_spki_sha256": "sha256:410376c9d5dc88022d04b4f31b1e035453ba0c2226887e019fb33a23dca2cbc7",
+      "owner_domain_id": "owner-domain_01",
+      "purpose": "eidolon-commissioning-voucher-v1"
+    },
+    "claims_canonical_utf8": "{\"base_identity_provenance\":\"derived-from-controller\",\"device_base_id\":\"device-base-4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b4f3b\",\"exp\":1788000000,\"jti\":\"jti-7b2c48e05d9f14a3c6b28e70f1d5a394\",\"operational_spki_sha256\":\"sha256:410376c9d5dc88022d04b4f31b1e035453ba0c2226887e019fb33a23dca2cbc7\",\"owner_domain_id\":\"owner-domain_01\",\"purpose\":\"eidolon-commissioning-voucher-v1\"}",
+    "compact": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJiYXNlX2lkZW50aXR5X3Byb3ZlbmFuY2UiOiJkZXJpdmVkLWZyb20tY29udHJvbGxlciIsImRldmljZV9iYXNlX2lkIjoiZGV2aWNlLWJhc2UtNGYzYjRmM2I0ZjNiNGYzYjRmM2I0ZjNiNGYzYjRmM2I0ZjNiNGYzYjRmM2I0ZjNiNGYzYjRmM2I0ZjNiNGYzYiIsImV4cCI6MTc4ODAwMDAwMCwianRpIjoianRpLTdiMmM0OGUwNWQ5ZjE0YTNjNmIyOGU3MGYxZDVhMzk0Iiwib3BlcmF0aW9uYWxfc3BraV9zaGEyNTYiOiJzaGEyNTY6NDEwMzc2YzlkNWRjODgwMjJkMDRiNGYzMWIxZTAzNTQ1M2JhMGMyMjI2ODg3ZTAxOWZiMzNhMjNkY2EyY2JjNyIsIm93bmVyX2RvbWFpbl9pZCI6Im93bmVyLWRvbWFpbl8wMSIsInB1cnBvc2UiOiJlaWRvbG9uLWNvbW1pc3Npb25pbmctdm91Y2hlci12MSJ9.6E2k_ctBTWvIEg-GtJJ6Ca9QblIbFYfs52YdUTaKES4",
+    "jti": "jti-7b2c48e05d9f14a3c6b28e70f1d5a394"
   },
   "enrolled_base_key": {
     "scheme": "enrolled-base-key-v1",
@@ -86,6 +110,14 @@
     {
       "case": "enrolled-base-key-v1 presented by a Revoked or Rejected base identity",
       "why": "re-entry requires a fresh Controller-witnessed voucher"
+    },
+    {
+      "case": "voucher whose base_identity_provenance is any other value",
+      "why": "only `minted` and `derived-from-controller` exist; a device may not describe how its own identity came to be"
+    },
+    {
+      "case": "voucher carrying a claim outside claim_names, or missing one",
+      "why": "the member set is part of the signed bytes and a verifier requires it exactly, so an added claim is not a compatible change"
     }
   ]
 }
