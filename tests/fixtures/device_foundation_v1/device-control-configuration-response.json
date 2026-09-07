@@ -2,6 +2,7 @@
   "vector_id": "DF-DEVICE-CONTROL-CONFIGURATION-RESPONSE-001",
   "description": "What `configuration:pull` answers, and what a Body must conclude from each answer. The outer object had no contract while four implementations read or wrote it; `body_state` is here because `lifecycle_state` and the presence of a channel are separate facts, and reading approved-with-no-channel as a failure is a Body giving up on an enrolment that is fine.",
   "schema": "https://contracts.eidolon.live/device-foundation/v1/device-control/schemas.schema.json#/$defs/DeviceConfigurationResult",
+  "expiry_is_not_judged_against": "the reader's clock",
   "request_nonce": "Y29uZmlndXJhdGlvbi1ub25jZQ",
   "device_ref": {
     "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
