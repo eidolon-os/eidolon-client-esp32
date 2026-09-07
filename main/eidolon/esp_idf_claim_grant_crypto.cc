@@ -305,12 +305,10 @@ bool EspIdfClaimGrantCrypto::SignWithHandoff(
 bool EspIdfClaimGrantCrypto::BuildHandoffKeyProof(
     const std::string& enrollment_id, uint64_t proposal_revision,
     const std::string& collection_challenge, std::string& proof) {
-    const std::string canonical =
-        std::string("{\"collection_challenge\":\"") + collection_challenge +
-        "\",\"contract\":\"eidolon.device-foundation.claim-grant-collection\"" +
-        ",\"enrollment_id\":\"" + enrollment_id +
-        "\",\"proposal_revision\":" + std::to_string(proposal_revision) + "}";
-    return SignWithHandoff(canonical, proof);
+    return SignWithHandoff(
+        DeviceClaimConsumerCore::ClaimGrantCollectionProofJson(
+            enrollment_id, proposal_revision, collection_challenge),
+        proof);
 }
 
 ClaimGrantUnsealResult EspIdfClaimGrantCrypto::OpenClaimGrant(
@@ -402,12 +400,10 @@ ClaimGrantUnsealResult EspIdfClaimGrantCrypto::OpenClaimGrant(
 bool EspIdfClaimGrantCrypto::BuildOperationalKeyProof(
     const std::string& enrollment_id, const std::string& grant_id,
     const device_foundation::v1::DeviceRef& device_ref, std::string& proof) {
-    const std::string canonical =
-        std::string("{\"contract\":\"eidolon.device-foundation.claim-grant-ack\"") +
-        ",\"device_ref\":" + DeviceClaimConsumerCore::DeviceRefJson(device_ref) +
-        ",\"enrollment_id\":\"" + enrollment_id +
-        "\",\"grant_id\":\"" + grant_id + "\"}";
-    return DeviceIdentity::GetInstance().SignCanonical(canonical, proof) == ESP_OK;
+    return DeviceIdentity::GetInstance().SignCanonical(
+               DeviceClaimConsumerCore::ClaimGrantAckProofJson(
+                   enrollment_id, grant_id, device_ref),
+               proof) == ESP_OK;
 }
 
 bool EspIdfClaimGrantCrypto::DestroyEnrollmentMaterial(

@@ -169,6 +169,21 @@ public:
     static std::string DeviceRefJson(
         const device_foundation::v1::DeviceRef& device_ref);
 
+    // The two documents this device signs to take possession of a Claim.
+    // Neither is ever sent: only the signature is, and the Authority rebuilds
+    // the bytes from the Proposal it holds. So a disagreement about them is
+    // never reported as a disagreement — it arrives as a refused proof at the
+    // one step of enrolment this device cannot retry its way out of. They live
+    // beside ClaimGrantAad, on the host-testable core rather than in the
+    // ESP-IDF adapter that signs with them, so the bytes can be held against
+    // golden/claim-grant-*-proof.json without an ESP-IDF build.
+    static std::string ClaimGrantCollectionProofJson(
+        const std::string& enrollment_id, uint64_t proposal_revision,
+        const std::string& collection_challenge);
+    static std::string ClaimGrantAckProofJson(
+        const std::string& enrollment_id, const std::string& grant_id,
+        const device_foundation::v1::DeviceRef& device_ref);
+
 private:
     DeviceClaimConsumerOutcome AckFor(const EnrollmentJournalEntry& entry);
 

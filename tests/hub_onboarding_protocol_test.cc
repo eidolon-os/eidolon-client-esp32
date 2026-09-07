@@ -159,6 +159,84 @@ std::string CompiledInteractionMode(const std::string& manifest)
     return mode;
 }
 
+// The session binding vector, synced from the SDK. The Channel Provider writes
+// this document and this device parses it, and until the vector existed each of
+// them held its own hand-written copy of the shape: `schema_version: 2` is the
+// record of one such disagreement already having happened, with nothing that
+// would have reported it.
+std::string ReadLiveKitBindingVector()
+{
+    std::ifstream file(
+        "tests/fixtures/device_foundation_v1/livekit-session-binding.json");
+    assert(file.is_open());
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
+
+void TestLiveKitBindingMatchesTheGoldenVector()
+{
+    const std::string raw = ReadLiveKitBindingVector();
+    cJSON* vector = cJSON_ParseWithLength(raw.data(), raw.size());
+    assert(cJSON_IsObject(vector));
+
+    // The media type is a literal on both sides and carries the document's
+    // version inside it, so bumping it on one side alone is the exact change
+    // that must not be quiet.
+    const cJSON* format =
+        cJSON_GetObjectItemCaseSensitive(vector, "binding_format");
+    assert(cJSON_IsString(format));
+    assert(std::string(eidolon::kLiveKitBindingFormat) == format->valuestring);
+
+    const cJSON* canonical =
+        cJSON_GetObjectItemCaseSensitive(vector, "canonical_utf8");
+    assert(cJSON_IsString(canonical));
+    const cJSON* binding = cJSON_GetObjectItemCaseSensitive(vector, "binding");
+    assert(cJSON_IsObject(binding));
+    const cJSON* session = cJSON_GetObjectItemCaseSensitive(binding, "session");
+    const cJSON* audio = cJSON_GetObjectItemCaseSensitive(binding, "audio");
+    assert(cJSON_IsObject(session) && cJSON_IsObject(audio));
+
+    eidolon::Esp32HubConfig parsed;
+    assert(eidolon::ParseLiveKitBinding(canonical->valuestring, parsed));
+    assert(parsed.session.server_url ==
+           cJSON_GetObjectItemCaseSensitive(session, "server_url")->valuestring);
+    assert(parsed.session.token ==
+           cJSON_GetObjectItemCaseSensitive(session, "token")->valuestring);
+    assert(parsed.session.identity ==
+           cJSON_GetObjectItemCaseSensitive(session, "identity")->valuestring);
+    assert(parsed.session.room_name ==
+           cJSON_GetObjectItemCaseSensitive(session, "room_name")->valuestring);
+    assert(parsed.sample_rate ==
+           cJSON_GetObjectItemCaseSensitive(audio, "sample_rate")->valueint);
+    assert(parsed.channels ==
+           cJSON_GetObjectItemCaseSensitive(audio, "channels")->valueint);
+
+    // And every document the vector says must be refused. Accepting one is not
+    // a parse error on this device: it is a room it joins holding a value it
+    // cannot honour, which nothing downstream reports either.
+    const cJSON* refusals =
+        cJSON_GetObjectItemCaseSensitive(vector, "must_refuse");
+    assert(cJSON_IsArray(refusals));
+    int refused = 0;
+    const cJSON* item = nullptr;
+    cJSON_ArrayForEach(item, refusals) {
+        const cJSON* document =
+            cJSON_GetObjectItemCaseSensitive(item, "binding");
+        assert(cJSON_IsObject(document));
+        char* encoded = cJSON_PrintUnformatted(document);
+        assert(encoded != nullptr);
+        eidolon::Esp32HubConfig rejected;
+        assert(!eidolon::ParseLiveKitBinding(encoded, rejected));
+        cJSON_free(encoded);
+        ++refused;
+    }
+    // Silence is not agreement: an empty list would leave the refusals
+    // entirely unchecked with this test still green.
+    assert(refused == 4);
+    cJSON_Delete(vector);
+}
+
 void TestCanonicalManifest()
 {
     const std::string raw = ReadDeviceManifestVector();
@@ -332,6 +410,7 @@ int main()
     TestDescriptorCanonicalisationMatchesTheGoldenVector();
     TestDescriptorWithoutItsOwnRouteIsRejected();
     TestCanonicalManifest();
+    TestLiveKitBindingMatchesTheGoldenVector();
     TestActiveClaimConfigurationAndProviderBinding();
     TestFinishedProposalIsRecognizedOnlyFromTheAuthoritysOwnWords();
     TestOperationalKeyIsPresentedInTheFormTheClaimRecords();

@@ -1,0 +1,34 @@
+{
+  "vector_id": "DF-CLAIM-GRANT-ACK-PROOF-001",
+  "description": "What a device signs with its operational key to acknowledge the ClaimGrant it opened, which is the step that makes the Claim active. The signing key is the key `device_ref.device_instance_id` is derived from: the acknowledgement is a statement by that device about itself, and a proof by any other key would be a device activating a Claim it is not the subject of.",
+  "signing_key": "operational",
+  "signature_algorithm": "ES256",
+  "signature_encoding": "64-byte-r-concat-s-base64url-no-padding",
+  "document": {
+    "contract": "eidolon.device-foundation.claim-grant-ack",
+    "enrollment_id": "enrollment_01",
+    "grant_id": "grant_01",
+    "device_ref": {
+      "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+      "owner_domain_id": "owner-domain_01",
+      "owner_domain_generation": 3,
+      "claim_generation": 7,
+      "trust_epoch": 4
+    }
+  },
+  "canonical_utf8": "{\"contract\":\"eidolon.device-foundation.claim-grant-ack\",\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"enrollment_id\":\"enrollment_01\",\"grant_id\":\"grant_01\"}",
+  "canonical_sha256": "sha256:9c32d3ce12cf3099a05ca346d5a21da0d6ddece11b3203eb25798a22b563232c",
+  "public_key_spki": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEtnQCGRdqvyj-Y1o_EBErJSYZ4OmMXMBvHHsrdJXtgy_gDjPYMJ-J5VHTsSCcdKyH1xQb-nYni36ZYVJ-f_82xQ",
+  "key_id": "sha256:591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+  "signature": "MS2zdS-VUY8Vmw3__7-hotuOY0O-pH9_4RAp_RHI_JrdlV9lYNm7daTqGxudg9RWl_CSvjxP7JMv2L_LL9efWg",
+  "mutate_each_field_must_fail": [
+    "contract",
+    "device_ref.claim_generation",
+    "device_ref.device_instance_id",
+    "device_ref.owner_domain_generation",
+    "device_ref.owner_domain_id",
+    "device_ref.trust_epoch",
+    "enrollment_id",
+    "grant_id"
+  ]
+}

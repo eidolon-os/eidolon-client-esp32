@@ -1,0 +1,24 @@
+{
+  "vector_id": "DF-CLAIM-GRANT-COLLECTION-PROOF-001",
+  "description": "What a device signs with its handoff key to collect the ClaimGrant it was approved for. The Authority rebuilds these bytes from the Proposal it holds and verifies the signature over them, so the two ends never exchange the document — they only find out, at the moment the device asks for its Grant, whether they built the same one. Until this vector the rule lived in a Python dict in the Authority and in a hand-concatenated string in the firmware, and nothing compared them.",
+  "signing_key": "handoff",
+  "signature_algorithm": "ES256",
+  "signature_encoding": "64-byte-r-concat-s-base64url-no-padding",
+  "document": {
+    "contract": "eidolon.device-foundation.claim-grant-collection",
+    "enrollment_id": "enrollment_01",
+    "proposal_revision": 3,
+    "collection_challenge": "Y29sbGVjdGlvbi1jaGFsbGVuZ2U"
+  },
+  "canonical_utf8": "{\"collection_challenge\":\"Y29sbGVjdGlvbi1jaGFsbGVuZ2U\",\"contract\":\"eidolon.device-foundation.claim-grant-collection\",\"enrollment_id\":\"enrollment_01\",\"proposal_revision\":3}",
+  "canonical_sha256": "sha256:7a315f0737537dd14ffd15c576778c3a8d52f20be3f62d383467c9bae043cb79",
+  "public_key_spki": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE05r1MqLlsnMgSTavbaU9tDHJPt8ZKBVJVj0fPHWbnU6hoyJrM0Hpn73NgwFLhbXitUnw52db2IXxogRQwbPbvA",
+  "key_id": "sha256:2d800f5fb4107ebfd8a4811f020caea8140e0787db75e5058ee564ee516ab025",
+  "signature": "q4EcjVdb5GZ21fyh-MbgxJTDqoGmpBE12tuS5cQet4fiCZ-mVWOjE2m5cUdsp2c9AF55RMkL6cG2yaliqIQ30w",
+  "mutate_each_field_must_fail": [
+    "collection_challenge",
+    "contract",
+    "enrollment_id",
+    "proposal_revision"
+  ]
+}

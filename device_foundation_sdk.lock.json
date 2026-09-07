@@ -1,5 +1,5 @@
 {
-  "sdk_commit": "c66b990fe490f53a38dd529a264e2fe8188de988",
+  "sdk_commit": "221287692d97855dcc366923b75263ecbb95f09e",
   "files": [
     {
       "source": "contracts/device_foundation/v1/generated/cpp/device_foundation_v1_generated.h",
@@ -65,6 +65,21 @@
       "source": "contracts/device_foundation/v1/golden/commissioning-voucher.json",
       "target": "tests/fixtures/device_foundation_v1/commissioning-voucher.json",
       "sha256": "53072e86b2592f8cd2aa6d1e49e1a8bbb2079bbd0dd1014fa763ccd1ebc65a65"
+    },
+    {
+      "source": "contracts/device_foundation/v1/golden/claim-grant-collection-proof.json",
+      "target": "tests/fixtures/device_foundation_v1/claim-grant-collection-proof.json",
+      "sha256": "3beaaec5dc93bbc336b302a05f9786a2c7de3028fe7b3a471a09ea601c957947"
+    },
+    {
+      "source": "contracts/device_foundation/v1/golden/claim-grant-ack-proof.json",
+      "target": "tests/fixtures/device_foundation_v1/claim-grant-ack-proof.json",
+      "sha256": "545b79ab0428659d04a2d0981a715d6942164d5fe8f5deda1a686ab95d73a42d"
+    },
+    {
+      "source": "contracts/device_foundation/v1/golden/livekit-session-binding.json",
+      "target": "tests/fixtures/device_foundation_v1/livekit-session-binding.json",
+      "sha256": "21c9a40aeb0621259e043502ecb7a352eda30ddb64cd5bc5e24b2481dbaff107"
     }
   ]
 }

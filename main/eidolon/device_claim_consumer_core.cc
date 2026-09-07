@@ -253,6 +253,26 @@ std::string DeviceClaimConsumerCore::DeviceRefJson(const DeviceRef& ref) {
            ",\"trust_epoch\":" + std::to_string(ref.trust_epoch) + "}";
 }
 
+std::string DeviceClaimConsumerCore::ClaimGrantCollectionProofJson(
+    const std::string& enrollment_id, uint64_t proposal_revision,
+    const std::string& collection_challenge) {
+    return std::string("{\"collection_challenge\":") +
+           Quote(collection_challenge) +
+           ",\"contract\":\"eidolon.device-foundation.claim-grant-collection\"" +
+           ",\"enrollment_id\":" + Quote(enrollment_id) +
+           ",\"proposal_revision\":" + std::to_string(proposal_revision) + "}";
+}
+
+std::string DeviceClaimConsumerCore::ClaimGrantAckProofJson(
+    const std::string& enrollment_id, const std::string& grant_id,
+    const DeviceRef& device_ref) {
+    return std::string(
+               "{\"contract\":\"eidolon.device-foundation.claim-grant-ack\"") +
+           ",\"device_ref\":" + DeviceRefJson(device_ref) +
+           ",\"enrollment_id\":" + Quote(enrollment_id) +
+           ",\"grant_id\":" + Quote(grant_id) + "}";
+}
+
 std::string DeviceClaimConsumerCore::ClaimGrantAad(const ClaimGrantAAD& aad) {
     return std::string("{\"claim_generation\":") +
            std::to_string(aad.claim_generation) +

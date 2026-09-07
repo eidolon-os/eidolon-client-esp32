@@ -1,6 +1,10 @@
 #include "eidolon/device_claim_consumer_core.h"
 
+#include <cJSON.h>
+
 #include <cassert>
+#include <fstream>
+#include <sstream>
 #include <string>
 
 using namespace eidolon;
@@ -250,6 +254,82 @@ void GoldenAadAndFiveFieldDeviceRefAreExact() {
            "{\"claim_generation\":2,\"device_instance_id\":\"device_01\","
            "\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\","
            "\"trust_epoch\":1}");
+}
+
+// The Device Foundation proof vectors, synced byte-for-byte from the SDK by
+// scripts/sync_device_foundation_v1.py. Read rather than restated: the two
+// documents below are never sent, so the only way this device learns it spells
+// one differently from the Authority is a refused proof at the step of
+// enrolment it cannot retry its way out of — and an inlined copy of the bytes
+// would agree with itself while doing exactly that.
+std::string ReadProofVector(const char* name) {
+    std::ifstream file(std::string("tests/fixtures/device_foundation_v1/") + name);
+    assert(file.is_open());
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
+
+const cJSON* RequiredMember(const cJSON* object, const char* key) {
+    const cJSON* item = cJSON_GetObjectItemCaseSensitive(object, key);
+    assert(item != nullptr);
+    return item;
+}
+
+std::string VectorString(const cJSON* object, const char* key) {
+    const cJSON* item = RequiredMember(object, key);
+    assert(cJSON_IsString(item));
+    return item->valuestring;
+}
+
+uint64_t VectorNumber(const cJSON* object, const char* key) {
+    const cJSON* item = RequiredMember(object, key);
+    assert(cJSON_IsNumber(item));
+    assert(item->valuedouble >= 0);
+    return static_cast<uint64_t>(item->valuedouble);
+}
+
+void TheSignedProofBytesAreTheGoldenVectorBytes() {
+    const std::string collection_raw =
+        ReadProofVector("claim-grant-collection-proof.json");
+    cJSON* collection = cJSON_ParseWithLength(
+        collection_raw.data(), collection_raw.size());
+    assert(cJSON_IsObject(collection));
+    const cJSON* collection_document = RequiredMember(collection, "document");
+    const std::string collection_expected =
+        VectorString(collection, "canonical_utf8");
+    const std::string collection_built =
+        DeviceClaimConsumerCore::ClaimGrantCollectionProofJson(
+            VectorString(collection_document, "enrollment_id"),
+            VectorNumber(collection_document, "proposal_revision"),
+            VectorString(collection_document, "collection_challenge"));
+    assert(collection_built == collection_expected);
+    cJSON_Delete(collection);
+
+    const std::string ack_raw = ReadProofVector("claim-grant-ack-proof.json");
+    cJSON* ack = cJSON_ParseWithLength(ack_raw.data(), ack_raw.size());
+    assert(cJSON_IsObject(ack));
+    const cJSON* ack_document = RequiredMember(ack, "document");
+    const cJSON* ref_member = RequiredMember(ack_document, "device_ref");
+    DeviceRef ref;
+    ref.device_instance_id = VectorString(ref_member, "device_instance_id");
+    ref.owner_domain_id.value = VectorString(ref_member, "owner_domain_id");
+    ref.owner_domain_generation = VectorNumber(ref_member, "owner_domain_generation");
+    ref.claim_generation = VectorNumber(ref_member, "claim_generation");
+    ref.trust_epoch = VectorNumber(ref_member, "trust_epoch");
+    const std::string ack_expected = VectorString(ack, "canonical_utf8");
+    const std::string ack_built = DeviceClaimConsumerCore::ClaimGrantAckProofJson(
+        VectorString(ack_document, "enrollment_id"),
+        VectorString(ack_document, "grant_id"), ref);
+    assert(ack_built == ack_expected);
+    cJSON_Delete(ack);
+
+    // The vectors are not the same document wearing two names, and neither is
+    // empty: a fixture pair that had collapsed into one would let a device sign
+    // an acknowledgement where a collection was asked for, with both assertions
+    // above still passing.
+    assert(!collection_expected.empty() && !ack_expected.empty());
+    assert(collection_expected != ack_expected);
 }
 
 void CanonicalProposalParsingFailsClosed() {
@@ -656,6 +736,7 @@ void StorageThatCannotForgetIsNotReportedAsProgress() {
 
 int main() {
     GoldenAadAndFiveFieldDeviceRefAreExact();
+    TheSignedProofBytesAreTheGoldenVectorBytes();
     CanonicalProposalParsingFailsClosed();
     ProposalCollectionGrantAckAndActivationResumeForwardOnly();
     ActiveClaimCommitWinsPowerLossBeforeEnrollmentCleanup();

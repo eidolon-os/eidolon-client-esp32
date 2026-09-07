@@ -1,0 +1,105 @@
+{
+  "vector_id": "DF-LIVEKIT-SESSION-BINDING-001",
+  "description": "The document a Channel Provider seals into `ChannelBinding.opaque_binding`, and the exact bytes a Body decodes back out of it. The Authority relays it without reading it; this vector is the agreement between the two ends that do.",
+  "no_schema_because": "The canonical schemas are held host- and transport-independent, and conformance enforces it: `room_name` is a refused key and `livekit` a refused substring in every *.schema.json and valid example. That rule is right and this document does not get an exception from it — a Body's addressing must not be describable in the vocabulary every Body shares. So the agreement between the Provider and the Body lives here, in a vector, where naming a transport is exactly what the artifact is for.",
+  "binding_format": "application/vnd.eidolon.livekit-session+json;v=2",
+  "binding": {
+    "schema_version": 2,
+    "session": {
+      "server_url": "wss://livekit.owner.test:7880",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJBUElleGFtcGxlIiwic3ViIjoiZGV2aWNlIiwidmlkZW8iOnsicm9vbSI6ImV4YW1wbGUifX0.Wm9uMV9zaWduYXR1cmVfcGxhY2Vob2xkZXJfZm9yX2Egdmlld2Vy",
+      "identity": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+      "room_name": "eidolon-device-9f1c0a4d2b6e8f3a5c7d1e04"
+    },
+    "audio": {
+      "sample_rate": 16000,
+      "channels": 1
+    }
+  },
+  "canonical_utf8": "{\"audio\":{\"channels\":1,\"sample_rate\":16000},\"schema_version\":2,\"session\":{\"identity\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"room_name\":\"eidolon-device-9f1c0a4d2b6e8f3a5c7d1e04\",\"server_url\":\"wss://livekit.owner.test:7880\",\"token\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJBUElleGFtcGxlIiwic3ViIjoiZGV2aWNlIiwidmlkZW8iOnsicm9vbSI6ImV4YW1wbGUifX0.Wm9uMV9zaWduYXR1cmVfcGxhY2Vob2xkZXJfZm9yX2Egdmlld2Vy\"}}",
+  "canonical_sha256": "sha256:10c1a014d51ab0626e1716a79c77d236cae1d7da8d399dd900f6a577352e87ea",
+  "opaque_binding_encoding": "base64-standard-with-padding",
+  "opaque_binding": "eyJhdWRpbyI6eyJjaGFubmVscyI6MSwic2FtcGxlX3JhdGUiOjE2MDAwfSwic2NoZW1hX3ZlcnNpb24iOjIsInNlc3Npb24iOnsiaWRlbnRpdHkiOiJkZXZpY2UtaW5zdGFuY2UtNTkxZDdjNjJkMGJjNzM4Mzc2OTM1Zjc3ZmYyYWNkNTQ3MmJiZWU2NDIwN2E3NjVkZjAzYWY2ZDYyNDBjMDdkYyIsInJvb21fbmFtZSI6ImVpZG9sb24tZGV2aWNlLTlmMWMwYTRkMmI2ZThmM2E1YzdkMWUwNCIsInNlcnZlcl91cmwiOiJ3c3M6Ly9saXZla2l0Lm93bmVyLnRlc3Q6Nzg4MCIsInRva2VuIjoiZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SnBjM01pT2lKQlVFbGxlR0Z0Y0d4bElpd2ljM1ZpSWpvaVpHVjJhV05sSWl3aWRtbGtaVzhpT25zaWNtOXZiU0k2SW1WNFlXMXdiR1VpZlgwLldtOXVNVjl6YVdkdVlYUjFjbVZmY0d4aFkyVm9iMnhrWlhKZlptOXlYMkVnZG1sbGQyVnkifX0=",
+  "not_the_opaque_binding": {
+    "base64url_no_padding": "eyJhdWRpbyI6eyJjaGFubmVscyI6MSwic2FtcGxlX3JhdGUiOjE2MDAwfSwic2NoZW1hX3ZlcnNpb24iOjIsInNlc3Npb24iOnsiaWRlbnRpdHkiOiJkZXZpY2UtaW5zdGFuY2UtNTkxZDdjNjJkMGJjNzM4Mzc2OTM1Zjc3ZmYyYWNkNTQ3MmJiZWU2NDIwN2E3NjVkZjAzYWY2ZDYyNDBjMDdkYyIsInJvb21fbmFtZSI6ImVpZG9sb24tZGV2aWNlLTlmMWMwYTRkMmI2ZThmM2E1YzdkMWUwNCIsInNlcnZlcl91cmwiOiJ3c3M6Ly9saXZla2l0Lm93bmVyLnRlc3Q6Nzg4MCIsInRva2VuIjoiZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SnBjM01pT2lKQlVFbGxlR0Z0Y0d4bElpd2ljM1ZpSWpvaVpHVjJhV05sSWl3aWRtbGtaVzhpT25zaWNtOXZiU0k2SW1WNFlXMXdiR1VpZlgwLldtOXVNVjl6YVdkdVlYUjFjbVZmY0d4aFkyVm9iMnhrWlhKZlptOXlYMkVnZG1sbGQyVnkifX0"
+  },
+  "member_paths": [
+    "audio.channels",
+    "audio.sample_rate",
+    "schema_version",
+    "session.identity",
+    "session.room_name",
+    "session.server_url",
+    "session.token"
+  ],
+  "must_refuse": [
+    {
+      "case_id": "DF-LIVEKIT-SESSION-BINDING-SCHEMA-VERSION-3",
+      "why": "A version this vocabulary does not define. Reading it as if it were 2 is how a field that moved becomes a Body holding a room it cannot use.",
+      "binding": {
+        "schema_version": 3,
+        "session": {
+          "server_url": "wss://livekit.owner.test:7880",
+          "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJBUElleGFtcGxlIiwic3ViIjoiZGV2aWNlIiwidmlkZW8iOnsicm9vbSI6ImV4YW1wbGUifX0.Wm9uMV9zaWduYXR1cmVfcGxhY2Vob2xkZXJfZm9yX2Egdmlld2Vy",
+          "identity": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+          "room_name": "eidolon-device-9f1c0a4d2b6e8f3a5c7d1e04"
+        },
+        "audio": {
+          "sample_rate": 16000,
+          "channels": 1
+        }
+      }
+    },
+    {
+      "case_id": "DF-LIVEKIT-SESSION-BINDING-NO-TOKEN",
+      "why": "A room nobody may enter is not a channel, and an empty token is not one.",
+      "binding": {
+        "schema_version": 2,
+        "session": {
+          "server_url": "wss://livekit.owner.test:7880",
+          "token": "",
+          "identity": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+          "room_name": "eidolon-device-9f1c0a4d2b6e8f3a5c7d1e04"
+        },
+        "audio": {
+          "sample_rate": 16000,
+          "channels": 1
+        }
+      }
+    },
+    {
+      "case_id": "DF-LIVEKIT-SESSION-BINDING-SAMPLE-RATE-OUT-OF-RANGE",
+      "why": "Outside the range a Body in this system opens a capture at. A rate accepted and then not honoured is silence with nothing reporting it.",
+      "binding": {
+        "schema_version": 2,
+        "session": {
+          "server_url": "wss://livekit.owner.test:7880",
+          "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJBUElleGFtcGxlIiwic3ViIjoiZGV2aWNlIiwidmlkZW8iOnsicm9vbSI6ImV4YW1wbGUifX0.Wm9uMV9zaWduYXR1cmVfcGxhY2Vob2xkZXJfZm9yX2Egdmlld2Vy",
+          "identity": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+          "room_name": "eidolon-device-9f1c0a4d2b6e8f3a5c7d1e04"
+        },
+        "audio": {
+          "sample_rate": 96000,
+          "channels": 1
+        }
+      }
+    },
+    {
+      "case_id": "DF-LIVEKIT-SESSION-BINDING-THREE-CHANNELS",
+      "why": "Mono or stereo. There is no third thing a Body knows how to play.",
+      "binding": {
+        "schema_version": 2,
+        "session": {
+          "server_url": "wss://livekit.owner.test:7880",
+          "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJBUElleGFtcGxlIiwic3ViIjoiZGV2aWNlIiwidmlkZW8iOnsicm9vbSI6ImV4YW1wbGUifX0.Wm9uMV9zaWduYXR1cmVfcGxhY2Vob2xkZXJfZm9yX2Egdmlld2Vy",
+          "identity": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+          "room_name": "eidolon-device-9f1c0a4d2b6e8f3a5c7d1e04"
+        },
+        "audio": {
+          "sample_rate": 16000,
+          "channels": 3
+        }
+      }
+    }
+  ]
+}
