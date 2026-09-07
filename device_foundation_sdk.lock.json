@@ -1,5 +1,5 @@
 {
-  "sdk_commit": "221287692d97855dcc366923b75263ecbb95f09e",
+  "sdk_commit": "394abcbf747928dfc482fe02f9356046a438b043",
   "files": [
     {
       "source": "contracts/device_foundation/v1/generated/cpp/device_foundation_v1_generated.h",
@@ -24,7 +24,7 @@
     {
       "source": "contracts/device_foundation/v1/golden/claim-grant-aad.json",
       "target": "tests/fixtures/device_foundation_v1/claim-grant-aad.json",
-      "sha256": "b7b17253f549c7bd0a39852b42de403c41974dafeb842bfa5f71e46540a6407e"
+      "sha256": "0fa64032f0830a382ed81ea53afac3558de5d3593518d0160f2ad03c1cc794a9"
     },
     {
       "source": "contracts/device_foundation/v1/golden/claim-grant-wire-envelope.json",

@@ -18,6 +18,7 @@
     "trust_epoch": 4,
     "grant_id": "grant_01"
   },
+  "canonical_aad_utf8": "{\"claim_generation\":2,\"contract\":\"eidolon.device-foundation.claim-grant-aad\",\"device_instance_id\":\"device-instance-3164c593258209d757654dbd421d2bd9732fe088bce70d8c90be15dd98b587ba\",\"enrollment_id\":\"enrollment_01\",\"grant_id\":\"grant_01\",\"hardware_evidence_digest\":\"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"manifest_ref\":{\"digest\":\"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"manifest_id\":\"manifest_01\",\"revision\":7},\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"profile_id\":\"eidolon-trust-p256-hpke-v1\",\"proposal_revision\":3,\"trust_epoch\":4}",
   "canonical_aad_sha256": "a3dabb42b900ff0d807adf22a4b96f726705e1f88cbe3e9d1bc8ac1b5fe53d94",
   "test_aead": "AES-128-GCM",
   "test_key": "000102030405060708090a0b0c0d0e0f",

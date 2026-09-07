@@ -50,7 +50,11 @@ def main() -> None:
     assert decided["decided_by"]["principal_type"] == "controller"
 
     aad = json.loads((FIXTURES / "claim-grant-aad.json").read_text())
-    digest = hashlib.sha256(canonical(aad["aad"]).encode()).hexdigest()
+    # Both forms the vector publishes, because the C++ builder is held to the
+    # string and this file is the only place that can say the string and the
+    # digest are two spellings of one document.
+    assert canonical(aad["aad"]) == aad["canonical_aad_utf8"]
+    digest = hashlib.sha256(aad["canonical_aad_utf8"].encode()).hexdigest()
     assert digest == aad["canonical_aad_sha256"]
     for field in aad["mutate_each_field_must_fail"]:
         mutated = dict(aad["aad"])

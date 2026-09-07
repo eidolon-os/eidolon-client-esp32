@@ -232,37 +232,13 @@ void Record(Stores& stores, Crypto& crypto, DeviceClaimConsumerCore& core) {
     crypto.SetValidGrant(stores.enrollment);
 }
 
-void GoldenAadAndFiveFieldDeviceRefAreExact() {
-    Stores stores;
-    Crypto crypto;
-    DeviceClaimConsumerCore core(stores, stores, crypto);
-    Record(stores, crypto, core);
-    const std::string expected =
-        std::string("{\"claim_generation\":2,") +
-        "\"contract\":\"eidolon.device-foundation.claim-grant-aad\"," +
-        "\"device_instance_id\":\"device_01\"," +
-        "\"enrollment_id\":\"enrollment_01\",\"grant_id\":\"grant_01\"," +
-        "\"hardware_evidence_digest\":\"" + kHardwareDigest + "\"," +
-        "\"manifest_ref\":{\"digest\":\"" + kManifestDigest +
-        "\",\"manifest_id\":\"manifest_01\",\"revision\":2}," +
-        "\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\"," +
-        "\"profile_id\":\"eidolon-trust-p256-hpke-v1\"," +
-        "\"proposal_revision\":1,\"trust_epoch\":1}";
-    assert(crypto.expected_aad == expected);
-    const std::string ref = DeviceClaimConsumerCore::DeviceRefJson(Ref());
-    assert(ref ==
-           "{\"claim_generation\":2,\"device_instance_id\":\"device_01\","
-           "\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\","
-           "\"trust_epoch\":1}");
-}
-
-// The Device Foundation proof vectors, synced byte-for-byte from the SDK by
-// scripts/sync_device_foundation_v1.py. Read rather than restated: the two
-// documents below are never sent, so the only way this device learns it spells
-// one differently from the Authority is a refused proof at the step of
-// enrolment it cannot retry its way out of — and an inlined copy of the bytes
-// would agree with itself while doing exactly that.
-std::string ReadProofVector(const char* name) {
+// The Device Foundation golden vectors, synced byte-for-byte from the SDK by
+// scripts/sync_device_foundation_v1.py. Read rather than restated: none of the
+// documents below is ever sent, so the only way this device learns it spells
+// one differently from the Authority is a refused proof, or an AEAD that will
+// not open, at the step of enrolment it cannot retry its way out of — and an
+// inlined copy of the bytes would agree with itself while doing exactly that.
+std::string ReadGoldenVector(const char* name) {
     std::ifstream file(std::string("tests/fixtures/device_foundation_v1/") + name);
     assert(file.is_open());
     std::ostringstream buffer;
@@ -289,9 +265,48 @@ uint64_t VectorNumber(const cJSON* object, const char* key) {
     return static_cast<uint64_t>(item->valuedouble);
 }
 
+// The AAD is the sharpest case for reading the vector: it is not a document
+// either end transmits, it is the additional data both ends feed their AEAD
+// from the Proposal they hold, so a member this device spells differently
+// arrives as a ClaimGrant that will not open — a tag failure, which reads as a
+// key or a transport problem. The vector's own AAD drives the builder, and its
+// values are deliberately not the fixture harness's: `Aad()` above carries
+// device_01 with proposal_revision 1 and trust_epoch 1, so an expectation built
+// from the harness rather than from the vector cannot satisfy this.
+//
+// `contract` and `profile_id` are not members of ClaimGrantAAD — the builder
+// writes both as literals — and comparing the whole canonical string is what
+// holds those literals to the vector's.
+void TheClaimGrantAadIsTheGoldenVectorBytes() {
+    const std::string raw = ReadGoldenVector("claim-grant-aad.json");
+    cJSON* vector = cJSON_ParseWithLength(raw.data(), raw.size());
+    assert(cJSON_IsObject(vector));
+    const cJSON* document = RequiredMember(vector, "aad");
+    const cJSON* manifest = RequiredMember(document, "manifest_ref");
+    ClaimGrantAAD aad;
+    aad.enrollment_id = VectorString(document, "enrollment_id");
+    aad.proposal_revision = VectorNumber(document, "proposal_revision");
+    aad.device_instance_id = VectorString(document, "device_instance_id");
+    aad.hardware_evidence_digest =
+        VectorString(document, "hardware_evidence_digest");
+    aad.manifest_ref.manifest_id = VectorString(manifest, "manifest_id");
+    aad.manifest_ref.revision = VectorNumber(manifest, "revision");
+    aad.manifest_ref.digest = VectorString(manifest, "digest");
+    aad.owner_domain_id.value = VectorString(document, "owner_domain_id");
+    aad.owner_domain_generation =
+        VectorNumber(document, "owner_domain_generation");
+    aad.claim_generation = VectorNumber(document, "claim_generation");
+    aad.trust_epoch = VectorNumber(document, "trust_epoch");
+    aad.grant_id = VectorString(document, "grant_id");
+    const std::string expected = VectorString(vector, "canonical_aad_utf8");
+    assert(DeviceClaimConsumerCore::ClaimGrantAad(aad) == expected);
+    assert(!expected.empty());
+    cJSON_Delete(vector);
+}
+
 void TheSignedProofBytesAreTheGoldenVectorBytes() {
     const std::string collection_raw =
-        ReadProofVector("claim-grant-collection-proof.json");
+        ReadGoldenVector("claim-grant-collection-proof.json");
     cJSON* collection = cJSON_ParseWithLength(
         collection_raw.data(), collection_raw.size());
     assert(cJSON_IsObject(collection));
@@ -306,7 +321,7 @@ void TheSignedProofBytesAreTheGoldenVectorBytes() {
     assert(collection_built == collection_expected);
     cJSON_Delete(collection);
 
-    const std::string ack_raw = ReadProofVector("claim-grant-ack-proof.json");
+    const std::string ack_raw = ReadGoldenVector("claim-grant-ack-proof.json");
     cJSON* ack = cJSON_ParseWithLength(ack_raw.data(), ack_raw.size());
     assert(cJSON_IsObject(ack));
     const cJSON* ack_document = RequiredMember(ack, "document");
@@ -735,7 +750,7 @@ void StorageThatCannotForgetIsNotReportedAsProgress() {
 }  // namespace
 
 int main() {
-    GoldenAadAndFiveFieldDeviceRefAreExact();
+    TheClaimGrantAadIsTheGoldenVectorBytes();
     TheSignedProofBytesAreTheGoldenVectorBytes();
     CanonicalProposalParsingFailsClosed();
     ProposalCollectionGrantAckAndActivationResumeForwardOnly();
