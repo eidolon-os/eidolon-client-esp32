@@ -2763,7 +2763,7 @@ void EidolonVoiceController::HandleRoomJoinCommand(const std::string& command_id
     if (!payload.empty()) {
         cJSON* root = cJSON_Parse(payload.c_str());
         if (root != nullptr) {
-            const cJSON* intent = cJSON_GetObjectItem(root, "session_intent");
+            const cJSON* intent = cJSON_GetObjectItem(root, kSessionIntentField);
             if (cJSON_IsString(intent) && intent->valuestring != nullptr) {
                 const char* value = intent->valuestring;
                 if (strcmp(value, kSessionIntentPresence) == 0 ||

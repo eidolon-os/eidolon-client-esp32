@@ -91,6 +91,7 @@ inline constexpr const char* kGuardOwnerPresenceType = "guard.owner_presence";
 inline constexpr const char* kInteractionModeHalfDuplex = "half_duplex";
 inline constexpr const char* kInteractionModeFullDuplex = "full_duplex";
 inline constexpr const char* kInteractionModePtt = "ptt";
+inline constexpr const char* kSessionIntentField = "session_intent";
 inline constexpr const char* kSessionIntentUserInitiated = "user_initiated";
 inline constexpr const char* kSessionIntentPresence = "presence_initiated";
 inline constexpr const char* kSessionIntentProactive = "proactive_initiated";
