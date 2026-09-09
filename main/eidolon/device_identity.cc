@@ -5,13 +5,10 @@
 #include <esp_log.h>
 #include <esp_random.h>
 #include <esp_timer.h>
+#include "mbedtls_compat.h"
 #include <mbedtls/base64.h>
 #include <mbedtls/asn1.h>
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/esp_mbedtls_random.h>
 #include <mbedtls/pk.h>
-#include <mbedtls/sha256.h>
 
 #include <ctime>
 #include <cstring>
@@ -84,10 +81,23 @@ std::string RequestTimestamp() {
 }
 
 esp_err_t SeedCtrDrbg(mbedtls_entropy_context& entropy, mbedtls_ctr_drbg_context& ctr_drbg) {
+#if EIDOLON_MBEDTLS_LEGACY_PUBLIC
     mbedtls_entropy_init(&entropy);
+#else
+    // mbedtls 4 dropped the standalone entropy module; PSA owns entropy now and
+    // there is no MBEDTLS_ENTROPY_C to turn back on. Seed the DRBG from
+    // eidolon_mbedtls_random instead — the hardware RNG this file already trusts for
+    // key parsing and signing, with a matching callback signature.
+    (void)entropy;
+#endif
     mbedtls_ctr_drbg_init(&ctr_drbg);
     const char* personal = "eidolon-device";
-    int ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy,
+    int ret = mbedtls_ctr_drbg_seed(&ctr_drbg,
+#if EIDOLON_MBEDTLS_LEGACY_PUBLIC
+                                    mbedtls_entropy_func, &entropy,
+#else
+                                    eidolon_mbedtls_random, nullptr,
+#endif
                                     reinterpret_cast<const unsigned char*>(personal),
                                     strlen(personal));
     if (ret != 0) {
@@ -161,22 +171,18 @@ esp_err_t DeviceIdentity::CreateKeypair() {
     mbedtls_ctr_drbg_context ctr_drbg;
     if (SeedCtrDrbg(entropy, ctr_drbg) != ESP_OK) {
         mbedtls_ctr_drbg_free(&ctr_drbg);
-        mbedtls_entropy_free(&entropy);
+        EIDOLON_ENTROPY_FREE(&entropy);
         return ESP_FAIL;
     }
 
     mbedtls_pk_context pk;
     mbedtls_pk_init(&pk);
-    int ret = mbedtls_pk_setup(&pk, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
-    if (ret == 0) {
-        ret = mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_SECP256R1, mbedtls_pk_ec(pk),
-                                  mbedtls_ctr_drbg_random, &ctr_drbg);
-    }
+    int ret = eidolon_pk_gen_p256(&pk, &ctr_drbg);
     if (ret != 0) {
         ESP_LOGE(TAG, "P-256 key generation failed: -0x%04x", -ret);
         mbedtls_pk_free(&pk);
         mbedtls_ctr_drbg_free(&ctr_drbg);
-        mbedtls_entropy_free(&entropy);
+        EIDOLON_ENTROPY_FREE(&entropy);
         return ESP_FAIL;
     }
 
@@ -186,7 +192,7 @@ esp_err_t DeviceIdentity::CreateKeypair() {
         ESP_LOGE(TAG, "write private key PEM failed: -0x%04x", -ret);
         mbedtls_pk_free(&pk);
         mbedtls_ctr_drbg_free(&ctr_drbg);
-        mbedtls_entropy_free(&entropy);
+        EIDOLON_ENTROPY_FREE(&entropy);
         return ESP_FAIL;
     }
     private_key_pem_ = reinterpret_cast<const char*>(pem);
@@ -195,7 +201,7 @@ esp_err_t DeviceIdentity::CreateKeypair() {
 
     mbedtls_pk_free(&pk);
     mbedtls_ctr_drbg_free(&ctr_drbg);
-    mbedtls_entropy_free(&entropy);
+    EIDOLON_ENTROPY_FREE(&entropy);
 
     ESP_LOGI(TAG, "Generated device P-256 keypair");
     return LoadPublicKeyFromPrivateKey();
@@ -204,9 +210,9 @@ esp_err_t DeviceIdentity::CreateKeypair() {
 esp_err_t DeviceIdentity::LoadPublicKeyFromPrivateKey() {
     mbedtls_pk_context pk;
     mbedtls_pk_init(&pk);
-    int ret = mbedtls_pk_parse_key(&pk,
+    int ret = eidolon_pk_parse_key(&pk,
                                    reinterpret_cast<const unsigned char*>(private_key_pem_.c_str()),
-                                   private_key_pem_.size() + 1, nullptr, 0, mbedtls_esp_random,
+                                   private_key_pem_.size() + 1, nullptr, 0, eidolon_mbedtls_random,
                                    nullptr);
     if (ret != 0) {
         ESP_LOGE(TAG, "parse private key failed: -0x%04x", -ret);
@@ -214,6 +220,12 @@ esp_err_t DeviceIdentity::LoadPublicKeyFromPrivateKey() {
         return ESP_FAIL;
     }
 
+    // device_instance_id is sha256 over SPKI DER, and three other implementations
+    // (SDK Python, mobile Dart, the contract pattern) derive it the same way. A PSA
+    // port must keep serialising through mbedtls_pk_write_pubkey_der — which mbedtls
+    // 4 still publishes — or re-wrap into SPKI first: psa_export_public_key returns a
+    // raw uncompressed point, and hashing that yields a different id for the same
+    // key, which Hub rejects with a 422 that names nothing.
     unsigned char der[256] = {};
     ret = mbedtls_pk_write_pubkey_der(&pk, der, sizeof(der));
     if (ret < 0) {
@@ -240,13 +252,13 @@ esp_err_t DeviceIdentity::SignCanonical(const std::string& canonical, std::strin
     mbedtls_ctr_drbg_context ctr_drbg;
     if (SeedCtrDrbg(entropy, ctr_drbg) != ESP_OK) {
         mbedtls_ctr_drbg_free(&ctr_drbg);
-        mbedtls_entropy_free(&entropy);
+        EIDOLON_ENTROPY_FREE(&entropy);
         return ESP_FAIL;
     }
 
     mbedtls_pk_context pk;
     mbedtls_pk_init(&pk);
-    int ret = mbedtls_pk_parse_key(&pk,
+    int ret = eidolon_pk_parse_key(&pk,
                                    reinterpret_cast<const unsigned char*>(private_key_pem_.c_str()),
                                    private_key_pem_.size() + 1, nullptr, 0, mbedtls_ctr_drbg_random,
                                    &ctr_drbg);
@@ -254,7 +266,7 @@ esp_err_t DeviceIdentity::SignCanonical(const std::string& canonical, std::strin
         ESP_LOGE(TAG, "parse signing key failed: -0x%04x", -ret);
         mbedtls_pk_free(&pk);
         mbedtls_ctr_drbg_free(&ctr_drbg);
-        mbedtls_entropy_free(&entropy);
+        EIDOLON_ENTROPY_FREE(&entropy);
         return ESP_FAIL;
     }
 
@@ -262,13 +274,13 @@ esp_err_t DeviceIdentity::SignCanonical(const std::string& canonical, std::strin
     mbedtls_sha256(reinterpret_cast<const unsigned char*>(canonical.data()), canonical.size(), hash, 0);
     unsigned char sig[MBEDTLS_PK_SIGNATURE_MAX_SIZE];
     size_t sig_len = 0;
-    ret = mbedtls_pk_sign(&pk, MBEDTLS_MD_SHA256, hash, sizeof(hash), sig, sizeof(sig), &sig_len,
+    ret = eidolon_pk_sign(&pk, MBEDTLS_MD_SHA256, hash, sizeof(hash), sig, sizeof(sig), &sig_len,
                           mbedtls_ctr_drbg_random, &ctr_drbg);
     if (ret != 0) {
         ESP_LOGE(TAG, "sign config request failed: -0x%04x", -ret);
         mbedtls_pk_free(&pk);
         mbedtls_ctr_drbg_free(&ctr_drbg);
-        mbedtls_entropy_free(&entropy);
+        EIDOLON_ENTROPY_FREE(&entropy);
         return ESP_FAIL;
     }
 
@@ -277,13 +289,13 @@ esp_err_t DeviceIdentity::SignCanonical(const std::string& canonical, std::strin
         ESP_LOGE(TAG, "ECDSA signature was not canonical DER");
         mbedtls_pk_free(&pk);
         mbedtls_ctr_drbg_free(&ctr_drbg);
-        mbedtls_entropy_free(&entropy);
+        EIDOLON_ENTROPY_FREE(&entropy);
         return ESP_FAIL;
     }
     signature = Base64Url(raw_signature, sizeof(raw_signature));
     mbedtls_pk_free(&pk);
     mbedtls_ctr_drbg_free(&ctr_drbg);
-    mbedtls_entropy_free(&entropy);
+    EIDOLON_ENTROPY_FREE(&entropy);
     return signature.empty() ? ESP_FAIL : ESP_OK;
 }
 

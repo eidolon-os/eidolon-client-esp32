@@ -130,6 +130,8 @@ elseif(CONFIG_BOARD_TYPE_DF_K10)
     set(DEFAULT_EMOJI_COLLECTION noto-emoji_128)
 elseif(CONFIG_BOARD_TYPE_DF_S3_AI_CAM)
     set(BOARD_TYPE "df-s3-ai-cam")
+elseif(CONFIG_BOARD_TYPE_KORVO_1)
+    set(BOARD_TYPE "korvo-1")
 elseif(CONFIG_BOARD_TYPE_ESP_BOX_3)
     set(BOARD_TYPE "esp-box-3")
     set(BUILTIN_TEXT_FONT font_noto_basic_20_4)
@@ -1096,6 +1098,7 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/claim_grant_hpke_schedule.cc"
         "eidolon/device_identity.cc"
         "eidolon/esp_idf_claim_grant_crypto.cc"
+        "eidolon/esp_peer_hmac_sha1_override.c"
         "eidolon/eidolon_lvgl_theme.cc"
         "eidolon/fonts/font_eidolon_ui_30.c"
         "eidolon/eidolon_ui_labels.cc"
@@ -1258,6 +1261,9 @@ idf_component_register(SRCS ${SOURCES}
                         spi_flash
                         console
                         efuse
+                        # mqtt_protocol.h includes mbedtls/aes.h directly. On ESP-IDF 5
+                        # another component happened to re-export mbedtls; 6 does not.
+                        mbedtls
                         bt
                         fatfs
                         # Device provisioning (protocomm over SoftAP or BLE). This has to be
@@ -1265,7 +1271,13 @@ idf_component_register(SRCS ${SOURCES}
                         # CMake's early expansion pass, where CONFIG_ values are not yet
                         # defined, so a requirement inside `if(CONFIG_EIDOLON_HUB_MODE)` is
                         # silently dropped and the headers then go missing at compile time.
-                        wifi_provisioning
+                        #
+                        # espressif/network_provisioning, not the in-tree wifi_provisioning:
+                        # ESP-IDF 6 removed that component and did not republish it, and this
+                        # managed component — which generalizes the same protocomm manager
+                        # over Wi-Fi and Thread — is what replaces it. It builds on IDF 5 too,
+                        # so every board uses one provisioning implementation.
+                        espressif__network_provisioning
                         ${MAIN_PRIV_REQUIRES_EXTRA}
                     )
 
@@ -1278,6 +1290,15 @@ target_compile_definitions(${COMPONENT_LIB}
                     PRIVATE BOARD_TYPE=\"${BOARD_TYPE}\" BOARD_NAME=\"${BOARD_NAME}\"
                     PRIVATE BUILTIN_TEXT_FONT=${BUILTIN_TEXT_FONT} BUILTIN_ICON_FONT=${BUILTIN_ICON_FONT}
                     )
+
+# esp_peer's IDF v6 HMAC-SHA1 helper zeroes the MAC when mbedtls_md_hmac()
+# fails, and tells no one, so a failed allocation turns into STUN messages
+# signed with twenty zero bytes and a peer connection that dies every 30s. Route
+# the ICE agent's only call site to the allocation-free implementation in
+# eidolon/esp_peer_hmac_sha1_override.c, which explains the whole fault in full.
+if(CONFIG_IDF_TARGET_ESP32S31)
+    target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--wrap=utils_get_hmac_sha1")
+endif()
 
 # Add generation rules
 add_custom_command(

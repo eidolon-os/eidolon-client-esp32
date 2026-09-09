@@ -1,4 +1,5 @@
 #include "hub_config_client.h"
+#include "mbedtls_compat.h"
 
 #include "board.h"
 #include "device_identity.h"
@@ -13,7 +14,6 @@
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <mbedtls/sha256.h>
 
 #include <algorithm>
 #include <cctype>

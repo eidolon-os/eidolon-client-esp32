@@ -221,7 +221,14 @@ RgbLcdDisplay::RgbLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
     const lvgl_port_display_cfg_t display_cfg = {
         .io_handle = panel_io_,
         .panel_handle = panel_,
-        .buffer_size = static_cast<uint32_t>(width_ * 20),
+        // direct_mode draws straight into the framebuffer LVGL is given, so
+        // esp_lvgl_port requires it to be the whole screen: it asserts
+        // hres * vres == buffer_size. A partial buffer (this used to ask for 20
+        // lines) fails that check and the display is never created. Nothing extra
+        // is allocated by asking for the full size here — with avoid_tearing and
+        // num_fbs=2 below, the RGB path hands LVGL the panel's own framebuffers,
+        // which live in PSRAM and are screen-sized already.
+        .buffer_size = static_cast<uint32_t>(width_ * height_),
         .double_buffer = true,
         .hres = static_cast<uint32_t>(width_),
         .vres = static_cast<uint32_t>(height_),

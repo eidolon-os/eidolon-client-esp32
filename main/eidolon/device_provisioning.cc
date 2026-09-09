@@ -14,12 +14,12 @@
 #include <esp_random.h>
 #include <esp_timer.h>
 #include <esp_wifi.h>
-#include <wifi_provisioning/manager.h>
+#include <network_provisioning/manager.h>
 #include <protocomm_security.h>
 #if CONFIG_EIDOLON_PROVISIONING_TRANSPORT_BLE
-#include <wifi_provisioning/scheme_ble.h>
+#include <network_provisioning/scheme_ble.h>
 #else
-#include <wifi_provisioning/scheme_softap.h>
+#include <network_provisioning/scheme_softap.h>
 #endif
 
 #include <cstdlib>
@@ -250,12 +250,12 @@ void DeviceProvisioningService::HandleProvisioningEvent(void*, const char* event
         return;
     }
     switch (event_id) {
-    case WIFI_PROV_START:
+    case NETWORK_PROV_START:
         ESP_LOGI(TAG, "Provisioning session open as %s", ServiceName().c_str());
         self.manager_started_.store(true, std::memory_order_release);
         self.MaybeReportReady();
         break;
-    case WIFI_PROV_CRED_RECV: {
+    case NETWORK_PROV_WIFI_CRED_RECV: {
         // The vendor stack has applied this candidate only to the live Wi-Fi
         // driver. This callback copies bounded evidence and returns; only the
         // commissioning actor may decide whether it becomes durable.
@@ -272,7 +272,7 @@ void DeviceProvisioningService::HandleProvisioningEvent(void*, const char* event
         }
         break;
     }
-    case WIFI_PROV_CRED_FAIL:
+    case NETWORK_PROV_WIFI_CRED_FAIL:
         // Unlike the endpoint this replaces, a wrong password is reported to the
         // controller while it is still connected, before anything is torn down.
         ESP_LOGW(TAG, "Provisioned network did not come up; controller was told");
@@ -280,13 +280,13 @@ void DeviceProvisioningService::HandleProvisioningEvent(void*, const char* event
             self.events_.wifi_connection_failed(generation);
         }
         break;
-    case WIFI_PROV_CRED_SUCCESS:
+    case NETWORK_PROV_WIFI_CRED_SUCCESS:
         ESP_LOGI(TAG, "Provisioned network came up");
         if (self.events_.wifi_connected) {
             self.events_.wifi_connected(generation);
         }
         break;
-    case WIFI_PROV_END:
+    case NETWORK_PROV_END:
         self.manager_started_.store(false, std::memory_order_release);
         // This callback never destroys resources. An unsolicited SDK end is
         // evidence for the actor; an actor-initiated end is already converging
@@ -306,7 +306,7 @@ esp_err_t DeviceProvisioningService::RegisterEventHandlers()
     const uint32_t generation =
         transport_generation_.load(std::memory_order_acquire);
     esp_err_t err = esp_event_handler_instance_register(
-        WIFI_PROV_EVENT, ESP_EVENT_ANY_ID, &HandleProvisioningEvent, nullptr,
+        NETWORK_PROV_EVENT, ESP_EVENT_ANY_ID, &HandleProvisioningEvent, nullptr,
         &provisioning_event_instance_);
     if (err != ESP_OK) return err;
     resources_.Own(generation, CommissioningTransportResource::EventHandlers);
@@ -344,7 +344,7 @@ esp_err_t DeviceProvisioningService::StartOwnedHttpServer()
     resources_.Own(generation, CommissioningTransportResource::HttpServer);
     // ESP-IDF's API is typed as void*, but protocomm expects the stable address
     // of the handle and dereferences it while registering every endpoint.
-    wifi_prov_scheme_softap_set_httpd_handle(&httpd_handle_);
+    network_prov_scheme_softap_set_httpd_handle(&httpd_handle_);
     ESP_LOGI(TAG, "Owned commissioning HTTP server has %u URI slots",
              static_cast<unsigned>(config.max_uri_handlers));
     return ESP_OK;
@@ -384,10 +384,10 @@ esp_err_t DeviceProvisioningService::StartTransport()
     security_params_.verifier = reinterpret_cast<const char*>(verifier_.data());
     security_params_.verifier_len = static_cast<uint16_t>(verifier_.size());
 
-    if (wifi_prov_mgr_endpoint_create(kDescriptorEndpoint) != ESP_OK ||
-        wifi_prov_mgr_endpoint_create(kTrustEndpoint) != ESP_OK ||
-        wifi_prov_mgr_endpoint_create(kStatusEndpoint) != ESP_OK ||
-        wifi_prov_mgr_endpoint_create(kTerminalAckEndpoint) != ESP_OK) {
+    if (network_prov_mgr_endpoint_create(kDescriptorEndpoint) != ESP_OK ||
+        network_prov_mgr_endpoint_create(kTrustEndpoint) != ESP_OK ||
+        network_prov_mgr_endpoint_create(kStatusEndpoint) != ESP_OK ||
+        network_prov_mgr_endpoint_create(kTerminalAckEndpoint) != ESP_OK) {
         ESP_LOGE(TAG, "Could not create the Eidolon provisioning endpoints");
         return ESP_FAIL;
     }
@@ -395,14 +395,14 @@ esp_err_t DeviceProvisioningService::StartTransport()
     // The SDK's default success path closes Protocomm before Eidolon can
     // publish and receive its committed terminal ACK. The commissioning actor
     // is the only component allowed to stop this generation.
-    if (wifi_prov_mgr_disable_auto_stop(1000) != ESP_OK) {
+    if (network_prov_mgr_disable_auto_stop(1000) != ESP_OK) {
         ESP_LOGE(TAG, "Could not transfer transport stop ownership to runtime");
         return ESP_FAIL;
     }
 
     const std::string service_name = ServiceName();
-    const esp_err_t err = wifi_prov_mgr_start_provisioning(
-        WIFI_PROV_SECURITY_2, &security_params_, service_name.c_str(), nullptr);
+    const esp_err_t err = network_prov_mgr_start_provisioning(
+        NETWORK_PROV_SECURITY_2, &security_params_, service_name.c_str(), nullptr);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Provisioning did not start: %s", esp_err_to_name(err));
         return err;
@@ -410,10 +410,10 @@ esp_err_t DeviceProvisioningService::StartTransport()
 
     // Endpoints are registered only once the service is up; the SDK requires
     // this order and unregisters them itself when provisioning stops.
-    if (wifi_prov_mgr_endpoint_register(kDescriptorEndpoint, &HandleDescriptor, nullptr) != ESP_OK ||
-        wifi_prov_mgr_endpoint_register(kTrustEndpoint, &HandleTrust, nullptr) != ESP_OK ||
-        wifi_prov_mgr_endpoint_register(kStatusEndpoint, &HandleStatus, nullptr) != ESP_OK ||
-        wifi_prov_mgr_endpoint_register(kTerminalAckEndpoint, &HandleTerminalAck, nullptr) != ESP_OK) {
+    if (network_prov_mgr_endpoint_register(kDescriptorEndpoint, &HandleDescriptor, nullptr) != ESP_OK ||
+        network_prov_mgr_endpoint_register(kTrustEndpoint, &HandleTrust, nullptr) != ESP_OK ||
+        network_prov_mgr_endpoint_register(kStatusEndpoint, &HandleStatus, nullptr) != ESP_OK ||
+        network_prov_mgr_endpoint_register(kTerminalAckEndpoint, &HandleTerminalAck, nullptr) != ESP_OK) {
         ESP_LOGE(TAG, "Could not register the Eidolon provisioning endpoints");
         return ESP_FAIL;
     }
@@ -488,15 +488,15 @@ esp_err_t DeviceProvisioningService::Start(
         return err;
     }
 
-    wifi_prov_mgr_config_t config = {};
+    network_prov_mgr_config_t config = {};
 #if CONFIG_EIDOLON_PROVISIONING_TRANSPORT_BLE
-    config.scheme = wifi_prov_scheme_ble;
-    config.scheme_event_handler = WIFI_PROV_SCHEME_BLE_EVENT_HANDLER_FREE_BTDM;
+    config.scheme = network_prov_scheme_ble;
+    config.scheme_event_handler = NETWORK_PROV_SCHEME_BLE_EVENT_HANDLER_FREE_BTDM;
 #else
-    config.scheme = wifi_prov_scheme_softap;
-    config.scheme_event_handler = WIFI_PROV_EVENT_HANDLER_NONE;
+    config.scheme = network_prov_scheme_softap;
+    config.scheme_event_handler = NETWORK_PROV_EVENT_HANDLER_NONE;
 #endif
-    err = wifi_prov_mgr_init(config);
+    err = network_prov_mgr_init(config);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Provisioning manager did not initialize: %s", esp_err_to_name(err));
         return err;
@@ -626,7 +626,7 @@ void DeviceProvisioningService::CleanupTransport(uint32_t generation)
         window_timer_ = nullptr;
     }
     if (cleanup.provisioning_manager) {
-        wifi_prov_mgr_deinit();
+        network_prov_mgr_deinit();
     }
     if (cleanup.event_handlers) {
         if (security_event_instance_ != nullptr) {
@@ -637,13 +637,13 @@ void DeviceProvisioningService::CleanupTransport(uint32_t generation)
         }
         if (provisioning_event_instance_ != nullptr) {
             esp_event_handler_instance_unregister(
-                WIFI_PROV_EVENT, ESP_EVENT_ANY_ID,
+                NETWORK_PROV_EVENT, ESP_EVENT_ANY_ID,
                 provisioning_event_instance_);
             provisioning_event_instance_ = nullptr;
         }
     }
 #if !CONFIG_EIDOLON_PROVISIONING_TRANSPORT_BLE
-    wifi_prov_scheme_softap_set_httpd_handle(nullptr);
+    network_prov_scheme_softap_set_httpd_handle(nullptr);
 #endif
     if (cleanup.http_server && httpd_handle_ != nullptr) {
         const esp_err_t stopped =
@@ -656,7 +656,7 @@ void DeviceProvisioningService::CleanupTransport(uint32_t generation)
     }
     bool wifi_driver_stopped = !cleanup.wifi_driver;
     if (cleanup.wifi_driver) {
-        // wifi_prov_mgr_deinit() stops Protocomm and switches APSTA to STA, but
+        // network_prov_mgr_deinit() stops Protocomm and switches APSTA to STA, but
         // deliberately leaves the driver started. Destroying its STA netif in
         // that state and then calling WifiManager::StartStation() cannot emit a
         // fresh WIFI_EVENT_STA_START, so the Station adapter never scans and

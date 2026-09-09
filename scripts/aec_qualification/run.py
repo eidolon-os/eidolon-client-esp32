@@ -261,7 +261,10 @@ def collect_boards() -> list[BoardVariant]:
         board_path = cfg_path.parent.relative_to(BOARDS_DIR).as_posix()
         cfg = read_json(cfg_path)
         target = cfg.get("target")
-        if target not in ("esp32s3", "esp32p4"):
+        # Targets with an esp-sr AFE build. esp-sr 2.4.7 added esp32s31, which
+        # is where ESP32-S31-Korvo-1 lives; keep this in step with the
+        # USE_AUDIO_PROCESSOR "depends on" in main/Kconfig.projbuild.
+        if target not in ("esp32s3", "esp32p4", "esp32s31"):
             continue
         manufacturer = get_manufacturer(cfg)
         if not board_has_reference_hint(board_path):
@@ -381,8 +384,12 @@ def write_overlay(
         "CONFIG_USE_SERVER_AEC=n",
         "CONFIG_USE_AUDIO_DEBUGGER=n",
         "CONFIG_EIDOLON_WAKE_WORD_ENABLE=n",
-        "CONFIG_ESP_CONSOLE_UART_DEFAULT=n",
-        "CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y",
+        # Console routing is a property of the board, not of this harness.
+        # Forcing USB-Serial-JTAG suits boards wired that way (esp-box-3), but
+        # sends every framed event out the wrong connector on a board whose
+        # serial is a UART bridge — korvo-1 speaks over a CP2102N on UART0, so
+        # the run completed and reported no_aecq_events with the capture side
+        # listening to a silent port. Leave whatever the board configures.
     ]
     if box_ref_channel is not None:
         lines.append(f"CONFIG_EIDOLON_AEC_QUALIFICATION_BOX_REF_CHANNEL={box_ref_channel}")

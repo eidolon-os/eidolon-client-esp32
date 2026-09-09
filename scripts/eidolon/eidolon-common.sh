@@ -70,6 +70,18 @@ eidolon_idf_current_version() {
   idf.py --version 2>/dev/null | sed -n 's/.*[vV]\([0-9][0-9.]*\).*/\1/p' | head -1
 }
 
+# Python belonging to the resolved IDF environment. Serial verification must
+# use the board toolchain's interpreter because that environment owns pyserial;
+# accepting an ambient python3 makes verification host-dependent.
+eidolon_idf_python() {
+  local python="${IDF_PYTHON_ENV_PATH:-}/bin/python"
+  if [[ -z "${IDF_PYTHON_ENV_PATH:-}" || ! -x "${python}" ]]; then
+    eidolon__warn "resolved ESP-IDF Python is unavailable; run the board's IDF resolver before verification"
+    return 1
+  fi
+  printf '%s\n' "${python}"
+}
+
 eidolon__idf_export_candidates() {
   local want="$1" home="${HOME:-}"
   [[ -n "${EIDOLON_IDF_EXPORT:-}" ]] && printf '%s\n' "${EIDOLON_IDF_EXPORT}"
@@ -96,10 +108,15 @@ eidolon_idf_ensure() {
 
   local current
   current="$(eidolon_idf_current_version)"
-  if [[ "${current}" == "${want}" ]] && command -v ninja >/dev/null 2>&1; then
+  if [[ "${current}" == "${want}" ]] && command -v ninja >/dev/null 2>&1 &&
+     [[ -n "${IDF_PYTHON_ENV_PATH:-}" && -x "${IDF_PYTHON_ENV_PATH}/bin/python" ]]; then
     EIDOLON_RESOLVED_IDF="${current}"
     export EIDOLON_RESOLVED_IDF
     return 0
+  fi
+  if [[ "${current}" == "${want}" ]] &&
+     { [[ -z "${IDF_PYTHON_ENV_PATH:-}" ]] || [[ ! -x "${IDF_PYTHON_ENV_PATH}/bin/python" ]]; }; then
+    eidolon__info "ESP-IDF v${current} is on PATH without its Python environment; reloading the board toolchain"
   fi
   if [[ -n "${current}" && "${current}" != "${want}" ]]; then
     eidolon__info "ESP-IDF v${current} is exported but this board requires v${want}; switching"
@@ -289,17 +306,19 @@ eidolon_prepare_build() {
 }
 
 # Read the EIDOLON-BUILDSTAMP boot line back over serial and diff vs expected.
-# Best-effort: resets the board, captures for a bounded time, degrades to a manual
-# hint if pyserial / the port is unavailable.
+# Resets the board and captures for a bounded time. Verification is a gate: an
+# unreadable or mismatched stamp returns non-zero instead of turning a manual
+# follow-up hint into a false successful flash.
 eidolon_verify_flashed() {
   local root="$1" port="$2" timeout="${3:-12}"
-  local expected="" actual=""
+  local expected="" actual="" verifier_python=""
   if [[ -f "${root}/.eidolon_expected_stamp" ]]; then
     expected="$(cat "${root}/.eidolon_expected_stamp")"
   fi
 
   eidolon__info "Verifying flashed firmware on ${port} (expected: ${expected:-<unknown>})"
-  actual="$(python3 - "${port}" "${timeout}" <<'PY' 2>/dev/null || true
+  verifier_python="$(eidolon_idf_python)" || return 1
+  actual="$("${verifier_python}" - "${port}" "${timeout}" <<'PY' 2>/dev/null || true
 import sys, time
 try:
     import serial
@@ -329,7 +348,7 @@ PY
     eidolon__warn "Could not auto-read the build stamp (pyserial/port busy?)."
     eidolon__warn "Open a monitor and look for a line containing: EIDOLON-BUILDSTAMP"
     eidolon__warn "It must match: ${expected:-<unknown>}"
-    return 0
+    return 1
   fi
 
   eidolon__info "Device reports: ${actual}"
@@ -344,8 +363,10 @@ PY
   if [[ "${exp_git}" == "${act_git}" && "${exp_sdk}" == "${act_sdk}" &&
         "${exp_idf}" == "${act_idf}" ]]; then
     eidolon__info "VERIFIED: device runs the just-built firmware (git=${act_git} sdk=${act_sdk} idf=${act_idf})."
+    return 0
   else
     eidolon__warn "MISMATCH: built git=${exp_git} sdk=${exp_sdk} idf=${exp_idf} but device git=${act_git} sdk=${act_sdk} idf=${act_idf}."
     eidolon__warn "The device is NOT running what you just built (stale flash / wrong path / cached SDK / wrong toolchain)."
+    return 1
   fi
 }

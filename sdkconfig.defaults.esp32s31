@@ -1,0 +1,55 @@
+# ESP32-S31 (ESP32-S31-Korvo-1). ESP-IDF 6.1 only: esp32s31 is a preview target
+# there and absent from 6.0.
+
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHMODE_DIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_USE_MALLOC=y
+
+# The memory policy the ESP32-S3 defaults carry, which this file was written
+# without. IDF's own default for ALWAYSINTERNAL is 16 kB, meaning every
+# allocation up to that size is taken from internal SRAM first — and esp_peer's
+# ICE agent asks for it with a plain calloc of 5,024 bytes. On the S3 boards
+# that lands in PSRAM because the threshold is 2 kB; here it was forced
+# internal, and the board could hold a signalling session but never open a peer
+# connection: "Not enough memory for agent", every time, until the retries had
+# eaten the internal heap down to a few kB.
+#
+# RESERVE_INTERNAL rises with it: lowering the threshold sends ordinary
+# allocations to PSRAM, and what stays behind is the traffic that genuinely
+# cannot leave — I2S descriptors, the RGB panel's bounce buffers, Wi-Fi's DMA
+# buffers — so the pool kept back for them has to be the larger one.
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=2048
+CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=98304
+
+# TLS record buffers are 16 kB in and 4 kB out per connection, and this board
+# holds a WSS signalling socket beside two DTLS-SRTP peers. None of it is DMA.
+CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
+
+# esp_peer compiles src/dtls_srtp_v6.c only on IDF >= 6, and that implementation
+# generates its own self-signed DTLS certificate. The IDF 5 path (dtls_srtp.c)
+# does not, which is why no ESP32-S3 board needs these.
+CONFIG_MBEDTLS_X509_CREATE_C=y
+CONFIG_MBEDTLS_X509_CRT_WRITE_C=y
+CONFIG_MBEDTLS_PEM_WRITE_C=y
+
+# Wi-Fi keeps the ESP32-S3 boards' buffer counts, and SPIRAM_TRY_ALLOCATE_WIFI_LWIP
+# stays off, because on this board those two decisions govern something the
+# original ones were made without: how much internal DMA-capable SRAM is left
+# for everyone else.
+#
+# Turning that option on makes esp_wifi's dynamic TX buffers unselectable, which
+# forces static TX and raises the AMPDU block-ack window default to 16, which in
+# turn forces the RX counts up to match. Every one of those buffers is taken
+# through wifi_calloc_dma(), hardcoded to MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL —
+# so none of it can live in the PSRAM the option was reached for, and the option
+# ends up spending the scarce pool to relieve the abundant one.
+#
+# What that pool runs out of is crypto. The hardware SHA and AES drivers take a
+# context from it for every operation, so a DTLS handshake failed as
+# MBEDTLS_ERR_SSL_HW_ACCEL_FAILED and a STUN MAC came back as twenty zero bytes,
+# both of them intermittently, both of them looking like anything but memory.

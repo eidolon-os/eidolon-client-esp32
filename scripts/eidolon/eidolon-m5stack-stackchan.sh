@@ -993,6 +993,7 @@ dispatch_cli() {
       ;;
     verify)
       if ! PORT="$(detect_port)"; then die "未找到串口"; fi
+      require_idf
       eidolon_verify_flashed "${PROJECT_ROOT}" "${PORT}"
       ;;
     monitor)

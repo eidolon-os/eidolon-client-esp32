@@ -1,4 +1,5 @@
 #include "hub_trust_store.h"
+#include "mbedtls_compat.h"
 
 #include "device_provisioning_protocol.h"
 #include "hub_types.h"
@@ -6,7 +7,6 @@
 
 #include <esp_log.h>
 #include <esp_partition.h>
-#include <mbedtls/sha256.h>
 #include <nvs.h>
 
 #include <array>

@@ -3,12 +3,11 @@
 #include "authority_locator_core.h"
 #include "hub_onboarding_protocol.h"
 
+#include "mbedtls_compat.h"
 #include <mbedtls/base64.h>
-#include <mbedtls/ecdsa.h>
 #include <mbedtls/oid.h>
 #include <mbedtls/pk.h>
 #include <mbedtls/private_access.h>
-#include <mbedtls/sha256.h>
 #include <mbedtls/x509_crt.h>
 
 #include <algorithm>
@@ -221,23 +220,8 @@ esp_err_t VerifyOwnerDomainDescriptor(
         mbedtls_sha256(
             reinterpret_cast<const unsigned char*>(canonical_signing_bytes.data()),
             canonical_signing_bytes.size(), digest.data(), 0);
-        mbedtls_mpi r;
-        mbedtls_mpi s;
-        mbedtls_mpi_init(&r);
-        mbedtls_mpi_init(&s);
-        result = mbedtls_mpi_read_binary(&r, signature.data(), 32);
-        if (result == 0) {
-            result = mbedtls_mpi_read_binary(&s, signature.data() + 32, 32);
-        }
-        if (result == 0) {
-            const mbedtls_ecp_keypair* key = mbedtls_pk_ec(authority.pk);
-            result = mbedtls_ecdsa_verify(
-                const_cast<mbedtls_ecp_group*>(&key->MBEDTLS_PRIVATE(grp)),
-                digest.data(), digest.size(),
-                &key->MBEDTLS_PRIVATE(Q), &r, &s);
-        }
-        mbedtls_mpi_free(&s);
-        mbedtls_mpi_free(&r);
+        result = eidolon_pk_verify_p256_raw(&authority.pk, digest.data(),
+                                            digest.size(), signature.data());
     }
     mbedtls_x509_crt_free(&authority);
     mbedtls_x509_crt_free(&root);

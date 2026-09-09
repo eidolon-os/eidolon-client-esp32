@@ -3,6 +3,8 @@
 
 #include "led.h"
 #include <driver/gpio.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include <led_strip.h>
 #include <esp_timer.h>
 #include <atomic>
