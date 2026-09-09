@@ -3,6 +3,7 @@
 #include "device_identity.h"
 #include "device_provisioning_protocol.h"
 #include "owner_trust_commissioning_worker.h"
+#include "esp_idf_commissioning_credential_store.h"
 #include "system_info.h"
 
 #include "sdkconfig.h"
@@ -172,6 +173,11 @@ esp_err_t DeviceProvisioningService::HandleDescriptor(uint32_t, const uint8_t*, 
     descriptor.device_kind = BOARD_TYPE;
     descriptor.display_name = BOARD_NAME;
     descriptor.identity_fingerprint = DeviceIdentity::GetInstance().Fingerprint();
+    PreparedCommissioningIdentity prepared;
+    if (EspIdfCommissioningCredentialStore::GetInstance().DescribeCandidate(self.transport_generation_, prepared)) {
+        descriptor.device_id = prepared.device_instance_id;
+        descriptor.identity_fingerprint = "p256:" + prepared.fingerprint.substr(7);
+    }
     descriptor.session_id = self.session_id_;
     descriptor.expires_in = AdvertisedWindowSeconds(self.window_);
     // This build carries a shared development secret unless it was given a

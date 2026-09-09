@@ -14,6 +14,8 @@ namespace eidolon {
 // later update a signed directory, but can never replace these certificates.
 class OwnerTrustStore : public OwnerTrustStorePort {
 public:
+    OwnerTrustLoadResult ReadActive(OwnerTrustBundle& out) const override;
+    bool DiscardInactive();
     OwnerTrustStoreResult Stage(
         const OwnerTrustBundle& bundle,
         uint32_t setup_generation,

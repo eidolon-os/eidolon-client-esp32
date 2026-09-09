@@ -22,6 +22,9 @@ namespace eidolon {
 // prove it is itself but still claims a lineage.
 struct CommissioningCredential {
     std::string device_base_id;
+    std::string owner_domain_id;
+    std::string operational_key_id;
+    uint64_t owner_domain_generation = 0;
     std::string voucher;      // empty once spent or expired
     std::string voucher_jti;  // the nonce a voucher-backed Proposal must carry
     int64_t voucher_expires_at_unix = 0;

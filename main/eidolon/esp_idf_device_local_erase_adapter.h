@@ -82,6 +82,10 @@ public:
 
     static OwnerDataErasePlan BuildErasePlan(
         const device_foundation::v1::DeviceLocalEraseCommand& command);
+    // Used only behind the commissioning transaction's durable commit decision.
+    // Trust, candidate identity, transaction journals and the selected network
+    // are published/retired by their owning stores, not by this cleanup plan.
+    static OwnerDataErasePlan BuildCommissioningCleanupPlan();
     static const std::vector<std::string>& ProtectedNvsNamespaces();
     static const std::vector<std::string>& ProtectedPartitions();
 

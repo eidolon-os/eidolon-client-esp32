@@ -787,6 +787,7 @@ VoiceSessionState EidolonVoiceController::StateForConfig(const Esp32HubConfig& c
         return VoiceSessionState::WaitingBinding;
     case HubConfigStatus::Active:
         return VoiceSessionState::ConfigReady;
+    case HubConfigStatus::RecoveryRequired:
     case HubConfigStatus::Revoked:
         return VoiceSessionState::Unauthorized;
     }
@@ -952,6 +953,14 @@ esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist)
     HubOnboardingClient client;
     Esp32HubConfig fresh;
     esp_err_t err = client.Resume(OperationalDeviceInstanceId(), fresh);
+    if (err == ESP_ERR_NOT_ALLOWED && fresh.status == HubConfigStatus::RecoveryRequired) {
+        config_ = {};
+        config_.status = HubConfigStatus::RecoveryRequired;
+        config_.recovery_hint = fresh.recovery_hint;
+        DoNetworkLost();
+        SetState(VoiceSessionState::Unauthorized, "owner_recovery_required");
+        return err;
+    }
     if (err == ESP_ERR_NOT_ALLOWED) {
         // Two different facts arrive as this one code. The Owner removing their
         // device is a decision about this device, and the way back is setup.
@@ -1651,6 +1660,7 @@ const char* EidolonVoiceController::JoinBlockedCode() const
         return "NEEDS_APPROVAL";
     case HubConfigStatus::WaitingBinding:
         return "NEEDS_BINDING";
+    case HubConfigStatus::RecoveryRequired:
     case HubConfigStatus::Revoked:
         return "UNAUTHORIZED";
     case HubConfigStatus::Active:

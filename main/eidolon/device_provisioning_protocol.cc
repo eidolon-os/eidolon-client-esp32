@@ -163,6 +163,12 @@ bool ParseTrustHandover(const std::string& body, TrustHandover& out)
     // not read through a pointer into a deleted document.
     const std::string contract_version = JsonString(root, "contract_version");
     TrustHandover handover;
+    const cJSON* prepare = cJSON_GetObjectItemCaseSensitive(root, "prepare_only");
+    if (prepare != nullptr && !cJSON_IsBool(prepare)) {
+        cJSON_Delete(root);
+        return false;
+    }
+    handover.prepare_only = cJSON_IsTrue(prepare);
     handover.owner_domain_id = JsonString(root, "owner_domain_id");
     handover.owner_root_certificate_pem =
         JsonString(root, "owner_root_certificate");

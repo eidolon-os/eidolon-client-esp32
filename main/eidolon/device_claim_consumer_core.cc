@@ -295,11 +295,32 @@ std::string DeviceClaimConsumerCore::ClaimGrantAad(const ClaimGrantAAD& aad) {
            ",\"trust_epoch\":" + std::to_string(aad.trust_epoch) + "}";
 }
 
+bool DeviceClaimConsumerCore::Current() const {
+    return !context_.owner_domain_id.empty() && context_.owner_domain_generation != 0 &&
+        !context_.device_instance_id.empty() && current_ && current_();
+}
+
+bool DeviceClaimConsumerCore::Matches(const DeviceRef& ref) const {
+    return Current() && ref.owner_domain_id.value == context_.owner_domain_id &&
+        ref.owner_domain_generation == context_.owner_domain_generation &&
+        ref.device_instance_id == context_.device_instance_id;
+}
+
+bool DeviceClaimConsumerCore::Matches(const EnrollmentJournalEntry& entry) const {
+    return Current() && entry.owner_domain_id.value == context_.owner_domain_id &&
+        entry.owner_domain_generation == context_.owner_domain_generation &&
+        entry.device_instance_candidate_id == context_.device_instance_id &&
+        entry.operational_key_id == crypto_.OperationalKeyId();
+}
+
 DeviceClaimConsumerOutcome DeviceClaimConsumerCore::RecordProposal(
     const std::string& create, const std::string& result,
     uint64_t owner_domain_generation) {
+    if (!Current()) return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     ActiveClaimState active;
     const auto active_load = active_claim_.LoadActiveClaim(active);
+    if (active_load == ClaimStoreLoadResult::Loaded && !Matches(active.device_ref))
+        return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     if (active_load == ClaimStoreLoadResult::StorageFailure) {
         return Result(DeviceClaimConsumerResult::StorageFailure);
     }
@@ -388,14 +409,18 @@ DeviceClaimConsumerOutcome DeviceClaimConsumerCore::RecordProposal(
         return Result(same ? DeviceClaimConsumerResult::Replayed
                            : DeviceClaimConsumerResult::IdempotencyConflict);
     }
+    if (!Matches(entry)) return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     return Result(enrollment_.StoreEnrollment(entry)
                       ? DeviceClaimConsumerResult::ProposalRecorded
                       : DeviceClaimConsumerResult::StorageFailure);
 }
 
 DeviceClaimConsumerOutcome DeviceClaimConsumerCore::BuildCollectionRequest() {
+    if (!Current()) return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     EnrollmentJournalEntry entry;
     const auto load = enrollment_.LoadEnrollment(entry);
+    if (load == ClaimStoreLoadResult::Loaded && !Matches(entry))
+        return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     if (load == ClaimStoreLoadResult::StorageFailure) {
         return Result(DeviceClaimConsumerResult::StorageFailure);
     }
@@ -419,13 +444,17 @@ DeviceClaimConsumerOutcome DeviceClaimConsumerCore::BuildCollectionRequest() {
         ",\"handoff_key_proof\":" + Quote(proof) +
         ",\"proposal_revision\":" +
         std::to_string(entry.proposal_revision) + "}";
+    if (!Matches(entry)) return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     return Result(DeviceClaimConsumerResult::CollectionReady, payload);
 }
 
 DeviceClaimConsumerOutcome DeviceClaimConsumerCore::AcceptCollectedGrant(
     const CollectClaimGrantResult& collect_result) {
+    if (!Current()) return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     EnrollmentJournalEntry entry;
     const auto load = enrollment_.LoadEnrollment(entry);
+    if (load == ClaimStoreLoadResult::Loaded && !Matches(entry))
+        return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     if (load != ClaimStoreLoadResult::Loaded) {
         return Result(load == ClaimStoreLoadResult::StorageFailure
                           ? DeviceClaimConsumerResult::StorageFailure
@@ -525,7 +554,7 @@ DeviceClaimConsumerOutcome DeviceClaimConsumerCore::AcceptCollectedGrant(
     entry.grant_id = grant_id;
     entry.approval_decision_id = decision;
     entry.staged_device_ref = ref;
-    if (!enrollment_.StoreEnrollment(entry)) {
+    if (!Matches(entry) || !enrollment_.StoreEnrollment(entry)) {
         return Result(DeviceClaimConsumerResult::StorageFailure);
     }
     return Result(DeviceClaimConsumerResult::GrantStaged);
@@ -533,6 +562,7 @@ DeviceClaimConsumerOutcome DeviceClaimConsumerCore::AcceptCollectedGrant(
 
 DeviceClaimConsumerOutcome DeviceClaimConsumerCore::AckFor(
     const EnrollmentJournalEntry& entry) {
+    if (!Current()) return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     if (entry.phase != EnrollmentJournalPhase::GrantStaged ||
         entry.grant_id.empty()) {
         return Result(DeviceClaimConsumerResult::PendingReview);
@@ -552,12 +582,16 @@ DeviceClaimConsumerOutcome DeviceClaimConsumerCore::AckFor(
         std::to_string(entry.staged_device_ref.claim_generation) +
         ",\"stored_trust_epoch\":" +
         std::to_string(entry.staged_device_ref.trust_epoch) + "}";
+    if (!Matches(entry)) return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     return Result(DeviceClaimConsumerResult::AckReady, payload);
 }
 
 DeviceClaimConsumerOutcome DeviceClaimConsumerCore::BuildGrantAck() {
+    if (!Current()) return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     EnrollmentJournalEntry entry;
     const auto load = enrollment_.LoadEnrollment(entry);
+    if (load == ClaimStoreLoadResult::Loaded && !Matches(entry))
+        return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     if (load != ClaimStoreLoadResult::Loaded) {
         return Result(load == ClaimStoreLoadResult::StorageFailure
                           ? DeviceClaimConsumerResult::StorageFailure
@@ -568,11 +602,17 @@ DeviceClaimConsumerOutcome DeviceClaimConsumerCore::BuildGrantAck() {
 
 DeviceClaimConsumerOutcome DeviceClaimConsumerCore::AcceptGrantAck(
     const std::string& ack_result) {
+    if (!Current()) return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     EnrollmentJournalEntry entry;
     const auto enrollment_load = enrollment_.LoadEnrollment(entry);
+    if (enrollment_load == ClaimStoreLoadResult::Loaded && !Matches(entry))
+        return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     if (enrollment_load != ClaimStoreLoadResult::Loaded) {
         ActiveClaimState active;
         const auto active_load = active_claim_.LoadActiveClaim(active);
+        if (active_load == ClaimStoreLoadResult::Loaded && !Matches(active.device_ref)) {
+            return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
+        }
         if (active_load == ClaimStoreLoadResult::Loaded && active.valid()) {
             cJSON* root =
                 cJSON_ParseWithLength(ack_result.data(), ack_result.size());
@@ -623,16 +663,16 @@ DeviceClaimConsumerOutcome DeviceClaimConsumerCore::AcceptGrantAck(
     }
     ActiveClaimState active{ref, entry.manifest_ref, entry.grant_id,
                             ActiveClaimLocalState::Active};
-    if (!active_claim_.StoreActiveClaim(active)) {
+    if (!Current() || !active_claim_.StoreActiveClaim(active)) {
         return Result(DeviceClaimConsumerResult::StorageFailure);
     }
-    if (!crypto_.DestroyEnrollmentMaterial(entry.enrollment_id,
+    if (!Current() || !crypto_.DestroyEnrollmentMaterial(entry.enrollment_id,
                                            entry.handoff_key_id)) {
         // ActiveClaim is durable and the Enrollment checkpoint remains so
         // ResumePending can retry the idempotent key/material destruction.
         return Result(DeviceClaimConsumerResult::StorageFailure);
     }
-    if (!enrollment_.ClearEnrollment()) {
+    if (!Current() || !enrollment_.ClearEnrollment()) {
         // ActiveClaim is already durable. ResumePending performs the only safe
         // forward recovery: clear the now-terminal Enrollment checkpoint.
         return Result(DeviceClaimConsumerResult::StorageFailure);
@@ -642,8 +682,11 @@ DeviceClaimConsumerOutcome DeviceClaimConsumerCore::AcceptGrantAck(
 
 DeviceClaimConsumerOutcome DeviceClaimConsumerCore::ApplyClaimRevoked(
     const DeviceRef& revoked_ref) {
+    if (!Current()) return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     ActiveClaimState active;
     const auto active_load = active_claim_.LoadActiveClaim(active);
+    if (active_load == ClaimStoreLoadResult::Loaded && !Matches(active.device_ref))
+        return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     if (active_load == ClaimStoreLoadResult::StorageFailure) {
         return Result(DeviceClaimConsumerResult::StorageFailure);
     }
@@ -661,7 +704,7 @@ DeviceClaimConsumerOutcome DeviceClaimConsumerCore::ApplyClaimRevoked(
             return Result(DeviceClaimConsumerResult::Replayed);
         }
         active.state = ActiveClaimLocalState::Revoked;
-        return Result(active_claim_.StoreActiveClaim(active)
+        return Result(Current() && active_claim_.StoreActiveClaim(active)
                           ? DeviceClaimConsumerResult::ClaimRevoked
                           : DeviceClaimConsumerResult::StorageFailure);
     }
@@ -672,8 +715,11 @@ DeviceClaimConsumerOutcome DeviceClaimConsumerCore::ApplyClaimRevoked(
 }
 
 DeviceClaimConsumerOutcome DeviceClaimConsumerCore::AbandonPendingProposal() {
+    if (!Current()) return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     ActiveClaimState active;
     const auto active_load = active_claim_.LoadActiveClaim(active);
+    if (active_load == ClaimStoreLoadResult::Loaded && !Matches(active.device_ref))
+        return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     if (active_load == ClaimStoreLoadResult::StorageFailure) {
         return Result(DeviceClaimConsumerResult::StorageFailure);
     }
@@ -682,6 +728,8 @@ DeviceClaimConsumerOutcome DeviceClaimConsumerCore::AbandonPendingProposal() {
     }
     EnrollmentJournalEntry entry;
     const auto enrollment_load = enrollment_.LoadEnrollment(entry);
+    if (enrollment_load == ClaimStoreLoadResult::Loaded && !Matches(entry))
+        return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     if (enrollment_load == ClaimStoreLoadResult::StorageFailure) {
         return Result(DeviceClaimConsumerResult::StorageFailure);
     }
@@ -694,20 +742,24 @@ DeviceClaimConsumerOutcome DeviceClaimConsumerCore::AbandonPendingProposal() {
     const bool material_is_this_proposal =
         !entry.handoff_key_id.empty() &&
         entry.handoff_key_id == crypto_.HandoffKeyId();
+    if (!Current()) return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     if (material_is_this_proposal &&
         !crypto_.DestroyEnrollmentMaterial(entry.enrollment_id,
                                            entry.handoff_key_id)) {
         return Result(DeviceClaimConsumerResult::StorageFailure);
     }
-    if (!enrollment_.ClearEnrollment()) {
+    if (!Current() || !enrollment_.ClearEnrollment()) {
         return Result(DeviceClaimConsumerResult::StorageFailure);
     }
     return Result(DeviceClaimConsumerResult::ProposalAbandoned);
 }
 
 DeviceClaimConsumerOutcome DeviceClaimConsumerCore::ResumePending() {
+    if (!Current()) return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     ActiveClaimState active;
     const auto active_load = active_claim_.LoadActiveClaim(active);
+    if (active_load == ClaimStoreLoadResult::Loaded && !Matches(active.device_ref))
+        return Result(DeviceClaimConsumerResult::OwnerDomainMismatch);
     if (active_load == ClaimStoreLoadResult::StorageFailure) {
         return Result(DeviceClaimConsumerResult::StorageFailure);
     }
@@ -724,10 +776,10 @@ DeviceClaimConsumerOutcome DeviceClaimConsumerCore::ResumePending() {
                 SameClaimDeviceRef(stale.staged_device_ref,
                                    active.device_ref) &&
                 SameManifest(stale.manifest_ref, active.manifest_ref);
-            if (!same_terminal_transition ||
+            if (!Matches(stale) || !same_terminal_transition ||
                 !crypto_.DestroyEnrollmentMaterial(stale.enrollment_id,
                                                    stale.handoff_key_id) ||
-                !enrollment_.ClearEnrollment()) {
+                !Current() || !enrollment_.ClearEnrollment()) {
                 return Result(DeviceClaimConsumerResult::StorageFailure);
             }
         }

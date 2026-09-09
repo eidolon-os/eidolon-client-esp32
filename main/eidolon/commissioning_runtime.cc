@@ -4,6 +4,8 @@
 #include "commissioning_transaction.h"
 #include "authority_locator.h"
 #include "device_identity.h"
+#include "esp_idf_commissioning_credential_store.h"
+#include <esp_system.h>
 #include "device_provisioning.h"
 #include "device_provisioning_protocol.h"
 #include "hub_onboarding_protocol.h"
@@ -200,6 +202,7 @@ const char* RuntimeStateName(CommissioningRuntimeState state)
 {
     switch (state) {
     case CommissioningRuntimeState::Idle: return "idle";
+    case CommissioningRuntimeState::RecoveringConfiguration: return "recovering-configuration";
     case CommissioningRuntimeState::PreparingIdentity: return "preparing-identity";
     case CommissioningRuntimeState::QuiescingOperationalRuntime:
         return "quiescing-operational-runtime";
@@ -328,12 +331,6 @@ bool ValidateStagedOwnerRoute(uint32_t generation)
     return true;
 }
 
-bool CommitTransaction(RuntimeState& state, uint32_t generation)
-{
-    return eidolon::CommitCommissioningTransaction(
-               generation, state.candidate_ssid, state.candidate_password) ==
-           CommissioningTransactionResult::Committed;
-}
 
 void Apply(RuntimeState& state, const CommissioningEvent& event);
 
@@ -344,7 +341,8 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
     completion.candidate_id = action.candidate_id;
     switch (action.type) {
     case CommissioningActionType::EnsureIdentity:
-        completion.type = DeviceIdentity::GetInstance().EnsureKeypair() == ESP_OK
+        completion.type = CommissioningTransactionAllowsNewSetup() &&
+                              DeviceIdentity::GetInstance().EnsureKeypair() == ESP_OK
                               ? CommissioningEventType::IdentityReady
                               : CommissioningEventType::IdentityFailed;
         Apply(state, completion);
@@ -477,11 +475,22 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
                               : CommissioningEventType::OwnerRouteValidationFailed;
         Apply(state, completion);
         break;
-    case CommissioningActionType::CommitCommissioningTransaction:
-        completion.type = CommitTransaction(state, action.generation)
-                              ? CommissioningEventType::CommissioningTransactionCommitted
-                              : CommissioningEventType::CommissioningTransactionCommitFailed;
+    case CommissioningActionType::CommitCommissioningTransaction: {
+        const auto result = CommitCommissioningTransaction(
+            action.generation, state.candidate_ssid, state.candidate_password);
+        completion.type = result == CommissioningTransactionResult::Committed
+            ? CommissioningEventType::CommissioningTransactionCommitted
+            : result == CommissioningTransactionResult::RecoveryRequired
+                ? CommissioningEventType::CommissioningTransactionRecoveryRequired
+                : CommissioningEventType::CommissioningTransactionCommitFailed;
         Apply(state, completion);
+        break;
+    }
+    case CommissioningActionType::RecoverCommissioningTransaction:
+        if (RecoverPendingCommissioningTransaction()) {
+            completion.type = CommissioningEventType::CommissioningTransactionCommitted;
+            Apply(state, completion);
+        }
         break;
     case CommissioningActionType::RollbackCommissioningTransaction:
         if (!RollbackPendingCommissioningTransaction(action.generation)) {
@@ -493,9 +502,20 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
         Apply(state, completion);
         break;
     case CommissioningActionType::StopTransport:
+        if (!state.core.transaction_committed() &&
+            !RollbackPendingCommissioningTransaction(action.generation)) {
+            ESP_LOGE(TAG, "Could not discard uncommitted candidate");
+        }
         DeviceProvisioningService::GetInstance().Stop(action.generation);
         break;
     case CommissioningActionType::RestorePreviousRadioMode:
+        if (state.core.transaction_committed() &&
+            EspIdfCommissioningCredentialStore::GetInstance().RequiresRuntimeRestart(action.generation)) {
+            // Storage is coherent and the setup transport is closed. A restart
+            // retires every old Owner's in-memory session, binding and cache.
+            esp_restart();
+            break;
+        }
         // A committed act transitions to Station with the new candidate. An
         // aborted act restores Station only if it was the mode we leased away.
         // Initial uncommissioned setup therefore does not silently invent a
@@ -536,6 +556,11 @@ void Apply(RuntimeState& state, const CommissioningEvent& event)
         state.committed_station_route_ready = false;
         state.awaiting_station_route.store(false, std::memory_order_release);
     }
+    if (event.type != CommissioningEventType::OpenRequested &&
+        (event.generation != state.core.generation() ||
+         state.core.state() == CommissioningRuntimeState::Idle)) return;
+    if (!event.candidate_id.empty() && !state.candidate_id.empty() &&
+        event.candidate_id != state.candidate_id) return;
     CommissioningEvent resolved = event;
     if ((resolved.type == CommissioningEventType::WifiConnected ||
          resolved.type == CommissioningEventType::OwnerRouteValidationFailed) &&
@@ -623,17 +648,27 @@ void Actor(void*)
     RuntimeState& state = State();
     while (true) {
         RuntimeMessage* raw = nullptr;
-        if (xQueueReceive(state.queue, &raw, portMAX_DELAY) != pdTRUE || raw == nullptr) {
+        const bool recovering = state.core.state() == CommissioningRuntimeState::RecoveringConfiguration;
+        if (xQueueReceive(state.queue, &raw, recovering ? pdMS_TO_TICKS(1000) : portMAX_DELAY) != pdTRUE || raw == nullptr) {
+            if (recovering) {
+                CommissioningEvent retry;
+                retry.type = CommissioningEventType::RecoveryRetry;
+                retry.generation = state.core.generation();
+                Apply(state, retry);
+            }
             continue;
         }
         std::unique_ptr<RuntimeMessage> message(raw);
         if (message->trust_request != nullptr) {
             TrustActorRequest* request = message->trust_request;
-            const esp_err_t result =
-                OwnerTrustCommissioningWorker::GetInstance().Submit(
+            const bool accepting = request->generation == state.core.generation() &&
+                state.core.state() == CommissioningRuntimeState::SessionActive;
+            const esp_err_t result = accepting
+                ? OwnerTrustCommissioningWorker::GetInstance().Submit(
                     request->generation,
                     reinterpret_cast<const uint8_t*>(request->payload.data()),
-                    request->payload.size(), request->response, request->staged);
+                    request->payload.size(), request->response, request->staged)
+                : ESP_ERR_INVALID_STATE;
             CommissioningEvent trust_event;
             trust_event.generation = request->generation;
             trust_event.type = result == ESP_OK && request->staged
@@ -645,7 +680,9 @@ void Actor(void*)
             if (RetireIfIdle(state)) break;
             continue;
         }
-        if (message->event.type == CommissioningEventType::NetworkCandidateReceived) {
+        if (message->event.type == CommissioningEventType::NetworkCandidateReceived &&
+            message->event.generation == state.core.generation() &&
+            state.core.state() == CommissioningRuntimeState::SessionActive) {
             state.candidate_ssid = std::move(message->ssid);
             state.candidate_password = std::move(message->password);
             state.candidate_id = message->event.candidate_id;
@@ -749,6 +786,10 @@ void CommissioningRuntime::SetOperationalRuntimeQuiescer(
     RuntimeState& state = State();
     std::lock_guard<std::mutex> lock(state.observer_mutex);
     state.operational_quiescer = std::move(quiescer);
+}
+
+uint32_t CommissioningRuntime::Generation() const {
+    return State().visible_generation.load(std::memory_order_acquire);
 }
 
 bool CommissioningRuntime::IsAdvertising() const

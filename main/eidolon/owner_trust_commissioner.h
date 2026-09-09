@@ -37,18 +37,24 @@ enum class OwnerTrustStoreResult {
     Unavailable,
 };
 
-// Where the standing this commissioning grants is kept.
-//
-// Deliberately not the Owner trust store: the base identity has to live with
-// the operational key it is bound to, so that erasing one erases the other. A
-// device holding a base identity it can no longer prove is a Body claiming a
-// lineage it cannot demonstrate, and that state must not be reachable.
+struct PreparedCommissioningIdentity {
+    std::string device_instance_id;
+    std::string fingerprint;
+};
+
 class CommissioningCredentialStorePort {
 public:
     virtual ~CommissioningCredentialStorePort() = default;
-
-    virtual bool Save(const CommissioningCredential& credential) = 0;
+    // One candidate, never visible to operational consumers before commit.
+    virtual bool Prepare(const std::string& owner, uint64_t owner_generation,
+                         uint32_t setup_generation, bool replace_identity,
+                         PreparedCommissioningIdentity& out) = 0;
+    virtual bool Stage(const CommissioningCredential* credential,
+                       uint32_t setup_generation,
+                       const std::function<bool()>& guard) = 0;
 };
+
+enum class OwnerTrustLoadResult { NotFound, Loaded, Unavailable };
 
 // The store must make the verified bundle durable but not operationally
 // visible. Trust becomes active only when the commissioning transaction later
@@ -57,6 +63,7 @@ class OwnerTrustStorePort {
 public:
     virtual ~OwnerTrustStorePort() = default;
 
+    virtual OwnerTrustLoadResult ReadActive(OwnerTrustBundle& out) const = 0;
     virtual OwnerTrustStoreResult Stage(
         const OwnerTrustBundle& bundle,
         uint32_t setup_generation,
@@ -65,6 +72,7 @@ public:
 
 enum class OwnerTrustCommissioningCode {
     Staged,
+    Prepared,
     Unsupported,
     Invalid,
     Stale,
@@ -74,6 +82,7 @@ enum class OwnerTrustCommissioningCode {
 struct OwnerTrustCommissioningOutcome {
     OwnerTrustCommissioningCode code = OwnerTrustCommissioningCode::Invalid;
     std::string owner_domain_id;
+    PreparedCommissioningIdentity identity{};
 };
 
 // Host-, transport-, radio- and storage-independent application service.

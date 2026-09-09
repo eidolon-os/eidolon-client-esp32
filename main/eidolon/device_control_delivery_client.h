@@ -15,7 +15,8 @@ public:
     // evidence was accepted by Device Control.
     esp_err_t PollAndExecute(const ActiveClaimState& claim,
                              const OwnerTrustBundle& trust,
-                             bool& removal_completed);
+                             bool& removal_completed,
+                             const std::function<bool()>& current);
 };
 
 }  // namespace eidolon

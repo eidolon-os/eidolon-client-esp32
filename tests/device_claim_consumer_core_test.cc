@@ -195,6 +195,7 @@ public:
             return ClaimGrantUnsealResult::AuthenticationRejected;
         }
         out = plaintext;
+        if (after_open) after_open();
         return ClaimGrantUnsealResult::Authenticated;
     }
     bool BuildOperationalKeyProof(const std::string&, const std::string&,
@@ -217,6 +218,7 @@ public:
         expected_aad = DeviceClaimConsumerCore::ClaimGrantAad(Aad());
     }
 
+    std::function<void()> after_open;
     bool available = true;
     bool reject = false;
     bool fail_destroy = false;
@@ -350,7 +352,7 @@ void TheSignedProofBytesAreTheGoldenVectorBytes() {
 void CanonicalProposalParsingFailsClosed() {
     Stores stores;
     Crypto crypto;
-    DeviceClaimConsumerCore core(stores, stores, crypto);
+    DeviceClaimConsumerCore core(stores, stores, crypto, {"owner-domain_01", 3, "device_01"});
     assert(core.RecordProposal(
                ReplaceOnce(CreateEnrollment(), "owner-domain_01", "owner_01"),
                CreateResult(), 3)
@@ -372,7 +374,7 @@ void CanonicalProposalParsingFailsClosed() {
 void ProposalCollectionGrantAckAndActivationResumeForwardOnly() {
     Stores stores;
     Crypto crypto;
-    DeviceClaimConsumerCore core(stores, stores, crypto);
+    DeviceClaimConsumerCore core(stores, stores, crypto, {"owner-domain_01", 3, "device_01"});
     Record(stores, crypto, core);
     const auto collection = core.BuildCollectionRequest();
     assert(collection.result == DeviceClaimConsumerResult::CollectionReady);
@@ -384,7 +386,7 @@ void ProposalCollectionGrantAckAndActivationResumeForwardOnly() {
            DeviceClaimConsumerResult::GrantStaged);
     assert(stores.enrollment.phase == EnrollmentJournalPhase::GrantStaged);
 
-    DeviceClaimConsumerCore rebooted(stores, stores, crypto);
+    DeviceClaimConsumerCore rebooted(stores, stores, crypto, {"owner-domain_01", 3, "device_01"});
     const auto resumed = rebooted.ResumePending();
     assert(resumed.result == DeviceClaimConsumerResult::AckReady);
     assert(resumed.wire_payload.find("stored_claim_generation\":2") !=
@@ -403,7 +405,7 @@ void ProposalCollectionGrantAckAndActivationResumeForwardOnly() {
 void ActiveClaimCommitWinsPowerLossBeforeEnrollmentCleanup() {
     Stores stores;
     Crypto crypto;
-    DeviceClaimConsumerCore core(stores, stores, crypto);
+    DeviceClaimConsumerCore core(stores, stores, crypto, {"owner-domain_01", 3, "device_01"});
     Record(stores, crypto, core);
     assert(core.AcceptCollectedGrant(CollectResult()).result ==
            DeviceClaimConsumerResult::GrantStaged);
@@ -412,7 +414,7 @@ void ActiveClaimCommitWinsPowerLossBeforeEnrollmentCleanup() {
            DeviceClaimConsumerResult::StorageFailure);
     assert(stores.has_active && stores.has_enrollment);
     stores.fail_clear = false;
-    DeviceClaimConsumerCore rebooted(stores, stores, crypto);
+    DeviceClaimConsumerCore rebooted(stores, stores, crypto, {"owner-domain_01", 3, "device_01"});
     assert(rebooted.ResumePending().result ==
            DeviceClaimConsumerResult::Replayed);
     assert(!stores.has_enrollment);
@@ -422,7 +424,7 @@ void ActiveClaimCommitWinsPowerLossBeforeEnrollmentCleanup() {
 void ActiveClaimCommitWinsPowerLossBeforeMaterialDestruction() {
     Stores stores;
     Crypto crypto;
-    DeviceClaimConsumerCore core(stores, stores, crypto);
+    DeviceClaimConsumerCore core(stores, stores, crypto, {"owner-domain_01", 3, "device_01"});
     Record(stores, crypto, core);
     assert(core.AcceptCollectedGrant(CollectResult()).result ==
            DeviceClaimConsumerResult::GrantStaged);
@@ -431,7 +433,7 @@ void ActiveClaimCommitWinsPowerLossBeforeMaterialDestruction() {
            DeviceClaimConsumerResult::StorageFailure);
     assert(stores.has_active && stores.has_enrollment);
     crypto.fail_destroy = false;
-    DeviceClaimConsumerCore rebooted(stores, stores, crypto);
+    DeviceClaimConsumerCore rebooted(stores, stores, crypto, {"owner-domain_01", 3, "device_01"});
     assert(rebooted.ResumePending().result ==
            DeviceClaimConsumerResult::Replayed);
     assert(!stores.has_enrollment);
@@ -441,7 +443,7 @@ void ActiveClaimCommitWinsPowerLossBeforeMaterialDestruction() {
 void ActiveClaimCannotClearAnUnrelatedEnrollmentGeneration() {
     Stores stores;
     Crypto crypto;
-    DeviceClaimConsumerCore core(stores, stores, crypto);
+    DeviceClaimConsumerCore core(stores, stores, crypto, {"owner-domain_01", 3, "device_01"});
     Record(stores, crypto, core);
     assert(core.AcceptCollectedGrant(CollectResult()).result ==
            DeviceClaimConsumerResult::GrantStaged);
@@ -457,7 +459,7 @@ void ActiveClaimCannotClearAnUnrelatedEnrollmentGeneration() {
 void WireAuthAbsenceAndAadMutationNeverStageOrActivate() {
     Stores stores;
     Crypto crypto;
-    DeviceClaimConsumerCore core(stores, stores, crypto);
+    DeviceClaimConsumerCore core(stores, stores, crypto, {"owner-domain_01", 3, "device_01"});
     Record(stores, crypto, core);
     crypto.available = false;
     assert(core.BuildCollectionRequest().result ==
@@ -477,7 +479,7 @@ void EveryEnvelopeAndAadMutationFailsClosedBeforeStaging() {
                         int expected_open_calls) {
         Stores stores;
         Crypto crypto;
-        DeviceClaimConsumerCore core(stores, stores, crypto);
+        DeviceClaimConsumerCore core(stores, stores, crypto, {"owner-domain_01", 3, "device_01"});
         Record(stores, crypto, core);
         auto collected = CollectResult();
         mutate(collected);
@@ -560,7 +562,7 @@ void PlaintextGrantMustMatchEnvelopeAadAndLocalPreconditions() {
     const auto run = [](auto mutate, DeviceClaimConsumerResult expected) {
         Stores stores;
         Crypto crypto;
-        DeviceClaimConsumerCore core(stores, stores, crypto);
+        DeviceClaimConsumerCore core(stores, stores, crypto, {"owner-domain_01", 3, "device_01"});
         Record(stores, crypto, core);
         mutate(crypto.plaintext);
         assert(core.AcceptCollectedGrant(CollectResult()).result == expected);
@@ -606,7 +608,7 @@ void PlaintextGrantMustMatchEnvelopeAadAndLocalPreconditions() {
 void OwnerDomainBusinessOwnerManifestAndGenerationCannotBeInterchanged() {
     Stores stores;
     Crypto crypto;
-    DeviceClaimConsumerCore core(stores, stores, crypto);
+    DeviceClaimConsumerCore core(stores, stores, crypto, {"owner-domain_01", 3, "device_01"});
     Record(stores, crypto, core);
     crypto.plaintext = Grant("owner_01");  // business Owner, not Owner Domain
     assert(core.AcceptCollectedGrant(CollectResult()).result ==
@@ -631,7 +633,7 @@ void OwnerDomainBusinessOwnerManifestAndGenerationCannotBeInterchanged() {
 void DuplicateGrantAndRevokedTerminalFenceOldGeneration() {
     Stores stores;
     Crypto crypto;
-    DeviceClaimConsumerCore core(stores, stores, crypto);
+    DeviceClaimConsumerCore core(stores, stores, crypto, {"owner-domain_01", 3, "device_01"});
     Record(stores, crypto, core);
     assert(core.AcceptCollectedGrant(CollectResult()).result ==
            DeviceClaimConsumerResult::GrantStaged);
@@ -659,7 +661,7 @@ void DuplicateGrantAndRevokedTerminalFenceOldGeneration() {
 void PreActiveRevokeCannotFabricateAClaim() {
     Stores stores;
     Crypto crypto;
-    DeviceClaimConsumerCore core(stores, stores, crypto);
+    DeviceClaimConsumerCore core(stores, stores, crypto, {"owner-domain_01", 3, "device_01"});
     Record(stores, crypto, core);
     assert(core.ApplyClaimRevoked(Ref()).result ==
            DeviceClaimConsumerResult::NoPendingEnrollment);
@@ -673,7 +675,7 @@ void AFinishedProposalIsAbandonedSoAnotherCanBeMade() {
     // day, retrying one dead Enrollment every 120 seconds.
     Stores stores;
     Crypto crypto;
-    DeviceClaimConsumerCore core(stores, stores, crypto);
+    DeviceClaimConsumerCore core(stores, stores, crypto, {"owner-domain_01", 3, "device_01"});
     Record(stores, crypto, core);
     assert(stores.has_enrollment);
 
@@ -697,7 +699,7 @@ void AbandoningIsRefusedWhileAClaimIsActive() {
     // revocation are their own paths, with their own proofs.
     Stores stores;
     Crypto crypto;
-    DeviceClaimConsumerCore core(stores, stores, crypto);
+    DeviceClaimConsumerCore core(stores, stores, crypto, {"owner-domain_01", 3, "device_01"});
     Record(stores, crypto, core);
     assert(core.AcceptCollectedGrant(CollectResult()).result ==
            DeviceClaimConsumerResult::GrantStaged);
@@ -719,7 +721,7 @@ void AbandoningSurvivesMaterialThatAlreadyRotated() {
     // device asking about a Proposal it can no longer prove anything for.
     Stores stores;
     Crypto crypto;
-    DeviceClaimConsumerCore core(stores, stores, crypto);
+    DeviceClaimConsumerCore core(stores, stores, crypto, {"owner-domain_01", 3, "device_01"});
     Record(stores, crypto, core);
     stores.enrollment.handoff_key_id =
         "sha256:9999999999999999999999999999999999999999999999999999999999999999";
@@ -733,7 +735,7 @@ void AbandoningSurvivesMaterialThatAlreadyRotated() {
 void StorageThatCannotForgetIsNotReportedAsProgress() {
     Stores stores;
     Crypto crypto;
-    DeviceClaimConsumerCore core(stores, stores, crypto);
+    DeviceClaimConsumerCore core(stores, stores, crypto, {"owner-domain_01", 3, "device_01"});
     Record(stores, crypto, core);
     stores.fail_clear = true;
     assert(core.AbandonPendingProposal().result ==
@@ -747,9 +749,51 @@ void StorageThatCannotForgetIsNotReportedAsProgress() {
     assert(stores.has_enrollment);
 }
 
+
+void RecoveryNeverUsesAnotherOwnerOrLateResponse() {
+    Stores stores;
+    Crypto crypto;
+    DeviceClaimConsumerCore original(stores, stores, crypto, {"owner-domain_01", 3, "device_01"});
+    Record(stores, crypto, original);
+    for (const auto& context : {
+            ClaimConsumerContext{"owner-domain_02", 3, "device_01"},
+            ClaimConsumerContext{"owner-domain_01", 4, "device_01"},
+            ClaimConsumerContext{"owner-domain_01", 3, "device_02"}}) {
+        DeviceClaimConsumerCore foreign(stores, stores, crypto, context);
+        assert(foreign.ResumePending().result == DeviceClaimConsumerResult::OwnerDomainMismatch);
+        assert(foreign.BuildGrantAck().result == DeviceClaimConsumerResult::OwnerDomainMismatch);
+        assert(foreign.AcceptCollectedGrant(CollectResult()).result == DeviceClaimConsumerResult::OwnerDomainMismatch);
+        assert(foreign.AcceptGrantAck(AckResult()).result == DeviceClaimConsumerResult::OwnerDomainMismatch);
+        assert(foreign.AbandonPendingProposal().result == DeviceClaimConsumerResult::OwnerDomainMismatch);
+        assert(stores.has_enrollment && !stores.has_active && crypto.destroy_calls == 0);
+    }
+    const auto valid = stores.enrollment;
+    stores.enrollment.operational_key_id = kHardwareDigest;
+    assert(original.ResumePending().result == DeviceClaimConsumerResult::OwnerDomainMismatch);
+    stores.enrollment = valid;
+    bool current = true;
+    DeviceClaimConsumerCore guarded(stores, stores, crypto, {"owner-domain_01", 3, "device_01"}, [&] { return current; });
+    crypto.SetValidGrant(stores.enrollment);
+    current = false;
+    assert(guarded.AcceptCollectedGrant(CollectResult()).result == DeviceClaimConsumerResult::OwnerDomainMismatch);
+    assert(stores.enrollment.phase == EnrollmentJournalPhase::ProposalCreated);
+    current = true;
+    crypto.after_open = [&] { current = false; };
+    assert(guarded.AcceptCollectedGrant(CollectResult()).result != DeviceClaimConsumerResult::GrantStaged);
+    assert(stores.enrollment.phase == EnrollmentJournalPhase::ProposalCreated);
+    crypto.after_open = {};
+    current = true;
+    assert(guarded.AcceptCollectedGrant(CollectResult()).result == DeviceClaimConsumerResult::GrantStaged);
+    current = false;
+    assert(guarded.AcceptGrantAck(AckResult()).result == DeviceClaimConsumerResult::OwnerDomainMismatch);
+    assert(stores.has_enrollment && !stores.has_active && crypto.destroy_calls == 0);
+}
+
+
 }  // namespace
 
 int main() {
+    RecoveryNeverUsesAnotherOwnerOrLateResponse();
     TheClaimGrantAadIsTheGoldenVectorBytes();
     TheSignedProofBytesAreTheGoldenVectorBytes();
     CanonicalProposalParsingFailsClosed();

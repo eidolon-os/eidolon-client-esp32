@@ -275,10 +275,38 @@ void TestOperationalRuntimeQuiesceFailureNeverTouchesRadio()
     assert(!Has(actions, CommissioningActionType::StartTransport));
 }
 
+
+void TestDurableDecisionIgnoresCancelAndRetriesForward() {
+    CommissioningOrchestratorCore core;
+    const auto generation = OpenToSession(core);
+    StageTrust(core, generation);
+    for (const auto type : {CommissioningEventType::NetworkCandidateReceived,
+                           CommissioningEventType::NetworkCandidateStaged,
+                           CommissioningEventType::WifiConnected,
+                           CommissioningEventType::OwnerRouteValidated,
+                           CommissioningEventType::CommissioningTransactionRecoveryRequired}) {
+        core.Handle(Event(type, generation, "candidate-1"));
+    }
+    assert(core.state() == CommissioningRuntimeState::RecoveringConfiguration);
+    for (const auto type : {CommissioningEventType::CancelRequested,
+                           CommissioningEventType::WindowExpired,
+                           CommissioningEventType::TransportEndedUnexpectedly}) {
+        assert(core.Handle(Event(type, generation)).empty());
+    }
+    const auto retry = core.Handle(Event(CommissioningEventType::RecoveryRetry, generation));
+    assert(Has(retry, CommissioningActionType::RecoverCommissioningTransaction));
+    const auto finished = core.Handle(Event(CommissioningEventType::CommissioningTransactionCommitted, generation, "candidate-1"));
+    assert(core.transaction_committed());
+    assert(Has(finished, CommissioningActionType::StopTransport));
+    assert(!Has(finished, CommissioningActionType::RollbackCommissioningTransaction));
+}
+
+
 }  // namespace
 
 int main()
 {
+    TestDurableDecisionIgnoresCancelAndRetriesForward();
     TestReadyRequiresEvidenceAndCallbacksAreGenerationFenced();
     TestCandidateCommitsOnlyAfterWifiAndOwnerValidation();
     TestTransportClosesOnlyAfterCommittedTerminalWasObserved();

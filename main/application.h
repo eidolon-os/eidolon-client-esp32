@@ -190,6 +190,7 @@ private:
     // flash operations that cannot run from an external-memory stack.
     TaskHandle_t activation_task_handle_ = nullptr;
     std::atomic_bool activation_in_progress_{false};
+    std::mutex activation_execution_mutex_;
     std::atomic_bool activation_succeeded_{false};
 
 #if CONFIG_EIDOLON_HUB_MODE

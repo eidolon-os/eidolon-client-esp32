@@ -1,4 +1,5 @@
 #include "device_identity.h"
+#include "esp_idf_commissioning_credential_store.h"
 
 #include "settings.h"
 
@@ -158,15 +159,13 @@ esp_err_t DeviceIdentity::EnsureKeypair() {
 }
 
 esp_err_t DeviceIdentity::LoadOrCreateKey() {
-    Settings settings(kSettingsNs, true);
-    private_key_pem_ = settings.GetString(kPrivateKeyKey);
-    if (private_key_pem_.empty()) {
-        return CreateKeypair();
-    }
+    const auto loaded = EspIdfCommissioningCredentialStore::LoadPrivateKey(private_key_pem_);
+    if (loaded == CommissioningIdentityLoad::Unavailable) return ESP_FAIL;
+    if (loaded == CommissioningIdentityLoad::NotFound) return CreateKeypair();
     return LoadPublicKeyFromPrivateKey();
 }
 
-esp_err_t DeviceIdentity::CreateKeypair() {
+esp_err_t DeviceIdentity::CreateKeypair(bool persist) {
     mbedtls_entropy_context entropy;
     mbedtls_ctr_drbg_context ctr_drbg;
     if (SeedCtrDrbg(entropy, ctr_drbg) != ESP_OK) {
@@ -196,15 +195,44 @@ esp_err_t DeviceIdentity::CreateKeypair() {
         return ESP_FAIL;
     }
     private_key_pem_ = reinterpret_cast<const char*>(pem);
-    Settings settings(kSettingsNs, true);
-    settings.SetString(kPrivateKeyKey, private_key_pem_);
+    bool stored = true;
+    if (persist) {
+        Settings settings(kSettingsNs, true);
+        stored = settings.SetString(kPrivateKeyKey, private_key_pem_) == ESP_OK &&
+                 settings.Commit() == ESP_OK;
+    }
 
     mbedtls_pk_free(&pk);
     mbedtls_ctr_drbg_free(&ctr_drbg);
     EIDOLON_ENTROPY_FREE(&entropy);
 
+    if (!stored) { ForgetCachedKeyAfterPhysicalRecovery(); return ESP_FAIL; }
     ESP_LOGI(TAG, "Generated device P-256 keypair");
     return LoadPublicKeyFromPrivateKey();
+}
+
+bool DeviceIdentity::DescribeKey(const std::string& pem, std::string& fingerprint,
+                                 std::string& instance_id) {
+    DeviceIdentity candidate;
+    candidate.private_key_pem_ = pem;
+    if (candidate.LoadPublicKeyFromPrivateKey() != ESP_OK) return false;
+    instance_id = candidate.DeviceInstanceId();
+    fingerprint = "sha256:" + instance_id.substr(std::string("device-instance-").size());
+    return true;
+}
+
+bool DeviceIdentity::PrepareKey(bool fresh, std::string& pem, std::string& fingerprint,
+                                std::string& instance_id) {
+    if (fresh) {
+        DeviceIdentity candidate;
+        if (candidate.CreateKeypair(false) != ESP_OK) return false;
+        pem = candidate.private_key_pem_;
+    } else {
+        auto& current = GetInstance();
+        if (current.EnsureKeypair() != ESP_OK) return false;
+        pem = current.private_key_pem_;
+    }
+    return DescribeKey(pem, fingerprint, instance_id);
 }
 
 esp_err_t DeviceIdentity::LoadPublicKeyFromPrivateKey() {

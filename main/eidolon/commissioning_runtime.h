@@ -40,6 +40,7 @@ public:
     void SetObserver(Observer observer);
     void SetOperationalRuntimeQuiescer(OperationalRuntimeQuiescer quiescer);
     bool IsAdvertising() const;
+    uint32_t Generation() const;
     // True for the whole physical commissioning lease, including identity
     // preparation, transport startup and restoration. Network callbacks use
     // this projection only to avoid presenting an expected Station handover as

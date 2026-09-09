@@ -1,4 +1,5 @@
 #include "hub_onboarding_client.h"
+#include "commissioning_runtime.h"
 
 #include "device_claim_consumer_core.h"
 #include "device_control_proof_documents.h"
@@ -328,6 +329,8 @@ esp_err_t HubOnboardingClient::FetchDescriptor(
         ESP_LOGE(TAG, "Owner Domain descriptor is not a V1 contract document");
         return ESP_ERR_INVALID_RESPONSE;
     }
+    const auto& runtime = CommissioningRuntime::GetInstance();
+    if (runtime.IsInProgress() || runtime.Generation() != setup_generation_) return ESP_ERR_INVALID_STATE;
     const esp_err_t accepted =
         DeviceAuthorityLocator::GetInstance().AcceptDescriptor(
             out, canonical, response.body);
@@ -367,6 +370,7 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
     auto& identity = DeviceIdentity::GetInstance();
     esp_err_t err = identity.EnsureKeypair();
     if (err != ESP_OK) return err;
+    if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
     const std::string nonce = Base64UrlRandom(18);
     const std::string public_key = identity.DeviceControlPublicKey();
     std::string signature;
@@ -396,11 +400,13 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
     err = DeviceAuthorityLocator::GetInstance().Resolve(
         device_foundation::v1::LogicalAuthority::DeviceControl, control);
     if (err != ESP_OK) return err;
+    if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
     HubHttpResponse response;
     err = HubHttpRequest(
         "POST", control.uri + "/configuration:pull",
         trust_.owner_root_certificate_pem, body, response);
     if (err != ESP_OK) return err;
+    if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
     if (response.status != 200) return StatusError(response.status);
     HubConfigStatus status = HubConfigStatus::PendingApproval;
     HubChannelAssignment assignment;
@@ -416,6 +422,7 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
     if (status != HubConfigStatus::Revoked) {
         ReconcileDeclaredManifest(claim, accepted_manifest);
     }
+    if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
     out = Esp32HubConfig{};
     out.status = status;
     if (status == HubConfigStatus::Active) {
@@ -481,6 +488,7 @@ void HubOnboardingClient::ReconcileDeclaredManifest(
         ESP_OK) {
         return;
     }
+    if (!ContextCurrent()) return;
     HubHttpResponse response;
     if (HubHttpRequest("POST", control.uri + "/manifest:assert",
                        trust_.owner_root_certificate_pem, body,
@@ -498,8 +506,25 @@ void HubOnboardingClient::ReconcileDeclaredManifest(
              plan.revision, manifest_digest.c_str());
 }
 
+bool HubOnboardingClient::ContextCurrent() const {
+    const auto& runtime = CommissioningRuntime::GetInstance();
+    if (runtime.IsInProgress() || runtime.Generation() != setup_generation_) return false;
+    OwnerTrustBundle trust;
+    device_foundation::v1::OwnerDomainDescriptor descriptor;
+    std::string canonical;
+    return OwnerTrustStore().Load(trust) &&
+        ParseOwnerDomainDescriptor(trust.owner_domain_descriptor_json, descriptor, canonical) &&
+        trust.owner_domain_id == context_.owner_domain_id &&
+        descriptor.owner_domain_generation == context_.owner_domain_generation &&
+        DeviceIdentity::GetInstance().DeviceInstanceId() == context_.device_instance_id;
+}
+
 esp_err_t HubOnboardingClient::LoadCommissionedTrust()
 {
+    auto& runtime = CommissioningRuntime::GetInstance();
+    if (runtime.IsInProgress()) return ESP_ERR_INVALID_STATE;
+    setup_generation_ = runtime.Generation();
+    recovery_hint_.clear();
     auto& locator = DeviceAuthorityLocator::GetInstance();
     if (locator.ReloadCommissionedDirectory() != ESP_OK ||
         locator.TrustBundle(trust_) != ESP_OK) {
@@ -530,9 +555,10 @@ esp_err_t HubOnboardingClient::ConsultOwnerInstruction(
     const ActiveClaimState& claim, bool& fenced)
 {
     fenced = false;
+    if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
     bool removal_completed = false;
     const esp_err_t err = DeviceControlDeliveryClient().PollAndExecute(
-        claim, trust_, removal_completed);
+        claim, trust_, removal_completed, [this] { return ContextCurrent(); });
     if (err != ESP_OK) return err;
     if (removal_completed) {
         ESP_LOGW(TAG, "Device removal completed; operational runtime is fenced");
@@ -589,7 +615,14 @@ esp_err_t HubOnboardingClient::ProposeFreshClaim(
     bool activated = false;
     const esp_err_t err =
         ContinueCanonicalClaim(descriptor, device_id, claim, activated);
-    if (err != ESP_OK) return err;
+    if (err != ESP_OK) {
+        if (err == ESP_ERR_NOT_ALLOWED && !recovery_hint_.empty()) {
+            out = {};
+            out.status = HubConfigStatus::RecoveryRequired;
+            out.recovery_hint = recovery_hint_;
+        }
+        return err;
+    }
     if (!activated) {
         // Asking is not being granted. The Proposal waits in pending-approval,
         // where the Owner decides as they did the first time.
@@ -600,37 +633,13 @@ esp_err_t HubOnboardingClient::ProposeFreshClaim(
     return PullActiveConfiguration(claim, out);
 }
 
-void HubOnboardingClient::LogDeadClaim(
-    ClaimUsability usability, const ActiveClaimState& claim,
-    const std::string& device_id,
-    const device_foundation::v1::OwnerDomainDescriptor& descriptor)
-{
-    // Which fact moved is the whole diagnosis. One message across three
-    // unrelated causes is how a Host that had merely been re-keyed looked
-    // identical to a device nobody could account for.
-    if (usability == ClaimUsability::ForeignPrincipal) {
-        ESP_LOGW(TAG,
-                 "Stored Claim belongs to another principal (%s); proposing "
-                 "again as %s",
-                 claim.device_ref.device_instance_id.c_str(), device_id.c_str());
-        return;
-    }
-    ESP_LOGW(TAG,
-             "Owner Domain moved on (claim owner=%s generation=%lu, directory "
-             "owner=%s generation=%lu); dropping the dead Claim and proposing "
-             "again for review",
-             claim.device_ref.owner_domain_id.value.c_str(),
-             static_cast<unsigned long>(
-                 claim.device_ref.owner_domain_generation),
-             descriptor.owner_domain_id.c_str(),
-             static_cast<unsigned long>(descriptor.owner_domain_generation));
-}
-
 esp_err_t HubOnboardingClient::RunAccepted(
     const device_foundation::v1::OwnerDomainDescriptor& descriptor,
     const std::string& device_id,
     Esp32HubConfig& out)
 {
+    context_ = {descriptor.owner_domain_id, descriptor.owner_domain_generation, device_id};
+    if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
     HubConfigStore store;
     ActiveClaimState active_claim;
     const ClaimStoreLoadResult claim_load = store.LoadActiveClaim(active_claim);
@@ -648,6 +657,12 @@ esp_err_t HubOnboardingClient::RunAccepted(
     if (RecoveryForUsability(usability) ==
         ClaimRecovery::RequirePhysicalPresence) {
         return StandDownRevoked(active_claim, out);
+    }
+
+    if (RecoveryForUsability(usability) == ClaimRecovery::RequireAuthorizedRecovery) {
+        out = {};
+        out.status = HubConfigStatus::RecoveryRequired;
+        return ESP_ERR_NOT_ALLOWED;
     }
 
     // What the Owner asked for outranks anything this device concludes about
@@ -674,15 +689,20 @@ esp_err_t HubOnboardingClient::RunAccepted(
         }
     }
 
-    if (RecoveryForUsability(usability) == ClaimRecovery::DropAndRepropose) {
-        LogDeadClaim(usability, active_claim, device_id, descriptor);
-        // The Claim goes; identity, Owner trust and the enrolment journal stay,
-        // so the device that proposes again is the same device.
-        if (!store.ClearActiveClaim()) {
-            ESP_LOGE(TAG, "Could not forget the dead Claim");
-            return ESP_FAIL;
+    // Finish a durable activation's cleanup even when the active Claim already
+    // exists. The normal active-configuration path used to bypass this resume.
+    EnrollmentJournalEntry pending;
+    const auto pending_load = store.LoadEnrollment(pending);
+    if (pending_load == ClaimStoreLoadResult::StorageFailure) return ESP_FAIL;
+    if (pending_load == ClaimStoreLoadResult::Loaded) {
+        EspIdfClaimGrantCrypto crypto;
+        if (!crypto.EnsureEnrollmentMaterial(false)) return ESP_FAIL;
+        DeviceClaimConsumerCore core(store, store, crypto, context_, [this] { return ContextCurrent(); });
+        if (core.ResumePending().result != DeviceClaimConsumerResult::Replayed) {
+            out = {};
+            out.status = HubConfigStatus::RecoveryRequired;
+            return ESP_ERR_NOT_ALLOWED;
         }
-        return ProposeFreshClaim(descriptor, device_id, active_claim, out);
     }
 
     const esp_err_t err = PullActiveConfiguration(active_claim, out);
@@ -705,50 +725,33 @@ esp_err_t HubOnboardingClient::RunAccepted(
     return StandDownRevoked(recorded, out);
 }
 
-esp_err_t HubOnboardingClient::AbandonAndRepropose(
-    DeviceClaimConsumerCore& core,
-    const device_foundation::v1::OwnerDomainDescriptor& descriptor,
-    const std::string& device_id, ActiveClaimState& activated_claim,
-    bool& activated, bool allow_reproposal, const char* reason)
-{
-    if (!allow_reproposal) {
-        ESP_LOGW(TAG, "Proposal is finished (%s) and one was already abandoned",
-                 reason);
-        return ESP_ERR_INVALID_STATE;
-    }
-    const auto outcome = core.AbandonPendingProposal();
-    if (outcome.result != DeviceClaimConsumerResult::ProposalAbandoned &&
-        outcome.result != DeviceClaimConsumerResult::NoPendingEnrollment) {
-        ESP_LOGE(TAG, "Could not abandon the finished Proposal (%s), result=%d",
-                 reason, static_cast<int>(outcome.result));
-        return outcome.result == DeviceClaimConsumerResult::StorageFailure
-                   ? ESP_FAIL
-                   : ESP_ERR_INVALID_STATE;
-    }
-    ESP_LOGW(TAG, "Proposal is finished (%s); proposing again for review",
-             reason);
-    return ContinueCanonicalClaim(descriptor, device_id, activated_claim,
-                                  activated, false);
-}
-
 esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
     const device_foundation::v1::OwnerDomainDescriptor& descriptor,
     const std::string& device_id, ActiveClaimState& activated_claim,
-    bool& activated, bool allow_reproposal)
+    bool& activated)
 {
     activated = false;
+    if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
     HubConfigStore store;
     EspIdfClaimGrantCrypto crypto;
-    if (!crypto.EnsureEnrollmentMaterial()) {
+    EnrollmentJournalEntry persisted;
+    const auto persisted_load = store.LoadEnrollment(persisted);
+    if (persisted_load == ClaimStoreLoadResult::StorageFailure) return ESP_FAIL;
+    if (!crypto.EnsureEnrollmentMaterial(persisted_load == ClaimStoreLoadResult::NotFound)) {
         ESP_LOGE(TAG,
                  "Claim enrollment material is absent or unreadable; refusing Proposal");
         return ESP_ERR_NOT_SUPPORTED;
     }
-    DeviceClaimConsumerCore core(store, store, crypto);
+    DeviceClaimConsumerCore core(store, store, crypto, context_, [this] { return ContextCurrent(); });
     auto outcome = core.ResumePending();
+    if (outcome.result == DeviceClaimConsumerResult::OwnerDomainMismatch) {
+        recovery_hint_ = "Connection recovery needed. Press and hold the button to open setup";
+        return ESP_ERR_NOT_ALLOWED;
+    }
     std::string admission;
     esp_err_t err = AdmissionEndpoint(admission);
     if (err != ESP_OK) return err;
+    if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
 
     if (outcome.result == DeviceClaimConsumerResult::NoPendingEnrollment) {
 #ifdef CONFIG_EIDOLON_PROVISIONING_MANUFACTURER_BOUND
@@ -770,6 +773,12 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
                      "No commissioning credential; this device has not been "
                      "commissioned into an Owner Domain");
             return ESP_ERR_NOT_SUPPORTED;
+        }
+        if ((!credential.owner_domain_id.empty() && credential.owner_domain_id != descriptor.owner_domain_id) ||
+            (credential.owner_domain_generation != 0 && credential.owner_domain_generation != descriptor.owner_domain_generation) ||
+            (!credential.operational_key_id.empty() && credential.operational_key_id != crypto.OperationalKeyId())) {
+            recovery_hint_ = "Connection recovery needed. Press and hold the button to open setup";
+            return ESP_ERR_NOT_ALLOWED;
         }
         const std::string handoff_public_key = crypto.HandoffPublicKey();
         const std::string operational_public_key = crypto.OperationalPublicKey();
@@ -864,10 +873,12 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
         const std::string correlation_id = "claim-" + identity;
         const std::string wire = WithCommandEnvelope(
             command_id, correlation_id, canonical_create);
+        if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
         HubHttpResponse response;
         err = HubHttpRequest("POST", admission + "/enrollments",
                              trust_.owner_root_certificate_pem, wire, response);
         if (err != ESP_OK) return err;
+        if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
         if (response.status != 201) return StatusError(response.status);
         outcome = core.RecordProposal(
             canonical_create, response.body, descriptor.owner_domain_generation);
@@ -891,6 +902,7 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
             "collect|" + journal.enrollment_id + "|" +
                 journal.collection_challenge,
             18);
+        if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
         HubHttpResponse response;
         err = HubHttpRequest(
             "POST",
@@ -901,6 +913,7 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
                                 outcome.wire_payload),
             response);
         if (err != ESP_OK) return err;
+        if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
         if (response.status == 409 &&
             HasProblemCode(response.body, "DECISION_REQUIRED")) {
             // A Decision may arrive after this bounded poll. Only that explicit
@@ -909,9 +922,10 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
             return ESP_OK;
         }
         if (IsFinishedProposalProblem(response.status, response.body)) {
-            return AbandonAndRepropose(core, descriptor, device_id,
-                                       activated_claim, activated,
-                                       allow_reproposal, "collect");
+            // Expiry/404 cannot revoke a Decision. Keep the Proposal and its
+            // proof material for Authority recovery instead of losing approval.
+            recovery_hint_ = "Waiting for Owner to restore device access";
+            return ESP_ERR_NOT_ALLOWED;
         }
         if (response.status != 200) return StatusError(response.status);
         device_foundation::v1::CollectClaimGrantResult collected;
@@ -928,9 +942,8 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
             static_cast<int64_t>(time(nullptr)) * 1000,
             1704067200000LL);
         if (deadline == Rfc3339DeadlineState::Expired) {
-            return AbandonAndRepropose(core, descriptor, device_id,
-                                       activated_claim, activated,
-                                       allow_reproposal, "grant deadline");
+            recovery_hint_ = "Waiting for Owner to restore device access";
+            return ESP_ERR_NOT_ALLOWED;
         }
         if (deadline == Rfc3339DeadlineState::Unknown) {
             ESP_LOGW(TAG,
@@ -954,6 +967,7 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
         }
         const std::string identity = StableToken(
             "ack|" + journal.enrollment_id + "|" + journal.grant_id, 18);
+        if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
         HubHttpResponse response;
         err = HubHttpRequest(
             "POST",
@@ -964,10 +978,12 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
                                 outcome.wire_payload),
             response);
         if (err != ESP_OK) return err;
+        if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
         if (IsFinishedProposalProblem(response.status, response.body)) {
-            return AbandonAndRepropose(core, descriptor, device_id,
-                                       activated_claim, activated,
-                                       allow_reproposal, "ack");
+            // Expiry/404 cannot revoke a Decision. Keep the Proposal and its
+            // proof material for Authority recovery instead of losing approval.
+            recovery_hint_ = "Waiting for Owner to restore device access";
+            return ESP_ERR_NOT_ALLOWED;
         }
         if (response.status != 200) return StatusError(response.status);
         outcome = core.AcceptGrantAck(response.body);

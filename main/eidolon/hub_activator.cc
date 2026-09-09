@@ -27,6 +27,10 @@ namespace {
 void ProjectHubConfig(Application& app, HubConfigStatus status)
 {
     switch (status) {
+    case HubConfigStatus::RecoveryRequired:
+        app.SetEidolonRuntimeUi(RuntimePhase::RecoveryRequired);
+        app.SetEidolonServiceUi(ServicePhase::Unavailable);
+        break;
     case HubConfigStatus::PendingApproval:
         app.SetEidolonEnrollmentUi(EnrollmentPhase::PendingReview);
         app.SetEidolonServiceUi(ServicePhase::Unavailable);
@@ -55,7 +59,7 @@ ActivationAttemptOutcome ClassifyAttempt(esp_err_t err, const Esp32HubConfig& co
     // alone does not: the Authority answering 401/403 has rejected a request,
     // not decided anything about this device, and showing its Owner "you were
     // removed" for a rejected request points the person at the wrong problem.
-    if (err == ESP_ERR_NOT_ALLOWED && config.status == HubConfigStatus::Revoked) {
+    if (err == ESP_ERR_NOT_ALLOWED && (config.status == HubConfigStatus::Revoked || config.status == HubConfigStatus::RecoveryRequired)) {
         return ActivationAttemptOutcome::ClaimTerminal;
     }
     return ActivationAttemptOutcome::Retryable;
@@ -138,6 +142,15 @@ bool HubActivator::Run() {
             return true;
 
         case ActivationStandDown::ClaimTerminal:
+            if (config.status == HubConfigStatus::RecoveryRequired) {
+                app.SetEidolonEnrollmentUi(EnrollmentPhase::Unknown);
+                app.SetEidolonServiceUi(ServicePhase::Unavailable);
+                app.SetEidolonRuntimeUi(RuntimePhase::RecoveryRequired,
+                    config.recovery_hint.empty()
+                        ? "Connection recovery needed. Press and hold the button to open setup"
+                        : config.recovery_hint);
+                return false;
+            }
             // Removal and revocation are deliberately terminal: the firmware
             // does not silently resurrect a revoked lifecycle. Asking again
             // cannot change the answer, so say what does — and say it as the

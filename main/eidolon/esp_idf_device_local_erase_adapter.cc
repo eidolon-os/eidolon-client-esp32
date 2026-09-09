@@ -128,7 +128,7 @@ OwnerDataErasePlan EspIdfDeviceLocalEraseAdapter::BuildErasePlan(
         plan.targets.push_back(NvsKeys(
             "active-claim-and-onboarding", kOwnerData, "", "eidolon",
             {"enrollment", "active_claim", "ctx_gen", "ctx_phase",
-             "ctx_owner", "ctx_ssid", "ctx_digest"}, true));
+             "ctx_owner", "ctx_ssid", "ctx_digest", "ctx_record"}, true));
         plan.targets.push_back(NvsKeys(
             "device-user-preferences", kOwnerData, "", "eidolon_device",
             {"mic_enabled", "theme_applied"}, true));
@@ -141,7 +141,7 @@ OwnerDataErasePlan EspIdfDeviceLocalEraseAdapter::BuildErasePlan(
     }
     if (network) {
         std::vector<std::string> wifi_keys = {
-            "ota_url", "max_tx_power", "remember_bssid", "sleep_mode"};
+            "ota_url", "max_tx_power", "remember_bssid", "sleep_mode", "ctx_candidate"};
         for (int index = 0; index < 10; ++index) {
             wifi_keys.push_back(index == 0 ? "ssid" :
                                 "ssid" + std::to_string(index));
@@ -173,6 +173,25 @@ OwnerDataErasePlan EspIdfDeviceLocalEraseAdapter::BuildErasePlan(
             true, true));
     }
     plan.valid = true;
+    return plan;
+}
+
+OwnerDataErasePlan EspIdfDeviceLocalEraseAdapter::BuildCommissioningCleanupPlan() {
+    device_foundation::v1::DeviceLocalEraseCommand scopes;
+    scopes.erase_scopes = {kOwnerCredentials, kOwnerData};
+    auto plan = BuildErasePlan(scopes);
+    plan.plan_id = "commissioning-owner-cleanup-v1";
+    plan.targets.erase(std::remove_if(plan.targets.begin(), plan.targets.end(),
+        [](const auto& target) {
+            return target.target_id == "owner-trust-dedicated" ||
+                   target.target_id == "owner-trust-default-fallback" ||
+                   target.target_id == "operational-device-identity";
+        }), plan.targets.end());
+    for (auto& target : plan.targets) {
+        if (target.target_id == "active-claim-and-onboarding") {
+            target.keys = {"enrollment", "active_claim"};
+        }
+    }
     return plan;
 }
 

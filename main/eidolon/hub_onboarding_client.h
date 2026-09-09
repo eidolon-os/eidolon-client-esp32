@@ -36,25 +36,11 @@ private:
     // poll carries the same opportunity a few seconds later.
     void ReconcileDeclaredManifest(const ActiveClaimState& claim,
                                    const AcceptedManifestRef& accepted);
-    // [allow_reproposal] permits exactly one abandonment per activation
-    // attempt: when the Authority answers that this Proposal is finished for
-    // good, the checkpoint is dropped and a fresh Proposal is made in the same
-    // pass. Bounded, so a Host that answers "finished" to everything costs one
-    // extra round trip rather than an unbounded loop.
     esp_err_t ContinueCanonicalClaim(
         const device_foundation::v1::OwnerDomainDescriptor& descriptor,
         const std::string& device_id,
         ActiveClaimState& activated_claim,
-        bool& activated,
-        bool allow_reproposal = true);
-    esp_err_t AbandonAndRepropose(
-        DeviceClaimConsumerCore& core,
-        const device_foundation::v1::OwnerDomainDescriptor& descriptor,
-        const std::string& device_id,
-        ActiveClaimState& activated_claim,
-        bool& activated,
-        bool allow_reproposal,
-        const char* reason);
+        bool& activated);
     // Ask the Authority whether the Owner left an instruction for this device
     // and carry it out. `fenced` reports that a removal completed, so the
     // operational runtime must not start.
@@ -70,14 +56,14 @@ private:
         const device_foundation::v1::OwnerDomainDescriptor& descriptor,
         const std::string& device_id, ActiveClaimState& claim,
         Esp32HubConfig& out);
-    static void LogDeadClaim(
-        ClaimUsability usability, const ActiveClaimState& claim,
-        const std::string& device_id,
-        const device_foundation::v1::OwnerDomainDescriptor& descriptor);
     esp_err_t RunAccepted(const device_foundation::v1::OwnerDomainDescriptor& descriptor,
                           const std::string& device_id,
                           Esp32HubConfig& out);
 
+    bool ContextCurrent() const;
+    ClaimConsumerContext context_;
+    std::string recovery_hint_;
+    uint32_t setup_generation_ = 0;
     OwnerTrustBundle trust_;
 };
 

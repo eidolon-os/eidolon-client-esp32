@@ -48,6 +48,8 @@ std::string BuildSetupDescriptorJson(
 // They stay separate messages so the controller can establish trust first and
 // still be answered over a transport the network change is about to remove.
 struct TrustHandover {
+    // Authenticated first visit, before the Controller requests a key-bound voucher.
+    bool prepare_only = false;
     std::string owner_domain_id;
     std::string owner_domain_descriptor_json;
     std::string owner_root_certificate_pem;

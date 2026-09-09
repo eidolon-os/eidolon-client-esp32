@@ -25,6 +25,7 @@ inline constexpr const char* kNvsNamespace = "eidolon";
 
 enum class HubConfigStatus {
     PendingApproval,
+    RecoveryRequired,
     WaitingBinding,
     Active,
     Revoked,
@@ -32,6 +33,7 @@ enum class HubConfigStatus {
 
 inline const char* HubConfigStatusToString(HubConfigStatus status) {
     switch (status) {
+    case HubConfigStatus::RecoveryRequired: return "recovery-required";
     case HubConfigStatus::PendingApproval:
         return "pending-approval";
     case HubConfigStatus::WaitingBinding:
@@ -45,6 +47,7 @@ inline const char* HubConfigStatusToString(HubConfigStatus status) {
 }
 
 inline HubConfigStatus ParseHubConfigStatus(const std::string& status) {
+    if (status == "recovery-required") return HubConfigStatus::RecoveryRequired;
     if (status == "approved") {
         return HubConfigStatus::Active;
     }
@@ -87,6 +90,8 @@ struct Esp32HubConfig {
     // Default to the most conservative status: a config that has not been
     // explicitly populated/parsed must never grant voice access.
     HubConfigStatus status = HubConfigStatus::PendingApproval;
+    // Local UI guidance; never a remote Claim or cached channel credential.
+    std::string recovery_hint;
     // The one channel this device has. It used to be two — a control room it
     // lived in and a voice room it visited — which cost a room teardown and
     // rebuild at the start of every conversation, and left the device

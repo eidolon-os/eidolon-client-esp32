@@ -55,6 +55,7 @@ protected:
     /**
      * WiFi connection timeout callback
      */
+    bool commissioning_recovery_pending_ = false;
     static void OnWifiConnectTimeout(void* arg);
 
 public:

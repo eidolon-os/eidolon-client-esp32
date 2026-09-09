@@ -2,6 +2,7 @@
 #define EIDOLON_DEVICE_CLAIM_CONSUMER_CORE_H_
 
 #include <cstdint>
+#include <functional>
 #include <string>
 
 #include "device_foundation_v1_generated.h"
@@ -131,12 +132,20 @@ struct DeviceClaimConsumerOutcome {
     std::string wire_payload;
 };
 
+struct ClaimConsumerContext {
+    std::string owner_domain_id;
+    uint64_t owner_domain_generation = 0;
+    std::string device_instance_id;
+};
+
 class DeviceClaimConsumerCore {
 public:
     DeviceClaimConsumerCore(EnrollmentJournalPort& enrollment,
                             ActiveClaimStorePort& active_claim,
-                            ClaimGrantCryptoPort& crypto)
-        : enrollment_(enrollment), active_claim_(active_claim), crypto_(crypto) {}
+                            ClaimGrantCryptoPort& crypto, ClaimConsumerContext context,
+                            std::function<bool()> current = [] { return true; })
+        : enrollment_(enrollment), active_claim_(active_claim), crypto_(crypto),
+          context_(std::move(context)), current_(std::move(current)) {}
 
     DeviceClaimConsumerOutcome RecordProposal(
         const std::string& canonical_create_enrollment,
@@ -187,9 +196,14 @@ public:
 private:
     DeviceClaimConsumerOutcome AckFor(const EnrollmentJournalEntry& entry);
 
+    bool Matches(const EnrollmentJournalEntry& entry) const;
+    bool Matches(const device_foundation::v1::DeviceRef& ref) const;
+    bool Current() const;
     EnrollmentJournalPort& enrollment_;
     ActiveClaimStorePort& active_claim_;
     ClaimGrantCryptoPort& crypto_;
+    ClaimConsumerContext context_;
+    std::function<bool()> current_;
 };
 
 }  // namespace eidolon

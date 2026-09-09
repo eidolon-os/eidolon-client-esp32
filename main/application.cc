@@ -396,6 +396,9 @@ void Application::Initialize() {
                         eidolon::RuntimePhase::Commissioning,
                         "Ready for secure device setup");
                     break;
+                case State::RecoveringConfiguration:
+                    SetEidolonRuntimeUi(eidolon::RuntimePhase::RecoveryRequired);
+                    break;
                 case State::ApplyingConfiguration:
                     SetEidolonRuntimeUi(
                         eidolon::RuntimePhase::NetworkConnecting,
@@ -526,6 +529,10 @@ void Application::Initialize() {
     eidolon::CommissioningRuntime::GetInstance()
         .SetOperationalRuntimeQuiescer(
             [this](std::function<void(bool)> completion) {
+                // Drain the existing activation writer as well as the voice
+                // actor. Generation checks reject late responses; this lock
+                // also closes the check-to-store race before trust can switch.
+                std::lock_guard<std::mutex> activation_lock(activation_execution_mutex_);
                 if (!voice_transport_) {
                     completion(true);
                     return;
@@ -944,6 +951,8 @@ void Application::ActivationWorkerTrampoline(void* arg) {
 
 bool Application::ActivationTask() {
 #if CONFIG_EIDOLON_HUB_MODE
+    std::lock_guard<std::mutex> activation_lock(activation_execution_mutex_);
+    if (eidolon::CommissioningRuntime::GetInstance().IsInProgress()) return false;
     // HUB_MODE never runs the Xiaozhi version-check, so it never reaches the
     // mark-valid path inside CheckNewVersion(). Commit the running firmware here so an
     // anti-rollback reset (e.g. a user power-cycle) before hub activation completes
@@ -961,6 +970,7 @@ bool Application::ActivationTask() {
     }
 
     CheckAssetsVersion();
+    if (eidolon::CommissioningRuntime::GetInstance().IsInProgress()) return false;
 
     SetEidolonRuntimeUi(eidolon::RuntimePhase::Normal);
     SetEidolonServiceUi(eidolon::ServicePhase::DiscoveringAuthority);

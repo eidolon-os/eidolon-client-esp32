@@ -517,6 +517,33 @@ OwnerTrustStoreResult OwnerTrustStore::ReplaceActive(
     return OwnerTrustStoreResult::Staged;
 }
 
+OwnerTrustLoadResult OwnerTrustStore::ReadActive(OwnerTrustBundle& out) const {
+    if (!EnsureLegacyTrustMigrated()) return OwnerTrustLoadResult::Unavailable;
+    NvsHandle nvs(NVS_READONLY);
+    if (!nvs.valid()) return OwnerTrustLoadResult::Unavailable;
+    switch (ProbeActiveBundle(nvs.get(), out)) {
+    case OwnerTrustSourceState::Valid: return OwnerTrustLoadResult::Loaded;
+    case OwnerTrustSourceState::Empty: return OwnerTrustLoadResult::NotFound;
+    case OwnerTrustSourceState::Unavailable: return OwnerTrustLoadResult::Unavailable;
+    }
+    return OwnerTrustLoadResult::Unavailable;
+}
+
+bool OwnerTrustStore::DiscardInactive() {
+    NvsHandle nvs(NVS_READWRITE);
+    if (!nvs.valid()) return false;
+    const int active = ActiveSlot(nvs.get());
+    if (active < 0) return false;
+    const int other = 1 - active;
+    for (const auto* key : {kOwnerKeys[other], kRootKeys[other], kAuthorityKeys[other],
+                            kDescriptorKeys[other], kDigestKeys[other],
+                            kStagedSlotKey, kStagedGenerationKey}) {
+        const auto err = nvs_erase_key(nvs.get(), key);
+        if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return false;
+    }
+    return nvs_commit(nvs.get()) == ESP_OK;
+}
+
 bool OwnerTrustStore::Load(OwnerTrustBundle& bundle) const
 {
     bundle = OwnerTrustBundle{};

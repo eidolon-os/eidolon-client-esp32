@@ -1,42 +1,34 @@
-#ifndef EIDOLON_ESP_IDF_COMMISSIONING_CREDENTIAL_STORE_H_
-#define EIDOLON_ESP_IDF_COMMISSIONING_CREDENTIAL_STORE_H_
+#pragma once
 
 #include "commissioning_credential.h"
 #include "owner_trust_commissioner.h"
 
 namespace eidolon {
-
-// Where this store keeps what it keeps, published because two other operations
-// have to end this identity completely: the Owner's remote erase, and the
-// physical recovery that follows a completed one. Both used to name the
-// operational private key and stop there, which left a device holding a base
-// identity issued to a key it no longer had — the half identity B3 declares
-// unrepresentable. It cost one Body a 401 loop it could not leave.
-//
-// Naming the keys here, once, is what makes the colocation below load-bearing
-// rather than decorative: a key added to this store is erased by both
-// operations without either being edited.
 inline constexpr const char* kCommissioningCredentialNamespace = "eidolon_id";
 inline constexpr const char* kCommissioningCredentialKeys[] = {
-    "base_id", "voucher", "voucher_jti", "voucher_exp"};
+    "base_id", "voucher", "voucher_jti", "voucher_exp", "id_active", "id_pending"};
 
-// The credential lives in the same NVS namespace as the operational private
-// key, on purpose. Erasing that namespace erases both, which is the whole of
-// what "this device was reset" now means: no factory secret survives it, so the
-// Body that comes back is a new one and the Owner is asked about it as such.
+enum class CommissioningIdentityLoad { NotFound, Loaded, Unavailable };
+
+// One active key/credential blob and one transaction candidate. The private key
+// and issued base identity are published by a single NVS item replacement.
 class EspIdfCommissioningCredentialStore : public CommissioningCredentialStorePort {
 public:
     static EspIdfCommissioningCredentialStore& GetInstance();
-
-    bool Save(const CommissioningCredential& credential) override;
+    bool Prepare(const std::string& owner, uint64_t owner_generation,
+                 uint32_t setup_generation, bool replace_identity,
+                 PreparedCommissioningIdentity& out) override;
+    bool Stage(const CommissioningCredential* credential, uint32_t generation,
+               const std::function<bool()>& guard) override;
+    bool DescribeCandidate(uint32_t generation, PreparedCommissioningIdentity& out) const;
+    bool StagedDigest(uint32_t generation, const std::string& owner, uint64_t owner_generation,
+                      std::string& digest, bool& replaces_owner) const;
+    bool RequiresRuntimeRestart(uint32_t generation) const;
+    bool CommitStaged(uint32_t generation, const std::string& digest);
+    bool Finish(uint32_t generation);
+    bool Rollback(uint32_t generation);
     bool Load(CommissioningCredential& out) const;
-
-    // Called once a voucher has been exchanged for a Proposal. The base identity
-    // stays: it is the anchor this Body returns on. Only the one-shot half is
-    // dropped, so a spent voucher cannot be presented again from flash.
     bool ForgetSpentVoucher();
+    static CommissioningIdentityLoad LoadPrivateKey(std::string& pem);
 };
-
 }  // namespace eidolon
-
-#endif  // EIDOLON_ESP_IDF_COMMISSIONING_CREDENTIAL_STORE_H_

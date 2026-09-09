@@ -12,9 +12,9 @@ enum class CommissioningTransactionResult {
     RecoveryRequired,
 };
 
-// Crash-safe adapter coordinating the legacy Wi-Fi profile store and the
-// fail-safe Owner trust slots. The journal contains only generation, Owner,
-// SSID and a credential digest; it never stores a replayable password.
+// One commissioning transaction coordinates Wi-Fi, scoped Owner cleanup,
+// identity/credential publication and the existing trust slots. Its journal
+// holds phases and snapshot digests; the password stays in the Wi-Fi store.
 CommissioningTransactionResult CommitCommissioningTransaction(
     uint32_t generation, const std::string& ssid, const std::string& password);
 
@@ -22,7 +22,13 @@ CommissioningTransactionResult CommitCommissioningTransaction(
 // still pending and normal networking must not race it.
 bool RecoverPendingCommissioningTransaction();
 
-// Rollback is permitted only before the network profile became durable.
+// An interrupted legacy transaction has no identity snapshot. A physically
+// opened, authenticated setup may replace it using a freshly issued identity.
+// A current durable transaction must finish before another setup can start.
+bool CommissioningTransactionAllowsNewSetup();
+bool CommissioningTransactionNeedsFreshIdentity();
+
+// Rollback is permitted only before the durable commit decision.
 bool RollbackPendingCommissioningTransaction(uint32_t generation);
 
 }  // namespace eidolon

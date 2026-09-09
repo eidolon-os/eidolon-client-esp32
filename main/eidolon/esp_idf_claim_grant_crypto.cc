@@ -25,6 +25,23 @@ namespace {
 constexpr char kNamespace[] = "eidolon_claim";
 constexpr char kHandoffPrivateKey[] = "handoff_priv";
 
+// Absence is a valid idempotent cleanup result; a failed read is not absence.
+esp_err_t ReadHandoffKey(std::string& pem) {
+    pem.clear();
+    nvs_handle_t handle = 0;
+    auto err = nvs_open(kNamespace, NVS_READONLY, &handle);
+    if (err != ESP_OK) return err;
+    size_t size = 0;
+    err = nvs_get_str(handle, kHandoffPrivateKey, nullptr, &size);
+    if (err == ESP_OK && size > 1 && size <= 1024) {
+        pem.resize(size);
+        err = nvs_get_str(handle, kHandoffPrivateKey, pem.data(), &size);
+        if (err == ESP_OK) pem.resize(size - 1);
+    } else if (err == ESP_OK) err = ESP_FAIL;
+    nvs_close(handle);
+    return err;
+}
+
 std::string Hex(const unsigned char* bytes, size_t size) {
     static constexpr char digits[] = "0123456789abcdef";
     std::string result(size * 2, '\0');
@@ -238,16 +255,19 @@ bool ParseClaimGrant(const std::string& json,
 }  // namespace
 
 bool EspIdfClaimGrantCrypto::LoadHandoffPrivateKey(std::string& pem) const {
-    Settings settings(kNamespace, false);
-    pem = settings.GetString(kHandoffPrivateKey);
-    return !pem.empty();
+    return ReadHandoffKey(pem) == ESP_OK;
 }
 
-bool EspIdfClaimGrantCrypto::EnsureEnrollmentMaterial() {
+bool EspIdfClaimGrantCrypto::EnsureEnrollmentMaterial(bool create_if_missing) {
     auto& identity = DeviceIdentity::GetInstance();
     if (identity.EnsureKeypair() != ESP_OK) return false;
     std::string pem;
-    if (!LoadHandoffPrivateKey(pem)) {
+    const auto loaded = ReadHandoffKey(pem);
+    if (loaded != ESP_OK && loaded != ESP_ERR_NVS_NOT_FOUND) return false;
+    if (loaded == ESP_ERR_NVS_NOT_FOUND) {
+        handoff_public_key_.clear();
+        handoff_key_id_.clear();
+        if (!create_if_missing) return true;
         mbedtls_entropy_context entropy;
         mbedtls_ctr_drbg_context random;
         if (!Seed(entropy, random)) return false;
@@ -388,10 +408,24 @@ bool EspIdfClaimGrantCrypto::BuildOperationalKeyProof(
 bool EspIdfClaimGrantCrypto::DestroyEnrollmentMaterial(
     const std::string& enrollment_id, const std::string& handoff_key_id) {
     (void)enrollment_id;
-    if (handoff_key_id.empty() || handoff_key_id != HandoffKeyId()) return false;
-    Settings settings(kNamespace, true);
-    settings.EraseKey(kHandoffPrivateKey);
-    if (settings.Commit() != ESP_OK) return false;
+    if (handoff_key_id.empty()) return false;
+    std::string pem;
+    const auto loaded = ReadHandoffKey(pem);
+    if (loaded == ESP_ERR_NVS_NOT_FOUND) {
+        handoff_public_key_.clear();
+        handoff_key_id_.clear();
+        return true;
+    }
+    if (loaded != ESP_OK) return false;
+    std::string stored_key, instance;
+    if (!DeviceIdentity::DescribeKey(pem, stored_key, instance) || stored_key != handoff_key_id) return false;
+    nvs_handle_t handle = 0;
+    if (nvs_open(kNamespace, NVS_READWRITE, &handle) != ESP_OK) return false;
+    auto err = nvs_erase_key(handle, kHandoffPrivateKey);
+    if (err == ESP_ERR_NVS_NOT_FOUND) err = ESP_OK;
+    if (err == ESP_OK) err = nvs_commit(handle);
+    nvs_close(handle);
+    if (err != ESP_OK || ReadHandoffKey(pem) != ESP_ERR_NVS_NOT_FOUND) return false;
     handoff_public_key_.clear();
     handoff_key_id_.clear();
     return true;

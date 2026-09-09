@@ -67,18 +67,26 @@ bool ParseCommissioningVoucher(const std::string& voucher,
     if (claims == nullptr) return false;
     const std::string purpose = JsonString(claims, "purpose");
     const std::string device_base_id = JsonString(claims, "device_base_id");
+    const std::string owner = JsonString(claims, "owner_domain_id");
+    const std::string key = JsonString(claims, "operational_spki_sha256");
     const std::string jti = JsonString(claims, "jti");
     const cJSON* expires = cJSON_GetObjectItemCaseSensitive(claims, "exp");
-    const bool expires_ok = cJSON_IsNumber(expires) && expires->valuedouble > 0;
+    const bool expires_ok = cJSON_IsNumber(expires) && expires->valuedouble > 0 &&
+        expires->valuedouble <= 9007199254740991.0;
     const int64_t expires_at =
         expires_ok ? static_cast<int64_t>(expires->valuedouble) : 0;
     cJSON_Delete(claims);
 
-    if (purpose != kPurpose || device_base_id.empty() || jti.empty() ||
-        !expires_ok) {
+    if (purpose != kPurpose || device_base_id.empty() || owner.empty() ||
+        key.size() != 71 || key.rfind("sha256:", 0) != 0 || jti.empty() ||
+        key.find_first_not_of("0123456789abcdef", 7) != std::string::npos ||
+        !expires_ok || expires_at <= 0) {
         return false;
     }
+    out = {};
     out.device_base_id = device_base_id;
+    out.owner_domain_id = owner;
+    out.operational_key_id = key;
     out.voucher = voucher;
     out.voucher_jti = jti;
     out.voucher_expires_at_unix = expires_at;

@@ -56,6 +56,8 @@ VoiceRuntimeStatus LiveKitVoiceTransport::BuildRuntimeStatus(VoiceSessionState s
 {
     EnrollmentPhase enrollment = EnrollmentPhase::Unknown;
     switch (controller_->GetConfigStatus()) {
+    case HubConfigStatus::RecoveryRequired:
+        break;
     case HubConfigStatus::PendingApproval:
         enrollment = EnrollmentPhase::PendingReview;
         break;

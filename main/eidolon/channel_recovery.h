@@ -152,7 +152,9 @@ inline Esp32HubConfig BuildChannelConnectionConfig(const Esp32HubConfig& registr
                                                     const RoomConfig* runtime_fallback = nullptr)
 {
     Esp32HubConfig selected = registration;
-    if (registration.status != HubConfigStatus::Active && runtime_fallback != nullptr &&
+    if (registration.status != HubConfigStatus::Active &&
+        registration.status != HubConfigStatus::RecoveryRequired &&
+        registration.status != HubConfigStatus::Revoked && runtime_fallback != nullptr &&
         runtime_fallback->usable()) {
         selected.session = *runtime_fallback;
     }

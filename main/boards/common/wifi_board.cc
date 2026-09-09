@@ -55,12 +55,6 @@ std::string WifiBoard::GetBoardType() {
 }
 
 void WifiBoard::StartNetwork() {
-#if CONFIG_EIDOLON_HUB_MODE
-    if (!eidolon::RecoverPendingCommissioningTransaction()) {
-        ESP_LOGE(TAG, "Commissioning transaction recovery is still pending; refusing Station start");
-        return;
-    }
-#endif
     auto& wifi_manager = WifiManager::GetInstance();
 
     // Initialize WiFi manager
@@ -93,6 +87,22 @@ void WifiBoard::StartNetwork() {
         }
     });
 
+#if CONFIG_EIDOLON_HUB_MODE
+    if (eidolon::CommissioningRuntime::GetInstance().IsInProgress()) return;
+    if (!eidolon::RecoverPendingCommissioningTransaction()) {
+        ESP_LOGW(TAG, "Commissioning recovery pending; retrying before Station start");
+        Application::GetInstance().SetEidolonRuntimeUi(
+            eidolon::RuntimePhase::RecoveryRequired,
+            eidolon::CommissioningTransactionNeedsFreshIdentity()
+                ? "Connection recovery needed. Press and hold the button to open setup"
+                : "Restoring connection");
+        commissioning_recovery_pending_ = true;
+        esp_timer_stop(connect_timer_);
+        esp_timer_start_once(connect_timer_, 3000000);
+        return;
+    }
+    commissioning_recovery_pending_ = false;
+#endif
     // Try to connect or enter config mode
     TryWifiConnect();
 }
@@ -174,6 +184,10 @@ void WifiBoard::SetNetworkEventCallback(NetworkEventCallback callback) {
 
 void WifiBoard::OnWifiConnectTimeout(void* arg) {
     auto* board = static_cast<WifiBoard*>(arg);
+    if (board->commissioning_recovery_pending_) {
+        Application::GetInstance().Schedule([board] { board->StartNetwork(); });
+        return;
+    }
     ESP_LOGW(TAG, "WiFi connection timeout");
 
 #if CONFIG_EIDOLON_HUB_MODE

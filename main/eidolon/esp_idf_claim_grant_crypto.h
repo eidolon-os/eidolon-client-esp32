@@ -12,7 +12,8 @@ namespace eidolon {
 // Enrollment journal can need it; DeviceIdentity remains the operational key.
 class EspIdfClaimGrantCrypto final : public ClaimGrantCryptoPort {
 public:
-    bool EnsureEnrollmentMaterial();
+    // Terminal cleanup and pending resume must never create a replacement key.
+    bool EnsureEnrollmentMaterial(bool create_if_missing = true);
     std::string HandoffPublicKey() const;
     std::string OperationalPublicKey() const;
 

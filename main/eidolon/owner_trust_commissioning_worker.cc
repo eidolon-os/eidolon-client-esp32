@@ -18,6 +18,7 @@
 #include <freertos/task.h>
 
 #include <atomic>
+#include <cJSON.h>
 #include <mutex>
 #include <new>
 #include <utility>
@@ -120,6 +121,7 @@ const char* RefusalReason(OwnerTrustCommissioningCode code)
         return "setup session is no longer active";
     case OwnerTrustCommissioningCode::StorageUnavailable:
         return "owner trust was not stored";
+    case OwnerTrustCommissioningCode::Prepared:
     case OwnerTrustCommissioningCode::Staged:
         break;
     }
@@ -157,18 +159,21 @@ void DecideOneRequest(Runtime& runtime, Request* request)
             request->payload, request->transport_generation, is_current);
     if (outcome.code == OwnerTrustCommissioningCode::Staged) {
         request->trust_staged = true;
-        auto& identity = DeviceIdentity::GetInstance();
-        if (identity.EnsureKeypair() != ESP_OK ||
-            identity.DeviceInstanceId().empty()) {
-            request->trust_staged = false;
-            request->response = BuildTrustRefusedJson(
-                "operational identity is unavailable");
-        } else {
-            request->response = BuildTrustStagedJson(
-                identity.DeviceInstanceId(), outcome.owner_domain_id);
-        }
+        request->response = BuildTrustStagedJson(
+            outcome.identity.device_instance_id, outcome.owner_domain_id);
         ESP_LOGI(TAG, "Staged Owner Domain %s",
                  outcome.owner_domain_id.c_str());
+    } else if (outcome.code == OwnerTrustCommissioningCode::Prepared) {
+        cJSON* root = cJSON_CreateObject();
+        cJSON_AddStringToObject(root, "contract_version", "1");
+        cJSON_AddBoolToObject(root, "prepared", true);
+        cJSON_AddStringToObject(root, "owner_domain_id", outcome.owner_domain_id.c_str());
+        cJSON_AddStringToObject(root, "device_id", outcome.identity.device_instance_id.c_str());
+        cJSON_AddStringToObject(root, "identity_fingerprint", outcome.identity.fingerprint.c_str());
+        char* raw = cJSON_PrintUnformatted(root);
+        if (raw) request->response = raw;
+        cJSON_free(raw);
+        cJSON_Delete(root);
     } else {
         request->response = BuildTrustRefusedJson(RefusalReason(outcome.code));
         ESP_LOGW(TAG, "Refused Owner trust with code %d",

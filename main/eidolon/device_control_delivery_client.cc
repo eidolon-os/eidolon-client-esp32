@@ -131,7 +131,7 @@ esp_err_t StatusError(int status) {
 esp_err_t DeviceControlDeliveryClient::PollAndExecute(
     const ActiveClaimState& claim,
     const OwnerTrustBundle& trust,
-    bool& removal_completed) {
+    bool& removal_completed, const std::function<bool()>& current) {
     removal_completed = false;
     // A revoked Claim is still this device's own Claim, and revoked is the one
     // state in which an erase instruction is likely to exist. Requiring Active
@@ -144,7 +144,7 @@ esp_err_t DeviceControlDeliveryClient::PollAndExecute(
     // the Authority, against the operational key this request is signed with.
     // The Claim still has to be a readable one, which `valid()` covers for both
     // states.
-    if (!claim.valid()) {
+    if (!current || !current() || !claim.valid()) {
         return ESP_ERR_INVALID_STATE;
     }
     auto& identity = DeviceIdentity::GetInstance();
@@ -173,6 +173,7 @@ esp_err_t DeviceControlDeliveryClient::PollAndExecute(
         "POST", endpoint.uri + "/erase-operations:pull",
         trust.owner_root_certificate_pem, request, response);
     if (err != ESP_OK) return err;
+    if (!current()) return ESP_ERR_INVALID_STATE;
     if (response.status == 204) return ESP_OK;
     if (response.status != 200) return StatusError(response.status);
 

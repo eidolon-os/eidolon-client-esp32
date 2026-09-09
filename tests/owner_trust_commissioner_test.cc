@@ -65,8 +65,19 @@ public:
     int calls = 0;
     CommissioningCredential stored;
 
-    bool Save(const CommissioningCredential& credential) override
-    {
+    bool Prepare(const std::string&, uint64_t, uint32_t, bool replacement,
+                 eidolon::PreparedCommissioningIdentity& out) override {
+        replaced = replacement;
+        out = {"device-instance-410376c9d5dc88022d04b4f31b1e035453ba0c2226887e019fb33a23dca2cbc7",
+               "sha256:410376c9d5dc88022d04b4f31b1e035453ba0c2226887e019fb33a23dca2cbc7"};
+        return accepted;
+    }
+    bool replaced = false;
+    bool Stage(const CommissioningCredential* candidate, uint32_t,
+               const std::function<bool()>& guard) override {
+        if (!guard()) return false;
+        if (!candidate) return accepted;
+        const auto& credential = *candidate;
         ++calls;
         if (!accepted) return false;
         stored = credential;
@@ -94,6 +105,12 @@ public:
 
 class FakeStore final : public OwnerTrustStorePort {
 public:
+    OwnerTrustBundle active;
+    eidolon::OwnerTrustLoadResult ReadActive(OwnerTrustBundle& out) const override {
+        out = active;
+        return active.owner_domain_id.empty() ? eidolon::OwnerTrustLoadResult::NotFound
+            : eidolon::OwnerTrustLoadResult::Loaded;
+    }
     OwnerTrustStoreResult result = OwnerTrustStoreResult::Staged;
     int calls = 0;
     uint32_t staged_generation = 0;
@@ -171,7 +188,7 @@ void RefusesAVoucherItCannotRead()
     assert(commissioner.Commission(
                Handover("owner-domain_01", "owner-domain_01", "not-a-voucher"),
                7, [] { return true; }).code ==
-           OwnerTrustCommissioningCode::Unsupported);
+           OwnerTrustCommissioningCode::Invalid);
     assert(credentials.calls == 0);
     assert(store.calls == 0);
 }
@@ -222,7 +239,7 @@ void GenerationFenceAppliesBeforeWorkAndAtCommit()
     assert(commissioner.Commission(Handover(), 7, [&] { return current; }).code ==
            OwnerTrustCommissioningCode::Stale);
     assert(verifier.calls == 1);
-    assert(store.calls == 1);
+    assert(store.calls == 0);
 }
 
 void StorageFailureIsNotReportedAsAccepted()
@@ -236,10 +253,38 @@ void StorageFailureIsNotReportedAsAccepted()
            OwnerTrustCommissioningCode::StorageUnavailable);
 }
 
+
+void PreparePreservesTrustAndEnforcesSameOwnerRevisionFloor() {
+    FakeVerifier verifier;
+    FakeStore store;
+    FakeCredentials credentials;
+    OwnerTrustCommissioner commissioner(verifier, store, credentials);
+    store.active = {"owner-domain_01", Descriptor(), "root", "authority"};
+    auto prepare = Handover("owner-domain_01", "owner-domain_01", "");
+    prepare.insert(1, "\"prepare_only\":true,");
+    const auto result = commissioner.Commission(prepare, 9, [] { return true; });
+    assert(result.code == OwnerTrustCommissioningCode::Prepared);
+    assert(!result.identity.device_instance_id.empty());
+    assert(store.calls == 0 && credentials.calls == 0 && !credentials.replaced);
+    auto revision = [&](const std::string& text, const std::string& from, const std::string& to) {
+        auto changed = text;
+        changed.replace(changed.find(from), from.size(), to);
+        return changed;
+    };
+    assert(commissioner.Commission(revision(prepare, "\"directory_revision\":7", "\"directory_revision\":6"), 9, [] { return true; }).code == OwnerTrustCommissioningCode::Invalid);
+    assert(commissioner.Commission(revision(prepare, "host-a.owner.test", "host-b.owner.test"), 9, [] { return true; }).code == OwnerTrustCommissioningCode::Invalid);
+    assert(commissioner.Commission(revision(prepare, "\"directory_revision\":7", "\"directory_revision\":8"), 9, [] { return true; }).code == OwnerTrustCommissioningCode::Prepared);
+    assert(!credentials.replaced);
+    assert(commissioner.Commission(revision(prepare, "\"owner_domain_generation\":1", "\"owner_domain_generation\":2"), 9, [] { return true; }).code == OwnerTrustCommissioningCode::Prepared);
+    assert(credentials.replaced);
+}
+
+
 }  // namespace
 
 int main()
 {
+    PreparePreservesTrustAndEnforcesSameOwnerRevisionFloor();
     AcceptsOnlyAfterVerifyAndDurableStore();
     ReCommissioningWithoutAVoucherLeavesTheIdentityAlone();
     RefusesToTrustAnOwnerItCannotIntroduceItselfTo();
