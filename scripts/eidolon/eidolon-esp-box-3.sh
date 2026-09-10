@@ -201,6 +201,11 @@ set_sdkconfig_value() {
 ensure_box3_sdkconfig() {
   set_sdkconfig_bool BOARD_TYPE_ESP_BOX_3 y
   set_sdkconfig_bool EIDOLON_HUB_MODE y
+  # esp_emote_gfx logs int64_t timestamps before a string argument. The ROM
+  # nano formatter lacks 64-bit support and reads that argument as a pointer.
+  # Defaults do not replace a saved sdkconfig, so enforce this on every build.
+  set_sdkconfig_bool LIBC_NEWLIB_NANO_FORMAT n
+  set_sdkconfig_bool NEWLIB_NANO_FORMAT n
   set_sdkconfig_bool EIDOLON_AUTO_JOIN_ON_ACTIVATION n
   set_sdkconfig_bool EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN y
   set_sdkconfig_bool EIDOLON_RADAR_PRESENCE_BROADCAST y

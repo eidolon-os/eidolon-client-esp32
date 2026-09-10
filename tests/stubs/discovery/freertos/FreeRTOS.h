@@ -1,0 +1,5 @@
+#pragma once
+#define pdMS_TO_TICKS(x) (x)
+#define CONFIG_EIDOLON_MDNS_SERVICE_TYPE "_eidolon-owner"
+#define CONFIG_EIDOLON_MDNS_QUERY_TIMEOUT_MS 8000
+#define CONFIG_EIDOLON_MDNS_PROBE_RETRIES 3

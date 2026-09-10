@@ -19,7 +19,6 @@
 #endif
 #include "hub_config_client.h"
 #include "hub_config_store.h"
-#include "hub_discovery.h"
 #include "hub_onboarding_client.h"
 #include "hub_onboarding_protocol.h"
 #include "hub_trust_store.h"
@@ -1004,16 +1003,9 @@ esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist)
 
 esp_err_t EidolonVoiceController::RediscoverHub()
 {
-    HubDiscovery discovery;
-    AuthorityCandidateRecord txt;
-    esp_err_t err = discovery.Discover(txt);
-    if (err != ESP_OK || txt.owner_domain_descriptor_uri.empty()) {
-        ESP_LOGW(TAG, "Hub rediscovery failed: %s", esp_err_to_name(err));
-        return err != ESP_OK ? err : ESP_ERR_NOT_FOUND;
-    }
     HubOnboardingClient client;
     Esp32HubConfig fresh;
-    err = client.Run(txt, OperationalDeviceInstanceId(), fresh);
+    esp_err_t err = client.Run(OperationalDeviceInstanceId(), fresh);
     if (err != ESP_OK) {
         return err;
     }

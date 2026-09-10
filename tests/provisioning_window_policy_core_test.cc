@@ -151,6 +151,25 @@ void SetupOpensFromEveryStateAFailedActivationCanLeaveTheDeviceIn()
     assert(HubDeviceStateAllowsSetupOpen(kDeviceStateStarting));
 }
 
+void ShortClickKeepsItsSetupMeaningAsBootAdvances()
+{
+    const DeviceState startup_and_recovery[] = {
+        kDeviceStateStarting, kDeviceStateActivating, kDeviceStateWifiConfiguring};
+    for (const auto state : startup_and_recovery) {
+        assert(HubSetupButtonClickOpensSetup(state));
+        assert(HubDeviceStateAllowsSetupOpen(state));
+    }
+    // Reaching voice operation must retain the ordinary chat gesture, and
+    // clicking during OTA must not request a new commissioning generation.
+    const DeviceState other_states[] = {
+        kDeviceStateIdle, kDeviceStateListening, kDeviceStateSpeaking,
+        kDeviceStateConnecting, kDeviceStateUpgrading, kDeviceStateUnknown,
+        kDeviceStateAudioTesting, kDeviceStateFatalError};
+    for (const auto state : other_states) {
+        assert(!HubSetupButtonClickOpensSetup(state));
+    }
+}
+
 void SetupOpensFromAWorkingDevice()
 {
     assert(HubDeviceStateAllowsSetupOpen(kDeviceStateIdle));
@@ -186,6 +205,7 @@ int main()
     TheAdvertisedDurationSaysWhatTheDeviceWillActuallyDo();
     AnUnboundedWindowHasNoDurationToAdvertiseAtAll();
     SetupOpensFromEveryStateAFailedActivationCanLeaveTheDeviceIn();
+    ShortClickKeepsItsSetupMeaningAsBootAdvances();
     SetupOpensFromAWorkingDevice();
     SetupStaysShutWhereOpeningItWouldBreakSomething();
     return 0;

@@ -7,8 +7,6 @@
 #include <freertos/task.h>
 #include <mdns.h>
 
-#include <cstring>
-
 #define TAG "HubDiscovery"
 
 namespace eidolon {
@@ -46,7 +44,7 @@ esp_err_t HubDiscovery::EnsureMdnsInit() {
 }
 
 esp_err_t HubDiscovery::QueryOnce(AuthorityCandidateRecord& best,
-                                  const std::string& preferred_instance_substr,
+                                  const std::string& owner_domain_id,
                                   bool* found) {
     *found = false;
     best = AuthorityCandidateRecord{};
@@ -68,10 +66,7 @@ esp_err_t HubDiscovery::QueryOnce(AuthorityCandidateRecord& best,
         ESP_LOGW(TAG, "Nothing answers %s._tcp on this network", service.c_str());
     }
 
-    AuthorityCandidateRecord preferred;
-    bool has_preferred = false;
-    AuthorityCandidateRecord fallback;
-    bool has_fallback = false;
+    bool matched = false;
 
     for (mdns_result_t* r = results; r != nullptr; r = r->next) {
         std::map<std::string, std::string> entries;
@@ -95,24 +90,16 @@ esp_err_t HubDiscovery::QueryOnce(AuthorityCandidateRecord& best,
             ESP_LOGI(TAG, "Found Owner candidate port=%u", r->port);
         }
 
-        if (r->instance_name && strstr(r->instance_name, preferred_instance_substr.c_str()) != nullptr) {
-            preferred = parsed;
-            has_preferred = true;
-        } else if (!has_fallback) {
-            fallback = parsed;
-            has_fallback = true;
+        // Broadcast order and display names do not express ownership. Keep
+        // looking when another Owner answered first.
+        if (!matched && parsed.owner_domain_id == owner_domain_id) {
+            best = parsed;
+            matched = true;
         }
     }
 
     mdns_query_results_free(results);
-
-    if (has_preferred) {
-        best = preferred;
-        *found = true;
-        return ESP_OK;
-    }
-    if (has_fallback) {
-        best = fallback;
+    if (matched) {
         *found = true;
         return ESP_OK;
     }
@@ -120,7 +107,9 @@ esp_err_t HubDiscovery::QueryOnce(AuthorityCandidateRecord& best,
 }
 
 esp_err_t HubDiscovery::Discover(AuthorityCandidateRecord& out,
-                                 const std::string& preferred_instance_substr) {
+                                 const std::string& owner_domain_id) {
+    out = AuthorityCandidateRecord{};
+    if (owner_domain_id.empty()) return ESP_ERR_INVALID_ARG;
     esp_err_t err = EnsureMdnsInit();
     if (err != ESP_OK) {
         return err;
@@ -128,7 +117,7 @@ esp_err_t HubDiscovery::Discover(AuthorityCandidateRecord& out,
 
     bool found = false;
     for (int probe = 0; probe < CONFIG_EIDOLON_MDNS_PROBE_RETRIES; ++probe) {
-        err = QueryOnce(out, preferred_instance_substr, &found);
+        err = QueryOnce(out, owner_domain_id, &found);
         if (found) {
             return ESP_OK;
         }
@@ -139,6 +128,28 @@ esp_err_t HubDiscovery::Discover(AuthorityCandidateRecord& out,
         }
     }
     return err == ESP_OK ? ESP_ERR_NOT_FOUND : err;
+}
+
+esp_err_t HubDiscovery::RefreshOwnerDirectory(
+    const AuthorityCandidateRecord& commissioned,
+    const std::function<esp_err_t(const AuthorityCandidateRecord&)>& accept)
+{
+    if (commissioned.owner_domain_id.empty() ||
+        commissioned.owner_domain_descriptor_uri.empty()) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    const esp_err_t direct = accept(commissioned);
+    // A new commissioning generation or Owner transition fenced this attempt.
+    // Discovery must not compete for its network after that decision.
+    if (direct == ESP_OK || direct == ESP_ERR_INVALID_STATE) return direct;
+
+    ESP_LOGW(TAG, "Commissioned Owner route failed (%s); discovering only owner=%s",
+             esp_err_to_name(direct), commissioned.owner_domain_id.c_str());
+    AuthorityCandidateRecord discovered;
+    const esp_err_t discovery = Discover(discovered, commissioned.owner_domain_id);
+    // Keep the useful route/verification error if no relocation was found.
+    if (discovery != ESP_OK) return direct;
+    return accept(discovered);
 }
 
 }  // namespace eidolon

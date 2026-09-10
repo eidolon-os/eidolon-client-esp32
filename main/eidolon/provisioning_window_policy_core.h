@@ -129,6 +129,10 @@ AdvertisedWindowSeconds(const ProvisioningWindowPolicy& policy);
 // nothing to hand over yet.
 bool HubDeviceStateAllowsSetupOpen(DeviceState state);
 
+// A short setup-button click stays useful after boot has advanced into
+// activation or recovery. Operational states retain their chat action.
+bool HubSetupButtonClickOpensSetup(DeviceState state);
+
 }  // namespace eidolon
 
 #endif  // EIDOLON_PROVISIONING_WINDOW_POLICY_CORE_H_

@@ -62,6 +62,13 @@ AdvertisedWindowSeconds(const ProvisioningWindowPolicy& policy)
         policy.seconds);
 }
 
+bool HubSetupButtonClickOpensSetup(DeviceState state)
+{
+    return state == kDeviceStateStarting ||
+           state == kDeviceStateActivating ||
+           state == kDeviceStateWifiConfiguring;
+}
+
 bool HubDeviceStateAllowsSetupOpen(DeviceState state)
 {
     switch (state) {

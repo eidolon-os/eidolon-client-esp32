@@ -15,9 +15,9 @@ namespace eidolon {
 
 class HubOnboardingClient {
 public:
-    esp_err_t Run(const AuthorityCandidateRecord& candidate,
-                  const std::string& device_id,
-                  Esp32HubConfig& out);
+    // Refresh the commissioned Owner directory before activation. Callers
+    // cannot select an unrelated discovery candidate on the device's behalf.
+    esp_err_t Run(const std::string& device_id, Esp32HubConfig& out);
     esp_err_t Resume(const std::string& device_id, Esp32HubConfig& out);
 
 private:

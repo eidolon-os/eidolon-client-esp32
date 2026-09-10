@@ -7,7 +7,6 @@
 #include "eidolon_ui_types.h"
 #include "hub_activation_retry_core.h"
 #include "hub_config_store.h"
-#include "hub_discovery.h"
 #include "hub_onboarding_client.h"
 
 #include "sdkconfig.h"
@@ -90,7 +89,6 @@ bool HubActivator::Run() {
         return false;
     }
 
-    HubDiscovery discovery;
     HubOnboardingClient client;
     HubConfigStore store;
     auto& identity = DeviceIdentity::GetInstance();
@@ -113,12 +111,8 @@ bool HubActivator::Run() {
         app.SetEidolonServiceUi(ServicePhase::DiscoveringAuthority);
 
         Esp32HubConfig config;
-        AuthorityCandidateRecord txt;
-        esp_err_t err = discovery.Discover(txt);
-        if (err == ESP_OK) {
-            app.SetEidolonServiceUi(ServicePhase::Registering);
-            err = client.Run(txt, device_id, config);
-        }
+        app.SetEidolonServiceUi(ServicePhase::Registering);
+        const esp_err_t err = client.Run(device_id, config);
 
         // A commissioning generation may have taken the radio while the attempt
         // was in flight; its UI and its RadioLease outrank this result.

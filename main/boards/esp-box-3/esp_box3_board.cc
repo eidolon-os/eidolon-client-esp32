@@ -11,6 +11,9 @@
 #include "button.h"
 #include "box3_radar_presence.h"
 #include "config.h"
+#if CONFIG_EIDOLON_HUB_MODE
+#include "eidolon/provisioning_window_policy_core.h"
+#endif
 
 #include <esp_log.h>
 #include <esp_timer.h>
@@ -172,18 +175,26 @@ private:
     void InitializeButtons() {
         boot_button_.OnClick([this]() {
             auto& app = Application::GetInstance();
+#if CONFIG_EIDOLON_HUB_MODE
+            if (eidolon::HubSetupButtonClickOpensSetup(app.GetDeviceState())) {
+#else
             if (app.GetDeviceState() == kDeviceStateStarting) {
-                EnterWifiConfigMode();
+#endif
+                // Button callbacks run on esp_timer. Physical recovery can
+                // generate keys and write NVS; keep it on the application task.
+                app.Schedule([this]() { EnterWifiConfigMode(); });
                 return;
             }
             app.ToggleChatState();
         });
 
-        // Setup must remain reachable after the short boot-only click window.
+        // Long-press also opens setup from an operational device.
         // The board adapter owns the gesture; the common Wi-Fi/Owner
         // provisioning service continues to own the bounded setup act itself.
         boot_button_.OnLongPress([this]() {
-            EnterWifiConfigMode();
+            Application::GetInstance().Schedule([this]() {
+                EnterWifiConfigMode();
+            });
         });
 
 #if CONFIG_USE_DEVICE_AEC

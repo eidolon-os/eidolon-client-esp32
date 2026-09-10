@@ -1,4 +1,5 @@
 #include "hub_onboarding_client.h"
+#include "hub_discovery.h"
 #include "commissioning_runtime.h"
 
 #include "device_claim_consumer_core.h"
@@ -534,19 +535,26 @@ esp_err_t HubOnboardingClient::LoadCommissionedTrust()
     return ESP_OK;
 }
 
-esp_err_t HubOnboardingClient::Run(const AuthorityCandidateRecord& candidate,
-                                   const std::string& device_id,
+esp_err_t HubOnboardingClient::Run(const std::string& device_id,
                                    Esp32HubConfig& out)
 {
     esp_err_t err = LoadCommissionedTrust();
     if (err != ESP_OK) return err;
-    if (!IsCommissionedOwnerDomain(
-            trust_.owner_domain_id, candidate.owner_domain_id)) {
-        ESP_LOGE(TAG, "Discovery candidate is for another Owner Domain");
-        return ESP_ERR_NOT_ALLOWED;
-    }
     device_foundation::v1::OwnerDomainDescriptor descriptor;
-    err = FetchDescriptor(candidate, descriptor);
+    err = DeviceAuthorityLocator::GetInstance().AcceptedDescriptor(descriptor);
+    if (err != ESP_OK) return err;
+    AuthorityCandidateRecord commissioned;
+    commissioned.owner_domain_id = trust_.owner_domain_id;
+    commissioned.owner_domain_descriptor_uri = descriptor.descriptor_uri;
+    HubDiscovery discovery;
+    err = discovery.RefreshOwnerDirectory(commissioned,
+        [this, &descriptor](const AuthorityCandidateRecord& candidate) {
+            const auto& runtime = CommissioningRuntime::GetInstance();
+            if (runtime.IsInProgress() || runtime.Generation() != setup_generation_) {
+                return ESP_ERR_INVALID_STATE;
+            }
+            return FetchDescriptor(candidate, descriptor);
+        });
     if (err != ESP_OK) return err;
     return RunAccepted(descriptor, device_id, out);
 }
