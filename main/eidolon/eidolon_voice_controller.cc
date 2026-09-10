@@ -3501,6 +3501,10 @@ esp_err_t EidolonVoiceController::ConnectChannel()
     }
 #endif
     Esp32HubConfig control_config = BuildChannelConnectionConfig(config_, runtime_fallback);
+    const auto& urls = control_config.session.server_urls;
+    if (!urls.empty()) {
+        control_config.session.server_url = urls[channel_recovery_.NextAddressIndex(urls.size())];
+    }
 
     // Retire any old room before assigning the next generation. Disconnect is
     // synchronous in LiveKitSession; the explicit supersede generation also

@@ -1,3 +1,4 @@
+#include "room_config_json.h"
 #include "hub_onboarding_protocol.h"
 
 #include "eidolon_device_profile.h"
@@ -156,7 +157,8 @@ bool ReadRoom(const cJSON* root, const char* key, RoomConfig& out)
     out.token = JsonString(room, "token");
     out.identity = JsonString(room, "identity");
     out.room_name = JsonString(room, "room_name");
-    return out.usable() && !out.identity.empty() && !out.room_name.empty();
+    return out.usable() && !out.identity.empty() && !out.room_name.empty() &&
+           ReadRoomServerUrls(room, out);
 }
 
 bool ParseDeviceRef(const cJSON* item,

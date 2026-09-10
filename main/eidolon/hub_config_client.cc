@@ -1,3 +1,4 @@
+#include "room_config_json.h"
 #include "hub_config_client.h"
 #include "mbedtls_compat.h"
 
@@ -156,7 +157,7 @@ bool ReadRoomConfig(const cJSON* root, RoomConfig* out)
     out->token = token->valuestring;
     out->identity = identity->valuestring;
     out->room_name = room_name->valuestring;
-    return out->usable();
+    return out->usable() && ReadRoomServerUrls(root, *out);
 }
 #endif
 

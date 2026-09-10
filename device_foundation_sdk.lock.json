@@ -1,5 +1,5 @@
 {
-  "sdk_commit": "d5b09be6033c65dda8df2d5a8a866f2f855f2863",
+  "sdk_commit": "bfb9441eb4bcef449ce3e2adc6e94ac44169a061",
   "files": [
     {
       "source": "contracts/device_foundation/v1/generated/cpp/device_foundation_v1_generated.h",
@@ -79,7 +79,7 @@
     {
       "source": "contracts/device_foundation/v1/golden/livekit-session-binding.json",
       "target": "tests/fixtures/device_foundation_v1/livekit-session-binding.json",
-      "sha256": "20bf749b9a6c598c78087ae2f2f1ffe5c1e4f80b1180266cd0ea68bc4ba07c82"
+      "sha256": "cf7079a8a12363aadbec3afb7e5345c11ca625108f94228cc9e15ea7b83b7542"
     },
     {
       "source": "contracts/device_foundation/v1/golden/device-control-configuration-proof.json",

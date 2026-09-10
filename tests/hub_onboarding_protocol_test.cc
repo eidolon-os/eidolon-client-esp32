@@ -237,6 +237,24 @@ void TestLiveKitBindingMatchesTheGoldenVector()
     // Silence is not agreement: an empty list would leave the refusals
     // entirely unchecked with this test still green.
     assert(refused == 4);
+    const cJSON* routing = cJSON_GetObjectItemCaseSensitive(vector, "routing");
+    assert(cJSON_IsObject(routing));
+    for (const char* name : {"accept", "refuse"}) {
+        const cJSON* cases = cJSON_GetObjectItemCaseSensitive(routing, name);
+        assert(cJSON_IsArray(cases) && cJSON_GetArraySize(cases) > 0);
+        const cJSON* item = nullptr;
+        cJSON_ArrayForEach(item, cases) {
+            cJSON* document = cJSON_Duplicate(binding, true);
+            cJSON_ReplaceItemInObject(document, "session", cJSON_Duplicate(
+                cJSON_GetObjectItemCaseSensitive(item, "session"), true));
+            char* encoded = cJSON_PrintUnformatted(document);
+            eidolon::Esp32HubConfig candidate;
+            assert(eidolon::ParseLiveKitBinding(encoded, candidate) == (std::string(name) == "accept"));
+            cJSON_free(encoded);
+            cJSON_Delete(document);
+        }
+    }
+
     cJSON_Delete(vector);
 }
 
@@ -433,6 +451,17 @@ void TestActiveClaimConfigurationAndProviderBinding()
     assert(eidolon::ParseLiveKitBinding(binding, config));
     assert(config.session.room_name == "channel");
     assert(config.session.token == "tok");
+
+
+    std::string candidates = binding;
+    const auto start = candidates.find("\"server_url\":");
+    candidates.insert(start, "\"server_urls\":[\"wss://lk\",\"wss://other\"],");
+    assert(eidolon::ParseLiveKitBinding(candidates, config));
+    assert(config.session.server_urls.size() == 2);
+    candidates.replace(candidates.find("wss://other"), 11, "wss://lk");
+    assert(!eidolon::ParseLiveKitBinding(candidates, config));
+    assert(eidolon::ParseLiveKitBinding(binding, config));
+    assert(config.session.server_urls.empty());
 
     // The Provider issues one channel. A device that accepted the old pair
     // would connect to rooms nobody serves, so the shape is refused outright

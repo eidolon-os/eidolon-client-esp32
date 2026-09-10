@@ -104,5 +104,116 @@
       }
     }
   ],
-  "must_not_claim_unapplied_audio": "A Body that does not configure its capture from `audio` must not expose those values as if it had. The phone answered 16000 from an accessor nothing set, and that is what made the gap look closed for as long as it did."
+  "must_not_claim_unapplied_audio": "A Body that does not configure its capture from `audio` must not expose those values as if it had. The phone answered 16000 from an accessor nothing set, and that is what made the gap look closed for as long as it did.",
+  "routing": {
+    "description": "Optional additive v2 server_urls are ordered, nonempty, unique strings. The first equals server_url. Omission is the legacy single route. All candidates belong to the same authenticated binding, token and room. Failed transports are retired before trying another; exhausted routes require a fresh binding, never re-enrollment. Routes are observations, not Host/Owner identity, and must not be globally pinned.",
+    "accept": [
+      {
+        "case_id": "legacy",
+        "session": {
+          "server_url": "wss://livekit.owner.test:7880",
+          "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJBUElleGFtcGxlIiwic3ViIjoiZGV2aWNlIiwidmlkZW8iOnsicm9vbSI6ImV4YW1wbGUifX0.Wm9uMV9zaWduYXR1cmVfcGxhY2Vob2xkZXJfZm9yX2Egdmlld2Vy",
+          "identity": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+          "room_name": "eidolon-device-9f1c0a4d2b6e8f3a5c7d1e04"
+        }
+      },
+      {
+        "case_id": "multiple",
+        "session": {
+          "server_url": "wss://livekit.owner.test:7880",
+          "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJBUElleGFtcGxlIiwic3ViIjoiZGV2aWNlIiwidmlkZW8iOnsicm9vbSI6ImV4YW1wbGUifX0.Wm9uMV9zaWduYXR1cmVfcGxhY2Vob2xkZXJfZm9yX2Egdmlld2Vy",
+          "identity": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+          "room_name": "eidolon-device-9f1c0a4d2b6e8f3a5c7d1e04",
+          "server_urls": [
+            "wss://livekit.owner.test:7880",
+            "wss://livekit-secondary.owner.test:7880"
+          ]
+        }
+      }
+    ],
+    "refuse": [
+      {
+        "case_id": "empty",
+        "session": {
+          "server_url": "wss://livekit.owner.test:7880",
+          "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJBUElleGFtcGxlIiwic3ViIjoiZGV2aWNlIiwidmlkZW8iOnsicm9vbSI6ImV4YW1wbGUifX0.Wm9uMV9zaWduYXR1cmVfcGxhY2Vob2xkZXJfZm9yX2Egdmlld2Vy",
+          "identity": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+          "room_name": "eidolon-device-9f1c0a4d2b6e8f3a5c7d1e04",
+          "server_urls": []
+        }
+      },
+      {
+        "case_id": "null",
+        "session": {
+          "server_url": "wss://livekit.owner.test:7880",
+          "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJBUElleGFtcGxlIiwic3ViIjoiZGV2aWNlIiwidmlkZW8iOnsicm9vbSI6ImV4YW1wbGUifX0.Wm9uMV9zaWduYXR1cmVfcGxhY2Vob2xkZXJfZm9yX2Egdmlld2Vy",
+          "identity": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+          "room_name": "eidolon-device-9f1c0a4d2b6e8f3a5c7d1e04",
+          "server_urls": null
+        }
+      },
+      {
+        "case_id": "not-list",
+        "session": {
+          "server_url": "wss://livekit.owner.test:7880",
+          "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJBUElleGFtcGxlIiwic3ViIjoiZGV2aWNlIiwidmlkZW8iOnsicm9vbSI6ImV4YW1wbGUifX0.Wm9uMV9zaWduYXR1cmVfcGxhY2Vob2xkZXJfZm9yX2Egdmlld2Vy",
+          "identity": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+          "room_name": "eidolon-device-9f1c0a4d2b6e8f3a5c7d1e04",
+          "server_urls": "wss://livekit.owner.test:7880"
+        }
+      },
+      {
+        "case_id": "duplicate",
+        "session": {
+          "server_url": "wss://livekit.owner.test:7880",
+          "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJBUElleGFtcGxlIiwic3ViIjoiZGV2aWNlIiwidmlkZW8iOnsicm9vbSI6ImV4YW1wbGUifX0.Wm9uMV9zaWduYXR1cmVfcGxhY2Vob2xkZXJfZm9yX2Egdmlld2Vy",
+          "identity": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+          "room_name": "eidolon-device-9f1c0a4d2b6e8f3a5c7d1e04",
+          "server_urls": [
+            "wss://livekit.owner.test:7880",
+            "wss://livekit.owner.test:7880"
+          ]
+        }
+      },
+      {
+        "case_id": "empty-url",
+        "session": {
+          "server_url": "wss://livekit.owner.test:7880",
+          "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJBUElleGFtcGxlIiwic3ViIjoiZGV2aWNlIiwidmlkZW8iOnsicm9vbSI6ImV4YW1wbGUifX0.Wm9uMV9zaWduYXR1cmVfcGxhY2Vob2xkZXJfZm9yX2Egdmlld2Vy",
+          "identity": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+          "room_name": "eidolon-device-9f1c0a4d2b6e8f3a5c7d1e04",
+          "server_urls": [
+            "wss://livekit.owner.test:7880",
+            ""
+          ]
+        }
+      },
+      {
+        "case_id": "not-string",
+        "session": {
+          "server_url": "wss://livekit.owner.test:7880",
+          "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJBUElleGFtcGxlIiwic3ViIjoiZGV2aWNlIiwidmlkZW8iOnsicm9vbSI6ImV4YW1wbGUifX0.Wm9uMV9zaWduYXR1cmVfcGxhY2Vob2xkZXJfZm9yX2Egdmlld2Vy",
+          "identity": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+          "room_name": "eidolon-device-9f1c0a4d2b6e8f3a5c7d1e04",
+          "server_urls": [
+            "wss://livekit.owner.test:7880",
+            42
+          ]
+        }
+      },
+      {
+        "case_id": "wrong-primary",
+        "session": {
+          "server_url": "wss://livekit.owner.test:7880",
+          "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJBUElleGFtcGxlIiwic3ViIjoiZGV2aWNlIiwidmlkZW8iOnsicm9vbSI6ImV4YW1wbGUifX0.Wm9uMV9zaWduYXR1cmVfcGxhY2Vob2xkZXJfZm9yX2Egdmlld2Vy",
+          "identity": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+          "room_name": "eidolon-device-9f1c0a4d2b6e8f3a5c7d1e04",
+          "server_urls": [
+            "wss://livekit-secondary.owner.test:7880",
+            "wss://livekit.owner.test:7880"
+          ]
+        }
+      }
+    ]
+  }
 }

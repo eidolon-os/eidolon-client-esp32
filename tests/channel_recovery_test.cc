@@ -258,6 +258,19 @@ void TestRegistrationCredentialsWinAndGenerationNeverRollsBack()
 
 int main()
 {
+    {
+        eidolon::ChannelRecovery recovery;
+        assert(recovery.NextAddressIndex(2) == 0);
+        recovery.OnDisconnected();
+        assert(recovery.NextAddressIndex(2) == 1);
+        recovery.OnConnected();
+        recovery.OnDisconnected();
+        assert(recovery.NextAddressIndex(2) == 1); // Prefer last successful route.
+        recovery.OnNetworkRestored();
+        assert(recovery.NextAddressIndex(2) == 0);
+        assert(recovery.NextAddressIndex(1) == 0); // Refreshed binding shrank.
+    }
+
     TestConnectedTerminalSchedulesAndRecovers();
     TestInitialSynchronousFailureRetries();
     TestFailedAndDisconnectedDeduplicate();

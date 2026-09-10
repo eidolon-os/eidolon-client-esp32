@@ -2,6 +2,7 @@
 #define EIDOLON_CHANNEL_RECOVERY_H_
 
 #include <cstdint>
+#include <cstddef>
 
 #include "hub_types.h"
 
@@ -31,6 +32,7 @@ public:
         phase_ = Phase::Idle;
         reconnect_pending_ = false;
         reconnect_attempts_ = 0;
+        address_attempt_ = last_address_ = 0;
     }
 
     void OnNetworkLost()
@@ -49,6 +51,7 @@ public:
 
     void OnConnected()
     {
+        address_attempt_ = last_address_;
         phase_ = Phase::Connected;
         reconnect_pending_ = false;
         reconnect_attempts_ = 0;
@@ -97,6 +100,14 @@ public:
 
     void FinishRetry() { reconnect_pending_ = false; }
 
+    // Transport callbacks keep the existing bounded retry/watchdog ownership.
+    // Each failed attempt advances instead of retrying the first route forever.
+    size_t NextAddressIndex(size_t count)
+    {
+        last_address_ = count == 0 ? 0 : address_attempt_++ % count;
+        return last_address_;
+    }
+
     bool network_available() const { return network_available_; }
     bool reconnect_pending() const { return reconnect_pending_; }
     bool connect_in_flight() const
@@ -108,6 +119,8 @@ public:
     Phase phase() const { return phase_; }
 
 private:
+    size_t address_attempt_ = 0;
+    size_t last_address_ = 0;
     bool network_available_ = true;
     bool reconnect_pending_ = false;
     int reconnect_attempts_ = 0;

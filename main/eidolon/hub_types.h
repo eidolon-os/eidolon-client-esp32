@@ -82,6 +82,8 @@ struct RoomConfig {
     std::string token;
     std::string identity;
     std::string room_name;
+    // Disposable routes from the same authenticated binding, never identities.
+    std::vector<std::string> server_urls;
 
     bool usable() const { return !server_url.empty() && !token.empty(); }
 };

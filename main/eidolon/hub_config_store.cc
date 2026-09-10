@@ -1,3 +1,4 @@
+#include "room_config_json.h"
 #include "hub_config_store.h"
 
 #include "device_foundation_v1_generated.h"
@@ -114,6 +115,12 @@ esp_err_t HubConfigStore::SaveHubConfig(const Esp32HubConfig& config) {
     cJSON_AddNumberToObject(root, "schema_version", kConfigSchemaVersion);
     cJSON_AddStringToObject(root, "status", HubConfigStatusToString(config.status));
     cJSON_AddStringToObject(root, "server_url", config.session.server_url.c_str());
+    if (!config.session.server_urls.empty()) {
+        cJSON* urls = cJSON_AddArrayToObject(root, "server_urls");
+        for (const auto& url : config.session.server_urls) {
+            cJSON_AddItemToArray(urls, cJSON_CreateString(url.c_str()));
+        }
+    }
     cJSON_AddStringToObject(root, "token", config.session.token.c_str());
     cJSON_AddStringToObject(root, "identity", config.session.identity.c_str());
     cJSON_AddStringToObject(root, "room_name", config.session.room_name.c_str());
@@ -171,6 +178,10 @@ bool HubConfigStore::Load(Esp32HubConfig& config) const {
     // (PendingApproval) — never silently grant voice on an absent field.
     config.status = ParseHubConfigStatus(JsonStringField(root, "status"));
     config.session.server_url = JsonStringField(root, "server_url");
+    if (!ReadRoomServerUrls(root, config.session)) {
+        cJSON_Delete(root);
+        return false;
+    }
     config.session.token = JsonStringField(root, "token");
     config.session.identity = JsonStringField(root, "identity");
     config.session.room_name = JsonStringField(root, "room_name");
