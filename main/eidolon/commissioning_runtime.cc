@@ -102,7 +102,6 @@ struct RuntimeState {
     std::atomic<uint32_t> visible_generation{0};
     std::atomic<bool> advertising{false};
     std::atomic<bool> active{false};
-    std::atomic<bool> awaiting_station_route{false};
     std::mutex evidence_mutex;
     device_foundation::v1::CommissioningStatusEvidence evidence;
     std::mutex observer_mutex;
@@ -113,7 +112,6 @@ struct RuntimeState {
     std::string candidate_password;
     std::string candidate_id;
     bool previous_station_mode = false;
-    bool committed_station_route_ready = false;
 };
 
 RuntimeState& State()
@@ -219,6 +217,7 @@ const char* RuntimeStateName(CommissioningRuntimeState state)
 
 void PublishEvidence(RuntimeState& state)
 {
+    uint32_t revision;
     {
         std::lock_guard<std::mutex> lock(state.evidence_mutex);
         auto& evidence = state.evidence;
@@ -226,6 +225,7 @@ void PublishEvidence(RuntimeState& state)
         evidence.setup_generation = state.core.generation();
         ++evidence.state_revision;
         if (evidence.state_revision == 0) ++evidence.state_revision;
+        revision = evidence.state_revision;
     }
     CommissioningRuntime::Observer observer;
     {
@@ -236,15 +236,15 @@ void PublishEvidence(RuntimeState& state)
         state.core.state(),
         state.core.generation(),
         state.core.transaction_committed(),
-        state.committed_station_route_ready,
         state.previous_station_mode,
+        revision,
     };
     ESP_LOGI(TAG,
-             "Confirmed state=%s generation=%lu committed=%d station_route_ready=%d",
+             "Confirmed state=%s generation=%lu committed=%d revision=%lu",
              RuntimeStateName(snapshot.state),
              static_cast<unsigned long>(snapshot.generation),
              snapshot.transaction_committed ? 1 : 0,
-             snapshot.station_route_ready ? 1 : 0);
+             static_cast<unsigned long>(snapshot.revision));
     if (observer) {
         observer(snapshot);
     }
@@ -520,14 +520,8 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
         // aborted act restores Station only if it was the mode we leased away.
         // Initial uncommissioned setup therefore does not silently invent a
         // Station mode on cancel/timeout.
-        if (state.core.transaction_committed()) {
-            // Starting a mode is a command, not evidence. Keep the generation
-            // alive until WifiBoard submits the fresh connected route emitted
-            // by the restored Station implementation.
-            state.awaiting_station_route.store(true, std::memory_order_release);
-            WifiManager::GetInstance().StartStation();
-            break;
-        }
+        state.previous_station_mode =
+            state.core.transaction_committed() || state.previous_station_mode;
         if (state.previous_station_mode) {
             WifiManager::GetInstance().StartStation();
         }
@@ -552,9 +546,8 @@ void Apply(RuntimeState& state, const CommissioningEvent& event)
         state.candidate_ssid.clear();
         state.candidate_password.clear();
         state.candidate_id.clear();
-        state.previous_station_mode = false;
-        state.committed_station_route_ready = false;
-        state.awaiting_station_route.store(false, std::memory_order_release);
+        state.previous_station_mode =
+            !SsidManager::GetInstance().GetSsidList().empty();
     }
     if (event.type != CommissioningEventType::OpenRequested &&
         (event.generation != state.core.generation() ||
@@ -582,25 +575,23 @@ void Apply(RuntimeState& state, const CommissioningEvent& event)
             state.evidence.conditions.network_committed = true;
             state.evidence.state = Status::Committed;
             break;
-        case CommissioningEventType::CommissioningTransactionRolledBack:
+        case CommissioningEventType::CommissioningTransactionRolledBack: {
+            // UI/status acknowledgments share this revision. Rollback clears
+            // candidate conditions, but must not reuse an earlier revision in
+            // the same generation and accidentally accept its queued snapshot.
+            const auto revision = state.evidence.state_revision;
             state.evidence = {};
+            state.evidence.state_revision = revision;
             state.evidence.state = Status::RolledBack;
             state.evidence.failure_code =
                 device_foundation::v1::CommissioningFailureCode::Internal;
             break;
+        }
         default:
             break;
         }
     }
-    const bool completes_committed_route =
-        resolved.type == CommissioningEventType::StationRouteReady &&
-        state.core.transaction_committed();
     const auto actions = state.core.Handle(resolved);
-    if (completes_committed_route &&
-        state.core.state() == CommissioningRuntimeState::Idle) {
-        state.committed_station_route_ready = true;
-        state.awaiting_station_route.store(false, std::memory_order_release);
-    }
     state.visible_generation.store(state.core.generation(), std::memory_order_release);
     state.advertising.store(
         state.core.state() == CommissioningRuntimeState::Advertising,
@@ -612,8 +603,8 @@ void Apply(RuntimeState& state, const CommissioningEvent& event)
 
 // True once this generation is over and nothing is waiting to start another.
 // Idle is reached by exactly three routes — a failure before any transport or
-// radio lease existed, a restore that finished, and a committed act whose new
-// Station route came back — and every one of them has already run the
+// radio lease existed, a restore that finished, and a committed act whose
+// radio mode was handed back — and every one of them has already run the
 // transport's single cleanup path. So Idle is not merely "not busy": it is the
 // point at which this actor owns nothing.
 //
@@ -756,21 +747,15 @@ bool CommissioningRuntime::RequestCancel()
            Enqueue(CommissioningEventType::CancelRequested, generation);
 }
 
-bool CommissioningRuntime::NotifyStationRouteReady()
+bool CommissioningRuntime::IsCurrent(
+    const CommissioningRuntimeSnapshot& snapshot) const
 {
     RuntimeState& state = State();
-    if (!state.awaiting_station_route.exchange(false,
-                                                std::memory_order_acq_rel)) {
-        return false;
-    }
-    const uint32_t generation =
-        state.visible_generation.load(std::memory_order_acquire);
-    if (generation == 0 ||
-        !Enqueue(CommissioningEventType::StationRouteReady, generation)) {
-        state.awaiting_station_route.store(true, std::memory_order_release);
-        return false;
-    }
-    return true;
+    std::lock_guard<std::mutex> lock(state.evidence_mutex);
+    return snapshot.generation == state.evidence.setup_generation &&
+           snapshot.revision == state.evidence.state_revision &&
+           snapshot.generation == Generation() &&
+           (snapshot.state != CommissioningRuntimeState::Idle) == IsInProgress();
 }
 
 void CommissioningRuntime::SetObserver(Observer observer)

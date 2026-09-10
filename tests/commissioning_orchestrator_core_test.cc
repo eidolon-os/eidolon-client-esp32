@@ -121,9 +121,14 @@ void TestTransportClosesOnlyAfterCommittedTerminalWasObserved()
     assert(Has(actions, CommissioningActionType::RestorePreviousRadioMode));
     core.Handle(Event(CommissioningEventType::PreviousModeRestored,
                       generation));
-    assert(core.state() == CommissioningRuntimeState::ReturningToPreviousMode);
-    core.Handle(Event(CommissioningEventType::StationRouteReady, generation));
     assert(core.state() == CommissioningRuntimeState::Idle);
+    // Losing the AP after commit must not monopolize commissioning forever.
+    // No post-handoff connected event is required to accept a new setup.
+    const auto reopened = core.Handle(Event(CommissioningEventType::OpenRequested, 0));
+    assert(Has(reopened, CommissioningActionType::EnsureIdentity));
+    assert(core.generation() != generation);
+    assert(core.Handle(Event(CommissioningEventType::WifiConnected,
+                             generation, "candidate-1")).empty());
 }
 
 void TestPreparationFailureDoesNotWaitForTransportThatNeverExisted()
@@ -175,6 +180,11 @@ void TestValidationFailureRollsBackBeforeTransportAndRadioRelease()
         CommissioningEventType::CommissioningTransactionRolledBack,
         generation, "candidate-1"));
     assert(Has(actions, CommissioningActionType::StopTransport));
+    // Neither an early mode callback nor candidate connectivity releases the
+    // actor before transport cleanup has handed the radio back.
+    core.Handle(Event(CommissioningEventType::PreviousModeRestored, generation));
+    core.Handle(Event(CommissioningEventType::WifiConnected, generation, "candidate-1"));
+    assert(core.state() == CommissioningRuntimeState::RestoringPreviousMode);
     actions = core.Handle(Event(CommissioningEventType::TransportStopped,
                                 generation));
     assert(Has(actions, CommissioningActionType::RestorePreviousRadioMode));

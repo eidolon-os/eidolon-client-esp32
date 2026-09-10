@@ -6,6 +6,7 @@
 #include <mqtt.h>
 #include <udp.h>
 #include <string>
+#include <optional>
 #include <functional>
 #include <network_interface.h>
 
@@ -77,6 +78,9 @@ public:
     virtual Camera* GetCamera();
     virtual NetworkInterface* GetNetwork() = 0;
     virtual void StartNetwork() = 0;
+    // Current link evidence for reconciling queued events and radio handoffs.
+    // Adapters without a synchronous observation keep using ordered callbacks.
+    virtual std::optional<bool> IsNetworkConnected() const { return std::nullopt; }
     virtual void SetNetworkEventCallback(NetworkEventCallback callback) { (void)callback; }
     virtual const char* GetNetworkStateIcon() = 0;
     virtual bool GetBatteryLevel(int &level, bool& charging, bool& discharging);

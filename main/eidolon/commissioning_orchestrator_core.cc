@@ -248,18 +248,10 @@ std::vector<CommissioningAction> CommissioningOrchestratorCore::Handle(
     case CommissioningEventType::PreviousModeRestored:
         if (state_ == CommissioningRuntimeState::ReturningToPreviousMode ||
             state_ == CommissioningRuntimeState::RestoringPreviousMode) {
-            // A committed act does not merely restore a Wi-Fi mode: it must
-            // prove the new Station route is usable before commissioning may
-            // hand control to enrollment/admission.
-            if (transaction_committed_) break;
-            ResetToIdle(actions);
-        }
-        break;
-    case CommissioningEventType::StationRouteReady:
-        if ((state_ == CommissioningRuntimeState::ReturningToPreviousMode ||
-             state_ == CommissioningRuntimeState::RestoringPreviousMode) &&
-            transaction_committed_) {
-            ResetToIdle(actions);
+            // The transaction and radio lease are complete. Connectivity is
+            // owned by WifiManager and may recover later, without keeping a
+            // setup generation open or preventing another authorized setup.
+            if (radio_restore_requested_) ResetToIdle(actions);
         }
         break;
     case CommissioningEventType::OpenRequested:

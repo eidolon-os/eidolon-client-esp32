@@ -126,17 +126,10 @@ void WifiBoard::TryWifiConnect() {
 
 void WifiBoard::OnNetworkEvent(NetworkEvent event, const std::string& data) {
 #if CONFIG_EIDOLON_HUB_MODE
-    // While commissioning owns the radio lease, legacy network callbacks are
-    // observations only. In particular they cannot start activation or replace
-    // the actor's confirmed UI projection. The one restored Station route is
-    // transferred back through the actor before Application sees it.
-    bool commissioning_owns_event =
+    // Candidate-network observations cannot start operational admission.
+    // Application re-reads the Station link when the radio lease is released.
+    const bool commissioning_owns_event =
         eidolon::CommissioningRuntime::GetInstance().IsInProgress();
-    if (event == NetworkEvent::Connected && commissioning_owns_event) {
-        commissioning_owns_event =
-            eidolon::CommissioningRuntime::GetInstance()
-                .NotifyStationRouteReady() || commissioning_owns_event;
-    }
 #endif
     switch (event) {
         case NetworkEvent::Connected:
@@ -161,8 +154,10 @@ void WifiBoard::OnNetworkEvent(NetworkEvent event, const std::string& data) {
         case NetworkEvent::WifiConfigModeExit:
             ESP_LOGI(TAG, "WiFi config mode exited");
             in_config_mode_ = false;
-            // Try to connect with the new credentials
+#if !CONFIG_EIDOLON_HUB_MODE
+            // HUB_MODE returns the radio through the commissioning actor.
             TryWifiConnect();
+#endif
             break;
         default:
             break;
@@ -188,16 +183,17 @@ void WifiBoard::OnWifiConnectTimeout(void* arg) {
         Application::GetInstance().Schedule([board] { board->StartNetwork(); });
         return;
     }
-    ESP_LOGW(TAG, "WiFi connection timeout");
-
 #if CONFIG_EIDOLON_HUB_MODE
-    // The timeout expresses intent only. StopStation belongs to the
-    // commissioning actor's AcquireCommissioningRadioLease action — and on a
-    // commissioned device the request below is refused, so Station is left
-    // running and keeps scanning with backoff, which is how the network is
-    // allowed to come back on its own.
-    board->OpenSetupWithoutAnyonePresent();
+    Application::GetInstance().Schedule([board] {
+        // A timer may already be queued when setup stops it or Wi-Fi connects.
+        // Recheck evidence on the same queue as their user-visible projections.
+        if (eidolon::CommissioningRuntime::GetInstance().IsInProgress() ||
+            WifiManager::GetInstance().IsConnected()) return;
+        ESP_LOGW(TAG, "WiFi connection timeout");
+        board->OpenSetupWithoutAnyonePresent();
+    });
 #else
+    ESP_LOGW(TAG, "WiFi connection timeout");
     WifiManager::GetInstance().StopStation();
     board->OpenSetupWithoutAnyonePresent();
 #endif
@@ -403,6 +399,10 @@ bool WifiBoard::IsInWifiConfigMode() const {
 #else
     return WifiManager::GetInstance().IsConfigMode();
 #endif
+}
+
+std::optional<bool> WifiBoard::IsNetworkConnected() const {
+    return WifiManager::GetInstance().IsConnected();
 }
 
 NetworkInterface* WifiBoard::GetNetwork() {

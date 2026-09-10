@@ -50,7 +50,6 @@ enum class CommissioningEventType {
     CancelRequested,
     TransportStopped,
     PreviousModeRestored,
-    StationRouteReady,
 };
 
 struct TransportReadyEvidence {

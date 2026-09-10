@@ -59,6 +59,8 @@ class GuardService;
 class IVoiceSessionTransport;
 }
 
+enum class NetworkEvent;
+
 class Application {
 public:
     static Application& GetInstance() {
@@ -197,6 +199,8 @@ private:
     std::unique_ptr<eidolon::IVoiceSessionTransport> voice_transport_;
     std::unique_ptr<eidolon::EidolonUiPresenter> ui_presenter_;
     bool network_connected_ = false;
+    uint32_t network_generation_ = 0;
+    std::atomic<uint32_t> activation_generation_{0};
     bool hub_activation_done_ = false;
 #if CONFIG_EIDOLON_GUARD_SERVICE
     std::unique_ptr<eidolon::GuardService> guard_service_;
@@ -215,6 +219,7 @@ private:
     void HandleToggleChatEvent();
     void HandleStartListeningEvent();
     void HandleStopListeningEvent();
+    void HandleNetworkEvent(NetworkEvent event, const std::string& data);
     void HandleNetworkConnectedEvent();
     void HandleNetworkDisconnectedEvent();
     void HandleActivationDoneEvent();

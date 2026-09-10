@@ -374,11 +374,12 @@ void Application::Initialize() {
 
     // Commissioning is a separate actor. Application consumes its confirmed
     // projection; it never infers setup progress from SoftAP callbacks or from
-    // commands such as StartStation(). The committed handoff is the sole event
-    // that may begin Hub enrollment after setup.
+    // commands such as StartStation(). Once the lease is released, current
+    // network evidence gates Hub enrollment through the ordinary network path.
     eidolon::CommissioningRuntime::GetInstance().SetObserver(
         [this](const eidolon::CommissioningRuntimeSnapshot& snapshot) {
             Schedule([this, snapshot]() {
+                if (!eidolon::CommissioningRuntime::GetInstance().IsCurrent(snapshot)) return;
                 using State = eidolon::CommissioningRuntimeState;
                 switch (snapshot.state) {
                 case State::PreparingIdentity:
@@ -410,20 +411,19 @@ void Application::Initialize() {
                 case State::RestoringPreviousMode:
                     SetEidolonRuntimeUi(
                         eidolon::RuntimePhase::NetworkConnecting,
-                        "Returning to the confirmed Wi-Fi route...");
+                        "Finishing device setup...");
                     break;
                 case State::Idle:
-                    if (snapshot.station_route_ready) {
-                        SetEidolonRuntimeUi(eidolon::RuntimePhase::Normal);
-                        SetEidolonServiceUi(
-                            eidolon::ServicePhase::DiscoveringAuthority,
-                            "Wi-Fi route confirmed");
-                        xEventGroupSetBits(event_group_,
-                                           MAIN_EVENT_NETWORK_CONNECTED);
-                    } else if (snapshot.previous_station_mode) {
+                    // A connected callback may have arrived while the actor
+                    // still owned the radio. Reconcile from the network adapter,
+                    // never from a remembered commissioning route or command.
+                    if (Board::GetInstance().IsNetworkConnected().value_or(false)) {
+                        HandleNetworkConnectedEvent();
+                    } else if (snapshot.station_mode_requested) {
+                        HandleNetworkDisconnectedEvent();
                         SetEidolonRuntimeUi(
                             eidolon::RuntimePhase::NetworkScanning,
-                            "Restoring the previous Wi-Fi route...");
+                            "Looking for saved Wi-Fi. Hold BOOT to change network");
                     } else {
                         // The only screen an Owner has after a setup window
                         // closes. "Closed" alone made a device that was merely
@@ -577,90 +577,16 @@ void Application::Initialize() {
 
     // Set network event callback for UI updates and network state handling
     board.SetNetworkEventCallback([this](NetworkEvent event, const std::string& data) {
-        auto display = Board::GetInstance().GetDisplay();
-        
-        switch (event) {
-            case NetworkEvent::Scanning:
 #if CONFIG_EIDOLON_HUB_MODE
-                SetEidolonRuntimeUi(eidolon::RuntimePhase::NetworkScanning);
+        const auto generation = eidolon::CommissioningRuntime::GetInstance().Generation();
+        Schedule([this, event, data, generation]() {
+            auto& commissioning = eidolon::CommissioningRuntime::GetInstance();
+            if (commissioning.IsInProgress() || generation != commissioning.Generation()) return;
+            HandleNetworkEvent(event, data);
+        });
 #else
-                display->ShowNotification(Lang::Strings::SCANNING_WIFI, 30000);
+        HandleNetworkEvent(event, data);
 #endif
-                xEventGroupSetBits(event_group_, MAIN_EVENT_NETWORK_DISCONNECTED);
-                break;
-            case NetworkEvent::Connecting: {
-#if CONFIG_EIDOLON_HUB_MODE
-                std::string detail = "Connecting to Wi-Fi";
-                if (!data.empty()) {
-                    detail += " ";
-                    detail += data;
-                }
-                detail += "...";
-                SetEidolonRuntimeUi(eidolon::RuntimePhase::NetworkConnecting, detail);
-#else
-                if (data.empty()) {
-                    // Cellular network - registering without carrier info yet
-                    display->SetStatus(Lang::Strings::REGISTERING_NETWORK);
-                } else {
-                    // WiFi or cellular with carrier info
-                    std::string msg = Lang::Strings::CONNECT_TO;
-                    msg += data;
-                    msg += "...";
-                    display->ShowNotification(msg.c_str(), 30000);
-                }
-#endif
-                break;
-            }
-            case NetworkEvent::Connected: {
-#if CONFIG_EIDOLON_HUB_MODE
-                SetEidolonRuntimeUi(eidolon::RuntimePhase::Normal);
-                SetEidolonServiceUi(eidolon::ServicePhase::DiscoveringAuthority,
-                                    "Wi-Fi connected");
-#else
-                std::string msg = Lang::Strings::CONNECTED_TO;
-                msg += data;
-                display->ShowNotification(msg.c_str(), 30000);
-#endif
-                xEventGroupSetBits(event_group_, MAIN_EVENT_NETWORK_CONNECTED);
-                break;
-            }
-            case NetworkEvent::Disconnected:
-#if CONFIG_EIDOLON_HUB_MODE
-                if (!eidolon::CommissioningRuntime::GetInstance().IsInProgress()) {
-                    SetEidolonRuntimeUi(eidolon::RuntimePhase::NetworkConnecting,
-                                        "Wi-Fi disconnected");
-                }
-#endif
-                xEventGroupSetBits(event_group_, MAIN_EVENT_NETWORK_DISCONNECTED);
-                break;
-            case NetworkEvent::WifiConfigModeEnter:
-#if CONFIG_EIDOLON_HUB_MODE
-                SetEidolonRuntimeUi(eidolon::RuntimePhase::Commissioning);
-#endif
-                break;
-            case NetworkEvent::WifiConfigModeExit:
-#if CONFIG_EIDOLON_HUB_MODE
-                SetEidolonRuntimeUi(eidolon::RuntimePhase::NetworkScanning,
-                                      "Applying Wi-Fi settings...");
-#endif
-                break;
-            // Cellular modem specific events
-            case NetworkEvent::ModemDetecting:
-                display->SetStatus(Lang::Strings::DETECTING_MODULE);
-                break;
-            case NetworkEvent::ModemErrorNoSim:
-                Alert(Lang::Strings::ERROR, Lang::Strings::PIN_ERROR, "triangle_exclamation", Lang::Sounds::OGG_ERR_PIN);
-                break;
-            case NetworkEvent::ModemErrorRegDenied:
-                Alert(Lang::Strings::ERROR, Lang::Strings::REG_ERROR, "triangle_exclamation", Lang::Sounds::OGG_ERR_REG);
-                break;
-            case NetworkEvent::ModemErrorInitFailed:
-                Alert(Lang::Strings::ERROR, Lang::Strings::MODEM_INIT_ERROR, "triangle_exclamation", Lang::Sounds::OGG_EXCLAMATION);
-                break;
-            case NetworkEvent::ModemErrorTimeout:
-                display->SetStatus(Lang::Strings::REGISTERING_NETWORK);
-                break;
-        }
     });
 
     // Start network asynchronously
@@ -668,6 +594,99 @@ void Application::Initialize() {
 
     // Update the status bar immediately to show the network state
     display->UpdateStatusBar(true);
+}
+
+void Application::HandleNetworkEvent(NetworkEvent event, const std::string& data) {
+#if CONFIG_EIDOLON_HUB_MODE
+    // Driver callbacks and setup projections share the Application queue. A
+    // delayed callback must also agree with the adapter's current link evidence.
+    const auto connected = Board::GetInstance().IsNetworkConnected();
+    if (event == NetworkEvent::Connected && connected == false) return;
+    if ((event == NetworkEvent::Scanning || event == NetworkEvent::Connecting ||
+         event == NetworkEvent::Disconnected) && connected == true) {
+        HandleNetworkConnectedEvent();
+        return;
+    }
+#endif
+    auto display = Board::GetInstance().GetDisplay();
+
+    switch (event) {
+        case NetworkEvent::Scanning:
+#if CONFIG_EIDOLON_HUB_MODE
+            HandleNetworkDisconnectedEvent();
+            SetEidolonRuntimeUi(eidolon::RuntimePhase::NetworkScanning,
+                                "Looking for saved Wi-Fi. Hold BOOT to change network");
+#else
+            display->ShowNotification(Lang::Strings::SCANNING_WIFI, 30000);
+            xEventGroupSetBits(event_group_, MAIN_EVENT_NETWORK_DISCONNECTED);
+#endif
+            break;
+        case NetworkEvent::Connecting: {
+#if CONFIG_EIDOLON_HUB_MODE
+            std::string detail = "Connecting to Wi-Fi";
+            if (!data.empty()) {
+                detail += " ";
+                detail += data;
+            }
+            detail += "...";
+            SetEidolonRuntimeUi(eidolon::RuntimePhase::NetworkConnecting, detail);
+#else
+            if (data.empty()) {
+                // Cellular network - registering without carrier info yet
+                display->SetStatus(Lang::Strings::REGISTERING_NETWORK);
+            } else {
+                // WiFi or cellular with carrier info
+                std::string msg = Lang::Strings::CONNECT_TO;
+                msg += data;
+                msg += "...";
+                display->ShowNotification(msg.c_str(), 30000);
+            }
+#endif
+            break;
+        }
+        case NetworkEvent::Connected: {
+#if CONFIG_EIDOLON_HUB_MODE
+            HandleNetworkConnectedEvent();
+#else
+            std::string msg = Lang::Strings::CONNECTED_TO;
+            msg += data;
+            display->ShowNotification(msg.c_str(), 30000);
+            xEventGroupSetBits(event_group_, MAIN_EVENT_NETWORK_CONNECTED);
+#endif
+            break;
+        }
+        case NetworkEvent::Disconnected:
+#if CONFIG_EIDOLON_HUB_MODE
+            if (!eidolon::CommissioningRuntime::GetInstance().IsInProgress()) {
+                SetEidolonRuntimeUi(eidolon::RuntimePhase::NetworkConnecting,
+                                    "Wi-Fi disconnected");
+            }
+            HandleNetworkDisconnectedEvent();
+#else
+            xEventGroupSetBits(event_group_, MAIN_EVENT_NETWORK_DISCONNECTED);
+#endif
+            break;
+        case NetworkEvent::WifiConfigModeEnter:
+        case NetworkEvent::WifiConfigModeExit:
+            // Commissioning UI belongs to its confirmed actor projection.
+            break;
+        // Cellular modem specific events
+        case NetworkEvent::ModemDetecting:
+            display->SetStatus(Lang::Strings::DETECTING_MODULE);
+            break;
+        case NetworkEvent::ModemErrorNoSim:
+            Alert(Lang::Strings::ERROR, Lang::Strings::PIN_ERROR, "triangle_exclamation", Lang::Sounds::OGG_ERR_PIN);
+            break;
+        case NetworkEvent::ModemErrorRegDenied:
+            Alert(Lang::Strings::ERROR, Lang::Strings::REG_ERROR, "triangle_exclamation", Lang::Sounds::OGG_ERR_REG);
+            break;
+        case NetworkEvent::ModemErrorInitFailed:
+            Alert(Lang::Strings::ERROR, Lang::Strings::MODEM_INIT_ERROR, "triangle_exclamation", Lang::Sounds::OGG_EXCLAMATION);
+            break;
+        case NetworkEvent::ModemErrorTimeout:
+            display->SetStatus(Lang::Strings::REGISTERING_NETWORK);
+            break;
+    }
 }
 
 void Application::Run() {
@@ -772,10 +791,22 @@ void Application::HandleNetworkConnectedEvent() {
     ESP_LOGI(TAG, "Network connected");
     auto state = GetDeviceState();
 #if CONFIG_EIDOLON_HUB_MODE
+    auto& commissioning = eidolon::CommissioningRuntime::GetInstance();
+    const bool connected = Board::GetInstance().IsNetworkConnected().value_or(true);
+    const auto generation = commissioning.Generation();
+    if (!eidolon::ShouldResumeOperationalNetwork(
+            connected, network_connected_, generation, network_generation_,
+            commissioning.IsInProgress())) return;
     network_connected_ = true;
+    network_generation_ = generation;
+    SetEidolonRuntimeUi(eidolon::RuntimePhase::Normal);
 #endif
 
+#if CONFIG_EIDOLON_HUB_MODE
+    if (!hub_activation_done_) {
+#else
     if (state == kDeviceStateStarting || state == kDeviceStateWifiConfiguring) {
+#endif
         // Network is ready, start activation
 #if CONFIG_EIDOLON_HUB_MODE
         SetEidolonRuntimeUi(eidolon::RuntimePhase::Normal);
@@ -795,9 +826,13 @@ void Application::HandleNetworkConnectedEvent() {
                                 "Hub activation worker unavailable");
             return;
         }
+#if CONFIG_EIDOLON_HUB_MODE
+        activation_generation_.store(generation);
+#endif
         xTaskNotifyGive(activation_task_handle_);
     } else {
 #if CONFIG_EIDOLON_HUB_MODE
+        if (state == kDeviceStateWifiConfiguring) SetDeviceState(kDeviceStateIdle);
         if (voice_transport_) {
             voice_transport_->OnNetworkRestored();
         }
@@ -815,22 +850,17 @@ void Application::HandleNetworkConnectedEvent() {
 
 void Application::HandleNetworkDisconnectedEvent() {
 #if CONFIG_EIDOLON_HUB_MODE
-    network_connected_ = false;
     const bool commissioning_in_progress =
         eidolon::CommissioningRuntime::GetInstance().IsInProgress();
-    auto state = GetDeviceState();
-    if (state != kDeviceStateStarting &&
-        state != kDeviceStateWifiConfiguring &&
-        state != kDeviceStateActivating &&
-        !commissioning_in_progress) {
-        SetEidolonRuntimeUi(eidolon::RuntimePhase::NetworkConnecting,
-                            "Owner network disconnected");
-    }
-    if (voice_transport_ && !commissioning_in_progress) {
+    if (commissioning_in_progress ||
+        Board::GetInstance().IsNetworkConnected() == true) return;
+    const bool was_connected = network_connected_;
+    network_connected_ = false;
+    if (voice_transport_ && was_connected) {
         voice_transport_->OnNetworkLost();
     }
 #if CONFIG_EIDOLON_GUARD_SERVICE
-    if (guard_service_ && !commissioning_in_progress) {
+    if (guard_service_ && was_connected) {
         guard_service_->Stop("network_lost");
     }
 #endif
@@ -852,6 +882,20 @@ void Application::HandleActivationDoneEvent() {
     const bool succeeded = activation_succeeded_.load();
     activation_in_progress_.store(false);
     ESP_LOGI(TAG, "Activation done succeeded=%d", succeeded ? 1 : 0);
+#if CONFIG_EIDOLON_HUB_MODE
+    auto& commissioning = eidolon::CommissioningRuntime::GetInstance();
+    if (commissioning.IsInProgress() ||
+        activation_generation_.load() != commissioning.Generation()) {
+        // If the lease already returned, its connected edge may have found the
+        // old worker busy. Retry now against current evidence exactly once.
+        if (!commissioning.IsInProgress() &&
+            Board::GetInstance().IsNetworkConnected() == true) {
+            network_connected_ = false;
+            HandleNetworkConnectedEvent();
+        }
+        return;
+    }
+#endif
 
     if (!succeeded) {
         SetDeviceState(kDeviceStateWifiConfiguring);

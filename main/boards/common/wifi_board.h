@@ -71,6 +71,7 @@ public:
     virtual void StartNetwork() override;
     
     virtual NetworkInterface* GetNetwork() override;
+    std::optional<bool> IsNetworkConnected() const override;
     virtual void SetNetworkEventCallback(NetworkEventCallback callback) override;
     virtual const char* GetNetworkStateIcon() override;
     virtual void SetPowerSaveLevel(PowerSaveLevel level) override;

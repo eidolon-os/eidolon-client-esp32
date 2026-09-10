@@ -23,6 +23,23 @@
 `DeviceClaimConsumerCore` 负责 Enrollment / Grant / ACK。
 `DeviceAuthorityLocator` 继续负责已验证目录和逻辑 Authority 的解析。
 
+## 配置退出与网络恢复
+
+配置 actor 负责事务收敛、关闭配置 transport 和交回无线电控制权。成功提交与安全取消
+都在这些步骤完成后进入 Idle；`StartStation()` 不代表连接成功，旧 AP 不可达也不能
+无限占用配置租约。不可逆事务仍未完成时继续留在 RecoveringConfiguration。
+
+连接状态由原有 WifiManager 提供，扫描与退避重试继续使用原实现。Application 在配置
+退出后读取当前 Station 连接事实，补回交接期间被屏蔽的连接通知；常规网络回调进入同一
+Application 队列，处理时核对配置 generation 与当前连接事实。配置 UI 快照使用既有
+state_revision 拒绝迟到投影，连接恢复按 generation 与连接边沿去重。旧 activation
+完成事件不能覆盖新配置，旧 worker 退出后按当前网络事实继续已有激活入口。
+
+因此，设备从旧网络断电带到新网络时，保留 Owner、身份、Claim 与伙伴状态，显示
+“寻找已保存 Wi-Fi／长按 BOOT 更换网络”，继续重试。物理在场配入新网络后继续原
+AuthorityLocator 与通道恢复流程。Idle 只说明配置资源已释放；已就绪仍要求网络、
+准入与业务 transport 的真实就绪证据。
+
 ## 身份准备与手机端配合
 
 继续使用现有 `eidolon-trust` 自定义配置 endpoint、已有物理开窗和认证会话。
@@ -143,3 +160,8 @@ M5Stack StackChan 与 ESP-BOX-3 / ESP32-S3 配置均生成完整固件并通过�
 串口确认设备以无 Owner、无已存 Wi-Fi 状态启动，并在收到配置请求后完成事务提交、
 连接 Wi-Fi。尚未验证这次运行的最终 Claim、伙伴分配和对话链路，也未执行
 真机电源/无线故障注入。LiveKit 固定提交未变。
+
+本轮网络交接回归覆盖：已提交但 AP 消失后可重新开窗、清理前的提前模式回调、
+新 generation 拒绝旧候选回调，以及连接先于/晚于租约释放、同代次重复通知和跨代次
+重新唤起运行时。对应 `run_commissioning_orchestrator_core_tests.sh` 与
+`run_operational_readiness_tests.sh`。这些为主机测试；本轮改动仍需 BOX-3 真机验证。

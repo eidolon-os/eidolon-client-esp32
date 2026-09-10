@@ -12,8 +12,8 @@ struct CommissioningRuntimeSnapshot {
     CommissioningRuntimeState state = CommissioningRuntimeState::Idle;
     uint32_t generation = 0;
     bool transaction_committed = false;
-    bool station_route_ready = false;
-    bool previous_station_mode = false;
+    bool station_mode_requested = false;
+    uint32_t revision = 0;
 };
 
 // ESP-IDF composition root for the platform-independent commissioning Core.
@@ -32,11 +32,8 @@ public:
 
     bool RequestOpen();
     bool RequestCancel();
-    // The board adapter submits confirmed Station connectivity here. Returning
-    // true transfers this event to the commissioning actor, which prevents the
-    // legacy network callback from starting enrollment before the actor has
-    // released its generation.
-    bool NotifyStationRouteReady();
+    // Scheduled projections must still belong to the latest actor evidence.
+    bool IsCurrent(const CommissioningRuntimeSnapshot& snapshot) const;
     void SetObserver(Observer observer);
     void SetOperationalRuntimeQuiescer(OperationalRuntimeQuiescer quiescer);
     bool IsAdvertising() const;

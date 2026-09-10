@@ -102,7 +102,7 @@ bool HubActivator::Run() {
         // Admission consumes a confirmed Station route; it never competes with
         // a commissioning generation for the radio or projects stale Hub state
         // over the commissioning actor's UI. The network-connected handoff
-        // starts a new ActivationTask after StationRouteReady.
+        // starts a new ActivationTask after the radio lease is released.
         if (retry.Evaluate(CommissioningRuntime::GetInstance().IsInProgress()) !=
             ActivationStandDown::KeepAsking) {
             ESP_LOGI(TAG, "Commissioning owns the RadioLease; suspending Hub activation");

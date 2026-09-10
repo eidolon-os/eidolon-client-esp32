@@ -51,6 +51,9 @@ public:
     virtual void StartNetwork() override;
     virtual void SetNetworkEventCallback(NetworkEventCallback callback) override;
     virtual NetworkInterface* GetNetwork() override;
+    std::optional<bool> IsNetworkConnected() const override {
+        return current_board_->IsNetworkConnected();
+    }
     virtual const char* GetNetworkStateIcon() override;
     virtual void SetPowerSaveLevel(PowerSaveLevel level) override;
     virtual std::string GetBoardJson() override;
