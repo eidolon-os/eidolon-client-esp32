@@ -1105,6 +1105,8 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/eidolon_ui_labels.cc"
         "eidolon/eidolon_ui_presenter.cc"
         "eidolon/eidolon_view.cc"
+        "eidolon/output_policy.cc"
+        "eidolon/policy_audio_renderer.cc"
         "eidolon/claim_recovery_core.cc"
         "eidolon/host_resolution_core.cc"
         "eidolon/hub_activation_retry_core.cc"
@@ -1166,7 +1168,7 @@ if(CONFIG_EIDOLON_HUB_MODE)
     # Per-board eidolon view: the presenter renders to whatever the board registers
     # via SetEidolonView(). CoreS3 (StackChan) uses the ported StackChan LVGL avatar
     # (needs the smooth_ui_toolkit component); other HUB boards keep the AMOLED view.
-    if(CONFIG_BOARD_TYPE_M5STACK_CORE_S3 OR CONFIG_BOARD_TYPE_M5STACK_STACKCHAN)
+    if(CONFIG_EIDOLON_COMPANION_FACE)
         file(GLOB_RECURSE EIDOLON_AVATAR_SRCS
             "${CMAKE_CURRENT_SOURCE_DIR}/eidolon/avatar/*.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/eidolon/avatar/*.c"
@@ -1183,7 +1185,11 @@ if(CONFIG_EIDOLON_HUB_MODE)
             "${CMAKE_CURRENT_SOURCE_DIR}/eidolon/third_party/smooth_ui_toolkit/src/*.c"
         )
         list(APPEND SOURCES
-            "eidolon/views/stackchan_avatar_view.cc"
+            "eidolon/views/companion_face_view.cc"
+            "eidolon/expression/core/runtime.cc"
+            "eidolon/expression/core/wire.cc"
+            "eidolon/expression/delivery.cc"
+            "display/companion_lcd_display.cc"
             ${EIDOLON_AVATAR_SRCS}
             ${SMOOTH_UI_TOOLKIT_SRCS}
         )

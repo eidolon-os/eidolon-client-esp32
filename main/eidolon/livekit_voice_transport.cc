@@ -109,11 +109,6 @@ void LiveKitVoiceTransport::QuiesceForCommissioning(
     controller_->QuiesceForCommissioning(std::move(completion));
 }
 
-void LiveKitVoiceTransport::OnAmbientPresenceChanged(bool present)
-{
-    controller_->OnAmbientPresenceChanged(present);
-}
-
 void LiveKitVoiceTransport::JoinSession()
 {
     ESP_LOGI(TAG, "[voice_request] JoinSession state=%s",

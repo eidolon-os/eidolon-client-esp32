@@ -117,6 +117,7 @@ void LiveKitSession::OnTextStreamChunk(const livekit_data_stream_chunk_t* chunk,
         return;
     }
 
+    if (!CurrentOutputGate().Allows(presentation::Output::DialogueText)) return;
     std::string payload(reinterpret_cast<const char*>(chunk->content), chunk->content_size);
     cJSON* root = cJSON_Parse(payload.c_str());
     if (!root) {
@@ -167,6 +168,27 @@ void LiveKitSession::OnDrainStreamChunk(const livekit_data_stream_chunk_t* chunk
     (void)ctx;
 }
 
+// Participant kind comes from authenticated server signalling, never packet JSON.
+void LiveKitSession::OnParticipantInfo(const livekit_participant_info_t* info, void* ctx)
+{
+    auto* session=static_cast<LiveKitSession*>(ctx);
+    if (!session || !info || !info->identity || std::strlen(info->identity)>128) return;
+    std::lock_guard<std::mutex> lock(session->peers_mutex_);
+    for (auto& peer:session->agent_peers_) {
+        if (peer==info->identity) { peer.clear(); break; }
+    }
+    if (info->kind!=LIVEKIT_PARTICIPANT_KIND_AGENT ||
+        info->state==LIVEKIT_PARTICIPANT_STATE_DISCONNECTED) return;
+    for (auto& peer:session->agent_peers_) if (peer.empty()) { peer=info->identity;return; }
+}
+bool LiveKitSession::IsAgent(const char* identity)
+{
+    if (!identity || !identity[0]) return false;
+    std::lock_guard<std::mutex> lock(peers_mutex_);
+    for (const auto& peer:agent_peers_) if (peer==identity) return true;
+    return false;
+}
+
 void LiveKitSession::OnDataReceived(const livekit_data_received_t* data, void* ctx)
 {
     auto* session = static_cast<LiveKitSession*>(ctx);
@@ -175,6 +197,7 @@ void LiveKitSession::OnDataReceived(const livekit_data_received_t* data, void* c
     }
     const char* topic = data->topic ? data->topic : "";
     if (strcmp(topic, kUiStateTopic) == 0) {
+        if (kCompanionFaceBuild && !session->IsAgent(data->sender_identity)) return;
         session->HandleUiStatePayload(reinterpret_cast<const char*>(data->payload.bytes),
                                       data->payload.size);
         return;
@@ -184,7 +207,7 @@ void LiveKitSession::OnDataReceived(const livekit_data_received_t* data, void* c
                             data->payload.size);
         ESP_LOGI(TAG, "[lifecycle] session_control received topic=%s bytes=%u",
                  topic, static_cast<unsigned>(data->payload.size));
-        session->on_session_control_(payload);
+        session->on_session_control_(payload, session->generation_, session->IsAgent(data->sender_identity));
         return;
     }
     if (strcmp(topic, kEventTopic) == 0 && session->on_device_event_) {
@@ -196,8 +219,9 @@ void LiveKitSession::OnDataReceived(const livekit_data_received_t* data, void* c
     if (strcmp(topic, kControlTopic) != 0 || !session->on_control_command_) {
         return;
     }
+    if (data->payload.size > 4096) return;
     std::string payload(reinterpret_cast<const char*>(data->payload.bytes), data->payload.size);
-    session->on_control_command_(payload);
+    session->on_control_command_(payload, session->generation_, session->IsAgent(data->sender_identity));
 }
 
 void LiveKitSession::HandleStateChanged(livekit_connection_state_t state)
@@ -244,7 +268,10 @@ void LiveKitSession::HandleUiStatePayload(const char* payload, size_t size)
         state = JsonString(root, "phase");
     }
     if (state) {
-        on_agent_phase_(PhaseFromUiState(state, JsonString(root, "reason")));
+        auto phase=PhaseFromUiState(state, JsonString(root, "reason"));
+        if (phase==AgentPhase::AgentSpeaking && !CurrentOutputGate().Allows(presentation::Output::Speech))
+            phase=AgentPhase::Silent;
+        on_agent_phase_(phase);
     }
     cJSON_Delete(root);
 }
@@ -292,12 +319,12 @@ void LiveKitSession::UnregisterStreamHandlers()
     }
 }
 
-esp_err_t LiveKitSession::EnsureMediaBoard()
+esp_err_t LiveKitSession::EnsureMediaBoard(bool speech)
 {
     if (media_board_initialized_) {
         return ESP_OK;
     }
-    esp_err_t err = eidolon_livekit_board_init();
+    esp_err_t err = eidolon_livekit_board_init(speech);
     if (err == ESP_OK) {
         media_board_initialized_ = true;
     } else {
@@ -376,14 +403,17 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
     identity_ = config.session.identity;
     generation_ = generation;
 
-    esp_err_t media_err = EnsureMediaBoard();
+    const bool speech=config.output_policy.known
+        ? bool(config.output_policy.allowed&OutputBit(presentation::Output::Speech))
+        : !kCompanionFaceBuild;
+    esp_err_t media_err = EnsureMediaBoard(speech);
     if (media_err != ESP_OK) {
         return media_err;
     }
 
     esp_capture_handle_t capturer = eidolon_livekit_board_get_capturer();
     av_render_handle_t renderer = eidolon_livekit_board_get_renderer();
-    if (!capturer || !renderer) {
+    if (!capturer || (speech && !renderer)) {
         ESP_LOGE(TAG, "Media pipeline not ready");
         ReleaseMediaBoard();
         return ESP_ERR_INVALID_STATE;
@@ -404,11 +434,13 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
         .capturer = capturer,
     };
     room_options.subscribe = {
-        .kind = LIVEKIT_MEDIA_TYPE_AUDIO,
+        .kind = speech ? LIVEKIT_MEDIA_TYPE_AUDIO : LIVEKIT_MEDIA_TYPE_NONE,
         .renderer = renderer,
     };
     room_options.on_state_changed = OnRoomStateChanged;
+    { std::lock_guard<std::mutex> lock(peers_mutex_); for (auto& peer:agent_peers_) peer.clear(); }
     room_options.on_data_received = OnDataReceived;
+    room_options.on_participant_info = OnParticipantInfo;
     room_options.ctx = this;
 
     // The engine is built out of FreeRTOS objects, and every FreeRTOS object

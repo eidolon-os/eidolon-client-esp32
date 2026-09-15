@@ -2,6 +2,7 @@
 #define EIDOLON_VIEW_H_
 
 #include <functional>
+#include "expression/surface.h"
 
 #include "eidolon_ui_model.h"
 
@@ -18,6 +19,7 @@ public:
 
     // Project the snapshot onto the screen: status/emotion, mode badge, the
     // talk/start button, and any flow-specific chrome.
+    virtual expression::Surface* Expressions() { return nullptr; }
     virtual void Render(const EidolonUiModel& model) = 0;
 
 };

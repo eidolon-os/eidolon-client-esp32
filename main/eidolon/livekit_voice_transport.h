@@ -23,7 +23,7 @@ public:
     void OnNetworkRestored() override;
     void QuiesceForCommissioning(
         std::function<void(bool)> completion) override;
-    void OnAmbientPresenceChanged(bool present) override;
+
 
     void ToggleSession() override;
     void JoinSession() override;

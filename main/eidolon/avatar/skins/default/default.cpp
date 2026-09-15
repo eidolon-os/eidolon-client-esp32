@@ -8,11 +8,12 @@
 using namespace uitk::lvgl_cpp;
 using namespace stackchan::avatar;
 
-void DefaultAvatar::init(lv_obj_t* parent, const lv_font_t* font)
+void DefaultAvatar::init(lv_obj_t* parent, const lv_font_t* font, bool speechBubble)
 {
     _pannel = std::make_unique<Container>(parent);
     _pannel->align(LV_ALIGN_CENTER, 0, 0);
-    _pannel->setSize(320, 240);
+    _pannel->setSize(lv_pct(100), lv_pct(100));
+    _pannel->setPadding(0, 0, 0, 0);
     _pannel->setRadius(0);
     _pannel->setBorderWidth(0);
     _pannel->setBgColor(secondaryColor);
@@ -21,7 +22,7 @@ void DefaultAvatar::init(lv_obj_t* parent, const lv_font_t* font)
     _key_elements.leftEye  = std::make_unique<DefaultEyes>(_pannel->get(), primaryColor, secondaryColor, true);
     _key_elements.rightEye = std::make_unique<DefaultEyes>(_pannel->get(), primaryColor, secondaryColor, false);
     _key_elements.mouth    = std::make_unique<DefaultMouth>(_pannel->get(), primaryColor, secondaryColor);
-    _key_elements.speechBubble =
+    if (speechBubble) _key_elements.speechBubble =
         std::make_unique<DefaultSpeechBubble>(_pannel->get(), primaryColor, secondaryColor, font);
 }
 

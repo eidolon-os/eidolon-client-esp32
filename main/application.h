@@ -147,7 +147,7 @@ public:
     void ToggleMicrophone();
     void PttPress();
     void PttRelease();
-    void OnAmbientPresenceChanged(bool present);
+
     void SetEidolonRuntimeUi(eidolon::RuntimePhase phase,
                              const std::string& detail = "");
     void SetEidolonEnrollmentUi(eidolon::EnrollmentPhase phase,

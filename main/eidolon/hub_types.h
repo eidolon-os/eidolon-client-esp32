@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "device_foundation_v1_generated.h"
+#include "output_policy.h"
 
 namespace eidolon {
 
@@ -89,6 +90,7 @@ struct RoomConfig {
 };
 
 struct Esp32HubConfig {
+    DeviceOutputPolicy output_policy;
     // Default to the most conservative status: a config that has not been
     // explicitly populated/parsed must never grant voice access.
     HubConfigStatus status = HubConfigStatus::PendingApproval;

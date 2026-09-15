@@ -412,8 +412,9 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
     HubConfigStatus status = HubConfigStatus::PendingApproval;
     HubChannelAssignment assignment;
     AcceptedManifestRef accepted_manifest;
+    DeviceOutputPolicy output_policy;
     if (!ParseDeviceConfigurationResponse(
-            response.body, nonce, claim, status, assignment, accepted_manifest)) {
+            response.body, nonce, claim, status, assignment, accepted_manifest, &output_policy)) {
         return ESP_ERR_INVALID_RESPONSE;
     }
     // What this build can do is this device's own fact to state, and the answer
@@ -426,6 +427,7 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
     if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
     out = Esp32HubConfig{};
     out.status = status;
+    out.output_policy = output_policy;
     if (status == HubConfigStatus::Active) {
         std::string binding;
         if (!Base64Decode(assignment.opaque_binding, binding) ||

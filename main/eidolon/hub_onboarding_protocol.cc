@@ -1,3 +1,4 @@
+#include "eidolon/expression/generated/presentation_catalog.h"
 #include "room_config_json.h"
 #include "hub_onboarding_protocol.h"
 
@@ -364,10 +365,20 @@ std::string BuildDeviceManifestJson(const std::string& board_name, bool has_came
         std::string("{\"name\":\"interaction_mode\",\"observable\":false,\"schema\":{\"const\":\"") +
         interaction_mode + "\",\"type\":\"string\"},\"writable\":false}";
 
+#if CONFIG_EIDOLON_COMPANION_FACE
+    properties += ",{\"name\":\"expression.profile\",\"observable\":false,\"schema\":{\"const\":\"eidolon.face.v1\",\"type\":\"string\"},\"writable\":false}";
+    properties += ",{\"name\":\"output.dialogue_text\",\"observable\":false,\"schema\":{\"const\":true,\"type\":\"boolean\"},\"writable\":false}";
+#endif
+
     // Keep a compact deterministic representation for the manifest wire
     // contract: keys stay sorted so the Host's manifest revision is stable
     // across boots that declare the same thing.
-    return "{\"actions\":[],\"events\":[],\"media\":[" + media +
+#if CONFIG_EIDOLON_COMPANION_FACE
+    const std::string actions=expression::kManifestActions;
+#else
+    const std::string actions="[]";
+#endif
+    return "{\"actions\":" + actions + ",\"events\":[],\"media\":[" + media +
            "],\"properties\":[" + properties +
            "],\"schema_version\":1,\"title\":" + escaped + "}";
 }
@@ -378,7 +389,8 @@ bool ParseDeviceConfigurationResponse(
     const ActiveClaimState& expected,
     HubConfigStatus& status,
     HubChannelAssignment& assignment,
-    AcceptedManifestRef& accepted_manifest)
+    AcceptedManifestRef& accepted_manifest,
+    DeviceOutputPolicy* output_policy)
 {
     cJSON* root = cJSON_ParseWithLength(body.data(), body.size());
     device_foundation::v1::DeviceRef ref;
@@ -400,6 +412,11 @@ bool ParseDeviceConfigurationResponse(
                         : HubConfigStatus::Active);
     // Which of this device's own declarations the Authority holds. Absent is a
     // valid answer and is reported as such, never as "it holds nothing".
+    DeviceOutputPolicy policy;
+    if (!ParseOutputPolicy(cJSON_GetObjectItemCaseSensitive(root,"output_policy"),policy)) {
+        cJSON_Delete(root);return false;
+    }
+    if (output_policy) *output_policy=policy;
     accepted_manifest = AcceptedManifestRef{};
     const cJSON* manifest = cJSON_GetObjectItemCaseSensitive(root, "manifest");
     if (cJSON_IsObject(manifest)) {

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "session_id": "session-1",
+  "policy_revision": 1,
+  "outputs": {
+    "speech": false,
+    "dialogue_text": false,
+    "expression": true,
+    "audio_cue": false,
+    "motion": false
+  },
+  "expression_profile": "eidolon.face.v1"
+}

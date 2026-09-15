@@ -1,15 +1,14 @@
 #include "wifi_board.h"
 #include "codecs/box_audio_codec.h"
 #include "display/display.h"
-#include "display/emote_display.h"
-#include "display/lcd_display.h"
+#include "display/companion_lcd_display.h"
 #include "esp_lcd_ili9341.h"
 #include "esp_lcd_touch.h"
+#include <esp_lvgl_port.h>
 #include "esp_lcd_touch_gt911.h"
 #include "esp_lcd_touch_tt21100.h"
 #include "application.h"
 #include "button.h"
-#include "box3_radar_presence.h"
 #include "config.h"
 #if CONFIG_EIDOLON_HUB_MODE
 #include "eidolon/provisioning_window_policy_core.h"
@@ -49,29 +48,10 @@ static const ili9341_lcd_init_cmd_t vendor_specific_init[] = {
 
 class EspBox3Board : public WifiBoard {
 private:
-    struct TouchExitButtonDriver : public button_driver_t {
-        EspBox3Board* board = nullptr;
-    };
-
     i2c_master_bus_handle_t i2c_bus_;
-    i2c_master_bus_handle_t sensor_i2c_bus_ = nullptr;
-    std::unique_ptr<Box3RadarPresence> radar_presence_;
-    RadarPresenceState last_radar_state_ = RadarPresenceState::Unavailable;
-    bool has_last_radar_state_ = false;
     Button boot_button_;
     Display* display_;
     esp_lcd_touch_handle_t touch_ = nullptr;
-    TouchExitButtonDriver touch_exit_driver_ = {};
-    std::unique_ptr<Button> touch_exit_button_;
-    bool touch_exit_cached_pressed_ = false;
-    int64_t last_touch_poll_us_ = 0;
-    uint16_t last_touch_x_ = 0;
-    uint16_t last_touch_y_ = 0;
-
-    static constexpr uint16_t kExitHitXMin = DISPLAY_WIDTH - 88;
-    static constexpr uint16_t kExitHitYMax = 68;
-    static constexpr int64_t kTouchPollIntervalUs = 30 * 1000;
-
     void InitializeI2c() {
         // Initialize I2C peripheral
         i2c_master_bus_config_t i2c_bus_cfg = {
@@ -87,78 +67,6 @@ private:
             },
         };
         ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_cfg, &i2c_bus_));
-    }
-
-    void InitializeSensorDock() {
-        i2c_master_bus_config_t sensor_bus_config = {
-            .i2c_port = I2C_NUM_0,
-            .sda_io_num = SENSOR_DOCK_I2C_SDA_PIN,
-            .scl_io_num = SENSOR_DOCK_I2C_SCL_PIN,
-            .clk_source = I2C_CLK_SRC_DEFAULT,
-            .glitch_ignore_cnt = 7,
-            .intr_priority = 0,
-            .trans_queue_depth = 0,
-            .flags = {
-                .enable_internal_pullup = 1,
-            },
-        };
-        esp_err_t err = i2c_new_master_bus(&sensor_bus_config, &sensor_i2c_bus_);
-        if (err != ESP_OK) {
-            ESP_LOGW(TAG, "[radar] sensor I2C init failed: %s", esp_err_to_name(err));
-            display_->SetPresenceState(PresenceState::Unavailable);
-            return;
-        }
-
-        radar_presence_ = std::make_unique<Box3RadarPresence>();
-        err = radar_presence_->Start(sensor_i2c_bus_, [this](RadarPresenceState state) {
-            PresenceState display_state = PresenceState::Unavailable;
-            switch (state) {
-            case RadarPresenceState::Calibrating:
-                display_state = PresenceState::Calibrating;
-                break;
-            case RadarPresenceState::Vacant:
-                display_state = PresenceState::Vacant;
-                break;
-            case RadarPresenceState::Present:
-                display_state = PresenceState::Present;
-                break;
-            case RadarPresenceState::Unavailable:
-            default:
-                break;
-            }
-            const bool entered =
-                has_last_radar_state_ &&
-                last_radar_state_ == RadarPresenceState::Vacant &&
-                state == RadarPresenceState::Present;
-            const bool left_or_unavailable =
-                has_last_radar_state_ &&
-                last_radar_state_ == RadarPresenceState::Present &&
-                state != RadarPresenceState::Present;
-            last_radar_state_ = state;
-            has_last_radar_state_ = true;
-            Application::GetInstance().Schedule(
-                [display_state, entered, left_or_unavailable]() {
-                if (auto* display = Board::GetInstance().GetDisplay()) {
-                    display->SetPresenceState(display_state);
-                }
-#if CONFIG_EIDOLON_HUB_MODE
-                if (entered) {
-                    Application::GetInstance().OnAmbientPresenceChanged(true);
-                } else if (left_or_unavailable) {
-                    Application::GetInstance().OnAmbientPresenceChanged(false);
-                }
-#else
-                (void)entered;
-                (void)left_or_unavailable;
-#endif
-            });
-        });
-        if (err != ESP_OK) {
-            ESP_LOGW(TAG, "[radar] presence monitor start failed: %s",
-                     esp_err_to_name(err));
-            radar_presence_.reset();
-            display_->SetPresenceState(PresenceState::Unavailable);
-        }
     }
 
     void InitializeSpi() {
@@ -280,90 +188,6 @@ private:
         return ESP_OK;
     }
 
-    bool IsExitHotspot(uint16_t x, uint16_t y) const {
-        return x >= kExitHitXMin && y <= kExitHitYMax;
-    }
-
-    void RequestVoiceLeaveFromTouch() {
-        auto& app = Application::GetInstance();
-        auto state = app.GetDeviceState();
-        ESP_LOGI(TAG, "[ui] EXIT touch x=%u y=%u device_state=%d",
-                 last_touch_x_, last_touch_y_, state);
-        if (state != kDeviceStateListening && state != kDeviceStateSpeaking) {
-            return;
-        }
-
-        app.Schedule([]() {
-            auto& app = Application::GetInstance();
-            auto state = app.GetDeviceState();
-            if (state == kDeviceStateListening || state == kDeviceStateSpeaking) {
-                ESP_LOGI(TAG, "[ui] EXIT touch -> RequestVoiceLeave");
-                app.RequestVoiceLeave();
-            }
-        });
-    }
-
-    bool ReadTouchExitButtonLevel() {
-        int64_t now = esp_timer_get_time();
-        if (last_touch_poll_us_ != 0 && now - last_touch_poll_us_ < kTouchPollIntervalUs) {
-            return touch_exit_cached_pressed_;
-        }
-        last_touch_poll_us_ = now;
-        touch_exit_cached_pressed_ = false;
-
-        if (touch_ == nullptr || esp_lcd_touch_read_data(touch_) != ESP_OK) {
-            return false;
-        }
-
-        esp_lcd_touch_point_data_t point = {};
-        uint8_t point_count = 0;
-        if (esp_lcd_touch_get_data(touch_, &point, &point_count, 1) != ESP_OK || point_count == 0) {
-            return false;
-        }
-
-        last_touch_x_ = point.x;
-        last_touch_y_ = point.y;
-        touch_exit_cached_pressed_ = IsExitHotspot(point.x, point.y);
-        return touch_exit_cached_pressed_;
-    }
-
-    static uint8_t TouchExitButtonGetLevel(button_driver_t* button_driver) {
-        auto* driver = static_cast<TouchExitButtonDriver*>(button_driver);
-        if (driver == nullptr || driver->board == nullptr) {
-            return BUTTON_INACTIVE;
-        }
-        return driver->board->ReadTouchExitButtonLevel() ? BUTTON_ACTIVE : BUTTON_INACTIVE;
-    }
-
-    static esp_err_t TouchExitButtonDelete(button_driver_t* button_driver) {
-        (void)button_driver;
-        return ESP_OK;
-    }
-
-    void InitializeTouchExitButton() {
-        touch_exit_driver_.board = this;
-        touch_exit_driver_.enable_power_save = false;
-        touch_exit_driver_.get_key_level = TouchExitButtonGetLevel;
-        touch_exit_driver_.del = TouchExitButtonDelete;
-
-        button_config_t button_config = {
-            .long_press_time = 0,
-            .short_press_time = 0,
-        };
-        button_handle_t button_handle = nullptr;
-        esp_err_t ret = iot_button_create(&button_config, &touch_exit_driver_, &button_handle);
-        if (ret != ESP_OK) {
-            ESP_LOGW(TAG, "[ui] touch EXIT virtual button init failed: %s", esp_err_to_name(ret));
-            return;
-        }
-
-        touch_exit_button_.reset(new Button(button_handle));
-        touch_exit_button_->OnPressDown([this]() {
-            RequestVoiceLeaveFromTouch();
-        });
-        ESP_LOGI(TAG, "[ui] touch EXIT virtual button ready");
-    }
-
     void InitializeTouch() {
         if (TryInitializeGt911Touch(ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS) != ESP_OK &&
             TryInitializeGt911Touch(ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS_BACKUP) != ESP_OK &&
@@ -372,7 +196,15 @@ private:
             return;
         }
 
-        InitializeTouchExitButton();
+        const lvgl_port_touch_cfg_t touch_config = {
+            .disp = lv_display_get_default(),
+            .handle = touch_,
+        };
+        if (lvgl_port_add_touch(&touch_config) == nullptr) {
+            ESP_LOGE(TAG, "[ui] LVGL touch registration failed");
+        } else {
+            ESP_LOGI(TAG, "[ui] LVGL touch ready");
+        }
     }
 
     void InitializeIli9341Display() {
@@ -413,12 +245,9 @@ private:
         esp_lcd_panel_mirror(panel, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y);
         esp_lcd_panel_disp_on_off(panel, true);
 
-#if CONFIG_USE_EMOTE_MESSAGE_STYLE
-        display_ = new emote::EmoteDisplay(panel, panel_io, DISPLAY_WIDTH, DISPLAY_HEIGHT);
-#else
-        display_ = new SpiLcdDisplay(panel_io, panel,
+        display_ = new CompanionLcdDisplay(panel_io, panel,
             DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
-#endif
+
     }
 
 public:
@@ -428,7 +257,6 @@ public:
         InitializeIli9341Display();
         InitializeTouch();
         InitializeButtons();
-        InitializeSensorDock();
         GetBacklight()->RestoreBrightness();
     }
 

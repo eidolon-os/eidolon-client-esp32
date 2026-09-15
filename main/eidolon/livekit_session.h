@@ -4,6 +4,8 @@
 #include <esp_err.h>
 #include <functional>
 #include <string>
+#include <array>
+#include <mutex>
 
 #include <livekit.h>
 #include <livekit_data_stream.h>
@@ -27,8 +29,8 @@ public:
     using StateCallback = std::function<void(LiveKitConnectionState, uint32_t generation)>;
     using TranscriptionCallback = std::function<void(const TranscriptionEvent& event)>;
     using AgentPhaseCallback = std::function<void(AgentPhase phase)>;
-    using ControlCommandCallback = std::function<void(const std::string& payload)>;
-    using SessionControlCallback = std::function<void(const std::string& payload)>;
+    using ControlCommandCallback = std::function<void(const std::string& payload, uint32_t generation, bool agent)>;
+    using SessionControlCallback = std::function<void(const std::string& payload, uint32_t generation, bool agent)>;
     using DeviceEventCallback =
         std::function<void(const std::string& payload, uint32_t generation)>;
 
@@ -74,6 +76,10 @@ private:
     static void OnRoomStateChanged(livekit_connection_state_t state, void* ctx);
     static void OnTextStreamChunk(const livekit_data_stream_chunk_t* chunk, void* ctx);
     static void OnDrainStreamChunk(const livekit_data_stream_chunk_t* chunk, void* ctx);
+    static void OnParticipantInfo(const livekit_participant_info_t* info, void* ctx);
+    bool IsAgent(const char* identity);
+    std::mutex peers_mutex_;
+    std::array<std::string, 4> agent_peers_;
     static void OnDataReceived(const livekit_data_received_t* data, void* ctx);
 
     void HandleStateChanged(livekit_connection_state_t state);
@@ -86,7 +92,7 @@ private:
     // — so the start of every conversation tore one down and built the other,
     // which is the moment a memory-tight board had least room to build it in.
     // Built once and kept, because the channel it serves is kept.
-    esp_err_t EnsureMediaBoard();
+    esp_err_t EnsureMediaBoard(bool speech);
     void ReleaseMediaBoard();
     // Decides, and says in the log, whether the internal heap can hold a room
     // right now. Returns false having already reported why.

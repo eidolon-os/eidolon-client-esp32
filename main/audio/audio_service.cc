@@ -1,4 +1,7 @@
 #include "audio_service.h"
+#if CONFIG_EIDOLON_HUB_MODE
+#include "eidolon/output_policy.h"
+#endif
 #include <esp_log.h>
 #include <cstring>
 
@@ -302,6 +305,9 @@ void AudioService::AudioOutputTask() {
         audio_queue_cv_.notify_all();
         lock.unlock();
 
+#if CONFIG_EIDOLON_HUB_MODE
+        if (!eidolon::CurrentOutputGate().Allows(eidolon::presentation::Output::AudioCue)) continue;
+#endif
         if (!codec_->output_enabled()) {
             esp_timer_stop(audio_power_timer_);
             esp_timer_start_periodic(audio_power_timer_, AUDIO_POWER_CHECK_INTERVAL_MS * 1000);
@@ -628,6 +634,9 @@ void AudioService::SetCallbacks(AudioServiceCallbacks& callbacks) {
 }
 
 void AudioService::PlaySound(const std::string_view& ogg) {
+#if CONFIG_EIDOLON_HUB_MODE
+    if (!eidolon::CurrentOutputGate().Allows(eidolon::presentation::Output::AudioCue)) return;
+#endif
     if (ogg.empty()) {
         return;
     }

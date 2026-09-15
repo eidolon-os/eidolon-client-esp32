@@ -1,6 +1,7 @@
 // LiveKit media board bring-up for Waveshare ESP32-S3-Touch-AMOLED-2.06 (shared BoxAudioCodec).
 
 #include "livekit_board.h"
+#include "policy_audio_renderer.h"
 
 #include "audio_codec.h"
 #include "audio/eidolon_mic_capture.h"
@@ -208,8 +209,10 @@ static esp_err_t build_renderer(esp_codec_dev_handle_t play_handle, uint32_t out
         .fixed_clock = false,
         .ctx = nullptr,
     };
-    s_audio_renderer = av_render_alloc_i2s_render(&i2s_cfg);
+    auto* inner = av_render_alloc_i2s_render(&i2s_cfg);
+    s_audio_renderer = eidolon::AllocatePolicyAudioRenderer(inner);
     if (!s_audio_renderer) {
+        if (inner) audio_render_free_handle(inner);
         return ESP_FAIL;
     }
 
@@ -221,6 +224,8 @@ static esp_err_t build_renderer(esp_codec_dev_handle_t play_handle, uint32_t out
     };
     s_av_renderer = av_render_open(&render_cfg);
     if (!s_av_renderer) {
+        audio_render_free_handle(s_audio_renderer);
+        s_audio_renderer = nullptr;
         return ESP_FAIL;
     }
 
@@ -237,7 +242,7 @@ static esp_err_t build_renderer(esp_codec_dev_handle_t play_handle, uint32_t out
     return ESP_OK;
 }
 
-extern "C" esp_err_t eidolon_livekit_board_init(void)
+extern "C" esp_err_t eidolon_livekit_board_init(bool speech)
 {
     if (s_capturer != nullptr) {
         return ESP_OK;
@@ -250,7 +255,7 @@ extern "C" esp_err_t eidolon_livekit_board_init(void)
 
     esp_codec_dev_handle_t play = audio_in.PlaybackHandle();
     auto* codec = audio_in.Codec();
-    if (!play || !codec) {
+    if ((speech && !play) || !codec) {
         ESP_LOGE(TAG, "Codec playback handle / codec not available");
         return ESP_ERR_INVALID_STATE;
     }
@@ -279,8 +284,10 @@ extern "C" esp_err_t eidolon_livekit_board_init(void)
     const int output_channels = codec && codec->output_channels() > 0
                                     ? codec->output_channels()
                                     : 1;
-    ESP_RETURN_ON_ERROR(build_renderer(play, output_sample_rate, output_channels), TAG,
-                        "renderer");
+    if (speech) {
+        ESP_RETURN_ON_ERROR(build_renderer(play, output_sample_rate, output_channels), TAG,
+                            "renderer");
+    }
 
     if (codec) {
         ESP_LOGI(TAG, "LiveKit board media ready (input=%d Hz, output=%d Hz)",
@@ -354,6 +361,7 @@ extern "C" void eidolon_livekit_board_deinit(void)
         av_render_close(s_av_renderer);
         s_av_renderer = nullptr;
     }
+    if (s_audio_renderer) audio_render_free_handle(s_audio_renderer);
     s_audio_renderer = nullptr;
 
     // Quiesce the capture PRODUCER before destroying the pipeline. esp_capture_close

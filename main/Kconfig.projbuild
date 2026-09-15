@@ -1155,6 +1155,19 @@ menu "Eidolon Hub"
             config from GET /api/config. Does not use Xiaozhi cloud OTA URL for
             mqtt/websocket. Firmware upgrade from Hub is phase 2.
 
+    config EIDOLON_COMPANION_FACE
+        bool
+        default y if EIDOLON_HUB_MODE && (BOARD_TYPE_ESP_BOX_3 || BOARD_TYPE_M5STACK_STACKCHAN || BOARD_TYPE_M5STACK_CORE_S3)
+
+    config EIDOLON_COMPANION_BENCHMARK
+        bool "Run bounded shared-face display benchmark at boot"
+        default n
+        depends on EIDOLON_COMPANION_FACE
+        help
+            Developer-only: after a 20 second startup settle period, render 64
+            gestures and report actual display completions and heap statistics.
+            Does not grant network output authority or enable speech/motion.
+
     config EIDOLON_PROVISIONING_TRANSPORT_BLE
         bool "Carry device provisioning over BLE instead of SoftAP"
         default n
@@ -1420,38 +1433,6 @@ menu "Eidolon Hub"
             correlates continuous local owner facts to every active assertion.
             Owner authentication is driven by local visual state, not by
             bounded remote recognition requests or retry timers.
-
-    config EIDOLON_RADAR_PRESENCE_BROADCAST
-        bool "Enable BOX-3 radar presence state broadcasting"
-        default n
-        depends on EIDOLON_HUB_MODE && BOARD_TYPE_ESP_BOX_3
-        help
-            Publishes source-scoped ambient.presence.state edge facts, a
-            reconnect snapshot, and low-frequency lease heartbeats while
-            present. Heartbeats repair state only and never trigger owner
-            authentication.
-
-    config EIDOLON_BOX3_RADAR_THRESHOLD_DELTA
-        int "BOX-3 radar detection threshold"
-        range 0 1023
-        default 450
-        depends on BOARD_TYPE_ESP_BOX_3
-        help
-            Configures the AT581X signal threshold at each boot. A larger value
-            shortens the sensing distance. The value is unitless: enclosure,
-            orientation, reflections, and target motion all affect the actual
-            distance. 450 is a conservative desktop starting point targeting
-            approximately one metre and must be calibrated on the real dock.
-
-    config EIDOLON_OWNER_PRESENCE_VOICE_WAKE
-        bool "Enable owner-confirmed BOX-3 automatic voice join"
-        default n
-        depends on EIDOLON_RADAR_PRESENCE_BROADCAST
-        help
-            Allows the BOX-3 with an active radar presence assertion to join a
-            Voice Room after a flow-correlated owner confirmation. Disabled by
-            default because this policy opens the microphone without a BOOT
-            press.
 
     config EIDOLON_GUARD_SAMPLE_INTERVAL_MS
         int "ATK guard sample interval in milliseconds"

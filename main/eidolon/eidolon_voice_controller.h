@@ -26,6 +26,10 @@
 #include "livekit_session.h"
 #include "voice_session_state.h"
 
+#if CONFIG_EIDOLON_COMPANION_FACE
+#include "expression/delivery.h"
+#endif
+
 namespace eidolon {
 
 class GuardService;
@@ -48,7 +52,6 @@ public:
     void OnNetworkLost();
     void OnNetworkRestored();
     void QuiesceForCommissioning(std::function<void(bool)> completion);
-    void OnAmbientPresenceChanged(bool present);
 
     esp_err_t JoinRoom();
     esp_err_t LeaveRoom();
@@ -117,10 +120,13 @@ private:
         OwnerFaceProfileCompleted,
 #endif
         ControlCommand,
+#if CONFIG_EIDOLON_COMPANION_FACE
+        PresentationEvent,
+#endif
         SessionControl,
         DeviceEvent,
         PublishDeviceEvent,
-        AmbientPresence,
+
         AmbientPresenceTimer,
         AgentPhaseChanged,
         SessionActivity,
@@ -133,6 +139,9 @@ private:
     };
     struct Event {
         EventType type;
+#if CONFIG_EIDOLON_COMPANION_FACE
+        expression::Event presentation;
+#endif
         LiveKitConnectionState lk_state = LiveKitConnectionState::Disconnected;
         AgentPhase phase = AgentPhase::Silent;
         bool flag = false;
@@ -177,13 +186,18 @@ private:
 #if CONFIG_EIDOLON_OWNER_FACE_PROFILE
     void DoOwnerFaceProfileCompleted(const std::string& payload);
 #endif
-    void DoControlCommand(const std::string& payload);
-    void DoSessionControl(const std::string& payload);
+    void DoControlCommand(const std::string& payload, uint32_t generation, bool agent);
+#if CONFIG_EIDOLON_COMPANION_FACE
+    expression::Delivery presentations_{[this](const std::string& id, const std::string& receipt) {
+        PublishPresentationReceipt(id, receipt);
+    }};
+    void PublishPresentationReceipt(const std::string& id, const std::string& receipt);
+    void HandleExpressionCommand(const ControlCommand& command);
+#endif
+    void DoSessionControl(const std::string& payload, uint32_t generation, bool agent);
     void DoDeviceEvent(const std::string& payload, uint32_t event_generation);
     void DoPublishDeviceEvent(const std::string& payload);
-    void DoAmbientPresenceChanged(bool present);
     void DoAmbientPresenceTimer();
-    void PublishRadarPresenceState(AmbientPresenceObservation observation);
     void OpenConversationAudio();
     void CloseConversationAudio();
     void ScheduleAmbientPresenceTimer(uint64_t delay_ms);
@@ -261,14 +275,10 @@ private:
     void HandleGuardVisionBenchmarkCommand(const std::string& command_id, const std::string& payload);
 #endif
     void HandleIdleTimeoutCommand();
-    void HandleOwnerPresenceConfirmedEvent(const DeviceEventMessage& event);
-    void HandleOwnerPresenceChangedEvent(const DeviceEventMessage& event);
     void PublishFlowNode(const std::string& flow_id,
                          const std::string& causation_id,
                          const char* stage, const char* status,
                          const char* label);
-    void ResetPresenceManagedSession();
-    void CheckOwnerPresenceLease();
     // Parse and act on a session_end{reason} packet from the channel: record the
     // reason for the UI, tear the voice room down gracefully, and pick the
     // resulting state (Ready for a normal end, Error for a server error).
@@ -344,12 +354,6 @@ private:
     // Controller-task only.
     std::string pending_session_intent_;
     std::string pending_session_flow_id_;
-    std::string current_presence_flow_id_;
-    std::string owner_lease_source_device_id_;
-    uint64_t owner_lease_deadline_ms_ = 0;
-    uint32_t owner_lease_guard_epoch_ = 0;
-    uint32_t owner_lease_sequence_ = 0;
-    bool presence_managed_voice_session_ = false;
     // Connected to the channel, but not in a conversation. It intentionally
     // covers Connecting/Reconnecting/Connected; actual health is tracked by
     // channel_recovery_ / LiveKitSession::IsConnected().
@@ -425,17 +429,6 @@ private:
     std::function<void(AgentPhase)> on_agent_phase_;
     std::function<void(PresenceWakePhase)> on_presence_wake_phase_;
     std::function<void(const std::string&)> on_ptt_turn_status_;
-#if CONFIG_EIDOLON_RADAR_PRESENCE_BROADCAST
-    bool radar_presence_known_ = false;
-    bool radar_present_ = false;
-    bool radar_presence_dirty_ = false;
-    uint32_t radar_presence_epoch_ = 0;
-    uint32_t radar_presence_sequence_ = 0;
-    std::string radar_presence_flow_id_;
-    AmbientPresenceObservation radar_pending_observation_ =
-        AmbientPresenceObservation::Snapshot;
-    AmbientPresenceActivationGate radar_activation_gate_;
-#endif
 #if CONFIG_EIDOLON_AMBIENT_PRESENCE_OWNER_AUTH
     AmbientPresenceRegistry ambient_presence_registry_;
 #endif

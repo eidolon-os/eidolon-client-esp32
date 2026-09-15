@@ -126,6 +126,14 @@ esp_err_t HubConfigStore::SaveHubConfig(const Esp32HubConfig& config) {
     cJSON_AddStringToObject(root, "room_name", config.session.room_name.c_str());
     cJSON_AddNumberToObject(root, "expires_at_ms",
                            static_cast<double>(config.expires_at_ms));
+    if (config.output_policy.known) {
+        auto* policy=cJSON_AddObjectToObject(root,"output_policy");
+        cJSON_AddNumberToObject(policy,"schema_version",1);
+        cJSON_AddNumberToObject(policy,"revision",config.output_policy.revision);
+        auto* allowed=cJSON_AddObjectToObject(policy,"allowed");
+        for (size_t i=0;i<presentation::kOutputNames.size();++i)
+            cJSON_AddBoolToObject(allowed,presentation::kOutputNames[i].data(),config.output_policy.allowed&(1u<<i));
+    }
     cJSON_AddNumberToObject(root, "sample_rate", config.sample_rate);
     cJSON_AddNumberToObject(root, "channels", config.channels);
 
@@ -177,6 +185,9 @@ bool HubConfigStore::Load(Esp32HubConfig& config) const {
     // A missing/unknown status parses to the most conservative state
     // (PendingApproval) — never silently grant voice on an absent field.
     config.status = ParseHubConfigStatus(JsonStringField(root, "status"));
+    if (!ParseOutputPolicy(cJSON_GetObjectItemCaseSensitive(root,"output_policy"),config.output_policy)) {
+        cJSON_Delete(root);return false;
+    }
     config.session.server_url = JsonStringField(root, "server_url");
     if (!ReadRoomServerUrls(root, config.session)) {
         cJSON_Delete(root);

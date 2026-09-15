@@ -128,7 +128,7 @@ void LvglDisplay::UpdateStatusBar(bool update_all) {
         bool show_mute = !app.IsMicrophoneEnabled();
         if (show_mute != muted_) {
             muted_ = show_mute;
-            lv_label_set_text(mute_label_, muted_ ? FONT_AWESOME_VOLUME_XMARK : "");
+            lv_label_set_text(mute_label_, muted_ ? FONT_AWESOME_MICROPHONE_SLASH : "");
         }
 #else
         // Update icon if mute state changes

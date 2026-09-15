@@ -12,8 +12,7 @@
 #                                      requires (default BOARD_IDF_VERSION)
 #   EIDOLON_IDF_EXPORT                 Full path to ESP-IDF export.sh
 #   EIDOLON_IDF_PATH                   ESP-IDF root directory
-#   EIDOLON_OWNER_PRESENCE_VOICE_WAKE Enable owner-confirmed voice join: y/n (default y)
-#   EIDOLON_BOX3_RADAR_THRESHOLD_DELTA Radar threshold: 0-1023, larger is nearer (default 450)
+#   EIDOLON_INTERACTION_MODE          full_duplex (default), half_duplex, ptt
 #   EIDOLON_RUNTIME_DIAGNOSTICS       Strong stack guards/watchpoint: y/n (default n)
 #   IDF_PATH                           ESP-IDF root directory
 
@@ -31,20 +30,18 @@ BUILD_DIR="${PROJECT_ROOT}/${PUBLIC_BUILD_DIR}"
 SDKCONFIG_FILE="${BUILD_DIR}/sdkconfig.esp-box-3"
 SDKCONFIG_OVERLAY="${BUILD_DIR}/sdkconfig.overlay.esp-box-3"
 PORT="${EIDOLON_PORT:-}"
-OWNER_PRESENCE_VOICE_WAKE="${EIDOLON_OWNER_PRESENCE_VOICE_WAKE:-y}"
-RADAR_THRESHOLD_DELTA="${EIDOLON_BOX3_RADAR_THRESHOLD_DELTA:-450}"
 RUNTIME_DIAGNOSTICS="${EIDOLON_RUNTIME_DIAGNOSTICS:-n}"
+# Input/turn-taking is independent of the face renderer and Hub output policy.
+INTERACTION_MODE="${EIDOLON_INTERACTION_MODE:-full_duplex}"
+PTT_ENABLED=n
+HALF_DUPLEX_ENABLED=n
+case "${INTERACTION_MODE}" in
+  full_duplex) ;;
+  half_duplex) HALF_DUPLEX_ENABLED=y ;;
+  ptt) PTT_ENABLED=y ;;
+  *) echo "error: EIDOLON_INTERACTION_MODE must be full_duplex, half_duplex or ptt" >&2; exit 2 ;;
+esac
 
-if [[ "${OWNER_PRESENCE_VOICE_WAKE}" != "y" &&
-      "${OWNER_PRESENCE_VOICE_WAKE}" != "n" ]]; then
-  echo "error: EIDOLON_OWNER_PRESENCE_VOICE_WAKE must be y or n" >&2
-  exit 2
-fi
-if [[ ! "${RADAR_THRESHOLD_DELTA}" =~ ^[0-9]+$ ]] ||
-   ((RADAR_THRESHOLD_DELTA < 0 || RADAR_THRESHOLD_DELTA > 1023)); then
-  echo "error: EIDOLON_BOX3_RADAR_THRESHOLD_DELTA must be an integer from 0 to 1023" >&2
-  exit 2
-fi
 if [[ "${RUNTIME_DIAGNOSTICS}" != "y" &&
       "${RUNTIME_DIAGNOSTICS}" != "n" ]]; then
   echo "error: EIDOLON_RUNTIME_DIAGNOSTICS must be y or n" >&2
@@ -130,17 +127,14 @@ CONFIG_EIDOLON_DEVICE_AEC_AFE_MODE_LOW_COST=y
 CONFIG_EIDOLON_HUB_MODE=y
 CONFIG_EIDOLON_AUTO_JOIN_ON_ACTIVATION=n
 CONFIG_EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN=y
-CONFIG_EIDOLON_RADAR_PRESENCE_BROADCAST=y
-CONFIG_EIDOLON_BOX3_RADAR_THRESHOLD_DELTA=${RADAR_THRESHOLD_DELTA}
-CONFIG_EIDOLON_OWNER_PRESENCE_VOICE_WAKE=${OWNER_PRESENCE_VOICE_WAKE}
-# CONFIG_EIDOLON_INTERACTION_MODE_PTT is not set
-# CONFIG_EIDOLON_INTERACTION_MODE_HALF_DUPLEX is not set
+CONFIG_EIDOLON_INTERACTION_MODE_PTT=${PTT_ENABLED}
+CONFIG_EIDOLON_INTERACTION_MODE_HALF_DUPLEX=${HALF_DUPLEX_ENABLED}
 CONFIG_EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS=75000
-CONFIG_USE_EMOTE_MESSAGE_STYLE=y
-# CONFIG_USE_DEFAULT_MESSAGE_STYLE is not set
+CONFIG_USE_EMOTE_MESSAGE_STYLE=n
+CONFIG_USE_DEFAULT_MESSAGE_STYLE=y
 # CONFIG_USE_WECHAT_MESSAGE_STYLE is not set
-# CONFIG_FLASH_DEFAULT_ASSETS is not set
-CONFIG_FLASH_EXPRESSION_ASSETS=y
+CONFIG_FLASH_DEFAULT_ASSETS=y
+CONFIG_FLASH_EXPRESSION_ASSETS=n
 # CONFIG_EIDOLON_WAKE_WORD_ENABLE is not set
 CONFIG_WAKE_WORD_DISABLED=y
 # CONFIG_USE_ESP_WAKE_WORD is not set
@@ -208,22 +202,20 @@ ensure_box3_sdkconfig() {
   set_sdkconfig_bool NEWLIB_NANO_FORMAT n
   set_sdkconfig_bool EIDOLON_AUTO_JOIN_ON_ACTIVATION n
   set_sdkconfig_bool EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN y
-  set_sdkconfig_bool EIDOLON_RADAR_PRESENCE_BROADCAST y
-  set_sdkconfig_value EIDOLON_BOX3_RADAR_THRESHOLD_DELTA "${RADAR_THRESHOLD_DELTA}"
-  set_sdkconfig_bool EIDOLON_OWNER_PRESENCE_VOICE_WAKE "${OWNER_PRESENCE_VOICE_WAKE}"
-  set_sdkconfig_bool EIDOLON_INTERACTION_MODE_PTT n
+  set_sdkconfig_bool EIDOLON_INTERACTION_MODE_PTT "${PTT_ENABLED}"
   set_sdkconfig_bool USE_DEVICE_AEC y
-  set_sdkconfig_bool EIDOLON_INTERACTION_MODE_HALF_DUPLEX n
+  set_sdkconfig_bool EIDOLON_INTERACTION_MODE_HALF_DUPLEX "${HALF_DUPLEX_ENABLED}"
 
-  set_sdkconfig_bool USE_DEFAULT_MESSAGE_STYLE n
+  set_sdkconfig_bool USE_DEFAULT_MESSAGE_STYLE y
   set_sdkconfig_bool USE_WECHAT_MESSAGE_STYLE n
-  set_sdkconfig_bool USE_EMOTE_MESSAGE_STYLE y
+  set_sdkconfig_bool USE_EMOTE_MESSAGE_STYLE n
   set_sdkconfig_bool FLASH_NONE_ASSETS n
-  set_sdkconfig_bool FLASH_DEFAULT_ASSETS n
+  set_sdkconfig_bool FLASH_DEFAULT_ASSETS y
   set_sdkconfig_bool FLASH_CUSTOM_ASSETS n
-  set_sdkconfig_bool FLASH_EXPRESSION_ASSETS y
+  set_sdkconfig_bool FLASH_EXPRESSION_ASSETS n
 
   set_sdkconfig_bool EIDOLON_WAKE_WORD_ENABLE n
+  set_sdkconfig_bool EIDOLON_COMPANION_BENCHMARK "${EIDOLON_COMPANION_BENCHMARK:-n}"
   set_sdkconfig_bool WAKE_WORD_DISABLED y
   set_sdkconfig_bool USE_ESP_WAKE_WORD n
   set_sdkconfig_bool USE_AFE_WAKE_WORD n
@@ -307,10 +299,8 @@ Environment:
                                The board pins BOARD_IDF_VERSION and the build is
                                refused if the exported toolchain is anything else.
   EIDOLON_LIVEKIT_SDK=0.3.7   Pin the LiveKit SDK version (forces clean re-resolve)
-  EIDOLON_OWNER_PRESENCE_VOICE_WAKE=y
-                               Compile owner-confirmed automatic voice join (default y)
-  EIDOLON_BOX3_RADAR_THRESHOLD_DELTA=450
-                               Unitless AT581X threshold; larger is nearer
+  EIDOLON_INTERACTION_MODE=full_duplex
+                               Independent input mode: full_duplex, half_duplex, ptt
   EIDOLON_RUNTIME_DIAGNOSTICS=n
                                Enable reproducible strong stack diagnostics
 EOF

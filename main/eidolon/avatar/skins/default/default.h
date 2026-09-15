@@ -18,12 +18,14 @@ namespace stackchan::avatar {
  */
 class DefaultAvatar : public Avatar {
 public:
+    // Destroy LVGL children before their panel; base members otherwise die last.
+    ~DefaultAvatar() override { clearDecorators(); _key_elements = {}; }
     lv_color_t primaryColor   = lv_color_white();
     lv_color_t secondaryColor = lv_color_black();
 
     // Default font uses LV_FONT_DEFAULT (montserrat_16 is not enabled in the eidolon
     // LVGL config). The board passes the CJK-capable theme font at the call site.
-    void init(lv_obj_t* parent, const lv_font_t* font = LV_FONT_DEFAULT);
+    void init(lv_obj_t* parent, const lv_font_t* font = LV_FONT_DEFAULT, bool speechBubble = true);
     uitk::lvgl_cpp::Container* getPanel() const;
 
 private:

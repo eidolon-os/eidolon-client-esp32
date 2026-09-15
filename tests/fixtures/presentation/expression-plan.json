@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "presentation_id": "presentation-1",
+  "response_id": "response-1",
+  "profile": "eidolon.face.v1",
+  "catalog_revision": "face-core-1",
+  "max_duration_ms": 1500,
+  "steps": [
+    {
+      "at_ms": 0,
+      "gesture": "affirm",
+      "variant": "subtle",
+      "intensity": 0.3,
+      "duration_ms": 1200
+    }
+  ],
+  "on_finish": "resume_current_base"
+}

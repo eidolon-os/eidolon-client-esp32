@@ -4,6 +4,8 @@
 #include <esp_log.h>
 
 #include <ctime>
+#include <cmath>
+#include <limits>
 
 #define TAG "ControlProtocol"
 
@@ -45,7 +47,10 @@ std::string FirstString(const cJSON* root, const char* a, const char* b = nullpt
 
 bool IsExpired(const cJSON* ts_item, const cJSON* ttl_item)
 {
-    if (!cJSON_IsNumber(ts_item) || !cJSON_IsNumber(ttl_item)) {
+    if (!cJSON_IsNumber(ts_item) || !cJSON_IsNumber(ttl_item) ||
+        !std::isfinite(ts_item->valuedouble) || !std::isfinite(ttl_item->valuedouble) ||
+        ts_item->valuedouble<0 || ts_item->valuedouble>9007199254740991.0 ||
+        ttl_item->valuedouble<0 || ttl_item->valuedouble>9007199254740991.0) {
         return false;
     }
     const auto ts_ms = static_cast<long long>(ts_item->valuedouble);
@@ -83,15 +88,26 @@ ControlCommand ParseControlCommand(const std::string& json)
 
     const cJSON* version = cJSON_GetObjectItem(root, "v");
     const std::string kind = JsonString(cJSON_GetObjectItem(root, "kind"));
-    if (cJSON_IsNumber(version) && version->valueint == kControlProtocolVersion && kind == "cmd") {
+    if (cJSON_IsNumber(version) && version->valuedouble == kControlProtocolVersion && kind == "cmd") {
         command.is_v1 = true;
         command.id = FirstString(root, "id", "command_id");
         command.op = FirstString(root, "op", "type", "command");
         const cJSON* capability_version = cJSON_GetObjectItem(root, "capability_version");
-        if (cJSON_IsNumber(capability_version) && capability_version->valueint > 0) {
+        if (cJSON_IsNumber(capability_version) && capability_version->valuedouble > 0 &&
+            capability_version->valuedouble <= 65535 &&
+            std::floor(capability_version->valuedouble) == capability_version->valuedouble) {
             command.capability_version = capability_version->valueint;
         }
         command.payload = PrintJson(cJSON_GetObjectItem(root, "payload"));
+        const auto* ts=cJSON_GetObjectItemCaseSensitive(root,"ts");
+        const auto* ttl=cJSON_GetObjectItemCaseSensitive(root,"ttl_ms");
+        const double now_ms=static_cast<double>(std::time(nullptr))*1000;
+        command.bounded_deadline=cJSON_IsNumber(ts) && cJSON_IsNumber(ttl) &&
+            std::isfinite(ts->valuedouble) && std::isfinite(ttl->valuedouble) &&
+            std::floor(ts->valuedouble)==ts->valuedouble && std::floor(ttl->valuedouble)==ttl->valuedouble &&
+            now_ms>=1700000000000.0 && ts->valuedouble>=1700000000000.0 &&
+            ts->valuedouble<=now_ms+5000 && ttl->valuedouble>0 && ttl->valuedouble<=15000;
+        if (command.bounded_deadline) command.issued_ms=static_cast<uint64_t>(ts->valuedouble);
         command.expired = IsExpired(cJSON_GetObjectItem(root, "ts"), cJSON_GetObjectItem(root, "ttl_ms"));
     } else {
         const cJSON* payload = cJSON_GetObjectItem(root, "payload");

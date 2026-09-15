@@ -168,13 +168,6 @@ void Application::RequestVoiceLeave()
     }
 }
 
-void Application::OnAmbientPresenceChanged(bool present)
-{
-    if (voice_transport_) {
-        voice_transport_->OnAmbientPresenceChanged(present);
-    }
-}
-
 void Application::ToggleVoiceSession()
 {
     Schedule([this]() {

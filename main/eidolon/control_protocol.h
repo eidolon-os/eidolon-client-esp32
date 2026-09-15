@@ -2,6 +2,7 @@
 #define EIDOLON_CONTROL_PROTOCOL_H_
 
 #include <string>
+#include <cstdint>
 
 #include "eidolon_topics.h"
 
@@ -13,6 +14,8 @@ struct ControlCommand {
     bool valid = false;
     bool expired = false;
     bool is_v1 = false;
+    bool bounded_deadline = false;
+    uint64_t issued_ms = 0;
     int capability_version = 0;
     std::string id;
     std::string op;
