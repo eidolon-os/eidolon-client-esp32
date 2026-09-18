@@ -340,13 +340,26 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
     completion.generation = action.generation;
     completion.candidate_id = action.candidate_id;
     switch (action.type) {
-    case CommissioningActionType::EnsureIdentity:
-        completion.type = CommissioningTransactionAllowsNewSetup() &&
-                              DeviceIdentity::GetInstance().EnsureKeypair() == ESP_OK
-                              ? CommissioningEventType::IdentityReady
-                              : CommissioningEventType::IdentityFailed;
+    case CommissioningActionType::EnsureIdentity: {
+        // Two independent reasons a setup window cannot open, collapsed into
+        // one bool and then into one unexplained return to Idle. From outside
+        // that is a button that does nothing: the actor announces
+        // preparing-identity, retires ten milliseconds later, and never says
+        // which of the two stopped it.
+        const bool transaction_allows = CommissioningTransactionAllowsNewSetup();
+        const bool ready =
+            transaction_allows && DeviceIdentity::GetInstance().EnsureKeypair() == ESP_OK;
+        if (!ready) {
+            ESP_LOGE(TAG, "cannot prepare an identity: %s",
+                     transaction_allows
+                         ? "no usable operational key"
+                         : "an unfinished commissioning transaction still owns this device");
+        }
+        completion.type = ready ? CommissioningEventType::IdentityReady
+                                : CommissioningEventType::IdentityFailed;
         Apply(state, completion);
         break;
+    }
     case CommissioningActionType::QuiesceOperationalRuntime: {
         CommissioningRuntime::OperationalRuntimeQuiescer quiescer;
         {

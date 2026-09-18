@@ -160,7 +160,13 @@ esp_err_t DeviceIdentity::EnsureKeypair() {
 
 esp_err_t DeviceIdentity::LoadOrCreateKey() {
     const auto loaded = EspIdfCommissioningCredentialStore::LoadPrivateKey(private_key_pem_);
-    if (loaded == CommissioningIdentityLoad::Unavailable) return ESP_FAIL;
+    if (loaded == CommissioningIdentityLoad::Unavailable) {
+        // The store has already said in what way it is incoherent. This adds
+        // that the refusal reached the identity, because everything above
+        // reports a bool and then a state name with no reason attached.
+        ESP_LOGE(TAG, "no usable operational key; an identity cannot be prepared");
+        return ESP_FAIL;
+    }
     if (loaded == CommissioningIdentityLoad::NotFound) return CreateKeypair();
     return LoadPublicKeyFromPrivateKey();
 }

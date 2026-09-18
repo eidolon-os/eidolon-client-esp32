@@ -6,11 +6,14 @@
 #include "mbedtls_sha256_compat.h"
 
 #include <cJSON.h>
+#include <esp_log.h>
 #include <nvs.h>
 #include <array>
 #include <cstdlib>
 #include <cerrno>
 #include <mutex>
+
+#define TAG "CommissioningCredentialStore"
 
 namespace eidolon {
 namespace {
@@ -170,16 +173,39 @@ CommissioningIdentityLoad EspIdfCommissioningCredentialStore::LoadPrivateKey(std
     const auto loaded = ReadIdentity(kActive, active);
     if (loaded == Load::Loaded) {
         std::string key_id, instance;
-        if (!active.ready || !DeviceIdentity::DescribeKey(active.pem, key_id, instance) ||
-            key_id != active.credential.operational_key_id) return Load::Unavailable;
+        const bool describable = DeviceIdentity::DescribeKey(active.pem, key_id, instance);
+        if (!active.ready || !describable ||
+            key_id != active.credential.operational_key_id) {
+            // Three ways for a stored identity to be incoherent, and they all
+            // used to leave by the same unlabelled door. Which one it is
+            // decides whether someone is looking at an interrupted rotation,
+            // an unreadable key, or a key that is not the one this credential
+            // was issued for.
+            ESP_LOGE(TAG,
+                     "active identity is incoherent: ready=%d describable=%d key_id_matches=%d",
+                     active.ready ? 1 : 0, describable ? 1 : 0,
+                     (describable && key_id == active.credential.operational_key_id) ? 1 : 0);
+            return Load::Unavailable;
+        }
         pem = active.pem;
         return loaded;
     }
-    if (loaded == Load::Unavailable) return loaded;
+    if (loaded == Load::Unavailable) {
+        ESP_LOGE(TAG, "the active identity record could not be read");
+        return loaded;
+    }
     const auto legacy = ReadString("p256_priv", pem);
     if (legacy == Load::NotFound) {
         std::string base;
-        if (ReadString("base_id", base) != Load::NotFound) return Load::Unavailable;
+        if (ReadString("base_id", base) != Load::NotFound) {
+            // The half identity the design names (R23, §4.1.1 E9): a base id
+            // the Owner Domain minted, with no private key left to speak for
+            // it. Refusing is right. Refusing in silence is what left a person
+            // pressing a button that answered nothing.
+            ESP_LOGE(TAG,
+                     "half identity: a base id is present and no operational private key remains");
+            return Load::Unavailable;
+        }
     }
     return legacy;
 }
