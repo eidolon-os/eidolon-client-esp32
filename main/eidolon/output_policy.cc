@@ -1,4 +1,5 @@
 #include "output_policy.h"
+#include "device_capabilities.h"
 #include <cJSON.h>
 #include "eidolon/expression/generated/presentation_catalog.h"
 #include <cmath>
@@ -88,6 +89,7 @@ bool DeviceOutputGate::Start(const SessionOutputPlan& plan,const std::string& ex
     std::lock_guard<std::mutex> lock(mutex_);
     if (!policy_.known || plan.session_id!=expected_session || plan.policy_revision!=policy_.revision ||
         !(plan.selected&kResponseOutputs) || (plan.selected&~policy_.allowed) ||
+        (plan.selected&~supported_outputs_) ||
         plan.face_profile!=bool(plan.selected&OutputBit(presentation::Output::Expression))) {
         active_=false;selected_=0;return false;
     }
@@ -99,13 +101,13 @@ void DeviceOutputGate::Close() {
 bool DeviceOutputGate::Allows(presentation::Output output) const {
     std::lock_guard<std::mutex> lock(mutex_);
     const auto mask=policy_.known ? (active_ ? selected_ : 0u) : (legacy_ ? kLegacyOutputs : 0u);
-    return mask&OutputBit(output);
+    return mask & supported_outputs_ & OutputBit(output);
 }
 DeviceOutputGate& CurrentOutputGate() {
 #if CONFIG_EIDOLON_COMPANION_FACE
-    static DeviceOutputGate gate(false);
+    static DeviceOutputGate gate(false, CompiledDeviceCapabilities().OutputMask());
 #else
-    static DeviceOutputGate gate(true);
+    static DeviceOutputGate gate(true, CompiledDeviceCapabilities().OutputMask());
 #endif
     return gate;
 }

@@ -22,7 +22,7 @@ add_executable(companion_ui_tests companion_ui_test.cc ${UI_CORE} ${SKIN}
     "${ROOT}/managed_components/78__xiaozhi-fonts/src/font_puhui_basic_20_4.c")
 target_include_directories(companion_ui_tests PRIVATE stubs "${ROOT}/main" "${UI}" "${UI}/lvgl"
     "${ROOT}/managed_components/espressif__cjson/cJSON")
-target_compile_definitions(companion_ui_tests PRIVATE CONFIG_EIDOLON_COMPANION_FACE=1)
+target_compile_definitions(companion_ui_tests PRIVATE CONFIG_EIDOLON_COMPANION_FACE=1 CONFIG_EIDOLON_CAP_EXPRESSION=1 CONFIG_EIDOLON_CAP_DIALOGUE_TEXT=1)
 target_link_libraries(companion_ui_tests PRIVATE lvgl)
 # Keep assertions active even when optimizing the renderer for fast screenshots.
 target_compile_options(companion_ui_tests PRIVATE -UNDEBUG)

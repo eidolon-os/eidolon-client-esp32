@@ -1,6 +1,7 @@
 #include "eidolon/expression/generated/presentation_catalog.h"
 #include "room_config_json.h"
 #include "hub_onboarding_protocol.h"
+#include "device_capabilities.h"
 
 #include "eidolon_device_profile.h"
 
@@ -336,6 +337,13 @@ bool ParseOwnerDomainDescriptor(
 
 std::string BuildDeviceManifestJson(const std::string& board_name, bool has_camera)
 {
+    auto capabilities = CompiledDeviceCapabilities();
+    capabilities.camera = has_camera;
+    return BuildDeviceManifestJson(board_name, capabilities);
+}
+
+std::string BuildDeviceManifestJson(const std::string& board_name, const DeviceCapabilities& capabilities)
+{
     cJSON* title = cJSON_CreateString(board_name.c_str());
     char* encoded_title = title ? cJSON_PrintUnformatted(title) : nullptr;
     std::string escaped = encoded_title ? encoded_title : "\"device\"";
@@ -349,9 +357,15 @@ std::string BuildDeviceManifestJson(const std::string& board_name, bool has_came
     // board does not have is not cosmetic: a camera that claims a microphone is
     // granted one and is assigned a voice agent that waits forever for audio.
     // Everything below is a compile-time fact about this build, never a guess.
-    std::string media = "{\"codecs\":[\"opus\"],\"direction\":\"bidirectional\",\"kind\":\"audio\"}";
-    if (has_camera) {
-        media += ",{\"codecs\":[\"h264\"],\"direction\":\"publish\",\"kind\":\"video\"}";
+    std::string media;
+    if (capabilities.microphone || capabilities.speaker) {
+        const char* direction = capabilities.microphone ?
+            (capabilities.speaker ? "bidirectional" : "publish") : "subscribe";
+        media = std::string("{\"codecs\":[\"opus\"],\"direction\":\"") + direction + "\",\"kind\":\"audio\"}";
+    }
+    if (capabilities.camera) {
+        if (!media.empty()) media += ",";
+        media += "{\"codecs\":[\"h264\"],\"direction\":\"publish\",\"kind\":\"video\"}";
     }
 
     // Turn taking rides in a property whose schema pins one value: the manifest
@@ -365,19 +379,15 @@ std::string BuildDeviceManifestJson(const std::string& board_name, bool has_came
         std::string("{\"name\":\"interaction_mode\",\"observable\":false,\"schema\":{\"const\":\"") +
         interaction_mode + "\",\"type\":\"string\"},\"writable\":false}";
 
-#if CONFIG_EIDOLON_COMPANION_FACE
-    properties += ",{\"name\":\"expression.profile\",\"observable\":false,\"schema\":{\"const\":\"eidolon.face.v1\",\"type\":\"string\"},\"writable\":false}";
-    properties += ",{\"name\":\"output.dialogue_text\",\"observable\":false,\"schema\":{\"const\":true,\"type\":\"boolean\"},\"writable\":false}";
-#endif
+    if (capabilities.expression) properties += ",{\"name\":\"expression.profile\",\"observable\":false,\"schema\":{\"const\":\"eidolon.face.v1\",\"type\":\"string\"},\"writable\":false}";
+    if (capabilities.dialogue_text) properties += ",{\"name\":\"output.dialogue_text\",\"observable\":false,\"schema\":{\"const\":true,\"type\":\"boolean\"},\"writable\":false}";
+    if (capabilities.speaker && capabilities.audio_cue)
+        properties += ",{\"name\":\"output.audio_cue\",\"observable\":false,\"schema\":{\"const\":true,\"type\":\"boolean\"},\"writable\":false}";
 
     // Keep a compact deterministic representation for the manifest wire
     // contract: keys stay sorted so the Host's manifest revision is stable
     // across boots that declare the same thing.
-#if CONFIG_EIDOLON_COMPANION_FACE
-    const std::string actions=expression::kManifestActions;
-#else
-    const std::string actions="[]";
-#endif
+    const std::string actions = capabilities.expression ? expression::kManifestActions : "[]";
     return "{\"actions\":" + actions + ",\"events\":[],\"media\":[" + media +
            "],\"properties\":[" + properties +
            "],\"schema_version\":1,\"title\":" + escaped + "}";

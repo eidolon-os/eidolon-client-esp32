@@ -34,7 +34,8 @@ bool ParseSessionOutputPlan(const cJSON* json,SessionOutputPlan& output);
 // Public transport callbacks authenticate the source before applying a plan.
 class DeviceOutputGate {
 public:
-    explicit DeviceOutputGate(bool legacy_profile):legacy_(legacy_profile) {}
+    explicit DeviceOutputGate(bool legacy_profile, uint32_t supported_outputs = UINT32_MAX)
+        : legacy_(legacy_profile), supported_outputs_(supported_outputs) {}
     bool Bind(const DeviceOutputPolicy& policy);
     bool Start(const SessionOutputPlan& plan,const std::string& expected_session);
     void Close();
@@ -44,6 +45,7 @@ private:
     bool legacy_=false, active_=false;
     DeviceOutputPolicy policy_;
     uint32_t selected_=0;
+    const uint32_t supported_outputs_;
 };
 DeviceOutputGate& CurrentOutputGate();
 }

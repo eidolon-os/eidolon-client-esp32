@@ -14,6 +14,8 @@ bool ParseOwnerDomainDescriptor(
     device_foundation::v1::OwnerDomainDescriptor& out,
     std::string& canonical_signing_bytes);
 
+struct DeviceCapabilities;
+std::string BuildDeviceManifestJson(const std::string& board_name, const DeviceCapabilities& capabilities);
 std::string BuildDeviceManifestJson(const std::string& board_name, bool has_camera);
 
 bool ParseDeviceConfigurationResponse(

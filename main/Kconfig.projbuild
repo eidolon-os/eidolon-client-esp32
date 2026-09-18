@@ -1159,6 +1159,35 @@ menu "Eidolon Hub"
         bool
         default y if EIDOLON_HUB_MODE && (BOARD_TYPE_ESP_BOX_3 || BOARD_TYPE_M5STACK_STACKCHAN || BOARD_TYPE_M5STACK_CORE_S3)
 
+    config EIDOLON_CAP_MICROPHONE
+        bool "Device has a microphone execution path"
+        default y
+
+    config EIDOLON_CAP_SPEAKER
+        bool "Device has a speech playback execution path"
+        default y
+
+    config EIDOLON_CAP_DIALOGUE_TEXT
+        bool "Device can render dialogue text"
+        default y if BOARD_TYPE_ESP_BOX_3 || BOARD_TYPE_M5STACK_STACKCHAN || BOARD_TYPE_M5STACK_CORE_S3 || BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_2_06
+        default n
+
+    config EIDOLON_CAP_EXPRESSION
+        bool "Device has the face expression executor"
+        depends on EIDOLON_COMPANION_FACE
+        default y
+        help
+            Declares the installed executor, not permission to use it.
+            A different executor can be integrated without changing text support.
+
+    config EIDOLON_CAP_AUDIO_CUE
+        bool "Device has an independent audio cue execution path"
+        depends on EIDOLON_CAP_SPEAKER
+        default n
+        help
+            Enable only after the cue path enforces AudioCue independently from
+            Speech. The current provider ceiling does not support cue selection.
+
     config EIDOLON_UI_TOUCH_CONTROLS
         bool "Use registered touch input for on-screen controls"
         depends on EIDOLON_HUB_MODE

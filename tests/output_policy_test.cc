@@ -28,6 +28,19 @@ int main() {
     assert(gate.Allows(Output::Speech));
     gate.Close();
     assert(!gate.Allows(Output::Speech));
+    const auto dialogue=OutputBit(Output::DialogueText);
+    DeviceOutputGate text_only(false,dialogue);
+    assert(text_only.Bind({true,1,dialogue|speech|expression}));
+    assert(text_only.Start({"text",1,dialogue,false},"text"));
+    assert(text_only.Allows(Output::DialogueText));
+    // A valid server grant cannot manufacture a missing local executor.
+    assert(!text_only.Start({"text",1,speech,false},"text"));
+    assert(!text_only.Allows(Output::DialogueText));
+    assert(!text_only.Start({"text",1,expression,true},"text"));
+    DeviceOutputGate legacy_text(true,dialogue);
+    assert(legacy_text.Allows(Output::DialogueText));
+    assert(!legacy_text.Allows(Output::Speech));
+    assert(!legacy_text.Allows(Output::AudioCue));
     DeviceOutputGate legacy(true);
     assert(legacy.Allows(Output::Speech));
     assert(!legacy.Allows(Output::Expression));
