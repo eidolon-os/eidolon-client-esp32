@@ -29,4 +29,15 @@ HTTP Date rounding and response round-trip delay are included conservatively, so
 - Mixed-output observation and five consecutive TTS errors verify independent failure handling without a global session close.
 - Agent tests cover public answer delivery before DONE/feedback, typed late failure evidence, strict silent selection and intentional suppression.
 - Native firmware tests cover cold boot without wall time, authenticated time acquisition, delayed commands/responses, malformed deadlines, monotonic reset and fresh configuration invalidation.
-- BOX-3 builds with the existing ESP-IDF 5.5.4 profile and partition layout. Hardware audibility and long-duration stability require现场 verification; local tests alone do not prove them.
+- BOX-3 builds with the existing ESP-IDF 5.5.4 profile and partition layout. Hardware verification is recorded below; long-duration stability is not established by this short acceptance run.
+
+## Deployment and hardware acceptance — 2026-09-19
+
+- Main commits: firmware `0dfd5be1`, Agent `00c0f84`, Channel `ab3dc926d1a33a05900c84d8b4e22b5677b351b4`. No push was performed.
+- Existing ops release `pi5-output-isolation-20260919a` activated successfully, with doctor and app-ready gates passing. Agent deployed as isolated cherry-pick `b07aa5a82268ed2015cbd4849408099df4796784` over the previously deployed Agent revision; unrelated concurrent main changes were excluded. Other components retained their prior deployed revisions.
+- Flash verification passed for the BOX-3 application at `0x20000`; running ELF hash prefix is `4eabaf6b7`. The previous application was backed up. NVS, ownership data, partition table and assets were not rewritten.
+- Channel regression suite: 121 passed. Agent functional/gRPC suite: 43 passed, including a repeat against the exact isolated release tree. Six native firmware suites and the BOX-3 firmware build passed.
+- At 01:20 Asia/Shanghai, live turns `c7511b932c6545a6` and `daa18e18de5c451f` both recorded public answer deltas, TTS first audio, and `agent_audio_playback_done_at`. The provider completed synthesis with 113,920 and 126,720 PCM bytes respectively.
+- Both turns received device expression receipts with `status=completed`, `sequence=3`, and elapsed times of 1,908 ms and 1,997 ms. The output snapshots independently record expression completion and speech audio readiness; the later playback completion is evidenced by its separate timeline timestamp.
+- Serial logs show both corresponding THINK → SPEAK → LISTEN cycles. The user confirmed: “听到回复，状态正常”. This verifies audible response and recovery of the device state on real hardware, alongside successful expression delivery.
+- Default subtitle synchronization remains unchanged. This acceptance run does not claim a separate visual verification of subtitle timing or automatic complete-text fallback after TTS failure.
