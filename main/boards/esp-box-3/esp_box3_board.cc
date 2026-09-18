@@ -104,15 +104,6 @@ private:
                 EnterWifiConfigMode();
             });
         });
-
-#if CONFIG_USE_DEVICE_AEC
-        boot_button_.OnDoubleClick([this]() {
-            auto& app = Application::GetInstance();
-            if (app.GetDeviceState() == kDeviceStateIdle) {
-                app.SetAecMode(app.GetAecMode() == kAecOff ? kAecOnDeviceSide : kAecOff);
-            }
-        });
-#endif
     }
 
     esp_lcd_touch_config_t CreateTouchConfig(bool tt21100) {
