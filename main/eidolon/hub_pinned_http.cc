@@ -9,6 +9,7 @@
 
 #include <esp_http_client.h>
 #include <esp_log.h>
+#include <esp_timer.h>
 #include <lwip/dns.h>
 #include <lwip/netdb.h>
 #include <lwip/inet.h>
@@ -174,6 +175,7 @@ esp_err_t HubHttpRequest(const std::string& method,
         esp_http_client_set_header(client, "Content-Type", "application/json");
     }
 
+    const int64_t request_start_ms = esp_timer_get_time() / 1000;
     err = esp_http_client_open(client, request_body.size());
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "%s %s failed to open: %s (%s)", method.c_str(), url.c_str(),
@@ -232,6 +234,7 @@ esp_err_t HubHttpRequest(const std::string& method,
     if (err == ESP_OK) {
         out.status = esp_http_client_get_status_code(client);
         out.body = std::move(body);
+        out.clock.Observe(out.hub_utc_millis, request_start_ms, esp_timer_get_time() / 1000);
     }
     esp_http_client_close(client);
     esp_http_client_cleanup(client);

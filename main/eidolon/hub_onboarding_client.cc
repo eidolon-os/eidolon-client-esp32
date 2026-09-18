@@ -426,6 +426,7 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
     }
     if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
     out = Esp32HubConfig{};
+    out.clock = response.clock;
     out.status = status;
     out.output_policy = output_policy;
     if (status == HubConfigStatus::Active) {

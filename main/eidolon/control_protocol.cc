@@ -3,7 +3,6 @@
 #include <cJSON.h>
 #include <esp_log.h>
 
-#include <ctime>
 #include <cmath>
 #include <limits>
 
@@ -45,7 +44,7 @@ std::string FirstString(const cJSON* root, const char* a, const char* b = nullpt
     return JsonString(cJSON_GetObjectItem(root, c));
 }
 
-bool IsExpired(const cJSON* ts_item, const cJSON* ttl_item)
+bool IsExpired(const cJSON* ts_item, const cJSON* ttl_item, int64_t now_ms)
 {
     if (!cJSON_IsNumber(ts_item) || !cJSON_IsNumber(ttl_item) ||
         !std::isfinite(ts_item->valuedouble) || !std::isfinite(ttl_item->valuedouble) ||
@@ -59,11 +58,7 @@ bool IsExpired(const cJSON* ts_item, const cJSON* ttl_item)
         return false;
     }
 
-    const std::time_t now_seconds = std::time(nullptr);
-    if (now_seconds < 1700000000) {
-        return false;
-    }
-    const long long now_ms = static_cast<long long>(now_seconds) * 1000;
+    if (now_ms < 1700000000000LL) return false;
     return now_ms > ts_ms + ttl_ms;
 }
 
@@ -76,7 +71,7 @@ void AddString(cJSON* root, const char* key, const std::string& value)
 
 }  // namespace
 
-ControlCommand ParseControlCommand(const std::string& json)
+ControlCommand ParseControlCommand(const std::string& json, int64_t now_utc_ms)
 {
     ControlCommand command;
     cJSON* root = cJSON_Parse(json.c_str());
@@ -101,14 +96,15 @@ ControlCommand ParseControlCommand(const std::string& json)
         command.payload = PrintJson(cJSON_GetObjectItem(root, "payload"));
         const auto* ts=cJSON_GetObjectItemCaseSensitive(root,"ts");
         const auto* ttl=cJSON_GetObjectItemCaseSensitive(root,"ttl_ms");
-        const double now_ms=static_cast<double>(std::time(nullptr))*1000;
+        const double now_ms=static_cast<double>(now_utc_ms);
+        command.clock_known = now_utc_ms >= 1700000000000LL;
         command.bounded_deadline=cJSON_IsNumber(ts) && cJSON_IsNumber(ttl) &&
             std::isfinite(ts->valuedouble) && std::isfinite(ttl->valuedouble) &&
             std::floor(ts->valuedouble)==ts->valuedouble && std::floor(ttl->valuedouble)==ttl->valuedouble &&
             now_ms>=1700000000000.0 && ts->valuedouble>=1700000000000.0 &&
             ts->valuedouble<=now_ms+5000 && ttl->valuedouble>0 && ttl->valuedouble<=15000;
         if (command.bounded_deadline) command.issued_ms=static_cast<uint64_t>(ts->valuedouble);
-        command.expired = IsExpired(cJSON_GetObjectItem(root, "ts"), cJSON_GetObjectItem(root, "ttl_ms"));
+        command.expired = IsExpired(cJSON_GetObjectItem(root, "ts"), cJSON_GetObjectItem(root, "ttl_ms"), now_utc_ms);
     } else {
         const cJSON* payload = cJSON_GetObjectItem(root, "payload");
         if (cJSON_IsObject(payload)) {
@@ -131,7 +127,8 @@ std::string BuildControlAck(const ControlCommand& command,
                             const std::string& status,
                             const std::string& code,
                             const std::string& message,
-                            const std::string& result_json)
+                            const std::string& result_json,
+                            int64_t now_utc_ms)
 {
     cJSON* root = cJSON_CreateObject();
     cJSON_AddNumberToObject(root, "v", kControlProtocolVersion);
@@ -146,7 +143,7 @@ std::string BuildControlAck(const ControlCommand& command,
     cJSON_AddStringToObject(root, "status", status.c_str());
     cJSON_AddStringToObject(root, "code", code.c_str());
     AddString(root, "message", message);
-    cJSON_AddNumberToObject(root, "ts", static_cast<double>(std::time(nullptr)) * 1000);
+    cJSON_AddNumberToObject(root, "ts", static_cast<double>(now_utc_ms));
 
     if (!result_json.empty()) {
         cJSON* result = cJSON_Parse(result_json.c_str());

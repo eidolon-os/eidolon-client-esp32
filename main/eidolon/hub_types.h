@@ -8,6 +8,7 @@
 
 #include "device_foundation_v1_generated.h"
 #include "output_policy.h"
+#include "hub_clock.h"
 
 namespace eidolon {
 
@@ -90,6 +91,8 @@ struct RoomConfig {
 };
 
 struct Esp32HubConfig {
+    // Ephemeral: only the authenticated configuration response establishes it.
+    HubClock clock;
     DeviceOutputPolicy output_policy;
     // Default to the most conservative status: a config that has not been
     // explicitly populated/parsed must never grant voice access.

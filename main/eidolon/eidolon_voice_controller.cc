@@ -69,7 +69,6 @@ constexpr int64_t kPlaybackActiveWindowUs = 1200 * 1000;
 // kAudioStateHeartbeatUs to avoid flooding lossy packets at the poll rate.
 constexpr uint64_t kAudioTickIntervalUs = 80 * 1000;
 constexpr int64_t kAudioStateHeartbeatUs = 500 * 1000;
-constexpr time_t kValidUnixTimeFloor = 1'700'000'000;
 // A connect/reconnect attempt that never reaches a terminal LiveKit state within
 // this long is treated as hung and force-recovered. Generous enough to cover a
 // slow mDNS + HTTPS + connect on a healthy-but-slow network.
@@ -215,14 +214,10 @@ bool ProviderBindingExpired(const eidolon::Esp32HubConfig& config)
     if (config.expires_at_ms <= 0) {
         return true;
     }
-    const time_t now = std::time(nullptr);
-    if (now < kValidUnixTimeFloor) {
-        // TLS/SNTP initialization owns wall-clock establishment. Until then,
-        // attempt an online refresh first but do not reject a bounded cached
-        // credential solely because the local clock still reads the epoch.
-        return false;
-    }
-    return static_cast<int64_t>(now) * 1000 >= config.expires_at_ms;
+    const int64_t now = config.clock.Now(esp_timer_get_time() / 1000);
+    // Cached NVS configuration has no boot-local time anchor. Refresh online;
+    // never treat an unknown clock as proof that a credential has expired.
+    return now > 0 && now >= config.expires_at_ms;
 }
 }  // namespace
 
@@ -1448,7 +1443,8 @@ esp_err_t EidolonVoiceController::AckCommand(const ControlCommand& command, cons
 {
     const esp_err_t err = session_.PublishData(
         kControlTopic,
-        BuildControlAck(command, OperationalDeviceInstanceId(), status, code, detail, result));
+        BuildControlAck(command, OperationalDeviceInstanceId(), status, code, detail, result,
+                        config_.clock.Now(esp_timer_get_time() / 1000)));
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "Control ACK publish failed op=%s id=%s status=%s code=%s err=%s",
                  command.op.c_str(), command.id.c_str(), status, code, esp_err_to_name(err));
@@ -1519,7 +1515,8 @@ void EidolonVoiceController::HandleExpressionCommand(const ControlCommand& comma
 void EidolonVoiceController::DoControlCommand(const std::string& payload, uint32_t generation, bool agent)
 {
     if (generation != session_generation_) return;
-    ControlCommand command = ParseControlCommand(payload);
+    ControlCommand command = ParseControlCommand(
+        payload, config_.clock.Now(esp_timer_get_time() / 1000));
     if (!command.valid) {
         ESP_LOGW(TAG, "Ignoring malformed control command");
         return;
@@ -1531,9 +1528,15 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload, uint32
     }
 #if CONFIG_EIDOLON_COMPANION_FACE
     if (command.op==expression::kPlayOp || command.op==expression::kCancelOp) {
-        if (!agent || !command.is_v1 || !command.bounded_deadline || command.capability_version!=1 ||
+        if (!agent || !command.is_v1 || command.capability_version!=1 ||
             !conversation_confirmed_ || !CurrentOutputGate().Allows(presentation::Output::Expression)) {
             AckCommand(command,"rejected","OUTPUT_NOT_AUTHORIZED");return;
+        }
+        if (!command.clock_known) {
+            AckCommand(command,"rejected","COMMAND_CLOCK_UNAVAILABLE");return;
+        }
+        if (!command.bounded_deadline) {
+            AckCommand(command,"rejected","INVALID_COMMAND_DEADLINE");return;
         }
         HandleExpressionCommand(command);return;
     }

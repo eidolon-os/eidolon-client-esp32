@@ -78,8 +78,7 @@ std::string RandomNonce() {
 // window between learning it and using it.
 class OperationalClock final : public DeviceEraseClockPort {
 public:
-    explicit OperationalClock(int64_t hub_utc_millis)
-        : hub_utc_millis_(hub_utc_millis) {}
+    explicit OperationalClock(const HubClock& clock) : clock_(clock) {}
 
     Rfc3339DeadlineState DeadlineState(
         const std::string& deadline) const override {
@@ -87,7 +86,7 @@ public:
         // must not condemn one: a Hub that stated no readable time leaves this
         // Unknown, and the core turns that into "ask me again", not into a
         // deadline that has passed.
-        return EvaluateRfc3339Deadline(deadline, hub_utc_millis_,
+        return EvaluateRfc3339Deadline(deadline, clock_.Now(esp_timer_get_time() / 1000),
                                        1704067200000LL);
     }
     uint64_t MonotonicTime() const override {
@@ -95,7 +94,7 @@ public:
     }
 
 private:
-    int64_t hub_utc_millis_ = 0;
+    HubClock clock_;
 };
 
 class Sha256Fingerprint final : public DeviceDeliveryFingerprintPort {
@@ -182,7 +181,7 @@ esp_err_t DeviceControlDeliveryClient::PollAndExecute(
     EspIdfDeviceLocalEraseAdapter adapter(storage);
     // The deadline this device is about to judge was written by the Hub that
     // just answered, and the answer says when that was.
-    OperationalClock clock(response.hub_utc_millis);
+    OperationalClock clock(response.clock);
     DeviceIdentityEraseAckSigner signer;
     Sha256Fingerprint fingerprint;
     DeviceLocalEraseCore erase(

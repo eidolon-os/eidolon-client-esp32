@@ -5,6 +5,7 @@
 #include <string>
 
 #include <esp_err.h>
+#include "hub_clock.h"
 
 namespace eidolon {
 
@@ -30,6 +31,7 @@ struct HubHttpResponse {
     // and so the Hub's own clock is the one reading a deadline it wrote can be
     // judged against. Zero means "no answer", never "the epoch".
     int64_t hub_utc_millis = 0;
+    HubClock clock;
 };
 
 // Perform `method` against `url`, requiring the server to present a certificate
