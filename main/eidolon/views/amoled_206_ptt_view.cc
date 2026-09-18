@@ -10,7 +10,8 @@ static constexpr const char* kTag = "Amoled206Ptt";
 
 const char* RingLabelText(const EidolonUiModel& model)
 {
-    if (model.primary_label != nullptr && model.primary_label[0] != '\0') {
+    if (model.primary_presentation==UiActionPresentation::InputHint) return model.input_hint;
+    if (model.primary_presentation==UiActionPresentation::TouchControl && model.primary_label != nullptr && model.primary_label[0] != '\0') {
         return model.primary_label;
     }
     return model.state_label;
@@ -175,7 +176,10 @@ void Amoled206PttView::Render(const EidolonUiModel& model)
 
     DisplayLockGuard lock(display_);
     last_primary_intent_ = model.primary_intent;
-    last_primary_enabled_ = model.primary_enabled;
+    last_primary_enabled_ = model.primary_enabled &&
+        model.primary_presentation==UiActionPresentation::TouchControl;
+    if (last_primary_enabled_) lv_obj_add_flag(ring_outer_,LV_OBJ_FLAG_CLICKABLE);
+    else lv_obj_remove_flag(ring_outer_,LV_OBJ_FLAG_CLICKABLE);
     if (legacy_status_label_ != nullptr) {
         lv_label_set_text(legacy_status_label_, "");
     }

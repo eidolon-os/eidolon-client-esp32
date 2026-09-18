@@ -33,12 +33,26 @@ static void Screenshot(lv_obj_t* screen,const std::string& path) {
     }
     std::fclose(file);lv_draw_buf_destroy(shot);
 }
+static lv_point_t pointer_point;
+static bool pointer_down;
+static void PointerRead(lv_indev_t*, lv_indev_data_t* data) {
+    data->point = pointer_point;
+    data->state = pointer_down ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+}
+static void ClickAt(lv_indev_t* input, int x, int y) {
+    pointer_point = {static_cast<int32_t>(x), static_cast<int32_t>(y)};
+    pointer_down = true; lv_indev_read(input);
+    pointer_down = false; lv_indev_read(input);
+}
 int main(int argc,char** argv) {
     assert(argc==2);lv_init();
     auto* disp=lv_display_create(320,240);
     static uint8_t pixels[320*20*2];
     lv_display_set_buffers(disp,pixels,nullptr,sizeof(pixels),LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_flush_cb(disp,[](lv_display_t* d,const lv_area_t*,uint8_t*){lv_display_flush_ready(d);});
+    auto* pointer = lv_indev_create();
+    lv_indev_set_type(pointer, LV_INDEV_TYPE_POINTER);
+    lv_indev_set_read_cb(pointer, PointerRead);
     Display display;
     const companion::Layout layout(320,240);
     auto& gate=CurrentOutputGate();
@@ -54,9 +68,10 @@ int main(int argc,char** argv) {
         view.Build({screen,font,&display,&font_awesome_20_4});
         lv_label_set_text(view.indicators().network,LV_SYMBOL_WIFI);
         lv_label_set_text(view.indicators().battery,LV_SYMBOL_BATTERY_FULL);
-        EidolonUiModel model;model.scene=UiScene::Conversation;model.status_text="Listening";
+        EidolonUiModel model;model.touch_navigation=true;model.scene=UiScene::Conversation;model.status_text="Listening";
         model.mode_label="FULL";model.primary_label="MIC";model.primary_enabled=true;
         model.primary_intent=UiIntent::ToggleMicrophone;model.show_end_action=true;
+        model.primary_presentation=UiActionPresentation::TouchControl;
         model.subtitle="PRIVATE DIALOGUE MUST NOT LEAK";
         assert(gate.Start({"silent",1,expression,true},"silent"));
         for(auto mode:{InteractionMode::FullDuplex,InteractionMode::HalfDuplex,InteractionMode::PushToTalk}) {
@@ -82,7 +97,22 @@ int main(int argc,char** argv) {
         const std::string prefix=std::string(argv[1])+(font==&font_noto_basic_20_4 ? "/box3" : "/stackchan");
         Screenshot(screen,prefix+"-silent.ppm");
         auto* mic=lv_obj_get_parent(Find(screen,"MIC"));
-        lv_obj_send_event(mic,LV_EVENT_CLICKED,nullptr);assert(events.back()==UiIntent::ToggleMicrophone);
+        lv_area_t mic_area; lv_obj_get_coords(mic, &mic_area);
+        const auto before_click = events.size();
+        ClickAt(pointer, (mic_area.x1+mic_area.x2)/2, (mic_area.y1+mic_area.y2)/2);
+        assert(events.size()==before_click+1 && events.back()==UiIntent::ToggleMicrophone);
+        ClickAt(pointer, 160, 100);
+        assert(events.size()==before_click+1); // touching the face is not a session toggle
+        model.primary_presentation=UiActionPresentation::InputHint;
+        model.input_hint="Press button to end";model.show_end_action=false;
+        view.Render(model);
+        assert(!lv_obj_is_visible(mic));
+        assert(!lv_obj_is_visible(lv_obj_get_parent(Find(screen,"END"))));
+        assert(lv_obj_is_visible(Find(screen,model.input_hint)));
+        ClickAt(pointer, (mic_area.x1+mic_area.x2)/2, (mic_area.y1+mic_area.y2)/2);
+        assert(events.size()==before_click+1);
+        Screenshot(screen,prefix+"-physical-input.ppm");
+        model.primary_presentation=UiActionPresentation::TouchControl;model.show_end_action=true;
         model.mode_label="PTT";model.primary_label="TALK";model.primary_intent=UiIntent::BeginTalk;
         view.Render(model);auto* talk=lv_obj_get_parent(Find(screen,"TALK"));
         const auto count=events.size();lv_obj_send_event(talk,LV_EVENT_PRESSED,nullptr);
@@ -111,6 +141,11 @@ int main(int argc,char** argv) {
         Screenshot(screen,prefix+"-recovery.ppm");
         lv_obj_scroll_to_y(panel,40,LV_ANIM_OFF);view.Render(model);
         assert(lv_obj_get_scroll_y(panel)==40); // periodic model updates must not reset reading
+        model.touch_navigation=false;view.Render(model);
+        assert(!Find(screen,"Swipe to read more"));
+        lv_obj_scroll_to_y(panel,0,LV_ANIM_OFF);
+        lv_tick_inc(3000);view.Advance(0);
+        assert(lv_obj_get_scroll_y(panel)>0); // no-touch devices can read overflowing recovery text
         // Declaring text output off clears dialogue in every interaction mode.
         gate.Close();model.scene=UiScene::Conversation;view.Render(model);assert(!Find(screen,model.subtitle));
 

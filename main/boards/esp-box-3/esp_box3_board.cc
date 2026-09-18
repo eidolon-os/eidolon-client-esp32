@@ -12,6 +12,7 @@
 #include "config.h"
 #if CONFIG_EIDOLON_HUB_MODE
 #include "eidolon/provisioning_window_policy_core.h"
+#include "eidolon/eidolon_view.h"
 #endif
 
 #include <esp_log.h>
@@ -81,6 +82,10 @@ private:
     }
 
     void InitializeButtons() {
+#if CONFIG_EIDOLON_HUB_MODE
+        eidolon::SetEidolonSetupHandler([this]() { EnterWifiConfigMode(); });
+        eidolon::SetEidolonInputAvailable(eidolon::UiInputSource::SessionButton,true);
+#endif
         boot_button_.OnClick([this]() {
             auto& app = Application::GetInstance();
 #if CONFIG_EIDOLON_HUB_MODE
@@ -93,7 +98,11 @@ private:
                 app.Schedule([this]() { EnterWifiConfigMode(); });
                 return;
             }
+#if CONFIG_EIDOLON_HUB_MODE
+            eidolon::DispatchEidolonUiInput(eidolon::UiInputSource::SessionButton,eidolon::UiInputGesture::Click);
+#else
             app.ToggleChatState();
+#endif
         });
 
         // Long-press also opens setup from an operational device.
@@ -180,6 +189,10 @@ private:
     }
 
     void InitializeTouch() {
+#if CONFIG_EIDOLON_HUB_MODE && !CONFIG_EIDOLON_UI_TOUCH_CONTROLS
+        // Display-only is an explicit product choice, not inferred from duplex.
+        return;
+#endif
         if (TryInitializeGt911Touch(ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS) != ESP_OK &&
             TryInitializeGt911Touch(ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS_BACKUP) != ESP_OK &&
             TryInitializeTt21100Touch() != ESP_OK) {
@@ -195,6 +208,9 @@ private:
             ESP_LOGE(TAG, "[ui] LVGL touch registration failed");
         } else {
             ESP_LOGI(TAG, "[ui] LVGL touch ready");
+#if CONFIG_EIDOLON_HUB_MODE
+            eidolon::SetEidolonInputAvailable(eidolon::UiInputSource::Touch,true);
+#endif
         }
     }
 

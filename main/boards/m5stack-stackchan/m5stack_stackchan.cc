@@ -19,6 +19,7 @@
 #if CONFIG_EIDOLON_HUB_MODE
 #include "display/lvgl_display/lvgl_theme.h"
 #include "eidolon/eidolon_view.h"
+#include "ft_touch_input.h"
 #include "display/companion_lcd_display.h"
 #include <lvgl.h>
 #endif
@@ -233,6 +234,11 @@ private:
     }
 
     void InitializeFt6336TouchPad() {
+#if CONFIG_EIDOLON_HUB_MODE
+        eidolon::SetEidolonSetupHandler([this]() { StartWifiConfigMode(); });
+        if (!RegisterFtTouchInput(i2c_bus_,DISPLAY_WIDTH,DISPLAY_HEIGHT))
+            ESP_LOGE(TAG,"Touch registration failed; screen controls unavailable");
+#else
         ESP_LOGI(TAG, "Init FT6336");
         ft6336_ = new Ft6336(i2c_bus_, 0x38);
         
@@ -250,6 +256,7 @@ private:
         
         ESP_ERROR_CHECK(esp_timer_create(&timer_args, &touchpad_timer_));
         ESP_ERROR_CHECK(esp_timer_start_periodic(touchpad_timer_, 20 * 1000));
+#endif
     }
 
     void InitializeSpi() {

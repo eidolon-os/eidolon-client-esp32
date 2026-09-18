@@ -1,6 +1,10 @@
 #ifndef EIDOLON_FLOWS_H_
 #define EIDOLON_FLOWS_H_
 
+#ifdef ESP_PLATFORM
+#include <sdkconfig.h>
+#endif
+
 // Device-independent conversation interaction vocabulary. Runtime, enrollment,
 // service and conversation lifecycle facts live in eidolon_runtime_status.h;
 // this dependency-light header holds the turn/mode concepts they share.

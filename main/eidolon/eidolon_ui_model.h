@@ -30,7 +30,10 @@ enum class UiIntent {
     BeginTalk,
     CommitTalk,
     ToggleMicrophone,
+    OpenSetup,
 };
+
+enum class UiActionPresentation { Hidden, TouchControl, InputHint };
 
 enum class UiSeverity {
     Normal,
@@ -59,8 +62,14 @@ struct EidolonUiModel {
     UiIntent primary_intent = UiIntent::None;
     const char* primary_label = "";
     bool primary_enabled = false;
+    // Semantic availability is distinct from a control being visible.
+    bool end_allowed = false;
     bool show_end_action = false;
+    UiActionPresentation primary_presentation = UiActionPresentation::Hidden;
+    const char* input_hint = "";
     bool show_mute_icon = false;
+    bool show_setup_action = false;
+    bool touch_navigation = false;
 };
 
 }  // namespace eidolon

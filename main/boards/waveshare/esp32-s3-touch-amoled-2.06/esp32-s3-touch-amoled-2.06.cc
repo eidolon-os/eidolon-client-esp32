@@ -289,11 +289,12 @@ private:
             EnterWifiConfigMode();
         });
         boot_button_.OnClick([]() {
-            eidolon::DispatchEidolonUiIntent(eidolon::UiIntent::OpenConversation);
+            eidolon::DispatchEidolonUiInput(eidolon::UiInputSource::AuxiliaryButton,eidolon::UiInputGesture::Click);
         });
 
+        eidolon::SetEidolonInputAvailable(eidolon::UiInputSource::AuxiliaryButton,true);
         boot_button_.OnDoubleClick([]() {
-            eidolon::DispatchEidolonUiIntent(eidolon::UiIntent::ToggleMicrophone);
+            eidolon::DispatchEidolonUiInput(eidolon::UiInputSource::AuxiliaryButton,eidolon::UiInputGesture::DoubleClick);
         });
 #endif
     }
@@ -373,8 +374,12 @@ private:
             .disp = lv_display_get_default(),
             .handle = tp,
         };
-        lvgl_port_add_touch(&touch_cfg);
-        ESP_LOGI(TAG, "Touch panel initialized successfully");
+        if (lvgl_port_add_touch(&touch_cfg)) {
+            eidolon::SetEidolonInputAvailable(eidolon::UiInputSource::Touch,true);
+            ESP_LOGI(TAG, "Touch panel initialized successfully");
+        } else {
+            ESP_LOGE(TAG, "Touch registration failed; controls unavailable");
+        }
     }
 
     // 初始化工具

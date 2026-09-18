@@ -5,6 +5,7 @@
 #include "expression/surface.h"
 
 #include "eidolon_ui_model.h"
+#include "ui_input_profile.h"
 
 namespace eidolon {
 
@@ -32,6 +33,14 @@ EidolonView* GetEidolonView();
 using UiIntentHandler = std::function<void(UiIntent)>;
 void SetEidolonUiIntentHandler(UiIntentHandler handler);
 void DispatchEidolonUiIntent(UiIntent intent);
+using UiInputHandler = std::function<void(UiInputSource, UiInputGesture)>;
+void SetEidolonUiInputHandler(UiInputHandler handler);
+void DispatchEidolonUiInput(UiInputSource source, UiInputGesture gesture);
+void SetEidolonInputAvailabilityHandler(std::function<void(UiInputSource, bool)> handler);
+void SetEidolonInputAvailable(UiInputSource source, bool available);
+UiInputProfile CurrentUiInputProfile();
+void SetEidolonSetupHandler(std::function<void()> handler);
+void OpenEidolonSetup();
 
 }  // namespace eidolon
 

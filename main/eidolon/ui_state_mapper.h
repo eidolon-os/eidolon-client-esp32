@@ -4,12 +4,17 @@
 #include "device_state.h"
 #include "eidolon_runtime_status.h"
 #include "eidolon_ui_model.h"
+#include "ui_input_profile.h"
 
 namespace eidolon {
 
 class UiStateProjector {
 public:
-    static EidolonUiModel Project(const EidolonRuntimeStatus& status);
+    static EidolonUiModel Project(const EidolonRuntimeStatus& status,
+                                  const UiInputProfile& inputs = {});
+    static UiIntent ResolveInput(const EidolonRuntimeStatus& status,
+                                 const UiInputProfile& inputs, UiInputSource source,
+                                 UiInputGesture gesture);
     static bool AllowsIntent(const EidolonRuntimeStatus& status, UiIntent intent);
 
     // The legacy DeviceState carries two unrelated things. The Application owns

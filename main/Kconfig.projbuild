@@ -1159,6 +1159,35 @@ menu "Eidolon Hub"
         bool
         default y if EIDOLON_HUB_MODE && (BOARD_TYPE_ESP_BOX_3 || BOARD_TYPE_M5STACK_STACKCHAN || BOARD_TYPE_M5STACK_CORE_S3)
 
+    config EIDOLON_UI_TOUCH_CONTROLS
+        bool "Use registered touch input for on-screen controls"
+        depends on EIDOLON_HUB_MODE
+        default y if BOARD_TYPE_M5STACK_STACKCHAN || BOARD_TYPE_M5STACK_CORE_S3 || BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_2_06
+        default n
+        help
+            Requires successful pointer registration at runtime. A screen alone
+            does not enable controls. Independent of duplex and output policy.
+
+    config EIDOLON_UI_SESSION_BUTTON
+        bool "Physical click toggles a conversation"
+        depends on EIDOLON_HUB_MODE
+        default y if BOARD_TYPE_ESP_BOX_3
+        default n
+
+    config EIDOLON_UI_TALK_BUTTON
+        bool "Physical button supplies press/release talk events"
+        depends on EIDOLON_HUB_MODE
+        default n
+        help
+            The board adapter must register the input and dispatch press,
+            release and cancellation. This does not select PTT by itself.
+
+    config EIDOLON_UI_AUXILIARY_BUTTON
+        bool "Physical click starts; double-click toggles microphone"
+        depends on EIDOLON_HUB_MODE
+        default y if BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_2_06 && !EIDOLON_INTERACTION_MODE_PTT
+        default n
+
     config EIDOLON_COMPANION_BENCHMARK
         bool "Run bounded shared-face display benchmark at boot"
         default n

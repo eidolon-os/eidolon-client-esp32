@@ -17,13 +17,34 @@ namespace eidolon {
 EidolonUiPresenter::EidolonUiPresenter(Application& app) : app_(app)
 {
     SetEidolonUiIntentHandler([this](UiIntent intent) {
-        app_.Schedule([this, intent]() { HandleIntent(intent); });
+        app_.Schedule([this, intent]() {
+            // View events are pointer operations, never a substitute for a
+            // physical binding or a successful input-driver registration.
+            if (CurrentUiInputProfile().Binding(intent,UiInputSource::Touch)) HandleIntent(intent);
+        });
+    });
+    SetEidolonUiInputHandler([this](UiInputSource source, UiInputGesture gesture) {
+        app_.Schedule([this,source,gesture]() {
+            HandleIntent(UiStateProjector::ResolveInput(status_,CurrentUiInputProfile(),source,gesture));
+        });
+    });
+    SetEidolonInputAvailabilityHandler([this](UiInputSource source, bool available) {
+        app_.Schedule([this,source,available]() {
+            // Input loss must not leave a held PTT recording open, even when
+            // another input remains available but never owned this gesture.
+            if (!available && status_.turn==TurnPhase::Recording &&
+                (source==UiInputSource::Touch || source==UiInputSource::TalkButton))
+                HandleIntent(UiIntent::CommitTalk);
+            Reapply();
+        });
     });
 }
 
 EidolonUiPresenter::~EidolonUiPresenter()
 {
     SetEidolonUiIntentHandler({});
+    SetEidolonUiInputHandler({});
+    SetEidolonInputAvailabilityHandler({});
 }
 
 void EidolonUiPresenter::ApplyVoiceStatus(const VoiceRuntimeStatus& voice)
@@ -189,6 +210,9 @@ void EidolonUiPresenter::HandleIntent(UiIntent intent)
     case UiIntent::ToggleMicrophone:
         app_.ToggleMicrophone();
         break;
+    case UiIntent::OpenSetup:
+        OpenEidolonSetup();
+        break;
     case UiIntent::None:
     default:
         break;
@@ -198,7 +222,7 @@ void EidolonUiPresenter::HandleIntent(UiIntent intent)
 void EidolonUiPresenter::Reapply()
 {
     SyncLegacyDeviceState();
-    ApplyModel(UiStateProjector::Project(status_));
+    ApplyModel(UiStateProjector::Project(status_,CurrentUiInputProfile()));
 }
 
 void EidolonUiPresenter::SyncLegacyDeviceState()

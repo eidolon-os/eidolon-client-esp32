@@ -48,7 +48,7 @@ void CompanionFaceView::Build(const BuildContext& ctx) {
     lv_obj_set_style_radius(state_dot_,LV_RADIUS_CIRCLE,0);
     lv_obj_set_style_bg_opa(state_dot_,LV_OPA_COVER,0);
     status_=Label(ctx.parent,ctx.font,LV_ALIGN_TOP_LEFT,26,4);
-    lv_obj_set_size(status_,layout.header.w-104,layout.header.h);
+    lv_obj_set_size(status_,layout.header.w-136,layout.header.h);
     lv_label_set_long_mode(status_,LV_LABEL_LONG_DOT);
     auto indicator=[&](int x) {
         auto* item=Label(ctx.parent,ctx.icon_font,LV_ALIGN_TOP_LEFT,x,4);
@@ -59,6 +59,11 @@ void CompanionFaceView::Build(const BuildContext& ctx) {
     };
     const auto width=lv_obj_get_width(ctx.parent);
     indicators_={indicator(width-84),indicator(width-60),indicator(width-36)};
+    setup_=indicator(width-108);
+    lv_label_set_text(setup_,LV_SYMBOL_SETTINGS);
+    lv_obj_add_flag(setup_,LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(setup_,OnSetup,LV_EVENT_CLICKED,this);
+    Visible(setup_,false);
     detail_panel_=panel(layout.detail);
     lv_obj_add_flag(detail_panel_,LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_scroll_dir(detail_panel_,LV_DIR_VER);
@@ -80,6 +85,11 @@ void CompanionFaceView::Build(const BuildContext& ctx) {
     lv_anim_set_delay(&scroll,1500);lv_anim_set_repeat_delay(&scroll,2500);
     lv_anim_set_playback_delay(&scroll,1500);lv_anim_set_duration(&scroll,6000);
     lv_obj_set_style_anim(information_,&scroll,0);
+    input_hint_=Label(ctx.parent,ctx.font,LV_ALIGN_TOP_LEFT,12,layout.actions.y+6);
+    lv_obj_set_size(input_hint_,layout.actions.w,28);
+    lv_label_set_long_mode(input_hint_,LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_color(input_hint_,lv_color_hex(0x9AA9B5),0);
+    Visible(input_hint_,false);
     mode_=Label(ctx.parent,ctx.font,LV_ALIGN_TOP_LEFT,12,layout.actions.y+6);
     lv_obj_set_size(mode_,72,28);
     lv_obj_set_style_text_color(mode_,lv_color_hex(0x71808D),0);
@@ -117,12 +127,24 @@ void CompanionFaceView::ShowNotification(const char* text,int duration_ms) {
     DisplayLockGuard lock(display_);
     notification_until_=NowMs()+std::clamp(duration_ms,1,15000);
     lv_label_set_text(information_,text ? text : "");
+    UpdateLayout();
 }
 void CompanionFaceView::RefreshInformation() {
-    if (notification_until_ && NowMs()<notification_until_) return;
+    if (notification_until_ && NowMs()<notification_until_) { UpdateLayout();return; }
     notification_until_=0;
     if (std::strcmp(lv_label_get_text(information_),information_text_.c_str()))
         lv_label_set_text(information_,information_text_.c_str());
+    UpdateLayout();
+}
+void CompanionFaceView::UpdateLayout() {
+    if (!viewport_) return;
+    auto* parent=lv_obj_get_parent(viewport_);
+    const bool information=lv_label_get_text(information_)[0]!='\0';
+    const companion::Layout layout(lv_obj_get_width(parent),lv_obj_get_height(parent),has_actions_,information);
+    lv_obj_set_pos(viewport_,layout.face.x,layout.face.y);
+    lv_obj_set_size(viewport_,layout.face.w,layout.face.h);
+    lv_obj_set_pos(information_,layout.information.x,layout.information.y);
+    Visible(information_,information);
 }
 void CompanionFaceView::Apply(const expression::FacePose& p) {
     auto eye=[&](auto& feature,float open,float tilt) {
@@ -139,6 +161,18 @@ void CompanionFaceView::Apply(const expression::FacePose& p) {
 void CompanionFaceView::Advance(uint32_t completed_frame) {
     if (!avatar_) return;
     RefreshInformation();
+    if (!touch_navigation_ && lv_obj_is_visible(detail_panel_)) {
+        lv_obj_update_layout(detail_panel_);
+        const int extent = lv_obj_get_scroll_bottom(detail_panel_) + lv_obj_get_scroll_y(detail_panel_);
+        if (extent > 0) {
+            // Pause at both ends; a non-touch device must expose the entire message.
+            const uint64_t travel = static_cast<uint64_t>(extent) * 50;
+            const uint64_t elapsed = (NowMs() - detail_scroll_start_) % (travel + 4000);
+            const int offset = elapsed < 2000 ? 0 :
+                static_cast<int>(std::min<uint64_t>(extent, (elapsed - 2000) / 50));
+            lv_obj_scroll_to_y(detail_panel_, offset, LV_ANIM_OFF);
+        }
+    }
     const bool visible=lv_obj_is_visible(avatar_->getPanel()->get());
     Emit(runtime_.SetVisible(visible));
     if (!visible) { awaiting_frame_=false;return; }
@@ -226,16 +260,25 @@ void CompanionFaceView::Render(const EidolonUiModel& model) {
     lv_obj_set_style_bg_color(state_dot_,lv_color_hex(color),0);
     lv_label_set_text(status_,model.status_text ? model.status_text : "");
     lv_label_set_text(mode_,model.mode_label ? model.mode_label : "");
-    primary_intent_=model.primary_enabled ? model.primary_intent : UiIntent::None;
+    const bool touch=model.primary_presentation==UiActionPresentation::TouchControl;
+    const bool hint=model.primary_presentation==UiActionPresentation::InputHint;
+    primary_intent_=touch && model.primary_enabled ? model.primary_intent : UiIntent::None;
+    has_actions_=primary_intent_!=UiIntent::None || model.show_end_action || hint;
+    lv_label_set_text(input_hint_,hint ? model.input_hint : "");
+    Visible(input_hint_,hint);
+    Visible(mode_,touch || model.show_end_action);
     lv_label_set_text(primary_label_,model.primary_label ? model.primary_label : "");
     Visible(primary_,primary_intent_!=UiIntent::None);
     Visible(close_,model.show_end_action);
+    Visible(setup_,model.show_setup_action);
     const bool face=model.scene==UiScene::Ready || model.scene==UiScene::Conversation ||
         model.scene==UiScene::OpeningConversation || model.scene==UiScene::Ended;
     Visible(viewport_,face);Visible(detail_panel_,!face);
+    touch_navigation_=model.touch_navigation;
     const char* detail=model.detail_text ? model.detail_text : "";
     if (!face && std::strcmp(lv_label_get_text(detail_),detail)) {
         lv_label_set_text(detail_,detail);
+        detail_scroll_start_=NowMs();
         lv_obj_scroll_to_y(detail_panel_,0,LV_ANIM_OFF);
     }
     // Dialogue only ever enters this dedicated strip. System instructions live
@@ -246,7 +289,7 @@ void CompanionFaceView::Render(const EidolonUiModel& model) {
         information_text_=model.subtitle;
     else if (!face) {
         lv_obj_update_layout(detail_panel_);
-        information_text_=lv_obj_get_height(detail_)>lv_obj_get_height(detail_panel_) ? "Swipe to read more" : "";
+        information_text_=lv_obj_get_height(detail_)>lv_obj_get_height(detail_panel_) ? (touch_navigation_ ? "Swipe to read more" : "") : "";
     }
     RefreshInformation();
 }
@@ -264,5 +307,6 @@ void CompanionFaceView::OnPrimary(lv_event_t* event) {
         DispatchEidolonUiIntent(self->primary_intent_);
     }
 }
+void CompanionFaceView::OnSetup(lv_event_t*) { DispatchEidolonUiIntent(UiIntent::OpenSetup); }
 void CompanionFaceView::OnClose(lv_event_t*) { DispatchEidolonUiIntent(UiIntent::CloseConversation); }
 }

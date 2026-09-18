@@ -38,8 +38,10 @@ private:
     void Apply(const expression::FacePose& pose);
     void Emit(expression::Event event);
     void RefreshInformation();
+    void UpdateLayout();
     static void OnPrimary(lv_event_t* event);
     static void OnClose(lv_event_t* event);
+    static void OnSetup(lv_event_t* event);
     Display* display_ = nullptr;
     std::unique_ptr<stackchan::avatar::DefaultAvatar> avatar_;
     expression::Runtime runtime_;
@@ -52,11 +54,16 @@ private:
     lv_obj_t* information_ = nullptr;
     lv_obj_t* state_dot_ = nullptr;
     lv_obj_t* mode_ = nullptr;
+    lv_obj_t* input_hint_ = nullptr;
+    bool has_actions_ = false;
+    bool touch_navigation_ = false;
+    uint64_t detail_scroll_start_ = 0;
     std::string information_text_;
     uint64_t notification_until_ = 0;
     bool has_model_ = false;
     bool talk_gesture_active_ = false;
     lv_obj_t* status_ = nullptr;
+    lv_obj_t* setup_ = nullptr;
     lv_obj_t* primary_ = nullptr;
     lv_obj_t* primary_label_ = nullptr;
     lv_obj_t* close_ = nullptr;

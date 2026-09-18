@@ -174,10 +174,10 @@ void ResolveActions(const EidolonRuntimeStatus& status, EidolonUiModel& model)
     case UiScene::OpeningConversation:
     case UiScene::Reconnecting:
         model.primary_label = "...";
-        model.show_end_action = true;
+        model.end_allowed = true;
         break;
     case UiScene::Conversation:
-        model.show_end_action = true;
+        model.end_allowed = true;
         model.primary_enabled = true;
         if (IsPushToTalk(status.interaction_mode)) {
             model.primary_intent = model.turn == TurnPhase::Recording
@@ -212,7 +212,8 @@ const std::string* DetailOverride(const EidolonRuntimeStatus& status,
 
 }  // namespace
 
-EidolonUiModel UiStateProjector::Project(const EidolonRuntimeStatus& status)
+EidolonUiModel UiStateProjector::Project(const EidolonRuntimeStatus& status,
+                                        const UiInputProfile& inputs)
 {
     EidolonUiModel model;
     model.scene = SelectScene(status);
@@ -261,6 +262,40 @@ EidolonUiModel UiStateProjector::Project(const EidolonRuntimeStatus& status)
                                     model.scene == UiScene::Reconnecting
                                 ? UiSeverity::Attention
                                 : UiSeverity::Normal);
+    model.touch_navigation = inputs.Has(UiInputSource::Touch);
+    model.show_setup_action = inputs.Binding(UiIntent::OpenSetup,UiInputSource::Touch) &&
+        status.runtime!=RuntimePhase::Updating;
+    model.show_end_action = model.end_allowed &&
+        inputs.Binding(UiIntent::CloseConversation, UiInputSource::Touch);
+    if (model.primary_enabled && inputs.Binding(model.primary_intent, UiInputSource::Touch)) {
+        model.primary_presentation = UiActionPresentation::TouchControl;
+    } else {
+        const UiInputBinding* hint = nullptr;
+        for (auto candidate : {model.primary_intent, UiIntent::CloseConversation}) {
+            if (candidate==UiIntent::None ||
+                (candidate==UiIntent::CloseConversation && !model.end_allowed)) continue;
+            for (size_t i=0; i<inputs.binding_count; ++i) {
+                const auto& binding=inputs.bindings[i];
+                if (binding.source!=UiInputSource::Touch && inputs.Has(binding.source) &&
+                    binding.intent==candidate) { hint=&binding;break; }
+            }
+            if (hint) break;
+        }
+        if (hint) {
+            model.primary_presentation = UiActionPresentation::InputHint;
+            model.input_hint = hint->hint;
+        }
+    }
+    if (model.primary_enabled && model.primary_intent==UiIntent::OpenConversation &&
+        model.primary_presentation==UiActionPresentation::Hidden) {
+        model.detail_text = inputs.automatic_start ? "Waiting for automatic connection" : "No start input available";
+    }
+    if (model.scene==UiScene::Conversation && IsPushToTalk(model.interaction_mode) &&
+        model.turn==TurnPhase::Idle &&
+        !inputs.Binding(UiIntent::BeginTalk,UiInputSource::Touch) &&
+        !inputs.Binding(UiIntent::BeginTalk,UiInputSource::TalkButton)) {
+        model.detail_text = "Talk input unavailable";
+    }
     return model;
 }
 
@@ -271,7 +306,7 @@ bool UiStateProjector::AllowsIntent(const EidolonRuntimeStatus& status, UiIntent
     case UiIntent::OpenConversation:
         return model.primary_enabled && model.primary_intent == intent;
     case UiIntent::CloseConversation:
-        return model.show_end_action;
+        return model.end_allowed;
     case UiIntent::BeginTalk:
         return model.scene == UiScene::Conversation &&
                IsPushToTalk(model.interaction_mode) &&
@@ -283,10 +318,25 @@ bool UiStateProjector::AllowsIntent(const EidolonRuntimeStatus& status, UiIntent
     case UiIntent::ToggleMicrophone:
         return model.scene == UiScene::Conversation &&
                IsAutomaticEndpointing(model.interaction_mode);
+    case UiIntent::OpenSetup:
+        return status.runtime!=RuntimePhase::Updating;
     case UiIntent::None:
     default:
         return false;
     }
+}
+
+UiIntent UiStateProjector::ResolveInput(const EidolonRuntimeStatus& status,
+                                       const UiInputProfile& inputs, UiInputSource source,
+                                       UiInputGesture gesture)
+{
+    if (!inputs.Has(source)) return UiIntent::None;
+    for (size_t i=0; i<inputs.binding_count; ++i) {
+        const auto& binding=inputs.bindings[i];
+        if (binding.source==source && binding.gesture==gesture &&
+            inputs.Binding(binding.intent,source) && AllowsIntent(status,binding.intent)) return binding.intent;
+    }
+    return UiIntent::None;
 }
 
 bool UiStateProjector::IsConversationState(DeviceState state)
