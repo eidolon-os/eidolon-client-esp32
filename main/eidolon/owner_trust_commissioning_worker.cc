@@ -167,6 +167,7 @@ void DecideOneRequest(Runtime& runtime, Request* request)
         cJSON* root = cJSON_CreateObject();
         cJSON_AddStringToObject(root, "contract_version", "1");
         cJSON_AddBoolToObject(root, "prepared", true);
+        cJSON_AddBoolToObject(root, "requires_voucher", outcome.identity.requires_voucher);
         cJSON_AddStringToObject(root, "owner_domain_id", outcome.owner_domain_id.c_str());
         cJSON_AddStringToObject(root, "device_id", outcome.identity.device_instance_id.c_str());
         cJSON_AddStringToObject(root, "identity_fingerprint", outcome.identity.fingerprint.c_str());

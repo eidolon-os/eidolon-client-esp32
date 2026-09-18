@@ -43,7 +43,6 @@ enum class CommissioningEventType {
     CommissioningTransactionCommitted,
     CommissioningTransactionCommitFailed,
     CommissioningTransactionRecoveryRequired,
-    RecoveryRetry,
     CommissioningTransactionRolledBack,
     ControllerObservedTerminal,
     WindowExpired,

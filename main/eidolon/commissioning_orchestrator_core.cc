@@ -67,6 +67,10 @@ std::vector<CommissioningAction> CommissioningOrchestratorCore::Handle(
 {
     std::vector<CommissioningAction> actions;
     if (event.type == CommissioningEventType::OpenRequested) {
+        if (state_ == CommissioningRuntimeState::RecoveringConfiguration) {
+            Act(actions, CommissioningActionType::RecoverCommissioningTransaction);
+            return actions;
+        }
         if (state_ != CommissioningRuntimeState::Idle) return actions;
         ++generation_;
         if (generation_ == 0) ++generation_;
@@ -80,9 +84,7 @@ std::vector<CommissioningAction> CommissioningOrchestratorCore::Handle(
     }
 
     if (state_ == CommissioningRuntimeState::RecoveringConfiguration) {
-        if (event.type == CommissioningEventType::RecoveryRetry) {
-            Act(actions, CommissioningActionType::RecoverCommissioningTransaction);
-        } else if (event.type == CommissioningEventType::CommissioningTransactionCommitted) {
+        if (event.type == CommissioningEventType::CommissioningTransactionCommitted) {
             transaction_committed_ = true;
             // The controller may already have disconnected or cancelled. The
             // durable decision still finishes, without waiting for another ACK.
@@ -182,8 +184,6 @@ std::vector<CommissioningAction> CommissioningOrchestratorCore::Handle(
         if (state_ == CommissioningRuntimeState::ApplyingConfiguration) {
             Transition(actions, CommissioningRuntimeState::RecoveringConfiguration);
         }
-        break;
-    case CommissioningEventType::RecoveryRetry:
         break;
     case CommissioningEventType::CommissioningTransactionCommitFailed:
         if (state_ == CommissioningRuntimeState::ApplyingConfiguration &&

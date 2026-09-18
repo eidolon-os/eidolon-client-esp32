@@ -391,7 +391,8 @@ void Application::Initialize() {
                         "Ready for secure device setup");
                     break;
                 case State::RecoveringConfiguration:
-                    SetEidolonRuntimeUi(eidolon::RuntimePhase::RecoveryRequired);
+                    SetEidolonRuntimeUi(eidolon::RuntimePhase::RecoveryRequired,
+                        "Configuration recovery blocked. Hold BOOT to retry setup");
                     break;
                 case State::ApplyingConfiguration:
                     SetEidolonRuntimeUi(
@@ -407,6 +408,11 @@ void Application::Initialize() {
                         "Finishing device setup...");
                     break;
                 case State::Idle:
+                    if (!snapshot.failure_hint.empty()) {
+                        SetEidolonRuntimeUi(eidolon::RuntimePhase::RecoveryRequired,
+                                           snapshot.failure_hint);
+                        break;
+                    }
                     // A connected callback may have arrived while the actor
                     // still owned the radio. Reconcile from the network adapter,
                     // never from a remembered commissioning route or command.
@@ -416,7 +422,7 @@ void Application::Initialize() {
                         HandleNetworkDisconnectedEvent();
                         SetEidolonRuntimeUi(
                             eidolon::RuntimePhase::NetworkScanning,
-                            "Looking for saved Wi-Fi. Hold BOOT to change network");
+                            "Returning to saved Wi-Fi. Hold BOOT to change network");
                     } else {
                         // The only screen an Owner has after a setup window
                         // closes. "Closed" alone made a device that was merely

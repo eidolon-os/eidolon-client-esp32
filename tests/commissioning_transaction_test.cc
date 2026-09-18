@@ -76,6 +76,12 @@ void SeedOwnerA() {
     active_claim.device_ref.trust_epoch = 1;
     has_claim = true;
 }
+const char* ActiveIdentityKey() {
+    const auto& values = disk["eidolon_id"];
+    const auto it = values.find("id_slot");
+    return it != values.end() && std::get<uint8_t>(it->second) == 1 ? "id_pending" : "id_active";
+}
+const char* InactiveIdentityKey() { return std::string(ActiveIdentityKey()) == "id_active" ? "id_pending" : "id_active"; }
 void AssertOwner(const std::string& owner) {
     CommissioningCredential credential;
     assert(EspIdfCommissioningCredentialStore::GetInstance().Load(credential));
@@ -84,7 +90,7 @@ void AssertOwner(const std::string& owner) {
     assert(DeviceIdentity::GetInstance().EnsureKeypair() == ESP_OK);
     assert(credential.operational_key_id == "sha256:" + DeviceIdentity::GetInstance().DeviceInstanceId().substr(16));
     assert(disk["eidolon"].count("ctx_record") == 0);
-    assert(disk["eidolon_id"].count("id_pending") == 0);
+    assert(disk["eidolon_id"].count(InactiveIdentityKey()) == 0);
     assert(disk["wifi"].count("ctx_candidate") == 0);
 }
 void SameOwnerUpdatesTheActualDirectoryAndPreservesIdentity() {
@@ -97,25 +103,95 @@ void SameOwnerUpdatesTheActualDirectoryAndPreservesIdentity() {
     assert(DeviceIdentity::GetInstance().DeviceInstanceId() == old_id && has_claim);
     assert(SsidManager::GetInstance().GetSsidList().size() == 2);
 }
-void CancelRestoresTheWholeOldContext() {
+void NetworkMaintenanceReferencesIdentityAcrossBootGenerations() {
     SeedOwnerA();
-    const auto before = disk["eidolon_id"].at("id_active");
-    Prepare(2, "owner-b", true);
-    assert(disk["eidolon_id"].at("id_active") == before);
+    const auto original = disk["eidolon_id"].at(ActiveIdentityKey());
+    auto& store = EspIdfCommissioningCredentialStore::GetInstance();
+    // Setup generation may be reused on reboot; the active record's historical
+    // generation/replacement must neither force a copy nor force a restart.
+    for (auto generation : {2u, 1u, 1u, 3u}) {
+        PreparedCommissioningIdentity prepared;
+        assert(store.Prepare("owner-a", 1, generation, false, prepared));
+        assert(!prepared.requires_voucher);
+        assert(disk["eidolon_id"].count(InactiveIdentityKey()) == 0);
+        assert(store.Stage(nullptr, generation, [] { return true; }));
+        staged_trust = active_trust;
+        staged_generation = generation;
+        bool replaced = true;
+        assert(CommitCommissioningTransaction(generation, "network-a", "new-password", &replaced) ==
+               CommissioningTransactionResult::Committed);
+        assert(!replaced);
+        assert(disk["eidolon_id"].at(ActiveIdentityKey()) == original);
+        AssertOwner("owner-a");
+    }
+}
+void SelectedIdentityCannotFallBackToAnOldKey() {
+    SeedOwnerA();
+    disk["eidolon_id"].erase(ActiveIdentityKey());
+    disk["eidolon_id"]["p256_priv"] = std::string("key-9");
+    std::string pem;
+    assert(EspIdfCommissioningCredentialStore::LoadPrivateKey(pem) == CommissioningIdentityLoad::Unavailable);
+}
+void ExplicitReplacementCannotReuseAMaintenanceCandidate() {
+    SeedOwnerA();
+    auto& store = EspIdfCommissioningCredentialStore::GetInstance();
+    PreparedCommissioningIdentity reuse, replacement;
+    assert(store.Prepare("owner-a", 1, 2, false, reuse));
+    assert(!reuse.requires_voucher);
+    assert(store.Prepare("owner-a", 1, 2, true, replacement));
+    assert(replacement.requires_voucher);
+    assert(replacement.fingerprint != reuse.fingerprint);
     assert(RollbackPendingCommissioningTransaction(2));
     AssertOwner("owner-a");
-    assert(has_claim && disk["eidolon_id"].at("id_active") == before);
+}
+void RevokedClaimCannotUseLeftoverEnrollmentForMaintenance() {
+    SeedOwnerA();
+    active_claim.state = ActiveClaimLocalState::Revoked;
+    enrollment.owner_domain_id.value = "owner-a";
+    enrollment.owner_domain_generation = 1;
+    enrollment.device_instance_candidate_id = DeviceIdentity::GetInstance().DeviceInstanceId();
+    has_enrollment = true;
+    PreparedCommissioningIdentity prepared;
+    assert(EspIdfCommissioningCredentialStore::GetInstance().Prepare("owner-a", 1, 2, false, prepared));
+    assert(prepared.requires_voucher);
+}
+void NetworkMaintenancePowerLossPreservesTheActiveIdentity() {
+    SeedOwnerA(); Prepare(2, "owner-a", false);
+    write_number = 0;
+    assert(CommitCommissioningTransaction(2, "network-a", "changed") == CommissioningTransactionResult::Committed);
+    const int writes = write_number;
+    for (int point = 1; point <= writes; ++point) {
+        SeedOwnerA(); Prepare(2, "owner-a", false);
+        const auto original = disk["eidolon_id"].at(ActiveIdentityKey());
+        write_number = 0; crash_at = point;
+        try { CommitCommissioningTransaction(2, "network-a", "changed"); }
+        catch (const std::runtime_error&) {}
+        crash_at = -1; handles.clear();
+        assert(RecoverPendingCommissioningTransaction());
+        assert(disk["eidolon_id"].at(ActiveIdentityKey()) == original);
+        assert(RollbackPendingCommissioningTransaction(2));
+        AssertOwner("owner-a");
+    }
+}
+void CancelRestoresTheWholeOldContext() {
+    SeedOwnerA();
+    const auto before = disk["eidolon_id"].at(ActiveIdentityKey());
+    Prepare(2, "owner-b", true);
+    assert(disk["eidolon_id"].at(ActiveIdentityKey()) == before);
+    assert(RollbackPendingCommissioningTransaction(2));
+    AssertOwner("owner-a");
+    assert(has_claim && disk["eidolon_id"].at(ActiveIdentityKey()) == before);
 }
 void PowerLossWhilePreparingNeverPublishesCredentials() {
     for (int point = 1; point <= 4; ++point) {
         SeedOwnerA();
-        const auto old = disk["eidolon_id"].at("id_active");
+        const auto old = disk["eidolon_id"].at(ActiveIdentityKey());
         write_number = 0; crash_at = point;
         try { Prepare(2, "owner-b", true); }
         catch (const std::runtime_error&) {}
         crash_at = -1; handles.clear();
         assert(RecoverPendingCommissioningTransaction());
-        assert(disk["eidolon_id"].at("id_active") == old && has_claim);
+        assert(disk["eidolon_id"].at(ActiveIdentityKey()) == old && has_claim);
         assert(RollbackPendingCommissioningTransaction(2));
         AssertOwner("owner-a");
     }
@@ -309,6 +385,11 @@ OwnerDataEraseStorageResult EspIdfOwnerDataEraseStorage::VerifyTargetErased(cons
 }
 }
 int main() {
+    NetworkMaintenanceReferencesIdentityAcrossBootGenerations();
+    SelectedIdentityCannotFallBackToAnOldKey();
+    ExplicitReplacementCannotReuseAMaintenanceCandidate();
+    RevokedClaimCannotUseLeftoverEnrollmentForMaintenance();
+    NetworkMaintenancePowerLossPreservesTheActiveIdentity();
     PowerLossWhilePreparingNeverPublishesCredentials();
     LegacyInterruptionNeedsAnAuthorizedFreshLifecycle();
     SameOwnerUpdatesTheActualDirectoryAndPreservesIdentity();

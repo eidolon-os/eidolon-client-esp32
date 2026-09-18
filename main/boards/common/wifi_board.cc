@@ -90,18 +90,18 @@ void WifiBoard::StartNetwork() {
 #if CONFIG_EIDOLON_HUB_MODE
     if (eidolon::CommissioningRuntime::GetInstance().IsInProgress()) return;
     if (!eidolon::RecoverPendingCommissioningTransaction()) {
-        ESP_LOGW(TAG, "Commissioning recovery pending; retrying before Station start");
+        ESP_LOGE(TAG, "Commissioning recovery blocked; physical setup may retry it");
         Application::GetInstance().SetEidolonRuntimeUi(
             eidolon::RuntimePhase::RecoveryRequired,
             eidolon::CommissioningTransactionNeedsFreshIdentity()
                 ? "Connection recovery needed. Press and hold the button to open setup"
-                : "Restoring connection");
-        commissioning_recovery_pending_ = true;
+                : "Configuration recovery blocked. Hold BOOT to retry setup");
+        // A failed durable write is not evidence that time can repair it.
+        // Retry on an explicit setup request or the next boot, never repeatedly
+        // compact flash while the required storage/snapshot is unchanged.
         esp_timer_stop(connect_timer_);
-        esp_timer_start_once(connect_timer_, 3000000);
         return;
     }
-    commissioning_recovery_pending_ = false;
 #endif
     // Try to connect or enter config mode
     TryWifiConnect();
@@ -179,10 +179,6 @@ void WifiBoard::SetNetworkEventCallback(NetworkEventCallback callback) {
 
 void WifiBoard::OnWifiConnectTimeout(void* arg) {
     auto* board = static_cast<WifiBoard*>(arg);
-    if (board->commissioning_recovery_pending_) {
-        Application::GetInstance().Schedule([board] { board->StartNetwork(); });
-        return;
-    }
 #if CONFIG_EIDOLON_HUB_MODE
     Application::GetInstance().Schedule([board] {
         // A timer may already be queued when setup stops it or Wi-Fi connects.
@@ -299,10 +295,9 @@ void WifiBoard::StartWifiConfigMode() {
         ESP_LOGE(TAG, "Commissioning runtime did not accept the request");
         return;
     }
-    // A manual setup request must revoke the legacy boot timeout immediately;
-    // otherwise it can fire in the middle of the actor-owned generation and
-    // become a second writer of the Wi-Fi driver.
-    esp_timer_stop(connect_timer_);
+    // Request acceptance does not transfer radio ownership. The queued timeout
+    // already checks IsInProgress before acting; it must not cancel recovery or
+    // manufacture a Station handoff when preparation fails.
 #elif defined(CONFIG_USE_HOTSPOT_WIFI_PROVISIONING)
     in_config_mode_ = true;
     Application::GetInstance().SetDeviceState(kDeviceStateWifiConfiguring);

@@ -303,7 +303,9 @@ void TestDurableDecisionIgnoresCancelAndRetriesForward() {
                            CommissioningEventType::TransportEndedUnexpectedly}) {
         assert(core.Handle(Event(type, generation)).empty());
     }
-    const auto retry = core.Handle(Event(CommissioningEventType::RecoveryRetry, generation));
+    const auto retry = core.Handle(Event(CommissioningEventType::OpenRequested, 0));
+    assert(core.generation() == generation); // resume the durable act, never replace it
+    assert(!Has(retry, CommissioningActionType::EnsureIdentity));
     assert(Has(retry, CommissioningActionType::RecoverCommissioningTransaction));
     const auto finished = core.Handle(Event(CommissioningEventType::CommissioningTransactionCommitted, generation, "candidate-1"));
     assert(core.transaction_committed());

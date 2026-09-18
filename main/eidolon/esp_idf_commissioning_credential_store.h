@@ -6,12 +6,12 @@
 namespace eidolon {
 inline constexpr const char* kCommissioningCredentialNamespace = "eidolon_id";
 inline constexpr const char* kCommissioningCredentialKeys[] = {
-    "base_id", "voucher", "voucher_jti", "voucher_exp", "id_active", "id_pending"};
+    "base_id", "voucher", "voucher_jti", "voucher_exp", "id_active", "id_pending", "id_slot", "id_stage"};
 
 enum class CommissioningIdentityLoad { NotFound, Loaded, Unavailable };
 
-// One active key/credential blob and one transaction candidate. The private key
-// and issued base identity are published by a single NVS item replacement.
+// Two identity slots and an atomic active selector, as in OwnerTrustStore.
+// Network maintenance references the active identity without copying its key.
 class EspIdfCommissioningCredentialStore : public CommissioningCredentialStorePort {
 public:
     static EspIdfCommissioningCredentialStore& GetInstance();
@@ -23,9 +23,8 @@ public:
     bool DescribeCandidate(uint32_t generation, PreparedCommissioningIdentity& out) const;
     bool StagedDigest(uint32_t generation, const std::string& owner, uint64_t owner_generation,
                       std::string& digest, bool& replaces_owner) const;
-    bool RequiresRuntimeRestart(uint32_t generation) const;
     bool CommitStaged(uint32_t generation, const std::string& digest);
-    bool Finish(uint32_t generation);
+    bool Finish(uint32_t generation, const std::string& digest);
     bool Rollback(uint32_t generation);
     bool Load(CommissioningCredential& out) const;
     bool ForgetSpentVoucher();

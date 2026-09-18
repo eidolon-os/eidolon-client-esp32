@@ -16,11 +16,12 @@ enum class CommissioningTransactionResult {
 // identity/credential publication and the existing trust slots. Its journal
 // holds phases and snapshot digests; the password stays in the Wi-Fi store.
 CommissioningTransactionResult CommitCommissioningTransaction(
-    uint32_t generation, const std::string& ssid, const std::string& password);
+    uint32_t generation, const std::string& ssid, const std::string& password,
+    bool* identity_replaced = nullptr);
 
 // Runs before Station starts. Returns false only when a durable transaction is
 // still pending and normal networking must not race it.
-bool RecoverPendingCommissioningTransaction();
+bool RecoverPendingCommissioningTransaction(bool* identity_replaced = nullptr);
 
 // An interrupted legacy transaction has no identity snapshot. A physically
 // opened, authenticated setup may replace it using a freshly issued identity.

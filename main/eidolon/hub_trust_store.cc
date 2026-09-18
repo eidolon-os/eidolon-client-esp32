@@ -358,8 +358,11 @@ OwnerTrustStoreResult OwnerTrustStore::Stage(
     if (!nvs.valid()) return OwnerTrustStoreResult::Unavailable;
 
     const int current_slot = ActiveSlot(nvs.get());
-    const int staging_slot = current_slot == 0 ? 1 : 0;
-    esp_err_t result = WriteSlot(nvs.get(), staging_slot, bundle);
+    OwnerTrustBundle current;
+    const bool unchanged = ReadSlot(nvs.get(), current_slot, current) &&
+        BundleDigest(current) == BundleDigest(bundle);
+    const int staging_slot = unchanged ? current_slot : (current_slot == 0 ? 1 : 0);
+    esp_err_t result = unchanged ? ESP_OK : WriteSlot(nvs.get(), staging_slot, bundle);
     if (result == ESP_OK) result = nvs_commit(nvs.get());
     if (result != ESP_OK) {
         ESP_LOGE(TAG, "Could not stage Owner trust: %s",

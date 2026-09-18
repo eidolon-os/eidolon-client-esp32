@@ -1,0 +1,3 @@
+#pragma once
+#define ESP_ERR_FLASH_OP_FAIL 0x6001
+#define ESP_ERR_FLASH_OP_TIMEOUT 0x6002

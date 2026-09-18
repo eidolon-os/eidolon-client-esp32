@@ -112,6 +112,9 @@ struct RuntimeState {
     std::string candidate_password;
     std::string candidate_id;
     bool previous_station_mode = false;
+    bool identity_replaced = false;
+    bool station_restore_requested = false;
+    std::string failure_hint;
 };
 
 RuntimeState& State()
@@ -236,8 +239,9 @@ void PublishEvidence(RuntimeState& state)
         state.core.state(),
         state.core.generation(),
         state.core.transaction_committed(),
-        state.previous_station_mode,
+        state.station_restore_requested,
         revision,
+        state.failure_hint,
     };
     ESP_LOGI(TAG,
              "Confirmed state=%s generation=%lu committed=%d revision=%lu",
@@ -346,10 +350,23 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
         // that is a button that does nothing: the actor announces
         // preparing-identity, retires ten milliseconds later, and never says
         // which of the two stopped it.
-        const bool transaction_allows = CommissioningTransactionAllowsNewSetup();
+        // A physical retry resumes an existing decision before opening a new
+        // generation; no new candidate may overwrite the unresolved snapshot.
+        bool recovered_replacement = false;
+        const bool recovered = RecoverPendingCommissioningTransaction(&recovered_replacement);
+        if (recovered && recovered_replacement) {
+            // A boot-blocked Owner replacement can also finish on physical
+            // retry. Retire the previous Owner's caches before opening setup.
+            esp_restart();
+            break;
+        }
+        const bool transaction_allows = recovered || CommissioningTransactionNeedsFreshIdentity();
         const bool ready =
             transaction_allows && DeviceIdentity::GetInstance().EnsureKeypair() == ESP_OK;
         if (!ready) {
+            state.failure_hint = transaction_allows
+                ? "Device identity needs recovery"
+                : "Configuration recovery blocked. Hold BOOT to retry setup";
             ESP_LOGE(TAG, "cannot prepare an identity: %s",
                      transaction_allows
                          ? "no usable operational key"
@@ -490,7 +507,8 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
         break;
     case CommissioningActionType::CommitCommissioningTransaction: {
         const auto result = CommitCommissioningTransaction(
-            action.generation, state.candidate_ssid, state.candidate_password);
+            action.generation, state.candidate_ssid, state.candidate_password,
+            &state.identity_replaced);
         completion.type = result == CommissioningTransactionResult::Committed
             ? CommissioningEventType::CommissioningTransactionCommitted
             : result == CommissioningTransactionResult::RecoveryRequired
@@ -500,7 +518,7 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
         break;
     }
     case CommissioningActionType::RecoverCommissioningTransaction:
-        if (RecoverPendingCommissioningTransaction()) {
+        if (RecoverPendingCommissioningTransaction(&state.identity_replaced)) {
             completion.type = CommissioningEventType::CommissioningTransactionCommitted;
             Apply(state, completion);
         }
@@ -523,7 +541,7 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
         break;
     case CommissioningActionType::RestorePreviousRadioMode:
         if (state.core.transaction_committed() &&
-            EspIdfCommissioningCredentialStore::GetInstance().RequiresRuntimeRestart(action.generation)) {
+            state.identity_replaced) {
             // Storage is coherent and the setup transport is closed. A restart
             // retires every old Owner's in-memory session, binding and cache.
             esp_restart();
@@ -537,6 +555,7 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
             state.core.transaction_committed() || state.previous_station_mode;
         if (state.previous_station_mode) {
             WifiManager::GetInstance().StartStation();
+            state.station_restore_requested = true;
         }
         completion.type = CommissioningEventType::PreviousModeRestored;
         Apply(state, completion);
@@ -555,6 +574,9 @@ void Apply(RuntimeState& state, const CommissioningEvent& event)
             std::lock_guard<std::mutex> lock(state.evidence_mutex);
             state.evidence = {};
         }
+        state.identity_replaced = false;
+        state.station_restore_requested = false;
+        state.failure_hint.clear();
         state.session_id.clear();
         state.candidate_ssid.clear();
         state.candidate_password.clear();
@@ -652,16 +674,7 @@ void Actor(void*)
     RuntimeState& state = State();
     while (true) {
         RuntimeMessage* raw = nullptr;
-        const bool recovering = state.core.state() == CommissioningRuntimeState::RecoveringConfiguration;
-        if (xQueueReceive(state.queue, &raw, recovering ? pdMS_TO_TICKS(1000) : portMAX_DELAY) != pdTRUE || raw == nullptr) {
-            if (recovering) {
-                CommissioningEvent retry;
-                retry.type = CommissioningEventType::RecoveryRetry;
-                retry.generation = state.core.generation();
-                Apply(state, retry);
-            }
-            continue;
-        }
+        if (xQueueReceive(state.queue, &raw, portMAX_DELAY) != pdTRUE || raw == nullptr) continue;
         std::unique_ptr<RuntimeMessage> message(raw);
         if (message->trust_request != nullptr) {
             TrustActorRequest* request = message->trust_request;

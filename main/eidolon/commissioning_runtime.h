@@ -14,6 +14,7 @@ struct CommissioningRuntimeSnapshot {
     bool transaction_committed = false;
     bool station_mode_requested = false;
     uint32_t revision = 0;
+    std::string failure_hint;
 };
 
 // ESP-IDF composition root for the platform-independent commissioning Core.

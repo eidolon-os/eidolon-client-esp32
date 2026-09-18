@@ -9,6 +9,7 @@
 #include <ssid_manager.h>
 #include <cJSON.h>
 #include <nvs.h>
+#include <esp_log.h>
 #include <array>
 #include <mutex>
 
@@ -50,6 +51,7 @@ bool Write(const char* ns, const char* key, const std::string& value) {
     auto err = nvs_set_str(handle, key, value.c_str());
     if (err == ESP_OK) err = nvs_commit(handle);
     nvs_close(handle);
+    if (err != ESP_OK) ESP_LOGE("CommissioningTransaction", "Write %s/%s failed: 0x%x", ns, key, err);
     return err == ESP_OK;
 }
 
@@ -170,7 +172,11 @@ bool Advance(Journal& j, Phase phase) { j.phase = phase; return Store(j); }
 
 bool Finish(Journal& j) {
     auto& credentials = EspIdfCommissioningCredentialStore::GetInstance();
-    if (j.phase == CommitDecided) {
+    // Network maintenance has no destructive Owner cleanup. Its durable
+    // snapshot is immutable: replay effects by read-back, not by rewriting a
+    // five-phase journal for an identity which did not change.
+    const bool maintenance = !j.replacement;
+    if ((maintenance && !DurableNetworkMatches(j)) || (!maintenance && j.phase == CommitDecided)) {
         std::string network;
         if (Read("wifi", kNetwork, network) != Load::Loaded) return false;
         cJSON* root = cJSON_ParseWithLength(network.data(), network.size());
@@ -178,9 +184,9 @@ bool Finish(Journal& j) {
         cJSON_Delete(root);
         if (ssid != j.ssid || Hash(std::to_string(ssid.size()) + ":" + ssid + password) != j.network_digest) return false;
         SsidManager::GetInstance().AddSsid(ssid, password);
-        if (!DurableNetworkMatches(j) || !Advance(j, NetworkCommitted)) return false;
+        if (!DurableNetworkMatches(j) || (!maintenance && !Advance(j, NetworkCommitted))) return false;
     }
-    if (j.phase == NetworkCommitted) {
+    if (!maintenance && j.phase == NetworkCommitted) {
         if (j.replacement) {
             const auto plan = EspIdfDeviceLocalEraseAdapter::BuildCommissioningCleanupPlan();
             if (!plan.valid || j.cleanup_index > plan.targets.size()) return false;
@@ -215,23 +221,25 @@ bool Finish(Journal& j) {
         }
         if (!Advance(j, OwnerCleaned)) return false;
     }
-    if (j.phase == OwnerCleaned) {
-        if (!credentials.CommitStaged(j.generation, j.identity_digest) || !Advance(j, IdentityCommitted)) return false;
+    if (maintenance || j.phase == OwnerCleaned) {
+        if (!credentials.CommitStaged(j.generation, j.identity_digest) ||
+            (!maintenance && !Advance(j, IdentityCommitted))) return false;
     }
-    if (j.phase == IdentityCommitted) {
+    if (maintenance || j.phase == IdentityCommitted) {
         OwnerTrustBundle active;
         if (!OwnerTrustStore().Load(active) || BundleHash(active) != j.trust_digest) {
             OwnerTrustBundle staged;
             if (!OwnerTrustStore().LoadStaged(j.generation, staged) || BundleHash(staged) != j.trust_digest ||
                 OwnerTrustStore().CommitStaged(j.generation, [] { return true; }) != OwnerTrustStoreResult::Staged) return false;
         }
-        if (!OwnerTrustStore().Load(active) || BundleHash(active) != j.trust_digest || !Advance(j, TrustCommitted)) return false;
+        if (!OwnerTrustStore().Load(active) || BundleHash(active) != j.trust_digest ||
+            (!maintenance && !Advance(j, TrustCommitted))) return false;
     }
-    if (j.phase != TrustCommitted) return false;
+    if (!maintenance && j.phase != TrustCommitted) return false;
     OwnerTrustBundle active;
     if (!OwnerTrustStore().Load(active) || BundleHash(active) != j.trust_digest ||
         !credentials.CommitStaged(j.generation, j.identity_digest) ||
-        !OwnerTrustStore().DiscardInactive() || !credentials.Finish(j.generation)) return false;
+        !OwnerTrustStore().DiscardInactive() || !credentials.Finish(j.generation, j.identity_digest)) return false;
     // Network candidate contains the password and lives in the Wi-Fi store,
     // never in the recovery journal. It is not needed once the network is durable.
     for (const auto* key : {"ctx_gen", "ctx_phase", "ctx_owner", "ctx_ssid", "ctx_digest"}) {
@@ -242,13 +250,15 @@ bool Finish(Journal& j) {
 }
 
 CommissioningTransactionResult CommitCommissioningTransaction(
-    uint32_t generation, const std::string& ssid, const std::string& password) {
+    uint32_t generation, const std::string& ssid, const std::string& password, bool* identity_replaced) {
+    if (identity_replaced) *identity_replaced = false;
     std::lock_guard<std::mutex> lock(transaction_mutex);
     Journal existing;
     const auto loaded = LoadJournal(existing);
     if (loaded == Load::Unavailable) return CommissioningTransactionResult::RecoveryRequired;
     if (loaded == Load::Loaded) {
         if (existing.generation != generation) return CommissioningTransactionResult::RecoveryRequired;
+        if (identity_replaced) *identity_replaced = existing.replacement;
         return Finish(existing) ? CommissioningTransactionResult::Committed : CommissioningTransactionResult::RecoveryRequired;
     }
     OwnerTrustBundle staged;
@@ -281,6 +291,7 @@ CommissioningTransactionResult CommitCommissioningTransaction(
         return LoadJournal(observed) == Load::Missing
             ? CommissioningTransactionResult::SafeFailure : CommissioningTransactionResult::RecoveryRequired;
     }
+    if (identity_replaced) *identity_replaced = j.replacement;
     return Finish(j) ? CommissioningTransactionResult::Committed : CommissioningTransactionResult::RecoveryRequired;
 }
 
@@ -297,10 +308,11 @@ bool CommissioningTransactionNeedsFreshIdentity() {
     return LoadJournal(j) == Load::Legacy;
 }
 
-bool RecoverPendingCommissioningTransaction() {
+bool RecoverPendingCommissioningTransaction(bool* identity_replaced) {
     std::lock_guard<std::mutex> lock(transaction_mutex);
     Journal j;
     const auto loaded = LoadJournal(j);
+    if (identity_replaced) *identity_replaced = loaded == Load::Loaded && j.replacement;
     return loaded == Load::Missing || (loaded == Load::Loaded && Finish(j));
 }
 

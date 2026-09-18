@@ -47,17 +47,22 @@ AuthorityLocator 与通道恢复流程。Idle 只说明配置资源已释放；�
 
 1. 手机读取目标 Owner 的签名目录和证书。
 2. 第一次连接设备时，在现有 trust handover 中附带 `prepare_only: true`。
-   设备验证目标、比较当前身份归属，将候选 key 写入当前事务暂存区。
+   设备验证目标、比较当前身份归属；可续用时引用生效身份，否则准备候选 key。
 3. 返回 `prepared: true`、目标 `owner_domain_id`、候选 `device_id` 和
-   `identity_fingerprint`（`sha256:`）。生效 trust 与身份此时不变。
-4. 手机离开设备 SoftAP 后，向目标 Host 为**候选 key**申请 voucher；
+   `identity_fingerprint`（`sha256:`）及 `requires_voucher`。生效 trust 与身份此时不变。
+   只有同 Owner、同 Owner generation、同 key 且有可续用 Claim/Enrollment 才返回 false。
+4. 手机离开设备 SoftAP 后，仅在需要时向目标 Host 为**候选 key**申请 voucher；
    再次连接设备，沿用 trust handover 提交 voucher 与网络配置。
 5. 设备核对 voucher 的 Owner、key 与候选身份一致，然后暂存凭据和 trust。
+   续用身份接受无 voucher 的既有 Stage 路径；旧手机仍发送 voucher 时核对绑定，
+   不为新的 jti/exp 改写现有身份。相同 trust bundle 也只引用已有槽。
 
 配套实现位于 sibling `eidolon_client_mobile` 的 `device_setup_page.dart` 与
 `platform_device_provisioning.dart`，保持原有“两次访问设备、中间访问 Host”的流程。
 跨 Owner 或代际重置必须先准备候选身份，旧手机直接携带旧 key 的 voucher 会被拒绝；
 该能力需要 ESP32 与手机端配套发布。
+新手机对没有 `requires_voucher` 字段的旧固件仍默认申请 voucher。
+本地 Claim 的续用不等于服务端仍批准：联网后继续既有撤销检查和 erase 接收流程。
 
 voucher 的 HS256 签名仍由 Hub 验证；设备只解析绑定字段并核对它们。
 本地提交不意味着获得准入或 Approval。跨 Owner 后仍需目标 Owner 的标准批准。
@@ -66,13 +71,14 @@ voucher 的 HS256 签名仍由 Hub 验证；设备只解析绑定字段并核对
 
 | 持久化项 | 用途 |
 | --- | --- |
-| `eidolon_id/id_active` | 一个原子 JSON 项，包含当前 PEM、Owner/generation、key id、base id 与 voucher |
-| `eidolon_id/id_pending` | 当前配置的一个候选身份；成功或取消后删除 |
+| `eidolon_id/id_active`、`id_pending` | 两个物理身份槽；每槽一个原子 JSON，保持 key/base 一体 |
+| `eidolon_id/id_slot` | 一个 u8 选择当前槽；旧存储无此键时读取槽 0（id_active） |
+| `eidolon_id/id_stage` | 当前会话 generation、候选槽及是否引用活动身份；不复制 key/base |
 | `owner_trust` 现有双槽 | 暂存和切换信任材料；完成后清理非生效槽 |
 | `eidolon/ctx_record` | 当前事务的阶段、目标 Owner、SSID、快照摘要及清理进度 |
 | `wifi/ctx_candidate` | 仅用于提交恢复的网络候选，含密码；成功或安全取消后删除 |
 
-事务顺序：
+需要更换身份的事务顺序：
 
 ```text
 准备身份和 voucher → 暂存 trust → 验证 Wi-Fi 与 Owner 路由
@@ -87,6 +93,13 @@ voucher 的 HS256 签名仍由 Hub 验证；设备只解析绑定字段并核对
 `CommitDecided` 是不可回滚边界，早于任何旧归属清理。此前取消只丢弃暂存；
 此后取消、断网和重启都继续同一事务。密码留在 Wi-Fi 存储中，事务记录只存摘要。
 网络写入需要读取 NVS 验证，不能以 SsidManager 内存列表作为落盘证据。
+身份提交只验证已准备的记录并切换 `id_slot`，不在决定之后再次分配整份身份。
+清理必须按当前槽删除另一槽，不能再假设 `id_pending` 永远是废弃候选。
+
+不换身份的事务不做 Owner 清理，也不逐阶段重写 journal；保持一份不可变快照，
+以持久网络、身份和 trust 的实际摘要判断哪些动作已完成。`setup_generation` 仅用于
+会话关联，可以跨重启重复；它不是 Owner generation，不能据历史 generation/replacement
+判断本次是否换身份或需要重启。本次结果明确返回 `identity_replaced`。
 
 跨 Owner 与授权代际恢复复用 `EspIdfDeviceLocalEraseAdapter` 的范围清理计划：
 清理旧 Claim、Enrollment、handoff key、配置、伙伴偏好、Owner 人脸数据和旧网络，
@@ -118,6 +131,11 @@ OwnerChanged、AuthorityReset、AuthorityRollback、ForeignPrincipal 和 OwnerRe
 - 历史凭据、Claim 或 Enrollment 的 Owner/key/generation 与已验证目标不一致时，
   在授权配置中准备新身份；不能把这些材料继续交给新 Owner。
 - 有效 `ctx_record` 在 Station 启动前自动续做；未完成时拒绝另一配置覆盖它。
+  失败后明确显示恢复受阻，停止无状态变化的定时重放；长按重试同一决定。
+  `RequestOpen()` 入队不等于成功取得无线电，不能据此停止其他生命周期的定时器。
+  UI 只有在实际请求恢复 Station 后才显示返回网络，收到扫描事件才显示寻找 Wi-Fi。
+- 旧 `id_pending`/`ctx_record` 可由新槽位机制直接完成，不清缓存、不擦身份。
+  槽 1 激活后，旧固件不知道选择器，不能直接降级至不支持槽位的固件。
 - 只有旧版 `ctx_gen` 的中断没有可信身份快照，不能自动回滚到猜测的旧归属。
   物理打开的认证配置可以用新 voucher、新身份完成目标生命周期，提交后清除旧记录。
 - 无法读取 NVS、损坏的新事务快照不能被当作“首次配置”或“事务不存在”。
@@ -132,6 +150,14 @@ Claim 测试覆盖外 Owner、外 key、外 DeviceInstance、旧代际与迟到 
 commissioner 测试覆盖 prepare 不提交 trust、目录反回退；actor 测试覆盖提交后取消
 不能触发回滚。另运行 AuthorityLocator、范围清理、物理恢复、通道恢复等回归。
 手机测试核对准备后的 key 被用于 voucher，且请求 Host 时已离开设备连接。
+
+`run_commissioning_nvs_replay_tests.sh` 使用 ESP-IDF 5.5.4 的原版 NVS 存储实现，
+在 16 KiB 合成满分区上先证明旧身份复制失败，再运行生产事务/凭据代码恢复，
+逐个 Flash 写/擦点断电重启，以及跨重启 100 次完整网络维护事务。
+需要 `IDF_PATH`、C++ 编译器、pkg-config、cJSON、OpenSSL、zlib；无参数不需要现场数据。
+可选参数为从 Flash 0x8000 开始的私有镜像；镜像含密钥和密码，不能提交仓库。
+Trust/Claim/SSID 硬件端口仍为测试替身，不将此测试称为全部驱动或证书校验的实机验收。
+上述回归已纳入 CI 的 commissioning-recovery job。
 
 这些是主机故障注入和构建验证，不等同真机电源中断、Wi-Fi 驱动和手机 SoftAP 验收。
 尚需按共享真机计划完成各阶段断电/迟到响应，以及最终伙伴分配、对话链路联调。
@@ -165,3 +191,11 @@ M5Stack StackChan 与 ESP-BOX-3 / ESP32-S3 配置均生成完整固件并通过�
 新 generation 拒绝旧候选回调，以及连接先于/晚于租约释放、同代次重复通知和跨代次
 重新唤起运行时。对应 `run_commissioning_orchestrator_core_tests.sh` 与
 `run_operational_readiness_tests.sh`。这些为主机测试；本轮改动仍需 BOX-3 真机验证。
+
+
+2026-09-19 BOX-3 回归：保留原故障存储，仅更新应用，启动自动完成旧事务；
+用户换网后取得 IP，pi5 的既有 erase 收到 ERASED ACK。用户再次长按重新认领，
+新 Claim 激活，分配伙伴后 LiveKit Connected 并出现 speaking/listening 事件。
+此次身份更换由服务端此前已撤销并排队的 erase 引起，事务恢复本身没有强制轮换。
+完整调查、原版 NVS 回放与实机证据边界见
+[BOX-3 recovery 报告](../reports/box3-recovery-20260918/analysis.md)。

@@ -13,6 +13,25 @@ permissions:
   contents: read
 
 jobs:
+  commissioning-recovery:
+    name: Commissioning recovery and NVS power loss
+    runs-on: ubuntu-latest
+    container:
+      image: espressif/idf:v5.5.4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native test dependencies
+        run: apt-get update && apt-get install -y g++ pkg-config libcjson-dev libssl-dev zlib1g-dev
+      - name: Verify transaction and physical recovery
+        shell: bash
+        run: |
+          bash tests/run_commissioning_transaction_tests.sh
+          bash tests/run_commissioning_orchestrator_core_tests.sh
+          bash tests/run_owner_trust_commissioner_tests.sh
+          bash tests/run_device_local_erase_adapter_tests.sh
+          bash tests/run_device_physical_recovery_core_tests.sh
+          bash tests/run_commissioning_nvs_replay_tests.sh
+
   prepare:
     name: Determine variants to build
     runs-on: ubuntu-latest

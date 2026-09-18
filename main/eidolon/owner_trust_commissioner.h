@@ -40,6 +40,7 @@ enum class OwnerTrustStoreResult {
 struct PreparedCommissioningIdentity {
     std::string device_instance_id;
     std::string fingerprint;
+    bool requires_voucher = true;
 };
 
 class CommissioningCredentialStorePort {
