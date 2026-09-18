@@ -104,11 +104,7 @@ bool DeviceOutputGate::Allows(presentation::Output output) const {
     return mask & supported_outputs_ & OutputBit(output);
 }
 DeviceOutputGate& CurrentOutputGate() {
-#if CONFIG_EIDOLON_COMPANION_FACE
-    static DeviceOutputGate gate(false, CompiledDeviceCapabilities().OutputMask());
-#else
-    static DeviceOutputGate gate(true, CompiledDeviceCapabilities().OutputMask());
-#endif
+    static DeviceOutputGate gate(!kOutputPolicyRequired, CompiledDeviceCapabilities().OutputMask());
     return gate;
 }
 }

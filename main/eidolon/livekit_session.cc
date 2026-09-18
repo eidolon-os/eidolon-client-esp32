@@ -1,3 +1,4 @@
+#include "device_capabilities.h"
 #include "livekit_session.h"
 
 #include "eidolon_topics.h"
@@ -197,7 +198,7 @@ void LiveKitSession::OnDataReceived(const livekit_data_received_t* data, void* c
     }
     const char* topic = data->topic ? data->topic : "";
     if (strcmp(topic, kUiStateTopic) == 0) {
-        if (kCompanionFaceBuild && !session->IsAgent(data->sender_identity)) return;
+        if (kOutputPolicyRequired && !session->IsAgent(data->sender_identity)) return;
         session->HandleUiStatePayload(reinterpret_cast<const char*>(data->payload.bytes),
                                       data->payload.size);
         return;
@@ -403,9 +404,9 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
     identity_ = config.session.identity;
     generation_ = generation;
 
-    const bool speech=config.output_policy.known
+    const bool speech=CompiledDeviceCapabilities().speaker && (config.output_policy.known
         ? bool(config.output_policy.allowed&OutputBit(presentation::Output::Speech))
-        : !kCompanionFaceBuild;
+        : !kOutputPolicyRequired);
     esp_err_t media_err = EnsureMediaBoard(speech);
     if (media_err != ESP_OK) {
         return media_err;

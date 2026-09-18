@@ -8,6 +8,7 @@
 namespace eidolon {
 // Installed execution facilities, independent of Owner grants and UI layout.
 struct DeviceCapabilities {
+    bool policy_required = false;
     bool microphone = true;
     bool speaker = true;
     bool camera = false;
@@ -24,6 +25,9 @@ struct DeviceCapabilities {
 };
 inline DeviceCapabilities CompiledDeviceCapabilities() {
     DeviceCapabilities capabilities;
+#if CONFIG_EIDOLON_OUTPUT_POLICY_V1
+    capabilities.policy_required = true;
+#endif
 #ifdef ESP_PLATFORM
 #if !CONFIG_EIDOLON_CAP_MICROPHONE
     capabilities.microphone = false;

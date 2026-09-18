@@ -10,7 +10,12 @@ int main() {
     std::ifstream file("tests/fixtures/presentation/companion-manifest.json");
     std::ostringstream buffer;buffer<<file.rdbuf();auto golden=buffer.str();
     if (!golden.empty() && golden.back()=='\n') golden.pop_back();
-    assert(eidolon::BuildDeviceManifestJson("esp-box-3",false)==golden);
+    auto legacy=eidolon::CompiledDeviceCapabilities();
+    legacy.policy_required=false;
+    assert(eidolon::BuildDeviceManifestJson("esp-box-3",legacy)==golden);
+    const auto declared=eidolon::BuildDeviceManifestJson("esp-box-3",false);
+    assert((declared.find("eidolon.outputs.v1")!=std::string::npos)==
+        eidolon::CompiledDeviceCapabilities().policy_required);
     const auto compiled=eidolon::CompiledDeviceCapabilities();
     assert(compiled.dialogue_text && compiled.expression);
     assert(eidolon::CurrentOutputGate().Bind({true,1,compiled.OutputMask()}));
@@ -20,6 +25,7 @@ int main() {
     // A new text-only device uses the same serializer without a board-name branch.
     eidolon::DeviceCapabilities text;
     text.speaker=false;text.dialogue_text=true;
+    text.policy_required=true;
     auto manifest=eidolon::BuildDeviceManifestJson("text-fixture",text);
     auto* json=cJSON_Parse(manifest.c_str());assert(json);
     auto* media=cJSON_GetArrayItem(cJSON_GetObjectItemCaseSensitive(json,"media"),0);
@@ -27,6 +33,7 @@ int main() {
     assert(cJSON_GetArraySize(cJSON_GetObjectItemCaseSensitive(json,"actions"))==0);
     assert(manifest.find("output.dialogue_text")!=std::string::npos);
     assert(manifest.find("expression.profile")==std::string::npos);
+    assert(manifest.find("eidolon.outputs.v1")!=std::string::npos);
     cJSON_Delete(json);
     text.microphone=false;text.camera=true;
     manifest=eidolon::BuildDeviceManifestJson("camera-fixture",text);

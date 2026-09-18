@@ -13,6 +13,11 @@ inline constexpr bool kCompanionFaceBuild = true;
 #else
 inline constexpr bool kCompanionFaceBuild = false;
 #endif
+#if CONFIG_EIDOLON_OUTPUT_POLICY_V1 || CONFIG_EIDOLON_COMPANION_FACE
+inline constexpr bool kOutputPolicyRequired = true;
+#else
+inline constexpr bool kOutputPolicyRequired = false;
+#endif
 constexpr uint32_t OutputBit(presentation::Output output) { return static_cast<uint32_t>(output); }
 struct DeviceOutputPolicy {
     bool known=false;

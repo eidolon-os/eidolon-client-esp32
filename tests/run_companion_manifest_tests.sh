@@ -8,7 +8,7 @@ output="${TMPDIR:-/tmp}/eidolon_companion_manifest_tests"
 read -r -a cjson_flags <<<"$(pkg-config --cflags --libs libcjson)"
 
 for face in 0 1; do
-"${compiler}" -DCONFIG_EIDOLON_COMPANION_FACE="${face}" -DCONFIG_EIDOLON_CAP_EXPRESSION=1 -DCONFIG_EIDOLON_CAP_DIALOGUE_TEXT=1 -std=c++17 -Wall -Wextra -Werror \
+"${compiler}" -DCONFIG_EIDOLON_COMPANION_FACE="${face}" -DCONFIG_EIDOLON_OUTPUT_POLICY_V1=1 -DCONFIG_EIDOLON_CAP_EXPRESSION=1 -DCONFIG_EIDOLON_CAP_DIALOGUE_TEXT=1 -std=c++17 -Wall -Wextra -Werror \
   -I tests/stubs \
   -I main \
   tests/companion_manifest_test.cc \

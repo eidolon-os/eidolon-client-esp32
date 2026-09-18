@@ -1541,7 +1541,7 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload, uint32
         HandleExpressionCommand(command);return;
     }
 #endif
-    if ((config_.output_policy.known || kCompanionFaceBuild) &&
+    if ((config_.output_policy.known || kOutputPolicyRequired) &&
         (command.op==kControlOpHeadLookAt || command.op==kControlOpHeadHome || command.op==kControlOpHeadGesture) &&
         !CurrentOutputGate().Allows(presentation::Output::Motion)) {
         AckCommand(command,"rejected","MOTION_NOT_SELECTED");return;
@@ -1719,7 +1719,7 @@ void EidolonVoiceController::DoSessionControl(const std::string& payload, uint32
             return;
         }
         const auto* plan_json=cJSON_GetObjectItemCaseSensitive(root,"output_plan");
-        if (config_.output_policy.known || kCompanionFaceBuild) {
+        if (config_.output_policy.known || kOutputPolicyRequired) {
             SessionOutputPlan plan;
             if (!agent || !ParseSessionOutputPlan(plan_json,plan) ||
                 !CurrentOutputGate().Start(plan,current_conversation_id_)) {
@@ -2578,7 +2578,7 @@ void EidolonVoiceController::HandlePresenceSetCommand(const std::string& command
     //   awake (owner present/candidate): tech chime + cute head wobble + RGB marquee + happy face
     //   warm  (owner absent):            settle head down + dim the ring + sleepy face
     auto& board = Board::GetInstance();
-    const bool legacy=!(config_.output_policy.known || kCompanionFaceBuild);
+    const bool legacy=!(config_.output_policy.known || kOutputPolicyRequired);
     const bool motion=(legacy || CurrentOutputGate().Allows(presentation::Output::Motion)) && board.HasHeadMotion();
     const bool face=legacy || CurrentOutputGate().Allows(presentation::Output::Expression);
     const bool cue=legacy || CurrentOutputGate().Allows(presentation::Output::AudioCue);

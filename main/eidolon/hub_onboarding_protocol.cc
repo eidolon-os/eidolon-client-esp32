@@ -379,6 +379,8 @@ std::string BuildDeviceManifestJson(const std::string& board_name, const DeviceC
         std::string("{\"name\":\"interaction_mode\",\"observable\":false,\"schema\":{\"const\":\"") +
         interaction_mode + "\",\"type\":\"string\"},\"writable\":false}";
 
+    if (capabilities.policy_required)
+        properties += ",{\"name\":\"output.contract\",\"observable\":false,\"schema\":{\"const\":\"eidolon.outputs.v1\",\"type\":\"string\"},\"writable\":false}";
     if (capabilities.expression) properties += ",{\"name\":\"expression.profile\",\"observable\":false,\"schema\":{\"const\":\"eidolon.face.v1\",\"type\":\"string\"},\"writable\":false}";
     if (capabilities.dialogue_text) properties += ",{\"name\":\"output.dialogue_text\",\"observable\":false,\"schema\":{\"const\":true,\"type\":\"boolean\"},\"writable\":false}";
     if (capabilities.speaker && capabilities.audio_cue)

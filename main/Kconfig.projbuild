@@ -1159,6 +1159,13 @@ menu "Eidolon Hub"
         bool
         default y if EIDOLON_HUB_MODE && (BOARD_TYPE_ESP_BOX_3 || BOARD_TYPE_M5STACK_STACKCHAN || BOARD_TYPE_M5STACK_CORE_S3)
 
+    config EIDOLON_OUTPUT_POLICY_V1
+        bool "Require explicit Owner output policy and session output plan"
+        default y
+        help
+            New devices declare eidolon.outputs.v1 regardless of their renderer.
+            Disable only for deliberate compatibility with pre-contract Hosts.
+
     config EIDOLON_CAP_MICROPHONE
         bool "Device has a microphone execution path"
         default y

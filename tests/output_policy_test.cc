@@ -6,6 +6,10 @@
 using namespace eidolon;
 using presentation::Output;
 int main() {
+#if CONFIG_EIDOLON_OUTPUT_POLICY_V1
+    static_assert(kOutputPolicyRequired);
+    assert(!CurrentOutputGate().Allows(Output::Speech));
+#endif
     DeviceOutputGate gate(false);
     assert(!gate.Allows(Output::Speech));
     const auto expression=OutputBit(Output::Expression);
