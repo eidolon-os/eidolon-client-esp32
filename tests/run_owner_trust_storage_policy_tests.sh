@@ -14,5 +14,7 @@ output="${TMPDIR:-/tmp}/eidolon_owner_trust_storage_policy_tests"
 
 grep -Eq '^owner_trust,[[:space:]]*data,[[:space:]]*nvs,[[:space:]]*0x10000,[[:space:]]*0x10000,' \
   partitions/v2/16m_eidolon_box3.csv
+grep -Eq '^owner_trust,[[:space:]]*data,[[:space:]]*nvs,[[:space:]]*0x10000,[[:space:]]*0x10000,' \
+  partitions/v2/16m_eidolon.csv
 
 echo "owner_trust_storage_policy_test: PASS"

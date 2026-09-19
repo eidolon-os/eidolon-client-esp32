@@ -225,6 +225,7 @@ partition_offset() {
     nvs)      echo "0x9000" ;;
     otadata)  echo "0xd000" ;;
     phy_init) echo "0xf000" ;;
+    owner_trust) echo "0x10000" ;;
     ota_0)    echo "0x20000" ;;
     ota_1)    echo "0x470000" ;;
     assets)   echo "0x8c0000" ;;
@@ -237,6 +238,7 @@ partition_size() {
     nvs)      echo "0x4000" ;;
     otadata)  echo "0x2000" ;;
     phy_init) echo "0x1000" ;;
+    owner_trust) echo "0x10000" ;;
     ota_0)    echo "0x450000" ;;
     ota_1)    echo "0x450000" ;;
     assets)   echo "0x740000" ;;

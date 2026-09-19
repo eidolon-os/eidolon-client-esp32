@@ -7,6 +7,8 @@
 #include "esp_err.h"
 
 using nvs_handle_t = std::uint32_t;
+using nvs_open_mode_t = int;
+esp_err_t nvs_open_from_partition(const char* partition, const char* name, int mode, nvs_handle_t* handle);
 
 constexpr int NVS_READONLY = 0;
 constexpr int NVS_READWRITE = 1;

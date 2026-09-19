@@ -1,5 +1,5 @@
 #include "hub_trust_store.h"
-#include "mbedtls_compat.h"
+#include "mbedtls_sha256_compat.h"
 
 #include "device_provisioning_protocol.h"
 #include "hub_types.h"
@@ -523,7 +523,10 @@ OwnerTrustStoreResult OwnerTrustStore::ReplaceActive(
 OwnerTrustLoadResult OwnerTrustStore::ReadActive(OwnerTrustBundle& out) const {
     if (!EnsureLegacyTrustMigrated()) return OwnerTrustLoadResult::Unavailable;
     NvsHandle nvs(NVS_READONLY);
-    if (!nvs.valid()) return OwnerTrustLoadResult::Unavailable;
+    // Boards without a dedicated trust partition have no namespace on first
+    // setup. Absence is not a storage failure; never downgrade other errors.
+    if (!nvs.valid()) return nvs.result() == ESP_ERR_NVS_NOT_FOUND
+        ? OwnerTrustLoadResult::NotFound : OwnerTrustLoadResult::Unavailable;
     switch (ProbeActiveBundle(nvs.get(), out)) {
     case OwnerTrustSourceState::Valid: return OwnerTrustLoadResult::Loaded;
     case OwnerTrustSourceState::Empty: return OwnerTrustLoadResult::NotFound;
