@@ -14,6 +14,7 @@
 #include "hub_types.h"
 #include "session_memory_admission_core.h"
 #include "pending_session_control.h"
+#include "transcription_stream.h"
 
 namespace eidolon {
 
@@ -75,6 +76,10 @@ public:
 
 private:
     static void OnRoomStateChanged(livekit_connection_state_t state, void* ctx);
+    TranscriptionStream transcription_stream_;
+    TranscriptionSource transcription_source_ = TranscriptionSource::Unknown;
+    static void OnTextStreamOpen(const livekit_data_stream_header_t* header, void* ctx);
+    static void OnTextStreamClose(const livekit_data_stream_trailer_t* trailer, void* ctx);
     static void OnTextStreamChunk(const livekit_data_stream_chunk_t* chunk, void* ctx);
     static void OnDrainStreamChunk(const livekit_data_stream_chunk_t* chunk, void* ctx);
     static void OnParticipantInfo(const livekit_participant_info_t* info, void* ctx);

@@ -44,42 +44,6 @@ const char* JsonString(cJSON* root, const char* key)
     return cJSON_IsString(item) ? item->valuestring : nullptr;
 }
 
-bool JsonBool(cJSON* root, const char* key, bool fallback)
-{
-    cJSON* item = cJSON_GetObjectItem(root, key);
-    if (cJSON_IsBool(item)) {
-        return cJSON_IsTrue(item);
-    }
-    return fallback;
-}
-
-const char* NestedJsonString(cJSON* root, const char* object_key, const char* key)
-{
-    cJSON* object = cJSON_GetObjectItem(root, object_key);
-    if (!cJSON_IsObject(object)) {
-        return nullptr;
-    }
-    return JsonString(object, key);
-}
-
-TranscriptionSource SourceFromString(const char* value)
-{
-    if (!value) {
-        return TranscriptionSource::Unknown;
-    }
-    if (strcmp(value, "user") == 0 || strcmp(value, "local") == 0) {
-        return TranscriptionSource::User;
-    }
-    if (strcmp(value, "agent") == 0 || strcmp(value, "assistant") == 0 ||
-        strcmp(value, "remote") == 0) {
-        return TranscriptionSource::Agent;
-    }
-    if (strcmp(value, "system") == 0) {
-        return TranscriptionSource::System;
-    }
-    return TranscriptionSource::Unknown;
-}
-
 AgentPhase PhaseFromUiState(const char* value, const char* reason)
 {
     if (!value || strcmp(value, "idle") == 0) {
@@ -112,56 +76,49 @@ void LiveKitSession::OnRoomStateChanged(livekit_connection_state_t state, void* 
     }
 }
 
+void LiveKitSession::OnTextStreamOpen(const livekit_data_stream_header_t* header, void* ctx)
+{
+    auto* session = static_cast<LiveKitSession*>(ctx);
+    if (!session || !header) return;
+    session->transcription_stream_.Clear();
+    session->transcription_source_ = TranscriptionSource::Unknown;
+    if (!header->is_text || !CurrentOutputGate().Allows(presentation::Output::DialogueText)) return;
+    if (header->sender_identity && session->identity_ == header->sender_identity) {
+        session->transcription_source_ = TranscriptionSource::User;
+    } else if (session->IsAgent(header->sender_identity)) {
+        session->transcription_source_ = TranscriptionSource::Agent;
+    } else {
+        return;
+    }
+    session->transcription_stream_.Open(header->stream_id);
+}
+
 void LiveKitSession::OnTextStreamChunk(const livekit_data_stream_chunk_t* chunk, void* ctx)
 {
     auto* session = static_cast<LiveKitSession*>(ctx);
-    if (!session || !chunk || !session->on_transcription_ || chunk->content_size == 0) {
+    if (!session || !chunk) return;
+    if (!CurrentOutputGate().Allows(presentation::Output::DialogueText)) {
+        session->transcription_stream_.Clear();
         return;
     }
+    session->transcription_stream_.Append(chunk->stream_id, chunk->chunk_index,
+                                          chunk->content, chunk->content_size);
+}
 
-    if (!CurrentOutputGate().Allows(presentation::Output::DialogueText)) return;
-    std::string payload(reinterpret_cast<const char*>(chunk->content), chunk->content_size);
-    cJSON* root = cJSON_Parse(payload.c_str());
-    if (!root) {
-        // lk.transcription may deliver raw token/chunk text. Those chunks are
-        // transport data, not a stable device subtitle; only structured
-        // transcription payloads are surfaced to the UI.
-        return;
+void LiveKitSession::OnTextStreamClose(const livekit_data_stream_trailer_t* trailer, void* ctx)
+{
+    auto* session = static_cast<LiveKitSession*>(ctx);
+    if (!session || !trailer) return;
+    auto text = session->transcription_stream_.Close(trailer->stream_id,
+        (!trailer->reason || !*trailer->reason) &&
+        CurrentOutputGate().Allows(presentation::Output::DialogueText));
+    if (!text.empty() && session->on_transcription_) {
+        // The ESP SDK does not expose transcription_final attributes. Do not
+        // present interim user recognition as a final user utterance.
+        const bool final = session->transcription_source_ == TranscriptionSource::Agent;
+        session->on_transcription_({session->transcription_source_, text, final});
+        ESP_LOGD(TAG, "Transcription delivered (%u bytes)", static_cast<unsigned>(text.size()));
     }
-
-    const char* text = JsonString(root, "text");
-    if (!text) {
-        text = JsonString(root, "transcript");
-    }
-    if (!text) {
-        text = JsonString(root, "content");
-    }
-    if (text && text[0] != '\0') {
-        const char* source = JsonString(root, "source");
-        if (!source) {
-            source = JsonString(root, "role");
-        }
-
-        TranscriptionSource mapped_source = SourceFromString(source);
-        if (mapped_source == TranscriptionSource::Unknown) {
-            const char* identity = JsonString(root, "participant_identity");
-            if (!identity) {
-                identity = JsonString(root, "identity");
-            }
-            if (!identity) {
-                identity = NestedJsonString(root, "participant", "identity");
-            }
-            if (identity && identity[0] != '\0') {
-                mapped_source = (session->identity_ == identity)
-                                    ? TranscriptionSource::User
-                                    : TranscriptionSource::Agent;
-            }
-        }
-
-        bool is_final = JsonBool(root, "final", JsonBool(root, "is_final", false));
-        session->on_transcription_({mapped_source, text, is_final});
-    }
-    cJSON_Delete(root);
 }
 
 void LiveKitSession::OnDrainStreamChunk(const livekit_data_stream_chunk_t* chunk, void* ctx)
@@ -317,6 +274,8 @@ void LiveKitSession::RegisterTranscriptionHandler()
     }
     livekit_data_stream_handler_t handler = {
         .on_recv = OnTextStreamChunk,
+        .on_open = OnTextStreamOpen,
+        .on_close = OnTextStreamClose,
         .ctx = this,
     };
     livekit_room_data_stream_topic_register(room_handle_, kTranscriptionTopic, &handler);
@@ -434,6 +393,7 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
         Disconnect();
     }
 
+    transcription_stream_.Clear();
     identity_ = config.session.identity;
     generation_ = generation;
 
@@ -596,6 +556,7 @@ esp_err_t LiveKitSession::Disconnect()
         pending_session_control_.Clear();
     }
     room_handle_ = nullptr;
+    transcription_stream_.Clear();
     identity_.clear();
     last_failure_reason_ = LIVEKIT_FAILURE_REASON_NONE;
     if (media_board_initialized_) {
