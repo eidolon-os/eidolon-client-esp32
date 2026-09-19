@@ -8,9 +8,6 @@
 #   ./scripts/eidolon/eidolon-m5stack-stackchan.sh build
 #   ./scripts/eidolon/eidolon-m5stack-stackchan.sh flash
 #
-# 兼容入口:
-#   ./scripts/eidolon/eidolon.sh  -> 转发到本脚本
-#
 # Environment:
 #   EIDOLON_PORT      默认串口
 #   EIDOLON_IDF_EXPORT  export.sh 的完整路径（最高优先级）
@@ -953,7 +950,6 @@ Eidolon dev toolkit — M5Stack CoreS3 (StackChan body)
 
 交互菜单（推荐）:
   $(basename "$0")
-  或 ./scripts/eidolon/eidolon.sh
 
 命令行模式:
   $(basename "$0") <command> [options]
