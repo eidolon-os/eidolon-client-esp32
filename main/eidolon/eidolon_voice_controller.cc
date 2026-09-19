@@ -1,4 +1,5 @@
 #include "eidolon_voice_controller.h"
+#include "device_capabilities.h"
 
 #include "controller_worker_resources.h"
 
@@ -1721,11 +1722,19 @@ void EidolonVoiceController::DoSessionControl(const std::string& payload, uint32
         const auto* plan_json=cJSON_GetObjectItemCaseSensitive(root,"output_plan");
         if (config_.output_policy.known || kOutputPolicyRequired) {
             SessionOutputPlan plan;
-            if (!agent || !ParseSessionOutputPlan(plan_json,plan) ||
+            const bool parsed = ParseSessionOutputPlan(plan_json,plan);
+            if (!agent || !parsed ||
                 !CurrentOutputGate().Start(plan,current_conversation_id_)) {
                 cJSON_Delete(root);
                 CurrentOutputGate().Close();
-                ESP_LOGW(TAG,"Rejecting missing, stale or unauthorized output plan");
+                ESP_LOGW(TAG,"Rejecting output plan agent=%d parsed=%d policy=%lu/%lu "
+                             "selected=0x%lx allowed=0x%lx supported=0x%lx session_match=%d",
+                         agent, parsed, static_cast<unsigned long>(plan.policy_revision),
+                         static_cast<unsigned long>(config_.output_policy.revision),
+                         static_cast<unsigned long>(plan.selected),
+                         static_cast<unsigned long>(config_.output_policy.allowed),
+                         static_cast<unsigned long>(CompiledDeviceCapabilities().OutputMask()),
+                         plan.session_id==current_conversation_id_);
                 HandleSessionEnd(EndReason::Error);
                 return;
             }

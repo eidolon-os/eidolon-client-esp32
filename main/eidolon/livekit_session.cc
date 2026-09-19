@@ -7,6 +7,7 @@
 
 #include <cJSON.h>
 #include <esp_log.h>
+#include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <livekit.h>
@@ -174,13 +175,28 @@ void LiveKitSession::OnParticipantInfo(const livekit_participant_info_t* info, v
 {
     auto* session=static_cast<LiveKitSession*>(ctx);
     if (!session || !info || !info->identity || std::strlen(info->identity)>128) return;
-    std::lock_guard<std::mutex> lock(session->peers_mutex_);
-    for (auto& peer:session->agent_peers_) {
-        if (peer==info->identity) { peer.clear(); break; }
+    std::string pending;
+    uint32_t generation;
+    {
+        std::lock_guard<std::mutex> lock(session->peers_mutex_);
+        generation=session->generation_;
+        for (auto& peer:session->agent_peers_) {
+            if (peer==info->identity) { peer.clear(); break; }
+        }
+        bool registered=false;
+        if (info->kind==LIVEKIT_PARTICIPANT_KIND_AGENT &&
+            info->state!=LIVEKIT_PARTICIPANT_STATE_DISCONNECTED) {
+            for (auto& peer:session->agent_peers_) if (peer.empty()) {
+                peer=info->identity;registered=true;break;
+            }
+        }
+        pending=session->pending_session_control_.Resolve(
+            info->identity,registered,generation,esp_timer_get_time()/1000);
     }
-    if (info->kind!=LIVEKIT_PARTICIPANT_KIND_AGENT ||
-        info->state==LIVEKIT_PARTICIPANT_STATE_DISCONNECTED) return;
-    for (auto& peer:session->agent_peers_) if (peer.empty()) { peer=info->identity;return; }
+    if (!pending.empty() && session->on_session_control_) {
+        ESP_LOGI(TAG,"Delivering session control after Agent signalling confirmation");
+        session->on_session_control_(pending,generation,true);
+    }
 }
 bool LiveKitSession::IsAgent(const char* identity)
 {
@@ -204,11 +220,28 @@ void LiveKitSession::OnDataReceived(const livekit_data_received_t* data, void* c
         return;
     }
     if (strcmp(topic, kSessionControlTopic) == 0 && session->on_session_control_) {
+        if (data->payload.size>1024) return;
         std::string payload(reinterpret_cast<const char*>(data->payload.bytes),
                             data->payload.size);
+        bool agent=false;
+        uint32_t generation;
+        {
+            std::lock_guard<std::mutex> lock(session->peers_mutex_);
+            generation=session->generation_;
+            if (data->sender_identity) {
+                for (const auto& peer:session->agent_peers_)
+                    if (!peer.empty() && peer==data->sender_identity) { agent=true;break; }
+                if (!agent) session->pending_session_control_.Stage(
+                    data->sender_identity,payload,generation,esp_timer_get_time()/1000);
+            }
+        }
+        if (!agent) {
+            ESP_LOGI(TAG,"Session control awaits authenticated Agent signalling");
+            return;
+        }
         ESP_LOGI(TAG, "[lifecycle] session_control received topic=%s bytes=%u",
                  topic, static_cast<unsigned>(data->payload.size));
-        session->on_session_control_(payload, session->generation_, session->IsAgent(data->sender_identity));
+        session->on_session_control_(payload, generation, true);
         return;
     }
     if (strcmp(topic, kEventTopic) == 0 && session->on_device_event_) {
@@ -440,7 +473,11 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
         .renderer = renderer,
     };
     room_options.on_state_changed = OnRoomStateChanged;
-    { std::lock_guard<std::mutex> lock(peers_mutex_); for (auto& peer:agent_peers_) peer.clear(); }
+    {
+        std::lock_guard<std::mutex> lock(peers_mutex_);
+        for (auto& peer:agent_peers_) peer.clear();
+        pending_session_control_.Clear();
+    }
     room_options.on_data_received = OnDataReceived;
     room_options.on_participant_info = OnParticipantInfo;
     room_options.ctx = this;
@@ -513,6 +550,11 @@ esp_err_t LiveKitSession::Disconnect()
 {
     connected_ = false;
     if (room_handle_ == nullptr) {
+        {
+            std::lock_guard<std::mutex> lock(peers_mutex_);
+            for (auto& peer:agent_peers_) peer.clear();
+            pending_session_control_.Clear();
+        }
         identity_.clear();
         last_failure_reason_ = LIVEKIT_FAILURE_REASON_NONE;
         if (media_board_initialized_) {
@@ -547,6 +589,11 @@ esp_err_t LiveKitSession::Disconnect()
 
     if (livekit_room_destroy(handle) != LIVEKIT_ERR_NONE) {
         ESP_LOGW(TAG, "livekit_room_destroy failed");
+    }
+    {
+        std::lock_guard<std::mutex> lock(peers_mutex_);
+        for (auto& peer:agent_peers_) peer.clear();
+        pending_session_control_.Clear();
     }
     room_handle_ = nullptr;
     identity_.clear();

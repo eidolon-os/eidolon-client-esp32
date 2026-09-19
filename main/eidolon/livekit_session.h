@@ -13,6 +13,7 @@
 #include "eidolon_ui_types.h"
 #include "hub_types.h"
 #include "session_memory_admission_core.h"
+#include "pending_session_control.h"
 
 namespace eidolon {
 
@@ -80,6 +81,7 @@ private:
     bool IsAgent(const char* identity);
     std::mutex peers_mutex_;
     std::array<std::string, 4> agent_peers_;
+    PendingSessionControl pending_session_control_;
     static void OnDataReceived(const livekit_data_received_t* data, void* ctx);
 
     void HandleStateChanged(livekit_connection_state_t state);
