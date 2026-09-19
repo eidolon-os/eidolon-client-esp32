@@ -85,7 +85,7 @@ void CompanionFaceView::Build(const BuildContext& ctx) {
     lv_anim_set_delay(&scroll,1500);lv_anim_set_repeat_delay(&scroll,2500);
     lv_anim_set_playback_delay(&scroll,1500);lv_anim_set_duration(&scroll,6000);
     lv_obj_set_style_anim(information_,&scroll,0);
-    input_hint_=Label(ctx.parent,ctx.font,LV_ALIGN_TOP_LEFT,12,layout.actions.y+6);
+    input_hint_=Label(ctx.parent,ctx.font,LV_ALIGN_TOP_LEFT,12,layout.actions.y+2);
     lv_obj_set_size(input_hint_,layout.actions.w,28);
     lv_label_set_long_mode(input_hint_,LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_color(input_hint_,lv_color_hex(0x9AA9B5),0);
@@ -284,6 +284,9 @@ void CompanionFaceView::Render(const EidolonUiModel& model) {
     // Dialogue only ever enters this dedicated strip. System instructions live
     // in a separate, manually scrollable page, never in the avatar's bubble.
     information_text_=face && model.scene!=UiScene::Conversation ? detail : "";
+    // The reachable start action already explains how to begin. Keep the
+    // ready face free of a second, generic invitation to do the same thing.
+    if (model.scene==UiScene::Ready && has_actions_) information_text_="";
     if (model.scene==UiScene::Conversation &&
         CurrentOutputGate().Allows(presentation::Output::DialogueText) && model.subtitle)
         information_text_=model.subtitle;

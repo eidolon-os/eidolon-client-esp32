@@ -112,6 +112,17 @@ int main(int argc,char** argv) {
         ClickAt(pointer, (mic_area.x1+mic_area.x2)/2, (mic_area.y1+mic_area.y2)/2);
         assert(events.size()==before_click+1);
         Screenshot(screen,prefix+"-physical-input.ppm");
+        model.scene=UiScene::Ready;model.status_text="Ready";model.detail_text="Start a conversation";
+        model.input_hint="Press button to start";
+        view.Render(model);
+        assert(!Find(screen,model.detail_text));
+        auto* ready_hint=Find(screen,model.input_hint);
+        assert(ready_hint && lv_obj_is_visible(ready_hint));
+        Within(ready_hint,layout.actions);
+        lv_area_t hint_area;lv_obj_get_coords(ready_hint,&hint_area);
+        assert(hint_area.y2<230); // at least ten pixels of bottom breathing room
+        Screenshot(screen,prefix+"-ready-physical.ppm");
+        model.scene=UiScene::Conversation;model.status_text="Listening";
         model.primary_presentation=UiActionPresentation::TouchControl;model.show_end_action=true;
         model.mode_label="PTT";model.primary_label="TALK";model.primary_intent=UiIntent::BeginTalk;
         view.Render(model);auto* talk=lv_obj_get_parent(Find(screen,"TALK"));

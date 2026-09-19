@@ -23,6 +23,11 @@
 # Every eidolon_* function takes PROJECT_ROOT explicitly and is safe under
 # `set -euo pipefail`.
 
+# Normal builds consume dependencies.lock. An optional search for newer versions
+# adds network work and evaluates Kconfig rules from unselected candidates.
+# Dependency updates remain explicit; callers can opt into the advisory check.
+export IDF_COMPONENT_CHECK_NEW_VERSION="${IDF_COMPONENT_CHECK_NEW_VERSION:-0}"
+
 # ---- paths -----------------------------------------------------------------
 eidolon_idf_manifest() { printf '%s/main/idf_component.yml' "$1"; }
 eidolon_lock_file()     { printf '%s/dependencies.lock' "$1"; }
