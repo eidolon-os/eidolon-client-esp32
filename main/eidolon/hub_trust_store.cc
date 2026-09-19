@@ -201,6 +201,21 @@ OwnerTrustSourceState ProbeActiveBundle(
     return OwnerTrustSourceState::Valid;
 }
 
+// The same read contract applies to dedicated storage and legacy default NVS.
+// Reading an unclaimed device must not create a namespace or hide real errors.
+OwnerTrustSourceState ReadTrustSource(
+    OwnerTrustBundle& bundle, bool force_default = false)
+{
+    bundle = OwnerTrustBundle{};
+    NvsHandle nvs(NVS_READONLY, force_default);
+    if (!nvs.valid()) {
+        return nvs.result() == ESP_ERR_NVS_NOT_FOUND
+                   ? OwnerTrustSourceState::Empty
+                   : OwnerTrustSourceState::Unavailable;
+    }
+    return ProbeActiveBundle(nvs.get(), bundle);
+}
+
 int StagedSlot(nvs_handle_t handle)
 {
     const std::string staged = ReadString(handle, kStagedSlotKey);
@@ -267,13 +282,7 @@ bool EnsureLegacyTrustMigrated()
     OwnerTrustBundle dedicated_bundle;
     OwnerTrustSourceState dedicated_state = OwnerTrustSourceState::Unavailable;
     {
-        // A freshly provisioned partition has no namespace yet; NVS_READONLY
-        // reports that normal state as ESP_ERR_NVS_NOT_FOUND. Opening the
-        // dedicated namespace read-write creates only its namespace entry and
-        // lets migration distinguish "empty" from an unavailable partition.
-        NvsHandle dedicated(NVS_READWRITE);
-        if (!dedicated.valid()) return false;
-        dedicated_state = ProbeActiveBundle(dedicated.get(), dedicated_bundle);
+        dedicated_state = ReadTrustSource(dedicated_bundle);
         if (dedicated_state == OwnerTrustSourceState::Valid) {
             ReclaimLegacyTrustKeys();
             return true;
@@ -287,16 +296,7 @@ bool EnsureLegacyTrustMigrated()
     OwnerTrustBundle legacy_bundle;
     OwnerTrustSourceState legacy_state = OwnerTrustSourceState::Unavailable;
     {
-        NvsHandle legacy(NVS_READONLY, true);
-        if (!legacy.valid()) {
-            // A factory-fresh default NVS has no Eidolon namespace. That is an
-            // empty migration source, not a storage outage.
-            legacy_state = legacy.result() == ESP_ERR_NVS_NOT_FOUND
-                               ? OwnerTrustSourceState::Empty
-                               : OwnerTrustSourceState::Unavailable;
-        } else {
-            legacy_state = ProbeActiveBundle(legacy.get(), legacy_bundle);
-        }
+        legacy_state = ReadTrustSource(legacy_bundle, true);
         const OwnerTrustMigrationAction action = ChooseOwnerTrustMigration(
             dedicated_state, legacy_state);
         if (action == OwnerTrustMigrationAction::StartEmpty) {
@@ -522,12 +522,7 @@ OwnerTrustStoreResult OwnerTrustStore::ReplaceActive(
 
 OwnerTrustLoadResult OwnerTrustStore::ReadActive(OwnerTrustBundle& out) const {
     if (!EnsureLegacyTrustMigrated()) return OwnerTrustLoadResult::Unavailable;
-    NvsHandle nvs(NVS_READONLY);
-    // Boards without a dedicated trust partition have no namespace on first
-    // setup. Absence is not a storage failure; never downgrade other errors.
-    if (!nvs.valid()) return nvs.result() == ESP_ERR_NVS_NOT_FOUND
-        ? OwnerTrustLoadResult::NotFound : OwnerTrustLoadResult::Unavailable;
-    switch (ProbeActiveBundle(nvs.get(), out)) {
+    switch (ReadTrustSource(out)) {
     case OwnerTrustSourceState::Valid: return OwnerTrustLoadResult::Loaded;
     case OwnerTrustSourceState::Empty: return OwnerTrustLoadResult::NotFound;
     case OwnerTrustSourceState::Unavailable: return OwnerTrustLoadResult::Unavailable;
