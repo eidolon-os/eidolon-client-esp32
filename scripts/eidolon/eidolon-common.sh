@@ -330,22 +330,41 @@ try:
 except Exception:
     sys.exit(3)
 port, tmo = sys.argv[1], float(sys.argv[2])
+deadline = time.monotonic() + tmo
+reset_sent = False
+p = None
 try:
-    p = serial.Serial(port, 115200, timeout=1)
-except Exception:
-    sys.exit(4)
-# Reset into the app: RTS=EN low pulse, DTR=IO0 high (normal boot).
-p.dtr = False
-p.rts = True; time.sleep(0.1); p.rts = False
-deadline = time.time() + tmo
-while time.time() < deadline:
-    try:
-        line = p.readline().decode("utf-8", "replace")
-    except Exception:
-        break
-    i = line.find("EIDOLON-BUILDSTAMP")
-    if i != -1:
-        print(line[i:].strip()); break
+    while time.monotonic() < deadline:
+        try:
+            if p is None:
+                # Set line levels before opening. Reopening after native USB
+                # re-enumeration must not reset the application again.
+                p = serial.Serial(port=None, baudrate=115200, timeout=0.3)
+                p.dtr = False
+                p.rts = False
+                p.port = port
+                p.open()
+                if not reset_sent:
+                    reset_sent = True
+                    p.rts = True
+                    time.sleep(0.1)
+                    p.rts = False
+            line = p.readline().decode("utf-8", "replace")
+            i = line.find("EIDOLON-BUILDSTAMP")
+            if i != -1:
+                print(line[i:].strip())
+                break
+        except (serial.SerialException, OSError):
+            if p is not None:
+                try:
+                    p.close()
+                except (serial.SerialException, OSError):
+                    pass
+            p = None
+            time.sleep(0.1)
+finally:
+    if p is not None:
+        p.close()
 PY
 )"
 

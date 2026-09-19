@@ -634,6 +634,7 @@ erase_partitions() {
 
 cmd_flash() {
   require_idf
+  verify_board_sdkconfig
   eidolon_prepare_build "${PROJECT_ROOT}"
   if ! PORT="$(detect_port)"; then
     echo "error: 未找到串口" >&2
@@ -959,7 +960,13 @@ Eidolon dev toolkit — M5Stack CoreS3 (StackChan body)
 
 Commands:
   port | info | setup | build | flash | monitor | run
-  erase | clean | menuconfig | merge-bin
+  erase | verify | clean | menuconfig | merge-bin
+
+完整清空后烧录（包含 NVS、应用及资源）:
+  $(basename "$0") erase --all -P PORT
+  $(basename "$0") flash -P PORT
+仅更新应用（保留 NVS 和资源）:
+  $(basename "$0") flash --app-only -P PORT
 
 ESP-IDF:
   本板要求 ESP-IDF v${BOARD_IDF_VERSION}，脚本按版本查找并校验后自动 source export.sh
