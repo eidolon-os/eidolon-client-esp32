@@ -78,8 +78,19 @@ dependencies:
     version: ^2.1.6
     rules:
     - if: target in [esp32s3]
+  # Lower bound: esp_capture 0.8.x requires esp_video ^2.1.
+  # Upper bound: 2.5.0 gates its own esp_h264 dependency on a Kconfig symbol
+  # that only esp_video 2.5.0 defines
+  # ($CONFIG{ESP_VIDEO_USE_CUSTOMIZED_ESP_H264_VERSION}). Dependency resolution
+  # runs before any component Kconfig is in the build, so on a project that
+  # resolves to any other esp_video the symbol never exists: the component
+  # manager reports a missing Kconfig key, asks CMake to re-run, and the second
+  # pass reports the same key -> "Missing required kconfig option after retry."
+  # at configure time, before one file is compiled. Being a *candidate* is
+  # enough — the solver reads that rule off the registry even when it settles
+  # on 2.4.1 — so the range, not the lock, is what has to exclude it.
   espressif/esp_video:
-    version: ^2.1      # esp_capture 0.8.x requires esp_video ^2.1
+    version: ">=2.1,<2.5"
     rules:
     - if: target in [esp32p4, esp32s3]
   
