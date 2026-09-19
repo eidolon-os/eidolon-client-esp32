@@ -270,7 +270,7 @@ void LiveKitSession::HandleUiStatePayload(const char* payload, size_t size)
     }
     if (state) {
         auto phase=PhaseFromUiState(state, JsonString(root, "reason"));
-        if (phase==AgentPhase::AgentSpeaking && !CurrentOutputGate().Allows(presentation::Output::Speech))
+        if (phase==AgentPhase::AgentSpeaking && !CurrentOutputGate().AllowsAny(kAudioOutputs))
             phase=AgentPhase::Silent;
         on_agent_phase_(phase);
     }
@@ -320,12 +320,12 @@ void LiveKitSession::UnregisterStreamHandlers()
     }
 }
 
-esp_err_t LiveKitSession::EnsureMediaBoard(bool speech)
+esp_err_t LiveKitSession::EnsureMediaBoard(bool audio_output)
 {
     if (media_board_initialized_) {
         return ESP_OK;
     }
-    esp_err_t err = eidolon_livekit_board_init(speech);
+    esp_err_t err = eidolon_livekit_board_init(audio_output);
     if (err == ESP_OK) {
         media_board_initialized_ = true;
     } else {
@@ -404,17 +404,18 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
     identity_ = config.session.identity;
     generation_ = generation;
 
-    const bool speech=CompiledDeviceCapabilities().speaker && (config.output_policy.known
-        ? bool(config.output_policy.allowed&OutputBit(presentation::Output::Speech))
-        : !kOutputPolicyRequired);
-    esp_err_t media_err = EnsureMediaBoard(speech);
+    const auto local_audio = CompiledDeviceCapabilities().OutputMask() & kAudioOutputs;
+    const bool audio_output = config.output_policy.known
+        ? bool(config.output_policy.allowed & local_audio)
+        : (!kOutputPolicyRequired && local_audio != 0);
+    esp_err_t media_err = EnsureMediaBoard(audio_output);
     if (media_err != ESP_OK) {
         return media_err;
     }
 
     esp_capture_handle_t capturer = eidolon_livekit_board_get_capturer();
     av_render_handle_t renderer = eidolon_livekit_board_get_renderer();
-    if (!capturer || (speech && !renderer)) {
+    if (!capturer || (audio_output && !renderer)) {
         ESP_LOGE(TAG, "Media pipeline not ready");
         ReleaseMediaBoard();
         return ESP_ERR_INVALID_STATE;
@@ -435,7 +436,7 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
         .capturer = capturer,
     };
     room_options.subscribe = {
-        .kind = speech ? LIVEKIT_MEDIA_TYPE_AUDIO : LIVEKIT_MEDIA_TYPE_NONE,
+        .kind = audio_output ? LIVEKIT_MEDIA_TYPE_AUDIO : LIVEKIT_MEDIA_TYPE_NONE,
         .renderer = renderer,
     };
     room_options.on_state_changed = OnRoomStateChanged;

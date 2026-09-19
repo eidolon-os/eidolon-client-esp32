@@ -99,9 +99,12 @@ void DeviceOutputGate::Close() {
     std::lock_guard<std::mutex> lock(mutex_);active_=false;selected_=0;
 }
 bool DeviceOutputGate::Allows(presentation::Output output) const {
+    return AllowsAny(OutputBit(output));
+}
+bool DeviceOutputGate::AllowsAny(uint32_t outputs) const {
     std::lock_guard<std::mutex> lock(mutex_);
     const auto mask=policy_.known ? (active_ ? selected_ : 0u) : (legacy_ ? kLegacyOutputs : 0u);
-    return mask & supported_outputs_ & OutputBit(output);
+    return mask & supported_outputs_ & outputs;
 }
 DeviceOutputGate& CurrentOutputGate() {
     static DeviceOutputGate gate(!kOutputPolicyRequired, CompiledDeviceCapabilities().OutputMask());

@@ -242,7 +242,7 @@ static esp_err_t build_renderer(esp_codec_dev_handle_t play_handle, uint32_t out
     return ESP_OK;
 }
 
-extern "C" esp_err_t eidolon_livekit_board_init(bool speech)
+extern "C" esp_err_t eidolon_livekit_board_init(bool audio_output)
 {
     if (s_capturer != nullptr) {
         return ESP_OK;
@@ -255,7 +255,7 @@ extern "C" esp_err_t eidolon_livekit_board_init(bool speech)
 
     esp_codec_dev_handle_t play = audio_in.PlaybackHandle();
     auto* codec = audio_in.Codec();
-    if ((speech && !play) || !codec) {
+    if ((audio_output && !play) || !codec) {
         ESP_LOGE(TAG, "Codec playback handle / codec not available");
         return ESP_ERR_INVALID_STATE;
     }
@@ -284,7 +284,7 @@ extern "C" esp_err_t eidolon_livekit_board_init(bool speech)
     const int output_channels = codec && codec->output_channels() > 0
                                     ? codec->output_channels()
                                     : 1;
-    if (speech) {
+    if (audio_output) {
         ESP_RETURN_ON_ERROR(build_renderer(play, output_sample_rate, output_channels), TAG,
                             "renderer");
     }

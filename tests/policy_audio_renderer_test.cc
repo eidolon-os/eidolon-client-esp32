@@ -32,6 +32,22 @@ int main() {
     // Queue contents are irrelevant: each final write is independently gated.
     for(int i=0;i<100;++i) assert(audio_render_write(outer,&frame)==0);
     assert(writes==1);
+    const auto text=eidolon::OutputBit(Output::DialogueText);
+    const auto cue=eidolon::OutputBit(Output::AudioCue);
+    assert(gate.Bind({true,2,text|cue}));
+#if CONFIG_EIDOLON_CAP_AUDIO_CUE
+    assert(gate.Start({"cue",2,text|cue,false},"cue"));
+    assert(!gate.Allows(Output::Speech));
+    assert(audio_render_write(outer,&frame)==0 && writes==2);
+#else
+    assert(!gate.Start({"cue",2,text|cue,false},"cue"));
+    assert(audio_render_write(outer,&frame)==0 && writes==1);
+#endif
+    const auto before=writes;
+    // A fresh text-only selection must stop stale buffered audio immediately.
+    assert(gate.Start({"text",2,text,false},"text"));
+    for(int i=0;i<100;++i) assert(audio_render_write(outer,&frame)==0);
+    assert(writes==before);
     assert(audio_render_close(outer)==0);
     audio_render_free_handle(outer);
     assert(freed==1);

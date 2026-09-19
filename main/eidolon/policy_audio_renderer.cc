@@ -6,7 +6,7 @@ audio_render_handle_t Init(void* cfg, int size) {
     return size == sizeof(audio_render_handle_t) ? *static_cast<audio_render_handle_t*>(cfg) : nullptr;
 }
 int Write(audio_render_handle_t inner, av_render_audio_frame_t* frame) {
-    if (!CurrentOutputGate().Allows(presentation::Output::Speech)) return 0;
+    if (!CurrentOutputGate().AllowsAny(kAudioOutputs)) return 0;
     return audio_render_write(inner, frame);
 }
 }

@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-esp_err_t eidolon_livekit_board_init(bool speech);
+esp_err_t eidolon_livekit_board_init(bool audio_output);
 esp_capture_handle_t eidolon_livekit_board_get_capturer(void);
 av_render_handle_t eidolon_livekit_board_get_renderer(void);
 int64_t eidolon_livekit_board_last_playback_us(void);

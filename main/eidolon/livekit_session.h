@@ -92,7 +92,7 @@ private:
     // — so the start of every conversation tore one down and built the other,
     // which is the moment a memory-tight board had least room to build it in.
     // Built once and kept, because the channel it serves is kept.
-    esp_err_t EnsureMediaBoard(bool speech);
+    esp_err_t EnsureMediaBoard(bool audio_output);
     void ReleaseMediaBoard();
     // Decides, and says in the log, whether the internal heap can hold a room
     // right now. Returns false having already reported why.

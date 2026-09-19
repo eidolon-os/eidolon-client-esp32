@@ -19,6 +19,8 @@ inline constexpr bool kOutputPolicyRequired = true;
 inline constexpr bool kOutputPolicyRequired = false;
 #endif
 constexpr uint32_t OutputBit(presentation::Output output) { return static_cast<uint32_t>(output); }
+inline constexpr uint32_t kAudioOutputs = OutputBit(presentation::Output::Speech) |
+    OutputBit(presentation::Output::AudioCue);
 struct DeviceOutputPolicy {
     bool known=false;
     uint32_t revision=0;
@@ -45,6 +47,7 @@ public:
     bool Start(const SessionOutputPlan& plan,const std::string& expected_session);
     void Close();
     bool Allows(presentation::Output output) const;
+    bool AllowsAny(uint32_t outputs) const;
 private:
     mutable std::mutex mutex_;
     bool legacy_=false, active_=false;
