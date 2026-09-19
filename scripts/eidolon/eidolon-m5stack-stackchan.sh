@@ -406,6 +406,7 @@ ensure_eidolon_trim_sdkconfig() {
   # device AEC and avoids recording its own playback by muting the mic during
   # playback. PTT=n + HALF_DUPLEX=y selects half_duplex.
   set_sdkconfig_bool EIDOLON_INTERACTION_MODE_PTT n
+  set_sdkconfig_bool EIDOLON_CAP_AUDIO_CUE y
   set_sdkconfig_bool EIDOLON_INTERACTION_MODE_HALF_DUPLEX y
   # Joining is touch-first (tap the ring) or a remote start-session, so this
   # board does not need microWakeWord in the app partition.
@@ -453,6 +454,7 @@ CONFIG_EIDOLON_HUB_MODE=y
 CONFIG_EIDOLON_AUTO_JOIN_ON_ACTIVATION=n
 CONFIG_EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN=y
 # CONFIG_EIDOLON_INTERACTION_MODE_PTT is not set
+CONFIG_EIDOLON_CAP_AUDIO_CUE=y
 CONFIG_EIDOLON_INTERACTION_MODE_HALF_DUPLEX=y
 CONFIG_EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS=75000
 CONFIG_EIDOLON_LIVEKIT_SPEAKER_VOLUME=50

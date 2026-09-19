@@ -32,6 +32,20 @@ int main() {
     assert(gate.Allows(Output::Speech));
     gate.Close();
     assert(!gate.Allows(Output::Speech));
+    const auto cue=OutputBit(Output::AudioCue);
+    DeviceOutputGate cue_only(false,expression|speech|cue);
+    assert(cue_only.Bind({true,1,expression|cue}));
+    assert(cue_only.Start({"cue",1,expression|cue,true},"cue"));
+    assert(cue_only.Allows(Output::AudioCue));
+    assert(!cue_only.Allows(Output::Speech));
+    assert(cue_only.AllowsAny(kAudioOutputs));
+    // Revoking the cue also closes playback, without changing expression.
+    assert(cue_only.Bind({true,2,expression}));
+    assert(!cue_only.AllowsAny(kAudioOutputs));
+    assert(!cue_only.Start({"cue",2,expression|cue,true},"cue"));
+    assert(cue_only.Start({"silent",2,expression,true},"silent"));
+    assert(cue_only.Allows(Output::Expression));
+    assert(!cue_only.AllowsAny(kAudioOutputs));
     const auto dialogue=OutputBit(Output::DialogueText);
     DeviceOutputGate text_only(false,dialogue);
     assert(text_only.Bind({true,1,dialogue|speech|expression}));

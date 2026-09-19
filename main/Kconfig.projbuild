@@ -1190,10 +1190,11 @@ menu "Eidolon Hub"
     config EIDOLON_CAP_AUDIO_CUE
         bool "Device has an independent audio cue execution path"
         depends on EIDOLON_CAP_SPEAKER
+        default y if BOARD_TYPE_ESP_BOX_3 || BOARD_TYPE_M5STACK_STACKCHAN
         default n
         help
-            Enable only after the cue path enforces AudioCue independently from
-            Speech. The current provider ceiling does not support cue selection.
+            Declares the cue executor, not permission to play sounds. Owner must
+            allow AudioCue separately from Speech; duplex is independent.
 
     config EIDOLON_UI_TOUCH_CONTROLS
         bool "Use registered touch input for on-screen controls"
