@@ -155,6 +155,7 @@ void StackChanBody::SetCaptureQuiet(bool quiet) {
     if (quiet == capture_quiet_) return;
     capture_quiet_ = quiet;
     if (quiet) {
+        gesture_abort_ = true;
         // Mic went hot: cut torque (head limp) while the rail is still up, then drop the
         // servo power rail (PY32 VM EN). The rail's switching whine is the noise source;
         // powering it down is the only thing that silences it. Head droop while listening
@@ -168,13 +169,14 @@ void StackChanBody::SetCaptureQuiet(bool quiet) {
         // resume. Torque stays released until the next motion command re-engages it; the
         // servos need a short boot before they track again.
         ioe_->digitalWrite(PY32_SERVO_POWER_PIN, true);
+        power_ready_us_ = esp_timer_get_time() + 200000;
         ESP_LOGI(TAG, "capture live: servo rail on");
     }
 }
 
 bool StackChanBody::GestureContinue(int delay_ms) {
     vTaskDelay(pdMS_TO_TICKS(delay_ms));
-    return ready_ && !gesture_abort_;
+    return ready_ && !gesture_abort_ && !capture_quiet_;
 }
 
 void StackChanBody::SetHeadAngles(float yaw_deg, float pitch_deg, int speed) {
@@ -282,8 +284,21 @@ void StackChanBody::StartSelfTest() {
 }
 
 void StackChanBody::HeadGesture(const std::string& name, int times, float x, float y,
-                                int hold_ms, int return_ms) {
-    if (!ready_ || gesture_busy_ || capture_quiet_) return;  // drop if busy or rail down (capture)
+                                int hold_ms, int return_ms, eidolon::HeadMotionObserver observer) {
+    using S = eidolon::HeadMotionStatus;
+    const bool known = name=="nod" || name=="shake" || name=="perk_up" ||
+        name=="droop" || name=="glance" || name=="wake_wobble";
+    const char* refusal = !ready_ ? "NO_HEAD_MOTION" : !known ? "UNKNOWN_GESTURE" :
+        (times<0 || times>3 || hold_ms<0 || hold_ms>2000 || return_ms<0 || return_ms>2000 ||
+         !std::isfinite(x) || !std::isfinite(y)) ? "INVALID_ARGUMENT" :
+        capture_quiet_ ? "CAPTURING" : nullptr;
+    if (refusal) { if (observer) observer({S::Rejected, refusal}); return; }
+    bool idle=false;
+    if (!gesture_busy_.compare_exchange_strong(idle,true)) {
+        if (observer) observer({S::Rejected,"BUSY"});
+        return;
+    }
+    gesture_observer_=std::move(observer);
     gesture_.name = name;
     gesture_.times = times;
     gesture_.x = x;
@@ -291,15 +306,30 @@ void StackChanBody::HeadGesture(const std::string& name, int times, float x, flo
     gesture_.hold_ms = hold_ms;
     gesture_.return_ms = return_ms;
     gesture_abort_ = false;  // fresh gesture clears any prior safety-stop request
-    gesture_busy_ = true;
-    xTaskCreate(
+    const auto created=xTaskCreate(
         [](void* arg) {
             auto* b = static_cast<StackChanBody*>(arg);
-            b->RunGesture();
-            b->gesture_busy_ = false;
+            using S=eidolon::HeadMotionStatus;
+            const auto remaining=b->power_ready_us_.load()-esp_timer_get_time();
+            if (remaining>0) vTaskDelay(pdMS_TO_TICKS((remaining+999)/1000));
+            if (!b->gesture_abort_ && !b->capture_quiet_) {
+                if (b->gesture_observer_) b->gesture_observer_({S::Started,""});
+                b->RunGesture();
+                // Software sequence completion, not a claim of measured arrival.
+                b->GestureContinue(250);
+            }
+            const bool cancelled=b->gesture_abort_ || b->capture_quiet_;
+            auto observer=std::move(b->gesture_observer_);
+            b->gesture_busy_=false;
+            if (observer) observer({cancelled ? S::Cancelled : S::Completed,
+                cancelled ? "STOPPED" : "SEQUENCE_FINISHED"});
             vTaskDelete(nullptr);
         },
         "stackchan_gesture", 4096, this, 3, nullptr);
+    if (created!=pdPASS) {
+        auto callback=std::move(gesture_observer_);gesture_busy_=false;
+        if (callback) callback({S::Failed,"TASK_UNAVAILABLE"});
+    }
 }
 
 void StackChanBody::RunGesture() {

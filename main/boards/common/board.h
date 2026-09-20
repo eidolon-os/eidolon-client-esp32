@@ -16,6 +16,7 @@
 #include "backlight.h"
 #include "camera.h"
 #include "assets.h"
+#include "head_motion.h"
 
 /**
  * Network events for unified callback
@@ -105,7 +106,8 @@ public:
     virtual void HeadHome() {}
     // Discrete expressive gesture: name in {nod, shake, perk_up, droop, glance}.
     virtual void HeadGesture(const std::string& name, int times, float x, float y,
-                             int hold_ms, int return_ms) {
+                             int hold_ms, int return_ms, eidolon::HeadMotionObserver observer = {}) {
+        if (observer) observer({eidolon::HeadMotionStatus::Rejected, "NO_HEAD_MOTION"});
         (void)name; (void)times; (void)x; (void)y; (void)hold_ms; (void)return_ms;
     }
     // Emergency stop: cut head-servo torque and preempt any running gesture.

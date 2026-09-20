@@ -1155,6 +1155,15 @@ menu "Eidolon Hub"
             config from GET /api/config. Does not use Xiaozhi cloud OTA URL for
             mqtt/websocket. Firmware upgrade from Hub is phase 2.
 
+    config EIDOLON_EXPRESSION_DIAGNOSTICS
+        bool "Show expression and motion execution diagnostics"
+        depends on EIDOLON_COMPANION_FACE
+        default y if BOARD_TYPE_M5STACK_STACKCHAN
+        default n
+        help
+            A small face-viewport label shows received expression and actual
+            motion lifecycle. Hides after five seconds; never displays dialogue.
+
     config EIDOLON_COMPANION_FACE
         bool
         default y if EIDOLON_HUB_MODE && (BOARD_TYPE_ESP_BOX_3 || BOARD_TYPE_M5STACK_STACKCHAN || BOARD_TYPE_M5STACK_CORE_S3)
@@ -1177,6 +1186,11 @@ menu "Eidolon Hub"
     config EIDOLON_CAP_DIALOGUE_TEXT
         bool "Device can render dialogue text"
         default y if BOARD_TYPE_ESP_BOX_3 || BOARD_TYPE_M5STACK_STACKCHAN || BOARD_TYPE_M5STACK_CORE_S3 || BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_2_06
+        default n
+
+    config EIDOLON_CAP_MOTION
+        bool "Device has bounded head gesture execution"
+        default y if BOARD_TYPE_M5STACK_STACKCHAN
         default n
 
     config EIDOLON_CAP_EXPRESSION

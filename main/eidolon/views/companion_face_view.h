@@ -22,6 +22,7 @@ public:
     // Caller holds the display lock and keeps the font alive until replacement.
     void SetContentFont(const lv_font_t* font);
     void SetSystemStatus(const char* text);
+    void SetMotionDiagnostic(const char* name, const char* status, const char* reason) override;
     void ShowNotification(const char* text, int duration_ms);
     void PulseEmotion(const char* emotion, int ttl_ms);
     expression::Event Submit(const expression::Plan& plan) override;
@@ -40,6 +41,10 @@ private:
     void Apply(const expression::FacePose& pose);
     void Emit(expression::Event event);
     void RefreshInformation();
+    void RefreshDiagnostic();
+    lv_obj_t* diagnostic_=nullptr;
+    std::string face_diagnostic_, motion_diagnostic_;
+    uint64_t diagnostic_until_=0, diagnostic_token_=0;
     void UpdateLayout();
     void RefreshSubtitle(uint64_t now);
     void ClearSubtitle();

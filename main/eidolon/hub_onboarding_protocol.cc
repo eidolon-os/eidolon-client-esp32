@@ -386,6 +386,9 @@ std::string BuildDeviceManifestJson(const std::string& board_name, const DeviceC
     if (capabilities.speaker && capabilities.audio_cue)
         properties += ",{\"name\":\"output.audio_cue\",\"observable\":false,\"schema\":{\"const\":true,\"type\":\"boolean\"},\"writable\":false}";
 
+    if (capabilities.motion)
+        properties += ",{\"name\":\"output.motion\",\"observable\":false,\"schema\":{\"const\":true,\"type\":\"boolean\"},\"writable\":false}";
+
     // Keep a compact deterministic representation for the manifest wire
     // contract: keys stay sorted so the Host's manifest revision is stable
     // across boots that declare the same thing.

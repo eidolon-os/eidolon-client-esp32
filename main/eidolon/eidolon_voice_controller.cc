@@ -394,6 +394,9 @@ void EidolonVoiceController::Dispatch(const Event& ev)
         presentations_.Observe(ev.presentation, esp_timer_get_time()/1000);
         break;
 #endif
+    case EventType::HeadMotionEvent:
+        DoHeadMotionResult(ev.motion_token,ev.motion);
+        break;
     case EventType::ControlCommand:
         if (ev.payload != nullptr) {
             DoControlCommand(*ev.payload, ev.generation, ev.flag);
@@ -1547,6 +1550,20 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload, uint32
         !CurrentOutputGate().Allows(presentation::Output::Motion)) {
         AckCommand(command,"rejected","MOTION_NOT_SELECTED");return;
     }
+    if (agent && (command.op==kControlOpHeadGesture || command.op==kControlOpSafetyStop)) {
+        auto* json=cJSON_Parse(command.payload.c_str());
+        auto* sid=cJSON_GetObjectItemCaseSensitive(json,"session_id");
+        auto* rev=cJSON_GetObjectItemCaseSensitive(json,"policy_revision");
+        const bool authorized=conversation_confirmed_ && command.is_v1 && command.clock_known &&
+            command.bounded_deadline && cJSON_IsString(sid) &&
+            current_conversation_id_==sid->valuestring && cJSON_IsNumber(rev) &&
+            rev->valuedouble==config_.output_policy.revision;
+        auto* motion_id=cJSON_GetObjectItemCaseSensitive(json,"motion_id");
+        const bool matches=command.op!=kControlOpSafetyStop ||
+            (cJSON_IsString(motion_id) && head_command_.id==motion_id->valuestring);
+        cJSON_Delete(json);
+        if (!authorized || !matches) { AckCommand(command,"rejected","OUTPUT_NOT_AUTHORIZED");return; }
+    }
     // Op dispatch registry. Each handler runs inline on the controller task (no
     // per-command worker task); blocking work just queues other events briefly.
     struct ControlOpHandler {
@@ -2533,9 +2550,37 @@ void EidolonVoiceController::HandleHeadGestureCommand(const std::string& command
     if (x < -1.0f) x = -1.0f; else if (x > 1.0f) x = 1.0f;
     if (y < -1.0f) y = -1.0f; else if (y > 1.0f) y = 1.0f;
 
-    ESP_LOGI(TAG, "Control command -> head.gesture %s", name.c_str());
-    board.HeadGesture(name, times, x, y, hold_ms, return_ms);
-    AckCommand(command, "completed", "OK");
+    command.payload=payload;
+    if (head_command_.id==command_id) {
+        if (head_command_.payload!=payload) { AckCommand(command,"rejected","COMMAND_CONFLICT");return; }
+        AckCommand(command,HeadMotionStatusName(head_result_.status),head_result_.reason);
+        return;
+    }
+    if (head_deadline_us_) { AckCommand(command,"rejected","BUSY");return; }
+    head_command_=command;head_gesture_=name;
+    head_result_={HeadMotionStatus::Accepted,"QUEUED"};
+    const auto token=++head_token_;
+    head_deadline_us_=esp_timer_get_time()+5000000;
+    // A bounded nonverbal response is an output window even without TTS.
+    if (conversation_confirmed_) PublishClientAudioState(AgentOutputActiveRecently());
+    if (auto* view=GetEidolonView()) view->SetMotionDiagnostic(name.c_str(),"accepted","");
+    board.HeadGesture(name,times,x,y,hold_ms,return_ms,[this,token](HeadMotionResult result) {
+        Event ev;ev.type=EventType::HeadMotionEvent;ev.motion_token=token;ev.motion=result;Enqueue(ev);
+    });
+}
+
+void EidolonVoiceController::DoHeadMotionResult(uint64_t token,HeadMotionResult result) {
+    if (token!=head_token_ || !head_deadline_us_) return;
+    head_result_=result;
+    AckCommand(head_command_,HeadMotionStatusName(result.status),result.reason);
+    if (auto* view=GetEidolonView()) view->SetMotionDiagnostic(head_gesture_.c_str(),
+        HeadMotionStatusName(result.status),result.reason);
+    ESP_LOGI(TAG,"head result gesture=%s status=%s reason=%s",head_gesture_.c_str(),
+        HeadMotionStatusName(result.status),result.reason);
+    if (result.status!=HeadMotionStatus::Started) {
+        head_deadline_us_=0;
+        if (conversation_confirmed_) PublishClientAudioState(AgentOutputActiveRecently());
+    }
 }
 
 void EidolonVoiceController::HandleSafetyStopCommand(const std::string& command_id,
@@ -3403,6 +3448,11 @@ void EidolonVoiceController::CloseConversationAudio()
     if (auto* view=GetEidolonView(); view && view->Expressions()) presentations_.Close(*view->Expressions());
 #endif
     if (kCompanionFaceBuild) Board::GetInstance().HeadStop();
+    if (head_deadline_us_) {
+        head_result_={HeadMotionStatus::Cancelled,"SESSION_CLOSED"};
+        if (auto* view=GetEidolonView()) view->SetMotionDiagnostic(head_gesture_.c_str(),"cancelled","SESSION_CLOSED");
+    }
+    head_deadline_us_=0;++head_token_;head_command_={};
     CurrentOutputGate().Close();
     // Unconditional, unlike the telemetry above it: the channel outlives the
     // conversation now, so a gate left open is a microphone running for as long
@@ -3502,9 +3552,16 @@ void EidolonVoiceController::PublishClientAudioState(bool playback_active)
         mic_muted = !mic_enabled_;
     }
 
-    // Physically gate the capture path to match so no unwanted audio reaches the
-    // channel.
+    if (head_deadline_us_ && now_us>=head_deadline_us_) {
+        Board::GetInstance().HeadStop();
+        DoHeadMotionResult(head_token_,{HeadMotionStatus::Failed,"MOTION_TIMEOUT"});
+    }
+    if (head_deadline_us_ && (half_duplex_mode_ || ptt_mode_)) {
+        capture_on=false;mic_muted=true;
+    }
+    // One owner derives both microphone and servo-noise gates from actual capture.
     eidolon_livekit_board_set_capture_enabled(capture_on);
+    Board::GetInstance().SetCaptureQuiet(capture_on);
     uint32_t capture_rms_ppm = eidolon_livekit_board_recent_capture_rms_ppm();
     if (mic_muted) {
         capture_rms_ppm = 0;

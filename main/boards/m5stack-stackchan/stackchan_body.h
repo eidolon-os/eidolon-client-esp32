@@ -5,6 +5,8 @@
 #include <freertos/semphr.h>
 
 #include <memory>
+#include <atomic>
+#include "boards/common/head_motion.h"
 #include <string>
 
 #include "SCSCL.h"
@@ -58,7 +60,7 @@ public:
     // Runs a short motion sequence in a one-shot task; a new gesture is dropped while
     // one is running. Unused params per gesture are ignored.
     void HeadGesture(const std::string& name, int times, float x, float y,
-                     int hold_ms, int return_ms);
+                     int hold_ms, int return_ms, eidolon::HeadMotionObserver observer = {});
 
     // Boot bring-up sweep in its own task (does not block board construction).
     void StartSelfTest();
@@ -70,6 +72,8 @@ public:
     void RgbOff();
 
 private:
+    eidolon::HeadMotionObserver gesture_observer_;
+    std::atomic<int64_t> power_ready_us_{0};
     void SelfTest();
     void RunGesture();
     void RunRgbMarquee();
@@ -89,13 +93,13 @@ private:
     // True while the mic is hot for uplink: the servo power rail is cut and motion is
     // suppressed so servo switching whine can't corrupt the captured audio. Read on the
     // 50 Hz update tick and by the motion command guards; written under motion_mutex_.
-    volatile bool capture_quiet_ = false;
+    std::atomic<bool> capture_quiet_ = false;
 
     // Pending gesture params, consumed by the one-shot gesture task. Guarded by
     // gesture_busy_ (only one gesture runs at a time).
-    volatile bool gesture_busy_ = false;
+    std::atomic<bool> gesture_busy_ = false;
     // Set by Stop() to preempt the running gesture; cleared when a new gesture starts.
-    volatile bool gesture_abort_ = false;
+    std::atomic<bool> gesture_abort_ = false;
     // RGB marquee one-shot task state (LED ring lives on the PY32, separate from the
     // servo bus). rgb_abort_ preempts a running marquee (RgbOff / new marquee).
     volatile bool rgb_busy_ = false;

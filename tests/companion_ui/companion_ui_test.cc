@@ -77,6 +77,8 @@ int main(int argc,char** argv) {
         model.primary_intent=UiIntent::ToggleMicrophone;model.show_end_action=true;
         model.primary_presentation=UiActionPresentation::TouchControl;
         model.subtitle="PRIVATE DIALOGUE MUST NOT LEAK";
+        view.SetMotionDiagnostic("nod","rejected","BUSY");
+        assert(Find(screen,"F:\nM:nod:rejected/BUSY"));
         assert(gate.Start({"silent",1,expression,true},"silent"));
         for(auto mode:{InteractionMode::FullDuplex,InteractionMode::HalfDuplex,InteractionMode::PushToTalk}) {
             model.interaction_mode=mode;
@@ -100,6 +102,18 @@ int main(int argc,char** argv) {
         Within(Find(screen,"END"),layout.actions);
         const std::string prefix=std::string(argv[1])+(font==&font_noto_basic_16_4 ? "/box3" : "/stackchan");
         Screenshot(screen,prefix+"-silent.ppm");
+        expression::Plan diagnostic_plan;diagnostic_plan.token=765;
+        diagnostic_plan.count=1;diagnostic_plan.max_duration_ms=1000;
+        diagnostic_plan.steps[0]={expression::Gesture::Delight,.5f,0,1000,false};
+        assert(view.Submit(diagnostic_plan).status==expression::Status::Accepted);
+        view.SetMotionDiagnostic("wake_wobble","started","");
+        auto* diagnostic=Find(screen,"F:delight:accepted\nM:wake_wobble:started");
+        assert(diagnostic && !lv_obj_has_flag(diagnostic,LV_OBJ_FLAG_HIDDEN));
+        Within(diagnostic,{8,36,304,160});
+        Screenshot(screen,prefix+"-diagnostic.ppm");
+        view.Cancel(765);
+        lv_tick_inc(5100);view.Advance(0);
+        assert(lv_obj_has_flag(diagnostic,LV_OBJ_FLAG_HIDDEN));
         auto* mic=lv_obj_get_parent(Find(screen,"MIC"));
         lv_area_t mic_area; lv_obj_get_coords(mic, &mic_area);
         const auto before_click = events.size();

@@ -164,6 +164,15 @@ void CompanionFaceView::Build(const BuildContext& ctx) {
     lv_obj_set_style_text_color(close_label,lv_color_hex(palette::Error),0);
     lv_obj_add_event_cb(close_,OnClose,LV_EVENT_CLICKED,this);
     Visible(primary_,false);Visible(close_,false);Visible(detail_panel_,false);
+#if CONFIG_EIDOLON_EXPRESSION_DIAGNOSTICS
+    diagnostic_=Label(viewport_,&lv_font_montserrat_14,LV_ALIGN_BOTTOM_LEFT,4,-2);
+    lv_obj_set_width(diagnostic_,layout.face.w-8);
+    lv_obj_set_style_text_color(diagnostic_,lv_color_hex(palette::Paper),0);
+    lv_obj_set_style_text_opa(diagnostic_,LV_OPA_70,0);
+    lv_obj_set_height(diagnostic_,32);
+    lv_label_set_long_mode(diagnostic_,LV_LABEL_LONG_CLIP);
+    Visible(diagnostic_,false);
+#endif
 }
 void CompanionFaceView::SetContentFont(const lv_font_t* font) {
     if (!font || !subtitle_ || font_==font) return;
@@ -191,7 +200,21 @@ void CompanionFaceView::ShowNotification(const char* text,int duration_ms) {
     Text(notification_,text);
     Visible(notification_,text && *text);
 }
+void CompanionFaceView::SetMotionDiagnostic(const char* name,const char* status,const char* reason) {
+    if (!display_ || !diagnostic_) return;
+    DisplayLockGuard lock(display_);
+    motion_diagnostic_=std::string(name ? name : "-")+":"+(status ? status : "-");
+    if (reason && *reason && std::strcmp(reason,"SEQUENCE_FINISHED")) motion_diagnostic_+="/"+std::string(reason);
+    diagnostic_until_=NowMs()+5000;RefreshDiagnostic();
+}
+void CompanionFaceView::RefreshDiagnostic() {
+    if (!diagnostic_) return;
+    const auto text="F:"+face_diagnostic_+"\nM:"+motion_diagnostic_;
+    Text(diagnostic_,text.c_str());
+    Visible(diagnostic_,NowMs()<diagnostic_until_);
+}
 void CompanionFaceView::RefreshInformation() {
+    RefreshDiagnostic();
     if (notification_until_ && NowMs()>=notification_until_) {
         notification_until_=0;
         Text(notification_,"");
@@ -345,6 +368,19 @@ void CompanionFaceView::Advance(uint32_t completed_frame) {
     awaiting_frame_=true;
 }
 void CompanionFaceView::Emit(expression::Event event) {
+    if (event.token==diagnostic_token_ && event.status!=expression::Status::None) {
+        const char* state="failed";
+        switch(event.status) {
+        case expression::Status::Accepted:state="accepted";break;
+        case expression::Status::Started:state="started";break;
+        case expression::Status::Completed:state="completed";break;
+        case expression::Status::Cancelled:state="cancelled";break;
+        case expression::Status::Rejected:state="rejected";break;
+        default:break;
+        }
+        face_diagnostic_=face_diagnostic_.substr(0,face_diagnostic_.find(':'))+":"+state;
+        diagnostic_until_=NowMs()+5000;RefreshDiagnostic();
+    }
 #if CONFIG_EIDOLON_COMPANION_BENCHMARK
     if (event.token >= 1000000 && event.token < 1000064) {
         if (event.status==expression::Status::Completed) ++bench_completed_;
@@ -374,7 +410,13 @@ void CompanionFaceView::SetObserver(Observer observer) {
 }
 expression::Event CompanionFaceView::Submit(const expression::Plan& plan) {
     DisplayLockGuard lock(display_);
-    auto event=runtime_.Submit(plan,NowMs());Emit(event);return event;
+    auto event=runtime_.Submit(plan,NowMs());
+    if (event.status==expression::Status::Accepted) {
+        diagnostic_token_=plan.token;
+        face_diagnostic_=std::string(expression::kGestureNames[static_cast<unsigned>(plan.steps[0].gesture)]);
+        if (NowMs()>=diagnostic_until_) motion_diagnostic_="-";
+    }
+    Emit(event);return event;
 }
 expression::Event CompanionFaceView::Cancel(uint64_t token) {
     DisplayLockGuard lock(display_);

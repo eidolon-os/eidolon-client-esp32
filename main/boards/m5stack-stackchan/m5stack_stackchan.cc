@@ -422,8 +422,9 @@ public:
         if (body_) body_->GoHome();
     }
     void HeadGesture(const std::string& name, int times, float x, float y,
-                     int hold_ms, int return_ms) override {
-        if (body_) body_->HeadGesture(name, times, x, y, hold_ms, return_ms);
+                     int hold_ms, int return_ms, eidolon::HeadMotionObserver observer = {}) override {
+        if (body_) body_->HeadGesture(name, times, x, y, hold_ms, return_ms, std::move(observer));
+        else if (observer) observer({eidolon::HeadMotionStatus::Rejected, "NO_HEAD_MOTION"});
     }
     void HeadStop() override {
         if (body_) body_->Stop();

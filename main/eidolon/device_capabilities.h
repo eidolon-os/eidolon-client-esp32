@@ -15,12 +15,14 @@ struct DeviceCapabilities {
     bool dialogue_text = false;
     bool expression = false;
     bool audio_cue = false;
+    bool motion = false;
     uint32_t OutputMask() const {
         using presentation::Output;
         return (speaker ? static_cast<uint32_t>(Output::Speech) : 0u) |
                (dialogue_text ? static_cast<uint32_t>(Output::DialogueText) : 0u) |
                (expression ? static_cast<uint32_t>(Output::Expression) : 0u) |
-               (speaker && audio_cue ? static_cast<uint32_t>(Output::AudioCue) : 0u);
+               (speaker && audio_cue ? static_cast<uint32_t>(Output::AudioCue) : 0u) |
+               (motion ? static_cast<uint32_t>(Output::Motion) : 0u);
     }
 };
 inline DeviceCapabilities CompiledDeviceCapabilities() {
@@ -44,6 +46,9 @@ inline DeviceCapabilities CompiledDeviceCapabilities() {
 #endif
 #if CONFIG_EIDOLON_CAP_AUDIO_CUE
     capabilities.audio_cue = true;
+#endif
+#if CONFIG_EIDOLON_CAP_MOTION
+    capabilities.motion = true;
 #endif
     return capabilities;
 }

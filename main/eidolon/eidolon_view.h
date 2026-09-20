@@ -22,6 +22,7 @@ public:
     // talk/start button, and any flow-specific chrome.
     virtual expression::Surface* Expressions() { return nullptr; }
     virtual void Render(const EidolonUiModel& model) = 0;
+    virtual void SetMotionDiagnostic(const char* name, const char* status, const char* reason) {}
 
 };
 

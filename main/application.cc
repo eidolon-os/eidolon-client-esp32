@@ -521,15 +521,7 @@ void Application::Initialize() {
             if (ui_presenter_) {
                 ui_presenter_->OnAgentPhase(phase);
             }
-            // Motor-rail noise gate (StackChan): in half_duplex the mic is hot for
-            // uplink in every phase except while the agent is speaking (the mic is
-            // closed then). Cut the board's servo power rail whenever the mic is hot
-            // so its switching whine can't rail the ADC and drown out near-end speech;
-            // restore it when the agent speaks so the head can animate. No-op on boards
-            // without a noisy motor rail.
-            const bool mic_hot = phase != eidolon::AgentPhase::AgentSpeaking &&
-                                 (!voice_transport_ || voice_transport_->IsMicrophoneEnabled());
-            Board::GetInstance().SetCaptureQuiet(mic_hot);
+
         });
     };
     callbacks.on_presence_wake_phase = [this](eidolon::PresenceWakePhase phase) {

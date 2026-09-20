@@ -1,3 +1,4 @@
+#include "boards/common/head_motion.h"
 #ifndef EIDOLON_VOICE_CONTROLLER_H_
 #define EIDOLON_VOICE_CONTROLLER_H_
 
@@ -120,6 +121,7 @@ private:
         OwnerFaceProfileCompleted,
 #endif
         ControlCommand,
+        HeadMotionEvent,
 #if CONFIG_EIDOLON_COMPANION_FACE
         PresentationEvent,
 #endif
@@ -139,6 +141,8 @@ private:
     };
     struct Event {
         EventType type;
+        uint64_t motion_token=0;
+        HeadMotionResult motion{HeadMotionStatus::Failed,""};
 #if CONFIG_EIDOLON_COMPANION_FACE
         expression::Event presentation;
 #endif
@@ -336,6 +340,12 @@ private:
     Esp32HubConfig config_;
     std::string device_control_uri_;
     VoiceSessionState state_ = VoiceSessionState::Idle;
+    ControlCommand head_command_;
+    std::string head_gesture_;
+    uint64_t head_token_=0;
+    int64_t head_deadline_us_=0;
+    HeadMotionResult head_result_{HeadMotionStatus::Failed,""};
+    void DoHeadMotionResult(uint64_t token, HeadMotionResult result);
     bool mic_enabled_ = true;
     // Interaction mode (one of three, compile-time per board via Kconfig):
     //   ptt_mode_        -> push-to-talk (mic open only while the button is held)
