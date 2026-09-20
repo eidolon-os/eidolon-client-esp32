@@ -125,11 +125,13 @@ void LvglDisplay::UpdateStatusBar(bool update_all) {
         }
 
 #if CONFIG_EIDOLON_HUB_MODE
+#if !CONFIG_EIDOLON_COMPANION_FACE
         bool show_mute = !app.IsMicrophoneEnabled();
         if (show_mute != muted_) {
             muted_ = show_mute;
             lv_label_set_text(mute_label_, muted_ ? FONT_AWESOME_MICROPHONE_SLASH : "");
         }
+#endif  // Companion view projects microphone state with the voice model.
 #else
         // Update icon if mute state changes
         if (codec->output_volume() == 0 && !muted_) {
@@ -216,6 +218,10 @@ void LvglDisplay::UpdateStatusBar(bool update_all) {
             kDeviceStateWifiConfiguring,
             kDeviceStateListening,
             kDeviceStateActivating,
+#if CONFIG_EIDOLON_HUB_MODE
+            kDeviceStateConnecting,
+            kDeviceStateSpeaking,
+#endif
         };
         if (std::find(allowed_states.begin(), allowed_states.end(), device_state) != allowed_states.end()) {
             icon = board.GetNetworkStateIcon();

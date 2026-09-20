@@ -40,7 +40,8 @@ void ProjectHubConfig(Application& app, HubConfigStatus status)
         break;
     case HubConfigStatus::Active:
         app.SetEidolonEnrollmentUi(EnrollmentPhase::ClaimActive);
-        app.SetEidolonServiceUi(ServicePhase::Ready);
+        // Admission is configuration evidence, not a connected Channel.
+        app.SetEidolonServiceUi(ServicePhase::Connecting);
         break;
     case HubConfigStatus::Revoked:
         app.SetEidolonEnrollmentUi(EnrollmentPhase::Revoked);

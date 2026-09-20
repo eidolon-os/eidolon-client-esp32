@@ -18,11 +18,13 @@ add_executable(companion_ui_tests companion_ui_test.cc ${UI_CORE} ${SKIN}
     "${ROOT}/main/eidolon/output_policy.cc"
     "${ROOT}/managed_components/espressif__cjson/cJSON/cJSON.c"
     "${ROOT}/managed_components/78__xiaozhi-fonts/src/font_awesome_20_4.c"
-    "${ROOT}/managed_components/78__xiaozhi-fonts/src/font_noto_basic_20_4.c"
+    "${ROOT}/managed_components/78__xiaozhi-fonts/src/font_noto_basic_16_4.c"
     "${ROOT}/managed_components/78__xiaozhi-fonts/src/font_puhui_basic_20_4.c")
 target_include_directories(companion_ui_tests PRIVATE stubs "${ROOT}/main" "${UI}" "${UI}/lvgl"
-    "${ROOT}/managed_components/espressif__cjson/cJSON")
+    "${ROOT}/managed_components/espressif__cjson/cJSON"
+    "${ROOT}/managed_components/78__xiaozhi-fonts/include")
 target_compile_definitions(companion_ui_tests PRIVATE CONFIG_EIDOLON_COMPANION_FACE=1 CONFIG_EIDOLON_CAP_EXPRESSION=1 CONFIG_EIDOLON_CAP_DIALOGUE_TEXT=1)
+target_compile_definitions(companion_ui_tests PRIVATE CBIN_FONT_FILE="${ROOT}/managed_components/78__xiaozhi-fonts/cbin/font_noto_qwen_16_4.bin")
 target_link_libraries(companion_ui_tests PRIVATE lvgl)
 # Keep assertions active even when optimizing the renderer for fast screenshots.
 target_compile_options(companion_ui_tests PRIVATE -UNDEBUG)

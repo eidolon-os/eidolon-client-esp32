@@ -65,11 +65,34 @@ void TestEnrollmentAndServiceAreOrthogonal()
     status.service = ServicePhase::Preparing;
     model = ProjectWithTouch(status);
     assert(model.scene == UiScene::PreparingService);
-    Expect(model.detail_text, "Device claimed; service is not ready");
+    Expect(model.detail_text, "Waiting for service configuration");
 
     status.service_detail = "Waiting for Channel binding";
     model = ProjectWithTouch(status);
     Expect(model.detail_text, "Waiting for Channel binding");
+}
+
+void TestStartupDoesNotClaimReadinessOrOwnershipEarly()
+{
+    EidolonRuntimeStatus status;
+    status.runtime = RuntimePhase::Normal;
+    for (auto phase : {ServicePhase::Unavailable, ServicePhase::DiscoveringAuthority,
+                       ServicePhase::Registering, ServicePhase::Connecting}) {
+        status.service = phase;
+        const auto model = ProjectWithTouch(status);
+        assert(model.scene == UiScene::PreparingService);
+        assert(!model.primary_enabled);
+        assert(std::strstr(model.detail_text, "claimed") == nullptr);
+    }
+    status.service = ServicePhase::Fault;
+    assert(ProjectWithTouch(status).scene == UiScene::Error);
+    status.service = ServicePhase::Unreachable;
+    assert(ProjectWithTouch(status).scene == UiScene::Reconnecting);
+    status.enrollment = EnrollmentPhase::ClaimActive;
+    status.service = ServicePhase::Connecting;
+    assert(!UiStateProjector::AllowsIntent(status,UiIntent::OpenConversation));
+    status.service = ServicePhase::Ready;
+    assert(UiStateProjector::AllowsIntent(status,UiIntent::OpenConversation));
 }
 
 void TestRecoverableServiceLossIsNotADeviceError()
@@ -222,6 +245,7 @@ void TestPresenceDoesNotOverrideConversation()
 int main()
 {
     Expect(EidolonBrandLabel(), "EIDOLON");
+    TestStartupDoesNotClaimReadinessOrOwnershipEarly();
     TestSafetyAndRuntimePrecedence();
     TestEnrollmentAndServiceAreOrthogonal();
     TestRecoverableServiceLossIsNotADeviceError();

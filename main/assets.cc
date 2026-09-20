@@ -186,6 +186,7 @@ bool Assets::LvglStrategy::InitializePartition(Assets* assets) {
 
 void Assets::LvglStrategy::UnApplyPartition(Assets* assets) {
     if (mmap_handle_ != 0) {
+        Board::GetInstance().GetDisplay()->OnAssetsUnloaded();
         esp_partition_munmap(mmap_handle_);
         mmap_handle_ = 0;
         mmap_root_ = nullptr;
@@ -332,6 +333,9 @@ bool Assets::LvglStrategy::Apply(Assets* assets, bool refresh_display_theme) {
         }
     }
 
+    // Font resources can change even when the caller preserves the current
+    // visual theme (the companion surface loads assets with that policy).
+    Board::GetInstance().GetDisplay()->OnAssetsLoaded();
     if (refresh_display_theme) {
         auto display = Board::GetInstance().GetDisplay();
         ESP_LOGI(TAG, "Refreshing display theme...");

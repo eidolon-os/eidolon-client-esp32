@@ -50,6 +50,9 @@ public:
     virtual void SetPresenceState(PresenceState state);
     virtual void ClearChatMessages();
     virtual void SetTheme(Theme* theme);
+    // Resource-backed views must rebind before mapped assets are released.
+    virtual void OnAssetsLoaded() {}
+    virtual void OnAssetsUnloaded() {}
     virtual Theme* GetTheme() { return current_theme_; }
     virtual void UpdateStatusBar(bool update_all = false);
     virtual void SetPowerSaveMode(bool on);

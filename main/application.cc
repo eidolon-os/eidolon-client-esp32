@@ -118,28 +118,47 @@ eidolon::GuardService* Application::GetGuardService()
 #endif
 }
 
+// Presenter state belongs to the Application task, including startup and Hub
+// admission. The display mutex alone cannot protect state before projection.
+void Application::DispatchEidolonUi(std::function<void()> update)
+{
+    if (xTaskGetCurrentTaskHandle() == ui_task_handle_) {
+        if (ui_presenter_) update();
+        return;
+    }
+    const bool activation = xTaskGetCurrentTaskHandle() == activation_task_handle_;
+    const auto generation = activation ? activation_generation_.load()
+        : eidolon::CommissioningRuntime::GetInstance().Generation();
+    Schedule([this, update = std::move(update), generation, activation]() {
+        auto& commissioning = eidolon::CommissioningRuntime::GetInstance();
+        if (!ui_presenter_ || generation != commissioning.Generation()) return;
+        if (activation && (commissioning.IsInProgress() || !network_connected_)) return;
+        update();
+    });
+}
+
 void Application::SetEidolonRuntimeUi(eidolon::RuntimePhase phase,
                                       const std::string& detail)
 {
-    if (ui_presenter_) {
+    DispatchEidolonUi([this, phase, detail]() {
         ui_presenter_->SetRuntimePhase(phase, detail);
-    }
+    });
 }
 
 void Application::SetEidolonEnrollmentUi(eidolon::EnrollmentPhase phase,
                                          const std::string& detail)
 {
-    if (ui_presenter_) {
+    DispatchEidolonUi([this, phase, detail]() {
         ui_presenter_->SetEnrollmentPhase(phase, detail);
-    }
+    });
 }
 
 void Application::SetEidolonServiceUi(eidolon::ServicePhase phase,
                                       const std::string& detail)
 {
-    if (ui_presenter_) {
+    DispatchEidolonUi([this, phase, detail]() {
         ui_presenter_->SetServicePhase(phase, detail);
-    }
+    });
 }
 
 void Application::RequestVoiceJoin()
@@ -330,6 +349,9 @@ bool Application::SetDeviceState(DeviceState state) {
 }
 
 void Application::Initialize() {
+#if CONFIG_EIDOLON_HUB_MODE
+    ui_task_handle_ = xTaskGetCurrentTaskHandle();
+#endif
     // One-line build fingerprint (git commit / branch / LiveKit SDK / ESP-IDF), printed early
     // and unconditionally on every boot so we can confirm exactly which firmware +
     // SDK the device is running — PROJECT_VER alone is a static "1.0.0".
@@ -449,10 +471,13 @@ void Application::Initialize() {
 
     eidolon::VoiceSessionCallbacks callbacks;
     callbacks.on_runtime_status = [this](const eidolon::VoiceRuntimeStatus& status) {
-        Schedule([this, status]() {
-            if (ui_presenter_) {
-                ui_presenter_->ApplyVoiceStatus(status);
-            }
+        const auto generation = eidolon::CommissioningRuntime::GetInstance().Generation();
+        Schedule([this, status, generation]() {
+            auto& commissioning = eidolon::CommissioningRuntime::GetInstance();
+            if (!ui_presenter_ || commissioning.IsInProgress() ||
+                generation != commissioning.Generation()) return;
+            if (status.service == eidolon::ServicePhase::Ready && !network_connected_) return;
+            ui_presenter_->ApplyVoiceStatus(status);
         });
     };
     callbacks.on_session_state = [this](eidolon::VoiceSessionState state) {
@@ -466,8 +491,10 @@ void Application::Initialize() {
     };
     callbacks.on_operational_ready = [this](bool ready) {
         ESP_LOGI(TAG, "[EIDOLON_UI] queue operational_ready=%d", ready ? 1 : 0);
-        Schedule([this, ready]() {
-            if (!ui_presenter_) {
+        const auto generation = eidolon::CommissioningRuntime::GetInstance().Generation();
+        Schedule([this, ready, generation]() {
+            if (!ui_presenter_ || generation !=
+                eidolon::CommissioningRuntime::GetInstance().Generation()) {
                 return;
             }
             const eidolon::OperationalReadinessSnapshot snapshot{
@@ -988,7 +1015,13 @@ void Application::ActivationWorkerTrampoline(void* arg) {
         app->activation_succeeded_.store(app->ActivationTask());
         ESP_LOGI(TAG, "Hub activation actor stack high-water=%u bytes",
                  static_cast<unsigned>(uxTaskGetStackHighWaterMark(nullptr)));
+#if CONFIG_EIDOLON_HUB_MODE
+        // Preserve FIFO with the worker's UI updates. A separate event bit can
+        // overtake them and let late admission state overwrite transport Ready.
+        app->Schedule([app]() { app->HandleActivationDoneEvent(); });
+#else
         xEventGroupSetBits(app->event_group_, MAIN_EVENT_ACTIVATION_DONE);
+#endif
     }
 }
 

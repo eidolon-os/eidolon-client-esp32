@@ -110,7 +110,7 @@ const char* UiSceneDetail(UiScene scene, EndReason end_reason)
     case UiScene::WaitingApproval:
         return "Approve this device in Eidolon";
     case UiScene::PreparingService:
-        return "Device claimed; service is not ready";
+        return "Preparing your service...";
     case UiScene::Ready:
         return "Start a conversation";
     case UiScene::OpeningConversation:

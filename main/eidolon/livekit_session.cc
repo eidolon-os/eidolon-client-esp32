@@ -91,6 +91,8 @@ void LiveKitSession::OnTextStreamOpen(const livekit_data_stream_header_t* header
         return;
     }
     session->transcription_stream_.Open(header->stream_id);
+    if (session->transcription_source_ == TranscriptionSource::Agent)
+        ESP_LOGI(TAG, "Assistant caption stream opened (incremental)");
 }
 
 void LiveKitSession::OnTextStreamChunk(const livekit_data_stream_chunk_t* chunk, void* ctx)
@@ -101,8 +103,16 @@ void LiveKitSession::OnTextStreamChunk(const livekit_data_stream_chunk_t* chunk,
         session->transcription_stream_.Clear();
         return;
     }
+    if (chunk->chunk_index == 0 && session->transcription_source_ == TranscriptionSource::Agent)
+        ESP_LOGI(TAG, "Assistant caption first chunk (%u bytes)", static_cast<unsigned>(chunk->content_size));
     session->transcription_stream_.Append(chunk->stream_id, chunk->chunk_index,
                                           chunk->content, chunk->content_size);
+    // LiveKit paces these deltas against speech. Forward a valid UTF-8 snapshot
+    // now; waiting for the trailer discards all of that synchronization.
+    if (session->transcription_source_ == TranscriptionSource::Agent && session->on_transcription_) {
+        auto text = session->transcription_stream_.Snapshot(chunk->stream_id);
+        if (!text.empty()) session->on_transcription_({TranscriptionSource::Agent, std::move(text), false});
+    }
 }
 
 void LiveKitSession::OnTextStreamClose(const livekit_data_stream_trailer_t* trailer, void* ctx)
@@ -117,7 +127,7 @@ void LiveKitSession::OnTextStreamClose(const livekit_data_stream_trailer_t* trai
         // present interim user recognition as a final user utterance.
         const bool final = session->transcription_source_ == TranscriptionSource::Agent;
         session->on_transcription_({session->transcription_source_, text, final});
-        ESP_LOGD(TAG, "Transcription delivered (%u bytes)", static_cast<unsigned>(text.size()));
+        ESP_LOGI(TAG, "Transcription stream closed (%u bytes)", static_cast<unsigned>(text.size()));
     }
 }
 
@@ -262,6 +272,10 @@ void LiveKitSession::HandleUiStatePayload(const char* payload, size_t size)
         auto phase=PhaseFromUiState(state, JsonString(root, "reason"));
         if (phase==AgentPhase::AgentSpeaking && !CurrentOutputGate().AllowsAny(kAudioOutputs))
             phase=AgentPhase::Silent;
+        if ((phase == AgentPhase::UserSpeaking || phase == AgentPhase::AgentThinking) &&
+            transcription_source_ == TranscriptionSource::Agent) {
+            transcription_stream_.Clear(); // Discard late chunks from the interrupted turn.
+        }
         on_agent_phase_(phase);
     }
     cJSON_Delete(root);

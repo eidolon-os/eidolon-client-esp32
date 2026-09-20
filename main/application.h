@@ -198,6 +198,8 @@ private:
 #if CONFIG_EIDOLON_HUB_MODE
     std::unique_ptr<eidolon::IVoiceSessionTransport> voice_transport_;
     std::unique_ptr<eidolon::EidolonUiPresenter> ui_presenter_;
+    TaskHandle_t ui_task_handle_ = nullptr;
+    void DispatchEidolonUi(std::function<void()> update);
     bool network_connected_ = false;
     uint32_t network_generation_ = 0;
     std::atomic<uint32_t> activation_generation_{0};

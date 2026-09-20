@@ -29,7 +29,7 @@ public:
 
     bool StopAnimDialog();
     bool InsertAnimDialog(const char* emoji_name, uint32_t duration_ms);
-    void OnAssetsUnloaded();
+    void OnAssetsUnloaded() override;
     void OnAssetsLoaded();
 
     void RefreshAll();

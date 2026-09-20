@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstring>
 #include <esp_timer.h>
+#include <font_awesome.h>
 #if CONFIG_EIDOLON_COMPANION_BENCHMARK
 #include <esp_heap_caps.h>
 #include <esp_log.h>
@@ -17,6 +18,10 @@ void Visible(lv_obj_t* obj, bool visible) {
     if (visible) lv_obj_remove_flag(obj, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
 }
+void Text(lv_obj_t* label, const char* text) {
+    const char* value = text ? text : "";
+    if (std::strcmp(lv_label_get_text(label), value)) lv_label_set_text(label, value);
+}
 lv_obj_t* Label(lv_obj_t* parent, const lv_font_t* font, lv_align_t align, int x, int y) {
     auto* label=lv_label_create(parent);
     lv_obj_set_style_text_font(label,font,0);
@@ -30,6 +35,7 @@ CompanionFaceView::CompanionFaceView() = default;
 CompanionFaceView::~CompanionFaceView() = default;
 void CompanionFaceView::Build(const BuildContext& ctx) {
     display_=ctx.display;
+    font_=ctx.font;
     lv_obj_update_layout(ctx.parent);
     const companion::Layout layout(lv_obj_get_width(ctx.parent),lv_obj_get_height(ctx.parent));
     lv_obj_set_style_bg_color(ctx.parent,lv_color_black(),0);
@@ -48,19 +54,23 @@ void CompanionFaceView::Build(const BuildContext& ctx) {
     lv_obj_set_style_radius(state_dot_,LV_RADIUS_CIRCLE,0);
     lv_obj_set_style_bg_opa(state_dot_,LV_OPA_COVER,0);
     status_=Label(ctx.parent,ctx.font,LV_ALIGN_TOP_LEFT,26,4);
-    lv_obj_set_size(status_,layout.header.w-136,layout.header.h);
+    lv_obj_set_size(status_,layout.header.w-112,layout.header.h);
     lv_label_set_long_mode(status_,LV_LABEL_LONG_DOT);
     auto indicator=[&](int x) {
         auto* item=Label(ctx.parent,ctx.icon_font,LV_ALIGN_TOP_LEFT,x,4);
         lv_obj_set_style_text_color(item,lv_color_hex(0x71808D),0);
-        lv_obj_set_size(item,24,28);
+        lv_obj_set_size(item,28,28);
+        lv_obj_set_style_text_align(item,LV_TEXT_ALIGN_CENTER,0);
         lv_label_set_long_mode(item,LV_LABEL_LONG_CLIP);
         return item;
     };
     const auto width=lv_obj_get_width(ctx.parent);
-    indicators_={indicator(width-84),indicator(width-60),indicator(width-36)};
-    setup_=indicator(width-108);
-    lv_label_set_text(setup_,LV_SYMBOL_SETTINGS);
+    indicators_={indicator(width-96),indicator(width-68),indicator(width-40)};
+    // Pack only populated indicators; BOX-3 has no battery telemetry.
+    lv_obj_set_style_text_color(indicators_.microphone,lv_color_hex(0xE5BE78),0);
+    setup_=indicator(width-124);
+    lv_label_set_text(setup_,FONT_AWESOME_GEAR);
+    lv_obj_set_ext_click_area(setup_,2);
     lv_obj_add_flag(setup_,LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(setup_,OnSetup,LV_EVENT_CLICKED,this);
     Visible(setup_,false);
@@ -79,12 +89,26 @@ void CompanionFaceView::Build(const BuildContext& ctx) {
     information_=Label(ctx.parent,ctx.font,LV_ALIGN_TOP_LEFT,layout.information.x,layout.information.y);
     lv_obj_set_size(information_,layout.information.w,layout.information.h);
     lv_obj_set_style_text_color(information_,lv_color_hex(0x9AA9B5),0);
-    lv_label_set_long_mode(information_,LV_LABEL_LONG_SCROLL);
-    // Use LVGL's bounded back-and-forth animation, with reading pauses.
-    auto& scroll=scroll_animation_;lv_anim_init(&scroll);
-    lv_anim_set_delay(&scroll,1500);lv_anim_set_repeat_delay(&scroll,2500);
-    lv_anim_set_playback_delay(&scroll,1500);lv_anim_set_duration(&scroll,6000);
-    lv_obj_set_style_anim(information_,&scroll,0);
+    lv_label_set_long_mode(information_,LV_LABEL_LONG_WRAP);
+    subtitle_panel_=panel(layout.information);
+    lv_obj_set_scrollbar_mode(subtitle_panel_,LV_SCROLLBAR_MODE_OFF);
+    lv_obj_add_flag(subtitle_panel_,LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scroll_dir(subtitle_panel_,LV_DIR_NONE);
+    subtitle_=Label(subtitle_panel_,ctx.font,LV_ALIGN_TOP_LEFT,0,0);
+    lv_obj_set_width(subtitle_,layout.information.w);
+    lv_obj_set_style_text_align(subtitle_,LV_TEXT_ALIGN_LEFT,0);
+    lv_label_set_long_mode(subtitle_,LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_line_space(subtitle_,4,0);
+    lv_obj_set_style_text_color(subtitle_,lv_color_hex(0xD5E0E8),0);
+    Visible(subtitle_panel_,false);
+    notification_=Label(ctx.parent,ctx.font,LV_ALIGN_TOP_MID,0,36);
+    lv_obj_set_size(notification_,layout.information.w,28);
+    lv_label_set_long_mode(notification_,LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_align(notification_,LV_TEXT_ALIGN_CENTER,0);
+    lv_obj_set_style_bg_color(notification_,lv_color_hex(0x172A30),0);
+    lv_obj_set_style_bg_opa(notification_,LV_OPA_COVER,0);
+    lv_obj_set_style_radius(notification_,6,0);
+    Visible(notification_,false);
     input_hint_=Label(ctx.parent,ctx.font,LV_ALIGN_TOP_LEFT,12,layout.actions.y+2);
     lv_obj_set_size(input_hint_,layout.actions.w,28);
     lv_label_set_long_mode(input_hint_,LV_LABEL_LONG_DOT);
@@ -116,6 +140,19 @@ void CompanionFaceView::Build(const BuildContext& ctx) {
     lv_obj_add_event_cb(close_,OnClose,LV_EVENT_CLICKED,this);
     Visible(primary_,false);Visible(close_,false);Visible(detail_panel_,false);
 }
+void CompanionFaceView::SetContentFont(const lv_font_t* font) {
+    if (!font || !subtitle_ || font_==font) return;
+    font_=font;
+    lv_obj_set_style_text_font(subtitle_,font_,0);
+    lv_obj_set_style_text_font(detail_,font_,0);
+    // Reflow from a whole page after a resource font changes its metrics.
+    displayed_subtitle_.clear();
+    subtitle_idle_=false;
+    detail_scroll_start_=NowMs();
+    lv_obj_scroll_to_y(detail_panel_,0,LV_ANIM_OFF);
+    UpdateLayout();
+    RefreshSubtitle(NowMs());
+}
 void CompanionFaceView::SetSystemStatus(const char* text) {
     if (!display_ || !status_) return;
     DisplayLockGuard lock(display_);
@@ -123,28 +160,112 @@ void CompanionFaceView::SetSystemStatus(const char* text) {
     if (status_ && !has_model_) lv_label_set_text(status_,text ? text : "");
 }
 void CompanionFaceView::ShowNotification(const char* text,int duration_ms) {
-    if (!display_ || !information_) return;
+    if (!display_ || !notification_) return;
     DisplayLockGuard lock(display_);
     notification_until_=NowMs()+std::clamp(duration_ms,1,15000);
-    lv_label_set_text(information_,text ? text : "");
-    UpdateLayout();
+    Text(notification_,text);
+    Visible(notification_,text && *text);
 }
 void CompanionFaceView::RefreshInformation() {
-    if (notification_until_ && NowMs()<notification_until_) { UpdateLayout();return; }
-    notification_until_=0;
-    if (std::strcmp(lv_label_get_text(information_),information_text_.c_str()))
-        lv_label_set_text(information_,information_text_.c_str());
+    if (notification_until_ && NowMs()>=notification_until_) {
+        notification_until_=0;
+        Text(notification_,"");
+        Visible(notification_,false);
+    }
+    Text(information_,information_text_.c_str());
     UpdateLayout();
+}
+void CompanionFaceView::ClearSubtitle() {
+    pending_subtitle_.clear();
+    displayed_subtitle_.clear();
+    Text(subtitle_,"");
+    lv_obj_scroll_to_y(subtitle_panel_,0,LV_ANIM_OFF);
+    subtitle_idle_=false;
+}
+void CompanionFaceView::RefreshSubtitle(uint64_t now) {
+    if (!dialogue_visible_ || !CurrentOutputGate().Allows(presentation::Output::DialogueText)) {
+        dialogue_visible_=false;
+        ClearSubtitle();
+        return;
+    }
+    // Coalesce bursts to at most ten visible text updates per second. The
+    // first phrase is immediate; duplicate models do not restart reading.
+    if (pending_subtitle_ != displayed_subtitle_ &&
+        (displayed_subtitle_.empty() || now-subtitle_updated_>=100)) {
+        const bool appended = !displayed_subtitle_.empty() &&
+            pending_subtitle_.compare(0,displayed_subtitle_.size(),displayed_subtitle_)==0;
+        Text(subtitle_,pending_subtitle_.c_str());
+        lv_obj_update_layout(subtitle_panel_);
+        lv_point_t size;
+        const int page_height=std::max<int>(1,(lv_obj_get_height(subtitle_panel_)+4)/(lv_font_get_line_height(font_)+4)) * (lv_font_get_line_height(font_)+4);
+        lv_text_get_size(&size,pending_subtitle_.c_str(),font_,0,4,lv_obj_get_width(subtitle_panel_),LV_TEXT_FLAG_NONE);
+        // Pad the final page so scrolling can stop on a whole-line boundary.
+        const int pages=std::max<int>(1,(size.y+4+page_height-1)/page_height);
+        const int line_height=lv_font_get_line_height(font_)+4;
+        const int lines=std::max<int>(1,(size.y+4+line_height-1)/line_height);
+        const int visible_lines=std::max<int>(1,(lv_obj_get_height(subtitle_panel_)+4)/line_height);
+        const int tail_y=std::max(0,lines-visible_lines)*line_height;
+        const int end_y=agent_speaking_ ? tail_y : (pages-1)*page_height;
+        lv_obj_set_style_pad_bottom(subtitle_,std::max<int>(0,end_y+lv_obj_get_height(subtitle_panel_)-size.y),0);
+        displayed_subtitle_=pending_subtitle_;
+        subtitle_updated_=now;
+        subtitle_idle_=false;
+        if (agent_speaking_) {
+            // Keep the newest spoken line visible, on whole-line boundaries.
+            lv_obj_scroll_to_y(subtitle_panel_,tail_y,LV_ANIM_OFF);
+            subtitle_page_at_=now;
+        } else if (!appended) {
+            lv_obj_scroll_to_y(subtitle_panel_,0,LV_ANIM_OFF);
+            subtitle_page_at_=now;
+        }
+    }
+    if (displayed_subtitle_.empty()) return;
+    lv_obj_update_layout(subtitle_panel_);
+    const int remaining=lv_obj_get_scroll_bottom(subtitle_panel_);
+    if (!agent_speaking_ && remaining>0 && now-subtitle_page_at_>=3500) {
+        const int line_height=lv_font_get_line_height(font_)+4;
+        // Move by whole lines; the last page must not begin with half a line.
+        const int page_lines=std::max<int>(1,(lv_obj_get_height(subtitle_panel_)+4)/line_height);
+        lv_obj_scroll_to_y(subtitle_panel_,lv_obj_get_scroll_y(subtitle_panel_)+page_lines*line_height,LV_ANIM_OFF);
+        subtitle_page_at_=now;
+        subtitle_idle_=false;
+    }
+    if (agent_speaking_ || lv_obj_get_scroll_bottom(subtitle_panel_)>0) {
+        subtitle_idle_=false;
+    } else if (!subtitle_idle_) {
+        subtitle_idle_=true;
+        subtitle_idle_since_=now;
+    } else if (now-subtitle_idle_since_>=6000) {
+        // Keep the consumed source for deduplication. A periodic Render of the
+        // same model must not resurrect text that has finished its reading time.
+        Text(subtitle_,"");
+    }
 }
 void CompanionFaceView::UpdateLayout() {
     if (!viewport_) return;
     auto* parent=lv_obj_get_parent(viewport_);
-    const bool information=lv_label_get_text(information_)[0]!='\0';
-    const companion::Layout layout(lv_obj_get_width(parent),lv_obj_get_height(parent),has_actions_,information);
+    const bool information=!information_text_.empty();
+    // Reserve caption space for the whole conversation, including pauses.
+    const companion::Layout layout(lv_obj_get_width(parent),lv_obj_get_height(parent),has_actions_,dialogue_visible_ || information,
+        dialogue_visible_ ? std::max<int>(52,2*lv_font_get_line_height(font_)+4) : 52);
     lv_obj_set_pos(viewport_,layout.face.x,layout.face.y);
     lv_obj_set_size(viewport_,layout.face.w,layout.face.h);
     lv_obj_set_pos(information_,layout.information.x,layout.information.y);
+    lv_obj_set_pos(subtitle_panel_,layout.information.x,layout.information.y);
+    lv_obj_set_height(subtitle_panel_,layout.information.h);
     Visible(information_,information);
+    Visible(subtitle_panel_,dialogue_visible_);
+    // On a detail page the toast uses the footer, leaving recovery instructions readable.
+    lv_obj_set_pos(notification_,12,lv_obj_is_visible(detail_panel_) ? layout.information.y : 36);
+    int right=lv_obj_get_width(parent)-12;
+    for (auto* icon : {indicators_.battery,indicators_.network,indicators_.microphone,setup_}) {
+        const bool visible=icon==setup_ ? lv_obj_is_visible(setup_) : lv_label_get_text(icon)[0]!='\0';
+        if (icon!=setup_) Visible(icon,visible);
+        if (!visible) continue;
+        right-=28;
+        lv_obj_set_pos(icon,right,4);
+    }
+    lv_obj_set_width(status_,std::max(28,right-34));
 }
 void CompanionFaceView::Apply(const expression::FacePose& p) {
     auto eye=[&](auto& feature,float open,float tilt) {
@@ -160,6 +281,7 @@ void CompanionFaceView::Apply(const expression::FacePose& p) {
 }
 void CompanionFaceView::Advance(uint32_t completed_frame) {
     if (!avatar_) return;
+    RefreshSubtitle(NowMs());
     RefreshInformation();
     if (!touch_navigation_ && lv_obj_is_visible(detail_panel_)) {
         lv_obj_update_layout(detail_panel_);
@@ -255,19 +377,23 @@ void CompanionFaceView::Render(const EidolonUiModel& model) {
         base=expression::BaseState::Listening;
     runtime_.SetBase(base);
     has_model_=true;
+    Text(indicators_.microphone,model.show_mute_icon ? FONT_AWESOME_MICROPHONE_SLASH : "");
+    dialogue_visible_=model.scene==UiScene::Conversation &&
+        CurrentOutputGate().Allows(presentation::Output::DialogueText);
+    agent_speaking_=model.turn==TurnPhase::AgentSpeaking;
     const auto color=model.severity==UiSeverity::Error ? 0xF58D8D :
         model.severity==UiSeverity::Attention ? 0xE5BE78 : 0x91D8CA;
     lv_obj_set_style_bg_color(state_dot_,lv_color_hex(color),0);
-    lv_label_set_text(status_,model.status_text ? model.status_text : "");
-    lv_label_set_text(mode_,model.mode_label ? model.mode_label : "");
+    Text(status_,model.status_text);
+    Text(mode_,model.mode_label);
     const bool touch=model.primary_presentation==UiActionPresentation::TouchControl;
     const bool hint=model.primary_presentation==UiActionPresentation::InputHint;
     primary_intent_=touch && model.primary_enabled ? model.primary_intent : UiIntent::None;
     has_actions_=primary_intent_!=UiIntent::None || model.show_end_action || hint;
-    lv_label_set_text(input_hint_,hint ? model.input_hint : "");
+    Text(input_hint_,hint ? model.input_hint : "");
     Visible(input_hint_,hint);
     Visible(mode_,touch || model.show_end_action);
-    lv_label_set_text(primary_label_,model.primary_label ? model.primary_label : "");
+    Text(primary_label_,model.primary_label);
     Visible(primary_,primary_intent_!=UiIntent::None);
     Visible(close_,model.show_end_action);
     Visible(setup_,model.show_setup_action);
@@ -287,13 +413,16 @@ void CompanionFaceView::Render(const EidolonUiModel& model) {
     // The reachable start action already explains how to begin. Keep the
     // ready face free of a second, generic invitation to do the same thing.
     if (model.scene==UiScene::Ready && has_actions_) information_text_="";
-    if (model.scene==UiScene::Conversation &&
-        CurrentOutputGate().Allows(presentation::Output::DialogueText) && model.subtitle)
-        information_text_=model.subtitle;
-    else if (!face) {
+    if (dialogue_visible_) {
+        pending_subtitle_=model.subtitle ? model.subtitle : "";
+        if (pending_subtitle_.empty()) ClearSubtitle();
+    }
+    if (!face) {
         lv_obj_update_layout(detail_panel_);
         information_text_=lv_obj_get_height(detail_)>lv_obj_get_height(detail_panel_) ? (touch_navigation_ ? "Swipe to read more" : "") : "";
     }
+    UpdateLayout();
+    RefreshSubtitle(NowMs());
     RefreshInformation();
 }
 void CompanionFaceView::OnPrimary(lv_event_t* event) {

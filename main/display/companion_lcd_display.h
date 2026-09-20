@@ -4,6 +4,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/portmacro.h>
 #include "eidolon/views/companion_face_view.h"
+class LvglFont;
 // One product display implementation for BOX-3, StackChan and CoreS3.
 // The SPI driver and font/theme infrastructure remain shared with LcdDisplay.
 class CompanionLcdDisplay : public SpiLcdDisplay {
@@ -13,6 +14,8 @@ public:
     ~CompanionLcdDisplay() override;
     void SetupUI() override;
     void SetTheme(Theme* theme) override;
+    void OnAssetsLoaded() override;
+    void OnAssetsUnloaded() override;
     void SetStatus(const char* text) override { face_.SetSystemStatus(text); }
     void ShowNotification(const char* text,int duration_ms=3000) override { face_.ShowNotification(text,duration_ms); }
     void ShowNotification(const std::string& text,int duration_ms=3000) override { ShowNotification(text.c_str(),duration_ms); }
@@ -26,6 +29,8 @@ private:
     static void OnFlush(lv_event_t* event);
     static void OnTimer(lv_timer_t* timer);
     eidolon::CompanionFaceView face_;
+    std::shared_ptr<LvglFont> fallback_font_;
+    std::shared_ptr<LvglFont> content_font_;
     lv_timer_t* timer_=nullptr;
     portMUX_TYPE frame_mux_ = portMUX_INITIALIZER_UNLOCKED;
     uint32_t submitted_frame_=0,completed_frame_=0;

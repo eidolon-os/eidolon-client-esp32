@@ -19,6 +19,8 @@ public:
     Indicators indicators() const { return indicators_; }
     void Build(const BuildContext& ctx);
     void Render(const EidolonUiModel& model) override;
+    // Caller holds the display lock and keeps the font alive until replacement.
+    void SetContentFont(const lv_font_t* font);
     void SetSystemStatus(const char* text);
     void ShowNotification(const char* text, int duration_ms);
     void PulseEmotion(const char* emotion, int ttl_ms);
@@ -39,6 +41,8 @@ private:
     void Emit(expression::Event event);
     void RefreshInformation();
     void UpdateLayout();
+    void RefreshSubtitle(uint64_t now);
+    void ClearSubtitle();
     static void OnPrimary(lv_event_t* event);
     static void OnClose(lv_event_t* event);
     static void OnSetup(lv_event_t* event);
@@ -47,11 +51,21 @@ private:
     expression::Runtime runtime_;
     Observer observer_;
     Indicators indicators_{};
-    lv_anim_t scroll_animation_{};
+
     lv_obj_t* viewport_ = nullptr;
     lv_obj_t* detail_panel_ = nullptr;
     lv_obj_t* detail_ = nullptr;
     lv_obj_t* information_ = nullptr;
+    lv_obj_t* subtitle_panel_ = nullptr;
+    lv_obj_t* subtitle_ = nullptr;
+    lv_obj_t* notification_ = nullptr;
+    const lv_font_t* font_ = nullptr;
+    std::string pending_subtitle_, displayed_subtitle_;
+    uint64_t subtitle_updated_ = 0, subtitle_page_at_ = 0;
+    uint64_t subtitle_idle_since_ = 0;
+    bool subtitle_idle_ = false;
+    bool dialogue_visible_ = false;
+    bool agent_speaking_ = false;
     lv_obj_t* state_dot_ = nullptr;
     lv_obj_t* mode_ = nullptr;
     lv_obj_t* input_hint_ = nullptr;

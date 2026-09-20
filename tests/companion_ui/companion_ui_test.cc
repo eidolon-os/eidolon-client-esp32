@@ -1,14 +1,17 @@
 #include <lvgl.h>
+#include <font_awesome.h>
 #include <cassert>
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <string>
 #include <vector>
 #include "display.h"
+#include "cbin_font_fixture.h"
 #include "eidolon/views/companion_face_view.h"
 #include "eidolon/views/companion_layout.h"
 #include "eidolon/output_policy.h"
-LV_FONT_DECLARE(font_noto_basic_20_4);
+LV_FONT_DECLARE(font_noto_basic_16_4);
 LV_FONT_DECLARE(font_awesome_20_4);
 LV_FONT_DECLARE(font_puhui_basic_20_4);
 using namespace eidolon;
@@ -20,6 +23,7 @@ static lv_obj_t* Find(lv_obj_t* obj,const char* text) {
 }
 static void Within(lv_obj_t* obj,companion::Rect r) {
     lv_obj_update_layout(obj);lv_area_t a;lv_obj_get_coords(obj,&a);
+    if (!(a.x1>=r.x && a.y1>=r.y && a.x2<r.x+r.w && a.y2<r.y+r.h)) std::fprintf(stderr,"bounds: (%d,%d)-(%d,%d), expected (%d,%d,%d,%d)\n",a.x1,a.y1,a.x2,a.y2,r.x,r.y,r.w,r.h);
     assert(a.x1>=r.x && a.y1>=r.y && a.x2<r.x+r.w && a.y2<r.y+r.h);
 }
 static void Screenshot(lv_obj_t* screen,const std::string& path) {
@@ -61,13 +65,13 @@ int main(int argc,char** argv) {
     const auto speech=OutputBit(presentation::Output::Speech);
     assert(gate.Bind({true,1,expression|dialogue|speech}));
     std::vector<UiIntent> events;SetEidolonUiIntentHandler([&](UiIntent i){events.push_back(i);});
-    for (const auto* font : {&font_noto_basic_20_4,&font_puhui_basic_20_4}) {
+    for (const auto* font : {&font_noto_basic_16_4,&font_puhui_basic_20_4}) {
         auto* screen=lv_obj_create(nullptr);lv_screen_load(screen);
         CompanionFaceView view;
         view.SetSystemStatus("Before setup");view.ShowNotification("Before setup",1000);
         view.Build({screen,font,&display,&font_awesome_20_4});
-        lv_label_set_text(view.indicators().network,LV_SYMBOL_WIFI);
-        lv_label_set_text(view.indicators().battery,LV_SYMBOL_BATTERY_FULL);
+        lv_label_set_text(view.indicators().network,FONT_AWESOME_WIFI);
+        lv_label_set_text(view.indicators().battery,FONT_AWESOME_BATTERY_FULL);
         EidolonUiModel model;model.touch_navigation=true;model.scene=UiScene::Conversation;model.status_text="Listening";
         model.mode_label="FULL";model.primary_label="MIC";model.primary_enabled=true;
         model.primary_intent=UiIntent::ToggleMicrophone;model.show_end_action=true;
@@ -94,7 +98,7 @@ int main(int argc,char** argv) {
         Within(Find(screen,"Listening"),layout.header);
         Within(Find(screen,"MIC"),layout.actions);
         Within(Find(screen,"END"),layout.actions);
-        const std::string prefix=std::string(argv[1])+(font==&font_noto_basic_20_4 ? "/box3" : "/stackchan");
+        const std::string prefix=std::string(argv[1])+(font==&font_noto_basic_16_4 ? "/box3" : "/stackchan");
         Screenshot(screen,prefix+"-silent.ppm");
         auto* mic=lv_obj_get_parent(Find(screen,"MIC"));
         lv_area_t mic_area; lv_obj_get_coords(mic, &mic_area);
@@ -136,11 +140,62 @@ int main(int argc,char** argv) {
         model.interaction_mode=InteractionMode::FullDuplex;model.mode_label="FULL";
         model.primary_label="MIC";model.primary_intent=UiIntent::ToggleMicrophone;model.turn=TurnPhase::Idle;
         model.subtitle="This is a long response that scrolls only below the face, while the controls remain visible.";
-        view.Render(model);Within(Find(screen,model.subtitle),layout.information);
+        lv_tick_inc(250);
+        view.Render(model);
+        auto* captions=lv_obj_get_parent(Find(screen,model.subtitle));
+        const companion::Layout caption_layout(320,240,true,true,std::max<int>(52,2*font->line_height+4));
+        Within(captions,caption_layout.information);
+        lv_obj_update_layout(captions);
+        assert(lv_obj_get_scroll_bottom(captions)>0);
+        lv_tick_inc(3500);view.Advance(0);
+        const int page_y=lv_obj_get_scroll_y(captions);
+        assert(page_y>0);
+        view.Render(model);assert(lv_obj_get_scroll_y(captions)==page_y);
+        // Fast revisions coalesce, then flush on the view timer.
+        model.subtitle="First revision";
+        view.Render(model);assert(Find(screen,model.subtitle));
+        model.subtitle="Latest revision";
+        view.Render(model);assert(!Find(screen,model.subtitle));
+        lv_tick_inc(250);view.Advance(0);assert(Find(screen,model.subtitle));
+        // Empty captions never move the face while dialogue output is enabled.
+        const auto reserved=companion::Layout(320,240,true,true,std::max<int>(52,2*font->line_height+4));
+        model.subtitle="";view.Render(model);
+        assert(lv_obj_is_visible(captions));Within(captions,reserved.information);
+        model.subtitle="This is a long response. Captions stay below the face and above the controls.";
+        view.Render(model);
         Screenshot(screen,prefix+"-text.ppm");
+        // BOX-3's shipped profile uses its physical button and has no battery.
+        model.primary_presentation=UiActionPresentation::InputHint;
+        model.input_hint="Press button to end";model.show_end_action=false;
+        lv_label_set_text(view.indicators().battery,"");
+        view.Render(model);
+        Screenshot(screen,prefix+"-voice-physical.ppm");
+        assert(!lv_obj_is_visible(view.indicators().battery));
+        model.primary_presentation=UiActionPresentation::TouchControl;
+        model.show_end_action=true;
+        lv_label_set_text(view.indicators().battery,FONT_AWESOME_BATTERY_FULL);
+        view.Render(model);
         view.ShowNotification("Volume 60%",1000);assert(Find(screen,"Volume 60%"));
+        assert(Find(screen,model.subtitle)); // notifications never replace speech
+        model.show_mute_icon=true;model.show_setup_action=true;
+        view.Render(model);
+        auto* mute=Find(screen,FONT_AWESOME_MICROPHONE_SLASH);assert(mute);
+        Within(mute,layout.header);
+        auto* setup=Find(screen,FONT_AWESOME_GEAR);assert(setup);
+        Within(setup,layout.header);
+        lv_font_glyph_dsc_t glyph;
+        for (uint32_t cp : {0xf013u,0xf131u,0xf1ebu,0xf240u})
+            assert(lv_font_get_glyph_dsc(&font_awesome_20_4,&glyph,cp,0));
+        Screenshot(screen,prefix+"-icons-notification.ppm");
+        model.show_mute_icon=false;view.Render(model);
+        assert(!lv_obj_is_visible(mute));
+        model.show_setup_action=false;
         view.Render(model);assert(Find(screen,"Volume 60%"));
         lv_tick_inc(1100);view.Advance(0);assert(Find(screen,model.subtitle));
+        // A short subtitle expires after reading, and duplicate models cannot revive it.
+        model.subtitle="Finished speaking.";lv_tick_inc(250);view.Render(model);
+        lv_tick_inc(6100);view.Advance(0);assert(!Find(screen,model.subtitle));
+        view.Render(model);assert(!Find(screen,model.subtitle));
         model.scene=UiScene::RecoveryRequired;model.status_text="Connection lost";
         model.detail_text="Please check your network.\nReconnect the device to Wi-Fi and retry.\nLong setup instructions stay on this page.\nSwipe vertically to read more.\nThe action row stays fixed.";
         model.severity=UiSeverity::Error;model.primary_enabled=false;model.show_end_action=false;
@@ -160,6 +215,64 @@ int main(int argc,char** argv) {
         // Declaring text output off clears dialogue in every interaction mode.
         gate.Close();model.scene=UiScene::Conversation;view.Render(model);assert(!Find(screen,model.subtitle));
 
+    }
+    {
+        CbinFontFixture resource(CBIN_FONT_FILE);
+        auto* screen=lv_obj_create(nullptr);lv_screen_load(screen);
+        CompanionFaceView view;view.Build({screen,&font_noto_basic_16_4,&display,&font_awesome_20_4});
+        assert(gate.Start({"chinese",1,expression|dialogue,true},"chinese"));
+        EidolonUiModel model;model.scene=UiScene::Conversation;model.status_text="Speaking";
+        model.turn=TurnPhase::AgentSpeaking;model.subtitle="我叫小何。";
+        view.Render(model);
+        lv_font_glyph_dsc_t glyph;
+        assert(!lv_font_get_glyph_dsc(&font_noto_basic_16_4,&glyph,U'叫',0) || glyph.is_placeholder);
+        Screenshot(screen,std::string(argv[1])+"/box3-chinese-before.ppm");
+        view.SetContentFont(resource.font());view.Advance(0);
+        auto* caption=Find(screen,model.subtitle);assert(caption);
+        assert(lv_obj_get_style_text_font(caption,LV_PART_MAIN)==resource.font());
+        for (uint32_t cp : {U'我',U'叫',U'小',U'何',U'。'}) {
+            assert(lv_font_get_glyph_dsc(resource.font(),&glyph,cp,0));
+            assert(!glyph.is_placeholder && glyph.box_w>0);
+        }
+        const companion::Layout chinese_layout(320,240,false,true,std::max<int>(52,2*resource.font()->line_height+4));
+        auto* captions=lv_obj_get_parent(caption);
+        Within(captions,chinese_layout.information);
+        assert(lv_obj_get_scroll_bottom(captions)==0);
+        Screenshot(screen,std::string(argv[1])+"/box3-chinese-after.ppm");
+        model.subtitle="我叫小何。我叫小何。我叫小何。我叫小何。我叫小何。我叫小何。我叫小何。我叫小何。我叫小何。";
+        model.turn=TurnPhase::Idle;
+        lv_tick_inc(250);view.Render(model);
+        lv_obj_update_layout(captions);assert(lv_obj_get_scroll_bottom(captions)>0);
+        lv_tick_inc(3500);view.Advance(0);
+        assert(lv_obj_get_scroll_y(captions)==2*(resource.font()->line_height+4));
+        Screenshot(screen,std::string(argv[1])+"/box3-chinese-page.ppm");
+        // Stream one character at a time: show partial text before stream close,
+        // fill the full 304px strip, and follow the latest spoken line.
+        model.subtitle="";view.Render(model);model.turn=TurnPhase::AgentSpeaking;
+        const std::string streaming="我叫小何，今天我们一起测试语音字幕是否能够随着说话逐步显示，并且在屏幕右侧正常换行。文字变小后可以展示更多内容，中英文都保持清晰。";
+        std::string partial;
+        for (size_t i=0;i<streaming.size();i+=3) {
+            partial.append(streaming,i,3);model.subtitle=partial.c_str();
+            lv_tick_inc(250);view.Render(model);
+            auto* visible=Find(screen,partial.c_str());assert(visible);
+            assert(lv_obj_get_width(visible)==304);
+            assert(lv_obj_get_style_text_align(visible,LV_PART_MAIN)==LV_TEXT_ALIGN_LEFT);
+        }
+        assert(lv_obj_get_scroll_y(captions)>0);
+        assert(lv_obj_get_scroll_bottom(captions)==0);
+        const int stream_y=lv_obj_get_scroll_y(captions);
+        lv_tick_inc(4000);view.Advance(0);
+        assert(lv_obj_get_scroll_y(captions)==stream_y);
+        Screenshot(screen,std::string(argv[1])+"/box3-streaming-chinese.ppm");
+        model.subtitle="Streaming captions now follow speech. Smaller text uses the full screen width with balanced margins.";
+        lv_tick_inc(250);view.Render(model);
+        Screenshot(screen,std::string(argv[1])+"/box3-streaming-english.ppm");
+        // Unloading/reloading must rebind labels before the mapped font disappears.
+        view.SetContentFont(&font_noto_basic_16_4);
+        assert(lv_obj_get_style_text_font(Find(screen,model.subtitle),LV_PART_MAIN)==&font_noto_basic_16_4);
+        view.SetContentFont(resource.font());
+        gate.Close();view.Render(model);assert(!Find(screen,model.subtitle));
+        view.SetContentFont(&font_noto_basic_16_4);
     }
     lv_deinit();
     std::puts("Companion UI: both board fonts, layout bounds, scroll, notifications, silent modes and PTT events passed");

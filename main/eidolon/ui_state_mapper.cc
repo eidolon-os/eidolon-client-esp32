@@ -86,6 +86,9 @@ UiScene SelectScene(const EidolonRuntimeStatus& status)
     case EnrollmentPhase::PendingReview:
         return UiScene::WaitingApproval;
     case EnrollmentPhase::Unknown:
+        if (status.service == ServicePhase::Fault) return UiScene::Error;
+        if (status.service == ServicePhase::Unreachable || status.service == ServicePhase::Reconnecting)
+            return UiScene::Reconnecting;
         return UiScene::PreparingService;
     case EnrollmentPhase::ClaimActive:
     case EnrollmentPhase::Revoked:
@@ -146,6 +149,34 @@ void ResolveConversationPresentation(const EidolonRuntimeStatus& status,
                                 : "Listening...";
         break;
     }
+}
+
+void ResolveServicePresentation(const EidolonRuntimeStatus& status, EidolonUiModel& model)
+{
+    if (model.scene != UiScene::PreparingService) return;
+    switch (status.service) {
+    case ServicePhase::DiscoveringAuthority:
+        model.status_text = "Finding service";
+        model.detail_text = "Looking for your Hub...";
+        break;
+    case ServicePhase::Registering:
+        model.status_text = "Checking device";
+        model.detail_text = "Confirming device access...";
+        break;
+    case ServicePhase::Connecting:
+        model.status_text = "Connecting";
+        model.detail_text = "Connecting to your service...";
+        break;
+    case ServicePhase::Preparing:
+        model.status_text = "Waiting for service";
+        model.detail_text = "Waiting for service configuration";
+        break;
+    default:
+        model.detail_text = status.enrollment == EnrollmentPhase::Unknown
+            ? "Checking device status..." : "Preparing your service...";
+        break;
+    }
+    if (!status.service_detail.empty()) model.detail_text = status.service_detail.c_str();
 }
 
 void ResolveRecoveryPresentation(const EidolonRuntimeStatus& status,
@@ -248,6 +279,7 @@ EidolonUiModel UiStateProjector::Project(const EidolonRuntimeStatus& status,
         model.emotion = "happy";
     }
 
+    ResolveServicePresentation(status, model);
     ResolveConversationPresentation(status, model);
     ResolveRecoveryPresentation(status, model);
     ResolveActions(status, model);

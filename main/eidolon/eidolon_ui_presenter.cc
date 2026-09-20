@@ -1,6 +1,7 @@
 #include "eidolon_ui_presenter.h"
 
 #include <esp_log.h>
+#include <cstring>
 
 #include "application.h"
 #include "board.h"
@@ -49,6 +50,8 @@ EidolonUiPresenter::~EidolonUiPresenter()
 
 void EidolonUiPresenter::ApplyVoiceStatus(const VoiceRuntimeStatus& voice)
 {
+    const bool entered_conversation = status_.conversation != ConversationPhase::Active &&
+                                      voice.conversation == ConversationPhase::Active;
     if (status_.enrollment != voice.enrollment) {
         status_.enrollment_detail.clear();
     }
@@ -65,7 +68,7 @@ void EidolonUiPresenter::ApplyVoiceStatus(const VoiceRuntimeStatus& voice)
         status_.last_transcription.clear();
         status_.last_transcription_role = "system";
         tracker_.OnRoomDisconnected();
-    } else {
+    } else if (entered_conversation) {
         tracker_.OnRoomConnected();
     }
     Reapply();
@@ -104,7 +107,8 @@ void EidolonUiPresenter::SetServicePhase(ServicePhase phase, const std::string& 
 
 void EidolonUiPresenter::OnTranscription(const TranscriptionEvent& event)
 {
-    if (event.source == TranscriptionSource::User && !event.is_final) {
+    if (status_.conversation != ConversationPhase::Active || event.text.empty() ||
+        (event.source == TranscriptionSource::User && !event.is_final)) {
         return;
     }
     tracker_.OnTranscription(event);
@@ -131,6 +135,10 @@ void EidolonUiPresenter::OnAgentPhase(AgentPhase phase)
     if (status_.conversation != ConversationPhase::Active ||
         status_.turn == TurnPhase::Recording) {
         return;
+    }
+    if ((phase == AgentPhase::UserSpeaking || phase == AgentPhase::AgentThinking) &&
+        std::strcmp(status_.last_transcription_role, "assistant") == 0) {
+        status_.last_transcription.clear();
     }
     switch (phase) {
     case AgentPhase::UserSpeaking:
