@@ -398,7 +398,7 @@ ensure_eidolon_trim_sdkconfig() {
   set_sdkconfig_bool USE_CUSTOM_WAKE_WORD n
   clear_sr_wakenet_models
   set_sdkconfig_value EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS 75000
-  set_sdkconfig_value EIDOLON_LIVEKIT_SPEAKER_VOLUME 50
+  set_sdkconfig_value EIDOLON_LIVEKIT_SPEAKER_VOLUME 25
   # Full-duplex board idles IN the control room (online), it must NOT auto-join a
   # voice session on boot. Auto-join skips ConnectControlRoom(), so the Hub sees no
   # control-room presence and admin shows the device offline. Matches esp-box-3.
@@ -438,7 +438,7 @@ CONFIG_EIDOLON_DEV_DISABLE_AUTO_SHUTDOWN=y
 CONFIG_EIDOLON_CAP_AUDIO_CUE=y
 CONFIG_EIDOLON_INTERACTION_MODE_HALF_DUPLEX=y
 CONFIG_EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS=75000
-CONFIG_EIDOLON_LIVEKIT_SPEAKER_VOLUME=50
+CONFIG_EIDOLON_LIVEKIT_SPEAKER_VOLUME=25
 CONFIG_USE_AUDIO_PROCESSOR=y
 CONFIG_USE_DEVICE_AEC=n
 CONFIG_EIDOLON_DEVICE_AEC_AFE_MODE_LOW_COST=y
