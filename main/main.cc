@@ -36,12 +36,18 @@ extern "C" void app_main(void)
         ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_NVS,
         eidolon::kOwnerTrustPartitionName);
     if (owner_trust_partition != nullptr) {
-        const esp_err_t trust_result =
-            nvs_flash_init_partition(eidolon::kOwnerTrustPartitionName);
+        const esp_err_t trust_result = owner_trust_partition->size >= eidolon::kOwnerTrustPartitionBytes
+            ? nvs_flash_init_partition(eidolon::kOwnerTrustPartitionName)
+            : ESP_ERR_INVALID_SIZE;
         if (trust_result != ESP_OK) {
             ESP_LOGE(TAG, "Owner trust partition unavailable: %s",
                      esp_err_to_name(trust_result));
+        } else {
+            ESP_LOGI(TAG, "EIDOLON-STORAGE owner_trust=ready bytes=%lu",
+                     static_cast<unsigned long>(owner_trust_partition->size));
         }
+    } else {
+        ESP_LOGW(TAG, "EIDOLON-STORAGE owner_trust=legacy-layout");
     }
 #endif
 

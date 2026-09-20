@@ -1,0 +1,66 @@
+# Eidolon board build and flash contract
+
+Use the board's existing script, or `idf.py` from this project. The project
+`idf_ext.py` applies the same verification to full, application, bootloader and
+partition-table flash actions. Raw esptool, Ninja flash targets and external
+flashers are outside this verified entry point.
+
+## New board
+
+1. Declare the chip, flash capacity and pinned ESP-IDF version in the board
+   configuration. Keep interaction mode and output capabilities independent.
+2. Select a compatible partition CSV. Prefer `partitions/v2/16m_eidolon.csv` for
+   compatible 16 MB boards; BOX-3 uses its asset/application size variant.
+   Do not copy offsets into shell scripts or board C++ code.
+3. Build using the board script. Hub builds require `owner_trust` (data/nvs,
+   at least the capacity in `owner_trust_storage_policy.h`), `nvs`, `otadata`,
+   equal-sized OTA slots and `assets`. IDF verifies names, overlap and alignment.
+   The generated binary table must match the configured CSV, and flash images
+   must fit their destinations. Missing requirements fail the build.
+4. Connect hardware and flash through the same script. The shared gate checks
+   actual chip, flash capacity and existing binary partition table before
+   invoking IDF's writer, then reads the partition table back. The board
+   script additionally checks the running build fingerprint. Startup reports
+   `EIDOLON-STORAGE owner_trust=ready bytes=...` after successful initialization.
+5. Verify factory-empty provisioning and normal interaction on hardware.
+   Compile-time storage checks do not replace those acceptance tests.
+
+Namespace and key names are internal to the shared storage implementation.
+Flash scripts never create namespaces. All read paths treat absent storage
+content as unclaimed and unreadable/corrupt content as unavailable.
+
+## Existing devices
+
+A matching layout permits an update. An erased partition table permits only a
+complete flash. A different or unreadable table stops the operation before
+writing. No script automatically erases or relocates ownership and user data.
+Plan a data-preserving migration, or explicitly authorize and perform a full
+erase before the complete flash. Application-only flashing cannot install a new
+partition layout. Read-only compatibility in the firmware does not bypass this
+release/flash requirement.
+
+Encrypted flash and extra raw esptool write arguments are refused by this gate
+until an explicit verification flow exists for them. The old
+`--only-flash-partition` option is not supported by the pinned IDF; use the
+supported application-only or full-image operation. Explicit partition erase
+uses IDF parttool to query the connected device's own table.
+
+The historical `16m_atk_guard.csv` has no Owner partition and intentionally fails
+Hub contract checks. Its face data layout needs an explicit migration design;
+it is not silently resized or moved by this change.
+
+## Regression tests
+
+With the pinned ESP-IDF environment exported:
+
+```sh
+python tests/partition_contract_test.py
+bash tests/run_fresh_owner_trust_tests.sh
+bash tests/run_owner_trust_storage_policy_tests.sh
+bash tests/run_owner_trust_commissioner_tests.sh
+bash tests/run_eidolon_common_tests.sh
+python tests/serial_buildstamp_reconnect_test.py
+```
+
+The Python test imports IDF's real partition parser. No duplicate CSV parser,
+flash writer or private provisioning protocol is introduced.

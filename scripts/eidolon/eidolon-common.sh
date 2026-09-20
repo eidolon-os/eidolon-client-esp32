@@ -394,3 +394,10 @@ PY
     return 1
   fi
 }
+
+# Resolve informational offsets from the selected CSV using IDF's parser.
+# Destructive partition operations must instead query the connected device.
+eidolon_partition_field() {
+  eidolon_require_idf "${BOARD_IDF_VERSION:-}" >&2
+  "$(eidolon_idf_python)" "$1/scripts/eidolon/partition_contract.py" field "$1/$2" "$3" "$4"
+}

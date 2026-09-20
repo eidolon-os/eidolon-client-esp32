@@ -224,27 +224,11 @@ menu_pick_port() {
 # Partition table (v2 / 16MB)
 # ---------------------------------------------------------------------------
 partition_offset() {
-  case "$1" in
-    nvs)      echo "0x9000" ;;
-    otadata)  echo "0xd000" ;;
-    phy_init) echo "0xf000" ;;
-    ota_0)    echo "0x20000" ;;
-    ota_1)    echo "0x470000" ;;
-    assets)   echo "0x8c0000" ;;
-    *) die "unknown partition: $1" ;;
-  esac
+  eidolon_partition_field "${PROJECT_ROOT}" "${PARTITION_CSV}" "$1" offset
 }
 
 partition_size() {
-  case "$1" in
-    nvs)      echo "0x4000" ;;
-    otadata)  echo "0x2000" ;;
-    phy_init) echo "0x1000" ;;
-    ota_0)    echo "0x450000" ;;
-    ota_1)    echo "0x450000" ;;
-    assets)   echo "0x740000" ;;
-    *) die "unknown partition: $1" ;;
-  esac
+  eidolon_partition_field "${PROJECT_ROOT}" "${PARTITION_CSV}" "$1" size
 }
 
 expand_group() {
@@ -269,7 +253,7 @@ show_partitions() {
   else
     echo "layout  : ${PARTITION_CSV} (default)"
     local name
-    for name in nvs otadata phy_init ota_0 ota_1 assets; do
+    for name in nvs otadata phy_init owner_trust ota_0 ota_1 assets; do
       printf "  %-10s offset=%-10s size=%s\n" \
         "${name}" "$(partition_offset "${name}")" "$(partition_size "${name}")"
     done
@@ -555,18 +539,9 @@ cmd_build() {
 # Erase / flash / monitor
 # ---------------------------------------------------------------------------
 erase_partition_esptool() {
-  local name="$1"
-  local offset size
-  offset="$(partition_offset "${name}")"
-  size="$(partition_size "${name}")"
-
-  local esptool
-  esptool="$(command -v esptool.py || command -v esptool || true)"
-  [[ -n "${esptool}" ]] || die "esptool not found"
-
-  info "erasing ${name}: offset=${offset} size=${size}"
-  "${esptool}" --chip "${BOARD_TARGET}" -p "${PORT}" -b 460800 \
-    erase_region "${offset}" "${size}"
+  # Query the connected device's own table, never a copied offset or stale build.
+  "$(eidolon_idf_python)" "${IDF_PATH}/components/partition_table/parttool.py" \
+    --port "${PORT}" erase_partition --partition-name "$1"
 }
 
 erase_partitions() {
@@ -633,11 +608,7 @@ cmd_flash() {
   fi
 
   if ((${#FLASH_PARTITIONS[@]} > 0)); then
-    local part
-    for part in "${FLASH_PARTITIONS[@]}"; do
-      idf flash "--only-flash-partition=${part}"
-    done
-    return
+    die "This IDF does not support --only-flash-partition; use --app-only or a complete flash. No data was written."
   fi
 
   idf flash
