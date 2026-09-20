@@ -1,0 +1,7 @@
+[
+  {
+    "section": ".flash.rodata",
+    "allocated": true,
+    "differing_bytes": 2
+  }
+]

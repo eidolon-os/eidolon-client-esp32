@@ -1,0 +1,92 @@
+[
+  {
+    "name": ".rtc.force_slow",
+    "address": "0x50000000",
+    "bytes": 32,
+    "type": "SHT_PROGBITS"
+  },
+  {
+    "name": ".rtc_reserved",
+    "address": "0x600fffd8",
+    "bytes": 40,
+    "type": "SHT_NOBITS"
+  },
+  {
+    "name": ".iram0.vectors",
+    "address": "0x40378000",
+    "bytes": 1028,
+    "type": "SHT_PROGBITS"
+  },
+  {
+    "name": ".iram0.text",
+    "address": "0x40378404",
+    "bytes": 99903,
+    "type": "SHT_PROGBITS"
+  },
+  {
+    "name": ".dram0.dummy",
+    "address": "0x3fc88000",
+    "bytes": 101120,
+    "type": "SHT_NOBITS"
+  },
+  {
+    "name": ".dram0.data",
+    "address": "0x3fca0b00",
+    "bytes": 33260,
+    "type": "SHT_PROGBITS"
+  },
+  {
+    "name": ".noinit",
+    "address": "0x3fca8cec",
+    "bytes": 0,
+    "type": "SHT_NOBITS"
+  },
+  {
+    "name": ".dram0.bss",
+    "address": "0x3fca8cf0",
+    "bytes": 34856,
+    "type": "SHT_NOBITS"
+  },
+  {
+    "name": ".flash.text",
+    "address": "0x42000020",
+    "bytes": 2855320,
+    "type": "SHT_PROGBITS"
+  },
+  {
+    "name": ".flash_rodata_dummy",
+    "address": "0x3c000020",
+    "bytes": 2883584,
+    "type": "SHT_NOBITS"
+  },
+  {
+    "name": ".flash.appdesc",
+    "address": "0x3c2c0020",
+    "bytes": 256,
+    "type": "SHT_PROGBITS"
+  },
+  {
+    "name": ".flash.rodata",
+    "address": "0x3c2c0120",
+    "bytes": 1233584,
+    "type": "SHT_PROGBITS"
+  },
+  {
+    "name": ".flash.rodata_noload",
+    "address": "0x3c3ed3d0",
+    "bytes": 12646,
+    "type": "SHT_NOBITS"
+  },
+  {
+    "name": ".ext_ram.dummy",
+    "address": "0x3c000020",
+    "bytes": 4128736,
+    "type": "SHT_NOBITS"
+  },
+  {
+    "name": ".iram0.text_end",
+    "address": "0x40390a43",
+    "bytes": 189,
+    "type": "SHT_NOBITS"
+  }
+]

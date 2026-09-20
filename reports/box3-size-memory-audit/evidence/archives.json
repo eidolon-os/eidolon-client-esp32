@@ -1,0 +1,922 @@
+{
+    "libesp_audio_codec.a": {
+        ".dram0.bss": 8,
+        ".dram0.data": 1098,
+        ".flash.rodata": 278257,
+        ".flash.text": 609420,
+        ".iram0.text": 5836,
+        "flash_total": 894611,
+        "ram_st_total": 6942
+    },
+    "libmain.a": {
+        ".dram0.bss": 2430,
+        ".dram0.data": 175,
+        ".flash.rodata": 163122,
+        ".flash.text": 329677,
+        "flash_total": 492974,
+        "ram_st_total": 2605
+    },
+    "liblvgl__lvgl.a": {
+        ".dram0.bss": 480,
+        ".flash.rodata": 25858,
+        ".flash.text": 225766,
+        "flash_total": 251624,
+        "ram_st_total": 480
+    },
+    "libesp_app_format.a": {
+        ".dram0.bss": 10,
+        ".flash.appdesc": 256,
+        ".flash.rodata": 220546,
+        ".flash.text": 479,
+        "flash_total": 221281,
+        "ram_st_total": 10
+    },
+    "libstdc++.a": {
+        ".dram0.bss": 4325,
+        ".dram0.data": 156,
+        ".flash.rodata": 78389,
+        ".flash.text": 136427,
+        "flash_total": 214972,
+        "ram_st_total": 4481
+    },
+    "lib78__xiaozhi-fonts.a": {
+        ".flash.rodata": 210961,
+        ".flash.text": 410,
+        "flash_total": 211371,
+        "ram_st_total": 0
+    },
+    "libdl_lib.a": {
+        ".dram0.bss": 8,
+        ".dram0.data": 5936,
+        ".flash.rodata": 7289,
+        ".flash.text": 174429,
+        ".iram0.text": 1789,
+        "flash_total": 189443,
+        "ram_st_total": 7733
+    },
+    "libnet80211.a": {
+        ".dram0.bss": 7603,
+        ".dram0.data": 936,
+        ".flash.rodata": 13979,
+        ".flash.rodata_noload": 12485,
+        ".flash.text": 124549,
+        "flash_total": 139464,
+        "ram_st_total": 8539
+    },
+    "libc.a": {
+        ".dram0.bss": 764,
+        ".dram0.data": 364,
+        ".flash.rodata": 6889,
+        ".flash.text": 99527,
+        "flash_total": 106780,
+        "ram_st_total": 1128
+    },
+    "libmbedtls.a": {
+        ".dram0.bss": 244,
+        ".flash.rodata": 71333,
+        ".flash.text": 30287,
+        "flash_total": 101620,
+        "ram_st_total": 244
+    },
+    "liblwip.a": {
+        ".dram0.bss": 4054,
+        ".dram0.data": 12,
+        ".flash.rodata": 3581,
+        ".flash.text": 84216,
+        ".iram0.text": 26,
+        "flash_total": 87835,
+        "ram_st_total": 4092
+    },
+    "libesp_audio_processor.a": {
+        ".dram0.bss": 52,
+        ".dram0.data": 3084,
+        ".flash.rodata": 3490,
+        ".flash.text": 74787,
+        ".iram0.text": 1768,
+        "flash_total": 83129,
+        "ram_st_total": 4904
+    },
+    "libmbedcrypto.a": {
+        ".dram0.bss": 280,
+        ".dram0.data": 92,
+        ".flash.rodata": 7012,
+        ".flash.text": 69662,
+        ".iram0.text": 80,
+        "flash_total": 76846,
+        "ram_st_total": 452
+    },
+    "libfreertos.a": {
+        ".dram0.bss": 1081,
+        ".dram0.data": 3116,
+        ".flash.rodata": 41885,
+        ".flash.text": 1379,
+        ".iram0.text": 18133,
+        "flash_total": 64513,
+        "ram_st_total": 22330
+    },
+    "libpp.a": {
+        ".dram0.bss": 1234,
+        ".dram0.data": 2640,
+        ".flash.rodata": 4050,
+        ".flash.rodata_noload": 161,
+        ".flash.text": 56338,
+        ".iram0.text": 830,
+        "flash_total": 63858,
+        "ram_st_total": 4704
+    },
+    "libesp_image_effects.a": {
+        ".flash.rodata": 361,
+        ".flash.text": 63055,
+        "flash_total": 63416,
+        "ram_st_total": 0
+    },
+    "libwpa_supplicant.a": {
+        ".dram0.bss": 1326,
+        ".dram0.data": 8,
+        ".flash.rodata": 1570,
+        ".flash.text": 53112,
+        "flash_total": 54690,
+        "ram_st_total": 1334
+    },
+    "libpeer_default.a": {
+        ".dram0.bss": 438,
+        ".flash.rodata": 2112,
+        ".flash.text": 45779,
+        "flash_total": 47891,
+        "ram_st_total": 438
+    },
+    "libphy.a": {
+        ".dram0.bss": 86,
+        ".dram0.data": 1277,
+        ".flash.text": 27922,
+        ".iram0.text": 5073,
+        "flash_total": 34272,
+        "ram_st_total": 6436
+    },
+    "libesp_hw_support.a": {
+        ".dram0.bss": 268,
+        ".dram0.data": 728,
+        ".flash.rodata": 1668,
+        ".flash.text": 21069,
+        ".iram0.text": 10495,
+        "flash_total": 33960,
+        "ram_st_total": 11491
+    },
+    "libespressif__gmf_core.a": {
+        ".dram0.bss": 4,
+        ".flash.rodata": 3667,
+        ".flash.text": 28833,
+        "flash_total": 32500,
+        "ram_st_total": 4
+    },
+    "libesp_new_jpeg.a": {
+        ".dram0.bss": 5,
+        ".dram0.data": 448,
+        ".flash.rodata": 1273,
+        ".flash.text": 28476,
+        ".iram0.text": 904,
+        "flash_total": 31101,
+        "ram_st_total": 1357
+    },
+    "libhal.a": {
+        ".dram0.bss": 4,
+        ".dram0.data": 7140,
+        ".flash.rodata": 408,
+        ".flash.text": 12089,
+        ".iram0.text": 11407,
+        "flash_total": 31044,
+        "ram_st_total": 18551
+    },
+    "lib78__esp-ml307.a": {
+        ".flash.rodata": 14816,
+        ".flash.text": 15399,
+        "flash_total": 30215,
+        "ram_st_total": 0
+    },
+    "libespressif__esp_capture.a": {
+        ".dram0.bss": 4,
+        ".flash.rodata": 483,
+        ".flash.text": 29422,
+        "flash_total": 29905,
+        "ram_st_total": 4
+    },
+    "libespressif__mdns.a": {
+        ".dram0.bss": 2366,
+        ".dram0.data": 48,
+        ".flash.rodata": 906,
+        ".flash.text": 28023,
+        "flash_total": 28977,
+        "ram_st_total": 2414
+    },
+    "libespressif__network_provisioning.a": {
+        ".dram0.bss": 20,
+        ".flash.rodata": 10679,
+        ".flash.text": 15811,
+        "flash_total": 26490,
+        "ram_st_total": 20
+    },
+    "libespressif__esp_libsrtp.a": {
+        ".dram0.bss": 1077,
+        ".dram0.data": 84,
+        ".flash.rodata": 5134,
+        ".flash.text": 18919,
+        "flash_total": 24137,
+        "ram_st_total": 1161
+    },
+    "libm.a": {
+        ".flash.rodata": 1636,
+        ".flash.text": 20522,
+        "flash_total": 22158,
+        "ram_st_total": 0
+    },
+    "libesp_audio_effects.a": {
+        ".flash.rodata": 1823,
+        ".flash.text": 18588,
+        ".iram0.text": 273,
+        "flash_total": 20684,
+        "ram_st_total": 273
+    },
+    "libwakenet.a": {
+        ".flash.rodata": 279,
+        ".flash.text": 19802,
+        "flash_total": 20081,
+        "ram_st_total": 0
+    },
+    "libespressif__gmf_video.a": {
+        ".flash.rodata": 1260,
+        ".flash.text": 18211,
+        "flash_total": 19471,
+        "ram_st_total": 0
+    },
+    "libnvs_flash.a": {
+        ".dram0.bss": 24,
+        ".flash.rodata": 4941,
+        ".flash.text": 14216,
+        "flash_total": 19157,
+        "ram_st_total": 24
+    },
+    "libespressif__gmf_audio.a": {
+        ".flash.rodata": 1472,
+        ".flash.text": 15515,
+        "flash_total": 16987,
+        "ram_st_total": 0
+    },
+    "liblivekit__livekit.a": {
+        ".dram0.bss": 1,
+        ".dram0.data": 152,
+        ".flash.rodata": 2816,
+        ".flash.text": 13544,
+        "flash_total": 16512,
+        "ram_st_total": 153
+    },
+    "libesp_driver_i2s.a": {
+        ".dram0.data": 24,
+        ".flash.rodata": 909,
+        ".flash.text": 15018,
+        ".iram0.text": 271,
+        "flash_total": 16222,
+        "ram_st_total": 295
+    },
+    "libprotocomm.a": {
+        ".dram0.bss": 5,
+        ".dram0.data": 8,
+        ".flash.rodata": 4350,
+        ".flash.text": 11696,
+        "flash_total": 16054,
+        "ram_st_total": 13
+    },
+    "lib78__esp-wifi-connect.a": {
+        ".dram0.bss": 120,
+        ".flash.rodata": 5046,
+        ".flash.text": 10681,
+        "flash_total": 15727,
+        "ram_st_total": 120
+    },
+    "libspi_flash.a": {
+        ".dram0.bss": 24,
+        ".dram0.data": 2216,
+        ".flash.rodata": 1102,
+        ".flash.text": 1201,
+        ".iram0.text": 10873,
+        "flash_total": 15392,
+        "ram_st_total": 13113
+    },
+    "libespressif__esp_codec_dev.a": {
+        ".dram0.bss": 12,
+        ".flash.rodata": 2229,
+        ".flash.text": 12467,
+        "flash_total": 14696,
+        "ram_st_total": 12
+    },
+    "libesp_audio_front_end.a": {
+        ".dram0.data": 1,
+        ".flash.rodata": 1046,
+        ".flash.text": 13264,
+        "flash_total": 14311,
+        "ram_st_total": 1
+    },
+    "libesp_system.a": {
+        ".dram0.bss": 349,
+        ".dram0.data": 501,
+        ".flash.rodata": 748,
+        ".flash.text": 9719,
+        ".iram0.text": 3221,
+        "flash_total": 14189,
+        "ram_st_total": 4071
+    },
+    "libmqtt.a": {
+        ".flash.rodata": 296,
+        ".flash.text": 12856,
+        "flash_total": 13152,
+        "ram_st_total": 0
+    },
+    "libnsnet.a": {
+        ".flash.rodata": 338,
+        ".flash.text": 12806,
+        "flash_total": 13144,
+        "ram_st_total": 0
+    },
+    "libesp_driver_spi.a": {
+        ".dram0.bss": 12,
+        ".dram0.data": 177,
+        ".flash.rodata": 629,
+        ".flash.text": 6313,
+        ".iram0.text": 3933,
+        "flash_total": 11052,
+        "ram_st_total": 4122
+    },
+    "libhttp_parser.a": {
+        ".flash.rodata": 714,
+        ".flash.text": 10178,
+        "flash_total": 10892,
+        "ram_st_total": 0
+    },
+    "libmbedx509.a": {
+        ".flash.rodata": 674,
+        ".flash.text": 10054,
+        "flash_total": 10728,
+        "ram_st_total": 0
+    },
+    "libesp_driver_i2c.a": {
+        ".dram0.bss": 28,
+        ".flash.rodata": 360,
+        ".flash.text": 9072,
+        ".iram0.text": 720,
+        "flash_total": 10152,
+        "ram_st_total": 748
+    },
+    "libheap.a": {
+        ".dram0.bss": 8,
+        ".dram0.data": 12,
+        ".flash.rodata": 954,
+        ".flash.text": 3039,
+        ".iram0.text": 5997,
+        "flash_total": 10002,
+        "ram_st_total": 6017
+    },
+    "libesp_http_server.a": {
+        ".flash.rodata": 368,
+        ".flash.text": 8875,
+        "flash_total": 9243,
+        "ram_st_total": 0
+    },
+    "libtcp_transport.a": {
+        ".flash.rodata": 180,
+        ".flash.text": 8240,
+        "flash_total": 8420,
+        "ram_st_total": 0
+    },
+    "libespressif__esp_websocket_client.a": {
+        ".flash.rodata": 217,
+        ".flash.text": 7886,
+        "flash_total": 8103,
+        "ram_st_total": 0
+    },
+    "libprotobuf-c.a": {
+        ".dram0.data": 12,
+        ".flash.rodata": 261,
+        ".flash.text": 7193,
+        "flash_total": 7466,
+        "ram_st_total": 12
+    },
+    "libesp_http_client.a": {
+        ".flash.rodata": 331,
+        ".flash.text": 7062,
+        "flash_total": 7393,
+        "ram_st_total": 0
+    },
+    "liblivekit__nanopb.a": {
+        ".flash.rodata": 4,
+        ".flash.text": 7093,
+        "flash_total": 7097,
+        "ram_st_total": 0
+    },
+    "libesp-tls.a": {
+        ".dram0.bss": 4,
+        ".flash.rodata": 90,
+        ".flash.text": 6854,
+        "flash_total": 6944,
+        "ram_st_total": 4
+    },
+    "libesp_driver_uart.a": {
+        ".dram0.bss": 32,
+        ".dram0.data": 304,
+        ".flash.rodata": 548,
+        ".flash.text": 5829,
+        ".iram0.text": 190,
+        "flash_total": 6871,
+        "ram_st_total": 526
+    },
+    "libtempotian__av_render.a": {
+        ".dram0.bss": 18,
+        ".flash.rodata": 16,
+        ".flash.text": 6789,
+        "flash_total": 6805,
+        "ram_st_total": 18
+    },
+    "libesp_driver_gpio.a": {
+        ".dram0.data": 36,
+        ".flash.rodata": 691,
+        ".flash.text": 5689,
+        ".iram0.text": 253,
+        "flash_total": 6669,
+        "ram_st_total": 289
+    },
+    "libesp_wifi.a": {
+        ".dram0.bss": 44,
+        ".dram0.data": 480,
+        ".flash.rodata": 843,
+        ".flash.text": 4942,
+        ".iram0.text": 284,
+        "flash_total": 6549,
+        "ram_st_total": 808
+    },
+    "libesp_netif.a": {
+        ".dram0.bss": 29,
+        ".dram0.data": 8,
+        ".flash.rodata": 223,
+        ".flash.text": 6111,
+        "flash_total": 6342,
+        "ram_st_total": 37
+    },
+    "libvfs.a": {
+        ".dram0.bss": 44,
+        ".dram0.data": 192,
+        ".flash.rodata": 143,
+        ".flash.text": 5248,
+        ".iram0.text": 75,
+        "flash_total": 5658,
+        "ram_st_total": 311
+    },
+    "libespressif__media_lib_sal.a": {
+        ".dram0.bss": 328,
+        ".flash.rodata": 304,
+        ".flash.text": 4705,
+        "flash_total": 5009,
+        "ram_st_total": 328
+    },
+    "libnewlib.a": {
+        ".dram0.bss": 216,
+        ".dram0.data": 172,
+        ".flash.rodata": 109,
+        ".flash.text": 1587,
+        ".iram0.text": 3133,
+        "flash_total": 5001,
+        "ram_st_total": 3521
+    },
+    "libespressif__cjson.a": {
+        ".dram0.bss": 8,
+        ".dram0.data": 12,
+        ".flash.rodata": 0,
+        ".flash.text": 4974,
+        "flash_total": 4986,
+        "ram_st_total": 20
+    },
+    "libgcc.a": {
+        ".dram0.bss": 8,
+        ".dram0.data": 4,
+        ".flash.rodata": 800,
+        ".flash.text": 4055,
+        ".iram0.text": 104,
+        "flash_total": 4963,
+        "ram_st_total": 116
+    },
+    "libvadnet.a": {
+        ".flash.rodata": 79,
+        ".flash.text": 4595,
+        "flash_total": 4674,
+        "ram_st_total": 0
+    },
+    "libesp_driver_ledc.a": {
+        ".dram0.bss": 44,
+        ".dram0.data": 8,
+        ".flash.rodata": 269,
+        ".flash.text": 4290,
+        ".iram0.text": 62,
+        "flash_total": 4629,
+        "ram_st_total": 114
+    },
+    "libc_speech_features.a": {
+        ".flash.rodata": 2068,
+        ".flash.text": 2489,
+        "flash_total": 4557,
+        "ram_st_total": 0
+    },
+    "liblvgl_port_lib.a": {
+        ".dram0.bss": 32,
+        ".flash.rodata": 292,
+        ".flash.text": 4053,
+        "flash_total": 4345,
+        "ram_st_total": 32
+    },
+    "libesp_lcd.a": {
+        ".flash.rodata": 437,
+        ".flash.text": 3553,
+        ".iram0.text": 124,
+        "flash_total": 4114,
+        "ram_st_total": 124
+    },
+    "libesp_ringbuf.a": {
+        ".flash.rodata": 477,
+        ".iram0.text": 3623,
+        "flash_total": 4100,
+        "ram_st_total": 3623
+    },
+    "libbootloader_support.a": {
+        ".dram0.bss": 8,
+        ".flash.rodata": 88,
+        ".flash.text": 3086,
+        ".iram0.text": 902,
+        "flash_total": 4076,
+        "ram_st_total": 910
+    },
+    "libespressif__button.a": {
+        ".dram0.bss": 18,
+        ".dram0.data": 8,
+        ".flash.rodata": 156,
+        ".flash.text": 3863,
+        "flash_total": 4027,
+        "ram_st_total": 26
+    },
+    "libesp_mm.a": {
+        ".dram0.bss": 48,
+        ".dram0.data": 129,
+        ".flash.rodata": 250,
+        ".flash.text": 2281,
+        ".iram0.text": 1303,
+        "flash_total": 3963,
+        "ram_st_total": 1480
+    },
+    "libespressif__esp_peer.a": {
+        ".dram0.bss": 4141,
+        ".flash.rodata": 10,
+        ".flash.text": 3927,
+        "flash_total": 3937,
+        "ram_st_total": 4141
+    },
+    "libespressif__dl_fft.a": {
+        ".dram0.bss": 8,
+        ".flash.rodata": 4,
+        ".flash.text": 3737,
+        "flash_total": 3741,
+        "ram_st_total": 8
+    },
+    "libxtensa.a": {
+        ".dram0.data": 1060,
+        ".flash.rodata": 48,
+        ".flash.text": 99,
+        ".iram0.text": 2057,
+        ".iram0.vectors": 427,
+        "flash_total": 3691,
+        "ram_st_total": 3544
+    },
+    "libesp_event.a": {
+        ".dram0.bss": 4,
+        ".flash.rodata": 163,
+        ".flash.text": 3375,
+        "flash_total": 3538,
+        "ram_st_total": 4
+    },
+    "libesp_psram.a": {
+        ".dram0.bss": 62,
+        ".dram0.data": 10,
+        ".flash.rodata": 152,
+        ".flash.text": 1092,
+        ".iram0.text": 1856,
+        "flash_total": 3110,
+        "ram_st_total": 1928
+    },
+    "libhufzip.a": {
+        ".dram0.bss": 24,
+        ".flash.rodata": 49,
+        ".flash.text": 3022,
+        "flash_total": 3071,
+        "ram_st_total": 24
+    },
+    "libesp_phy.a": {
+        ".dram0.bss": 43,
+        ".dram0.data": 9,
+        ".flash.rodata": 299,
+        ".flash.text": 2427,
+        ".iram0.text": 234,
+        "flash_total": 2969,
+        "ram_st_total": 286
+    },
+    "libapp_update.a": {
+        ".dram0.bss": 12,
+        ".flash.rodata": 96,
+        ".flash.text": 2570,
+        "flash_total": 2666,
+        "ram_st_total": 12
+    },
+    "libesp_timer.a": {
+        ".dram0.bss": 36,
+        ".dram0.data": 32,
+        ".flash.rodata": 99,
+        ".flash.text": 1410,
+        ".iram0.text": 996,
+        "flash_total": 2537,
+        "ram_st_total": 1064
+    },
+    "libsoc.a": {
+        ".flash.rodata": 2224,
+        ".flash.text": 30,
+        "flash_total": 2254,
+        "ram_st_total": 0
+    },
+    "libesp_partition.a": {
+        ".dram0.bss": 8,
+        ".flash.rodata": 189,
+        ".flash.text": 2044,
+        "flash_total": 2233,
+        "ram_st_total": 8
+    },
+    "lib78__uart-eth-modem.a": {
+        ".flash.rodata": 2184,
+        "flash_total": 2184,
+        "ram_st_total": 0
+    },
+    "libespressif__esp_lcd_ili9341.a": {
+        ".dram0.bss": 3,
+        ".dram0.data": 59,
+        ".flash.rodata": 501,
+        ".flash.text": 1575,
+        "flash_total": 2135,
+        "ram_st_total": 62
+    },
+    "libesp_driver_usb_serial_jtag.a": {
+        ".dram0.bss": 17,
+        ".dram0.data": 56,
+        ".flash.rodata": 173,
+        ".flash.text": 1647,
+        ".iram0.text": 223,
+        "flash_total": 2099,
+        "ram_st_total": 296
+    },
+    "libefuse.a": {
+        ".dram0.bss": 4,
+        ".dram0.data": 172,
+        ".flash.rodata": 387,
+        ".flash.text": 1395,
+        "flash_total": 1954,
+        "ram_st_total": 176
+    },
+    "libpthread.a": {
+        ".dram0.bss": 4,
+        ".dram0.data": 16,
+        ".flash.rodata": 117,
+        ".flash.text": 1760,
+        "flash_total": 1893,
+        "ram_st_total": 20
+    },
+    "libesp_common.a": {
+        ".flash.rodata": 1798,
+        ".flash.text": 46,
+        "flash_total": 1844,
+        "ram_st_total": 0
+    },
+    "libtempotian__media_lib_utils.a": {
+        ".flash.rodata": 0,
+        ".flash.text": 1690,
+        "flash_total": 1690,
+        "ram_st_total": 0
+    },
+    "liblog.a": {
+        ".dram0.bss": 276,
+        ".dram0.data": 8,
+        ".flash.rodata": 48,
+        ".flash.text": 935,
+        ".iram0.text": 439,
+        "flash_total": 1430,
+        "ram_st_total": 723
+    },
+    "libespressif__esp-sr.a": {
+        ".dram0.bss": 12,
+        ".dram0.data": 4,
+        ".flash.rodata": 18,
+        ".flash.text": 1141,
+        "flash_total": 1163,
+        "ram_st_total": 16
+    },
+    "libsmartconfig.a": {
+        ".dram0.bss": 206,
+        ".dram0.data": 2,
+        ".flash.rodata": 0,
+        ".flash.text": 1129,
+        "flash_total": 1131,
+        "ram_st_total": 208
+    },
+    "libesp_security.a": {
+        ".dram0.bss": 16,
+        ".flash.rodata": 8,
+        ".flash.text": 1026,
+        "flash_total": 1034,
+        "ram_st_total": 16
+    },
+    "libcxx.a": {
+        ".dram0.bss": 20,
+        ".dram0.data": 8,
+        ".flash.rodata": 148,
+        ".flash.text": 668,
+        "flash_total": 824,
+        "ram_st_total": 28
+    },
+    "libesp_rom.a": {
+        ".dram0.data": 4,
+        ".flash.text": 66,
+        ".iram0.text": 703,
+        "flash_total": 773,
+        "ram_st_total": 707
+    },
+    "libesp_vfs_console.a": {
+        ".dram0.bss": 16,
+        ".flash.rodata": 180,
+        ".flash.text": 546,
+        "flash_total": 726,
+        "ram_st_total": 16
+    },
+    "libespressif__esp_video_codec.a": {
+        ".dram0.bss": 4,
+        ".flash.rodata": 0,
+        ".flash.text": 637,
+        "flash_total": 637,
+        "ram_st_total": 4
+    },
+    "libesp_muxer.a": {
+        ".dram0.bss": 4,
+        ".flash.rodata": 0,
+        ".flash.text": 490,
+        "flash_total": 490,
+        "ram_st_total": 4
+    },
+    "lib78__uart-uhci.a": {
+        ".flash.rodata": 476,
+        "flash_total": 476,
+        "ram_st_total": 0
+    },
+    "libxt_hal.a": {
+        ".flash.rodata": 32,
+        ".iram0.text": 405,
+        "flash_total": 437,
+        "ram_st_total": 405
+    },
+    "libespressif__esp_io_expander.a": {
+        ".flash.rodata": 0,
+        ".flash.text": 435,
+        "flash_total": 435,
+        "ram_st_total": 0
+    },
+    "libcore.a": {
+        ".dram0.bss": 9,
+        ".flash.rodata": 43,
+        ".flash.text": 252,
+        "flash_total": 295,
+        "ram_st_total": 9
+    },
+    "libesp_coex.a": {
+        ".flash.text": 197,
+        ".iram0.text": 98,
+        "flash_total": 295,
+        "ram_st_total": 98
+    },
+    "libespressif__esp_audio_codec.a": {
+        ".flash.text": 171,
+        "flash_total": 171,
+        "ram_st_total": 0
+    },
+    "libespressif__esp-dsp.a": {
+        ".flash.text": 131,
+        "flash_total": 131,
+        "ram_st_total": 0
+    },
+    "libesp_adc.a": {
+        ".flash.rodata": 4,
+        ".flash.text": 69,
+        "flash_total": 73,
+        "ram_st_total": 0
+    },
+    "libesp_pm.a": {
+        ".flash.text": 16,
+        ".iram0.text": 16,
+        "flash_total": 32,
+        "ram_st_total": 16
+    },
+    "libesp_eth.a": {
+        ".flash.rodata": 4,
+        "flash_total": 4,
+        "ram_st_total": 0
+    },
+    "libespnow.a": {
+        ".dram0.data": 3,
+        "flash_total": 3,
+        "ram_st_total": 3
+    },
+    "(exe)": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    },
+    "libbtbb.a": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    },
+    "libesp_driver_cam.a": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    },
+    "libesp_driver_rmt.a": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    },
+    "libespressif2022__esp_emote_expression.a": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    },
+    "libespressif2022__esp_emote_gfx.a": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    },
+    "libespressif__adc_battery_estimation.a": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    },
+    "libespressif__esp32-camera.a": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    },
+    "libespressif__esp_cam_sensor.a": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    },
+    "libespressif__esp_lcd_touch.a": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    },
+    "libespressif__esp_mmap_assets.a": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    },
+    "libespressif__esp_sccb_intf.a": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    },
+    "libespressif__esp_video.a": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    },
+    "libespressif__iot_eth.a": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    },
+    "libespressif__iot_usbh_cdc.a": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    },
+    "libespressif__iot_usbh_rndis.a": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    },
+    "libespressif__knob.a": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    },
+    "libespressif__led_strip.a": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    },
+    "liblaride__heatshrink.a": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    },
+    "libmesh.a": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    },
+    "libspiffs.a": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    },
+    "libusb.a": {
+        "flash_total": 0,
+        "ram_st_total": 0
+    }
+}

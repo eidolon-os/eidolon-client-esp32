@@ -1,0 +1,147 @@
+Total sizes:
+Used stat D/IRAM:  169047 bytes ( 172713 remain, 49.5% used)
+      .data size:   33260 bytes
+      .bss  size:   34856 bytes
+      .text size:   99903 bytes
+   .vectors size:    1028 bytes
+Used Flash size : 4089160 bytes
+           .text: 2855320 bytes
+         .rodata: 1233584 bytes
+Total image size: 4223351 bytes (.bin may be padded larger)
+Per-archive contributions to ELF file:
+            Archive File DRAM .data & 0.bss IRAM0 .text & 0.vectors ram_st_total Flash .text & .rodata & .rodata_noload & .appdesc flash_total
+    libesp_audio_codec.a       1098       8        5836           0         6942      609420    278257                0          0      894611
+               libmain.a        175    2430           0           0         2605      329677    163122                0          0      492974
+         liblvgl__lvgl.a          0     480           0           0          480      225766     25858                0          0      251624
+     libesp_app_format.a          0      10           0           0           10         479    220546                0        256      221281
+             libstdc++.a        156    4325           0           0         4481      136427     78389                0          0      214972
+  lib78__xiaozhi-fonts.a          0       0           0           0            0         410    210961                0          0      211371
+             libdl_lib.a       5936       8        1789           0         7733      174429      7289                0          0      189443
+           libnet80211.a        936    7603           0           0         8539      124549     13979            12485          0      139464
+                  libc.a        364     764           0           0         1128       99527      6889                0          0      106780
+            libmbedtls.a          0     244           0           0          244       30287     71333                0          0      101620
+               liblwip.a         12    4054          26           0         4092       84216      3581                0          0       87835
+libesp_audio_processor.a       3084      52        1768           0         4904       74787      3490                0          0       83129
+         libmbedcrypto.a         92     280          80           0          452       69662      7012                0          0       76846
+           libfreertos.a       3116    1081       18133           0        22330        1379     41885                0          0       64513
+                 libpp.a       2640    1234         830           0         4704       56338      4050              161          0       63858
+  libesp_image_effects.a          0       0           0           0            0       63055       361                0          0       63416
+     libwpa_supplicant.a          8    1326           0           0         1334       53112      1570                0          0       54690
+       libpeer_default.a          0     438           0           0          438       45779      2112                0          0       47891
+                libphy.a       1277      86        5073           0         6436       27922         0                0          0       34272
+     libesp_hw_support.a        728     268       10495           0        11491       21069      1668                0          0       33960
+libespressif__gmf_core.a          0       4           0           0            4       28833      3667                0          0       32500
+       libesp_new_jpeg.a        448       5         904           0         1357       28476      1273                0          0       31101
+                libhal.a       7140       4       11407           0        18551       12089       408                0          0       31044
+      lib78__esp-ml307.a          0       0           0           0            0       15399     14816                0          0       30215
+libespressif__esp_captur          0       4           0           0            4       29422       483                0          0       29905
+    libespressif__mdns.a         48    2366           0           0         2414       28023       906                0          0       28977
+libespressif__network_pr          0      20           0           0           20       15811     10679                0          0       26490
+libespressif__esp_libsrt         84    1077           0           0         1161       18919      5134                0          0       24137
+                  libm.a          0       0           0           0            0       20522      1636                0          0       22158
+  libesp_audio_effects.a          0       0         273           0          273       18588      1823                0          0       20684
+            libwakenet.a          0       0           0           0            0       19802       279                0          0       20081
+libespressif__gmf_video.          0       0           0           0            0       18211      1260                0          0       19471
+          libnvs_flash.a          0      24           0           0           24       14216      4941                0          0       19157
+libespressif__gmf_audio.          0       0           0           0            0       15515      1472                0          0       16987
+   liblivekit__livekit.a        152       1           0           0          153       13544      2816                0          0       16512
+     libesp_driver_i2s.a         24       0         271           0          295       15018       909                0          0       16222
+          libprotocomm.a          8       5           0           0           13       11696      4350                0          0       16054
+lib78__esp-wifi-connect.          0     120           0           0          120       10681      5046                0          0       15727
+          libspi_flash.a       2216      24       10873           0        13113        1201      1102                0          0       15392
+libespressif__esp_codec_          0      12           0           0           12       12467      2229                0          0       14696
+libesp_audio_front_end.a          1       0           0           0            1       13264      1046                0          0       14311
+         libesp_system.a        501     349        3221           0         4071        9719       748                0          0       14189
+               libmqtt.a          0       0           0           0            0       12856       296                0          0       13152
+              libnsnet.a          0       0           0           0            0       12806       338                0          0       13144
+     libesp_driver_spi.a        177      12        3933           0         4122        6313       629                0          0       11052
+        libhttp_parser.a          0       0           0           0            0       10178       714                0          0       10892
+           libmbedx509.a          0       0           0           0            0       10054       674                0          0       10728
+     libesp_driver_i2c.a          0      28         720           0          748        9072       360                0          0       10152
+               libheap.a         12       8        5997           0         6017        3039       954                0          0       10002
+    libesp_http_server.a          0       0           0           0            0        8875       368                0          0        9243
+      libtcp_transport.a          0       0           0           0            0        8240       180                0          0        8420
+libespressif__esp_websoc          0       0           0           0            0        7886       217                0          0        8103
+         libprotobuf-c.a         12       0           0           0           12        7193       261                0          0        7466
+    libesp_http_client.a          0       0           0           0            0        7062       331                0          0        7393
+    liblivekit__nanopb.a          0       0           0           0            0        7093         4                0          0        7097
+            libesp-tls.a          0       4           0           0            4        6854        90                0          0        6944
+    libesp_driver_uart.a        304      32         190           0          526        5829       548                0          0        6871
+libtempotian__av_render.          0      18           0           0           18        6789        16                0          0        6805
+    libesp_driver_gpio.a         36       0         253           0          289        5689       691                0          0        6669
+           libesp_wifi.a        480      44         284           0          808        4942       843                0          0        6549
+          libesp_netif.a          8      29           0           0           37        6111       223                0          0        6342
+                libvfs.a        192      44          75           0          311        5248       143                0          0        5658
+libespressif__media_lib_          0     328           0           0          328        4705       304                0          0        5009
+             libnewlib.a        172     216        3133           0         3521        1587       109                0          0        5001
+   libespressif__cjson.a         12       8           0           0           20        4974         0                0          0        4986
+                libgcc.a          4       8         104           0          116        4055       800                0          0        4963
+             libvadnet.a          0       0           0           0            0        4595        79                0          0        4674
+    libesp_driver_ledc.a          8      44          62           0          114        4290       269                0          0        4629
+  libc_speech_features.a          0       0           0           0            0        2489      2068                0          0        4557
+      liblvgl_port_lib.a          0      32           0           0           32        4053       292                0          0        4345
+            libesp_lcd.a          0       0         124           0          124        3553       437                0          0        4114
+        libesp_ringbuf.a          0       0        3623           0         3623           0       477                0          0        4100
+ libbootloader_support.a          0       8         902           0          910        3086        88                0          0        4076
+  libespressif__button.a          8      18           0           0           26        3863       156                0          0        4027
+             libesp_mm.a        129      48        1303           0         1480        2281       250                0          0        3963
+libespressif__esp_peer.a          0    4141           0           0         4141        3927        10                0          0        3937
+  libespressif__dl_fft.a          0       8           0           0            8        3737         4                0          0        3741
+             libxtensa.a       1060       0        2057         427         3544          99        48                0          0        3691
+          libesp_event.a          0       4           0           0            4        3375       163                0          0        3538
+          libesp_psram.a         10      62        1856           0         1928        1092       152                0          0        3110
+             libhufzip.a          0      24           0           0           24        3022        49                0          0        3071
+            libesp_phy.a          9      43         234           0          286        2427       299                0          0        2969
+         libapp_update.a          0      12           0           0           12        2570        96                0          0        2666
+          libesp_timer.a         32      36         996           0         1064        1410        99                0          0        2537
+                libsoc.a          0       0           0           0            0          30      2224                0          0        2254
+      libesp_partition.a          0       8           0           0            8        2044       189                0          0        2233
+ lib78__uart-eth-modem.a          0       0           0           0            0           0      2184                0          0        2184
+libespressif__esp_lcd_il         59       3           0           0           62        1575       501                0          0        2135
+libesp_driver_usb_serial         56      17         223           0          296        1647       173                0          0        2099
+              libefuse.a        172       4           0           0          176        1395       387                0          0        1954
+            libpthread.a         16       4           0           0           20        1760       117                0          0        1893
+         libesp_common.a          0       0           0           0            0          46      1798                0          0        1844
+libtempotian__media_lib_          0       0           0           0            0        1690         0                0          0        1690
+                liblog.a          8     276         439           0          723         935        48                0          0        1430
+  libespressif__esp-sr.a          4      12           0           0           16        1141        18                0          0        1163
+        libsmartconfig.a          2     206           0           0          208        1129         0                0          0        1131
+       libesp_security.a          0      16           0           0           16        1026         8                0          0        1034
+                libcxx.a          8      20           0           0           28         668       148                0          0         824
+            libesp_rom.a          4       0         703           0          707          66         0                0          0         773
+    libesp_vfs_console.a          0      16           0           0           16         546       180                0          0         726
+libespressif__esp_video_          0       4           0           0            4         637         0                0          0         637
+          libesp_muxer.a          0       4           0           0            4         490         0                0          0         490
+      lib78__uart-uhci.a          0       0           0           0            0           0       476                0          0         476
+             libxt_hal.a          0       0         405           0          405           0        32                0          0         437
+libespressif__esp_io_exp          0       0           0           0            0         435         0                0          0         435
+               libcore.a          0       9           0           0            9         252        43                0          0         295
+           libesp_coex.a          0       0          98           0           98         197         0                0          0         295
+libespressif__esp_audio_          0       0           0           0            0         171         0                0          0         171
+ libespressif__esp-dsp.a          0       0           0           0            0         131         0                0          0         131
+            libesp_adc.a          0       0           0           0            0          69         4                0          0          73
+             libesp_pm.a          0       0          16           0           16          16         0                0          0          32
+            libesp_eth.a          0       0           0           0            0           0         4                0          0           4
+             libespnow.a          3       0           0           0            3           0         0                0          0           3
+                   (exe)          0       0           0           0            0           0         0                0          0           0
+               libbtbb.a          0       0           0           0            0           0         0                0          0           0
+     libesp_driver_cam.a          0       0           0           0            0           0         0                0          0           0
+     libesp_driver_rmt.a          0       0           0           0            0           0         0                0          0           0
+libespressif2022__esp_em          0       0           0           0            0           0         0                0          0           0
+libespressif2022__esp_em          0       0           0           0            0           0         0                0          0           0
+libespressif__adc_batter          0       0           0           0            0           0         0                0          0           0
+libespressif__esp32-came          0       0           0           0            0           0         0                0          0           0
+libespressif__esp_cam_se          0       0           0           0            0           0         0                0          0           0
+libespressif__esp_lcd_to          0       0           0           0            0           0         0                0          0           0
+libespressif__esp_mmap_a          0       0           0           0            0           0         0                0          0           0
+libespressif__esp_sccb_i          0       0           0           0            0           0         0                0          0           0
+libespressif__esp_video.          0       0           0           0            0           0         0                0          0           0
+ libespressif__iot_eth.a          0       0           0           0            0           0         0                0          0           0
+libespressif__iot_usbh_c          0       0           0           0            0           0         0                0          0           0
+libespressif__iot_usbh_r          0       0           0           0            0           0         0                0          0           0
+    libespressif__knob.a          0       0           0           0            0           0         0                0          0           0
+libespressif__led_strip.          0       0           0           0            0           0         0                0          0           0
+ liblaride__heatshrink.a          0       0           0           0            0           0         0                0          0           0
+               libmesh.a          0       0           0           0            0           0         0                0          0           0
+             libspiffs.a          0       0           0           0            0           0         0                0          0           0
+                libusb.a          0       0           0           0            0           0         0                0          0           0

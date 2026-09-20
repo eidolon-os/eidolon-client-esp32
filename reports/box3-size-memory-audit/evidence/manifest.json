@@ -1,0 +1,52 @@
+{
+  "eidolon.bin": {
+    "bytes": 4223504,
+    "sha256": "1843c1e3a7c8ff8224d83f7eb8fdaf20a95e7aab81c41547fe4ec1eb36964694",
+    "mtime_ns": 1789916844325009744
+  },
+  "eidolon.elf": {
+    "bytes": 55632968,
+    "sha256": "b81aa939e33a7943153beecafc0e42e9a2bcfd5a5d000396aca8a12e577f4939",
+    "mtime_ns": 1789916844151801562
+  },
+  "eidolon.map": {
+    "bytes": 32786667,
+    "sha256": "35b4dc3beea12b590e070a50bb0740b960ab84fedaa963a5f8940d8ab7314768",
+    "mtime_ns": 1789916844175124716
+  },
+  "sdkconfig.esp-box-3": {
+    "bytes": 119493,
+    "sha256": "2b93d58f481f6d8cd55b04175e6d6c59ac60fa811038fb0c90d00d79bdf1997b",
+    "mtime_ns": 1789869150610402237
+  },
+  "sdkconfig.overlay.esp-box-3": {
+    "bytes": 1268,
+    "sha256": "2b7214b171ade534c49e8f7f675d4b1330e301636ec6b2d9ccd258d4730520a5",
+    "mtime_ns": 1789869113072383931
+  },
+  "partition_table/partition-table.bin": {
+    "bytes": 3072,
+    "sha256": "476dfc80c6699a73cf11971499a69607c635201f49ce499ffbb1cae694f517db",
+    "mtime_ns": 1787588698131914784
+  },
+  "generated_assets.bin": {
+    "bytes": 7705022,
+    "sha256": "cb38f3f0faed822cbdae3ccbf05b17e7642dd178f3666af071e8cb65ce37ac0d",
+    "mtime_ns": 1789869153807072905
+  },
+  "expression_assets.bin": {
+    "bytes": 2448470,
+    "sha256": "5e255412f356028ff448ccd5f8a80a19558bebe6002af203a80e8207ba91067e",
+    "mtime_ns": 1787588698332537969
+  },
+  "project_description.json": {
+    "bytes": 580410,
+    "sha256": "ffb1adf6d273816abdf8ade0bdfd9113df9db3fc3ea1e0f303a66af47eafe89e",
+    "mtime_ns": 1789747917475802353
+  },
+  "compile_commands.json": {
+    "bytes": 24937384,
+    "sha256": "b1feef79a5da772daf9bcda2c0802c018e8474310440ee64f17f56fc664d2ce0",
+    "mtime_ns": 1789869153513968337
+  }
+}

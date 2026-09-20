@@ -1,0 +1,14 @@
+{
+  "eidolon.bin": {
+    "old_bytes": 4223504,
+    "new_bytes": 4223504,
+    "new_sha256": "738106426cb576512ae293fdba5ce0ae6a5814a565c5ab9f20c13330c0dccb3a",
+    "mtime_ns": 1789918001975553182
+  },
+  "eidolon.elf": {
+    "old_bytes": 55632968,
+    "new_bytes": 55632968,
+    "new_sha256": "cd3e3f9c73e6f44cb29d5587cb6b365cee4e5b2f05eeea606dc7ea2e05bfdd61",
+    "mtime_ns": 1789918001804902406
+  }
+}

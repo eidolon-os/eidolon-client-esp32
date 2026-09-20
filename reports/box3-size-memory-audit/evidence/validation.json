@@ -1,0 +1,16 @@
+{
+  "archived_baseline_hashes_match": true,
+  "partition_checks": [
+    {
+      "variant": "baseline-relink",
+      "returncode": 0,
+      "output": "eidolon.bin binary size 0x407210 bytes. Smallest app partition is 0x410000 bytes. 0x8df0 bytes (1%) free.\nWarning: The smallest app partition is nearly full (1% free space left)!\n"
+    },
+    {
+      "variant": "opus-pcm-registration",
+      "returncode": 0,
+      "output": "eidolon.bin binary size 0x354010 bytes. Smallest app partition is 0x410000 bytes. 0xbbff0 bytes (18%) free.\n"
+    }
+  ],
+  "current_source_drift_guard": "refused changed original ELF/bin as designed"
+}

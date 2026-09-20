@@ -1,0 +1,121 @@
+{
+  "count": 23,
+  "bytes": 7705022,
+  "entries": [
+    {
+      "name": "font_noto_qwen_20_4.bin",
+      "bytes": 2998916,
+      "offset": 0
+    },
+    {
+      "name": "angry.gif",
+      "bytes": 157395,
+      "offset": 2998918
+    },
+    {
+      "name": "confident.gif",
+      "bytes": 177513,
+      "offset": 3156315
+    },
+    {
+      "name": "confused.gif",
+      "bytes": 333888,
+      "offset": 3333830
+    },
+    {
+      "name": "cool.gif",
+      "bytes": 211771,
+      "offset": 3667720
+    },
+    {
+      "name": "crying.gif",
+      "bytes": 238728,
+      "offset": 3879493
+    },
+    {
+      "name": "delicious.gif",
+      "bytes": 263998,
+      "offset": 4118223
+    },
+    {
+      "name": "embarrassed.gif",
+      "bytes": 244709,
+      "offset": 4382223
+    },
+    {
+      "name": "funny.gif",
+      "bytes": 248180,
+      "offset": 4626934
+    },
+    {
+      "name": "happy.gif",
+      "bytes": 188256,
+      "offset": 4875116
+    },
+    {
+      "name": "kissy.gif",
+      "bytes": 220408,
+      "offset": 5063374
+    },
+    {
+      "name": "laughing.gif",
+      "bytes": 397482,
+      "offset": 5283784
+    },
+    {
+      "name": "loving.gif",
+      "bytes": 202592,
+      "offset": 5681268
+    },
+    {
+      "name": "neutral.gif",
+      "bytes": 56274,
+      "offset": 5883862
+    },
+    {
+      "name": "relaxed.gif",
+      "bytes": 290618,
+      "offset": 5940138
+    },
+    {
+      "name": "sad.gif",
+      "bytes": 219551,
+      "offset": 6230758
+    },
+    {
+      "name": "shocked.gif",
+      "bytes": 252365,
+      "offset": 6450311
+    },
+    {
+      "name": "silly.gif",
+      "bytes": 165405,
+      "offset": 6702678
+    },
+    {
+      "name": "sleepy.gif",
+      "bytes": 251041,
+      "offset": 6868085
+    },
+    {
+      "name": "surprised.gif",
+      "bytes": 99679,
+      "offset": 7119128
+    },
+    {
+      "name": "thinking.gif",
+      "bytes": 274392,
+      "offset": 7218809
+    },
+    {
+      "name": "winking.gif",
+      "bytes": 208903,
+      "offset": 7493203
+    },
+    {
+      "name": "index.json",
+      "bytes": 1888,
+      "offset": 7702108
+    }
+  ]
+}

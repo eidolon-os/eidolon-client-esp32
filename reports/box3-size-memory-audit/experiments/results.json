@@ -1,0 +1,12 @@
+{
+  "baseline-relink": {
+    "bytes": 4223504,
+    "sha256": "1843c1e3a7c8ff8224d83f7eb8fdaf20a95e7aab81c41547fe4ec1eb36964694",
+    "slot_free": 36336
+  },
+  "opus-pcm-registration": {
+    "bytes": 3489808,
+    "sha256": "f28f80decce01a49a55784b39b084c8e616f6902e7ed88c0f5bdca8ff2ac1a55",
+    "slot_free": 770032
+  }
+}

@@ -1,0 +1,44 @@
+[
+  {
+    "name": "nvs",
+    "offset": "0x9000",
+    "size": 16384,
+    "end": "0xd000"
+  },
+  {
+    "name": "otadata",
+    "offset": "0xd000",
+    "size": 8192,
+    "end": "0xf000"
+  },
+  {
+    "name": "phy_init",
+    "offset": "0xf000",
+    "size": 4096,
+    "end": "0x10000"
+  },
+  {
+    "name": "owner_trust",
+    "offset": "0x10000",
+    "size": 65536,
+    "end": "0x20000"
+  },
+  {
+    "name": "ota_0",
+    "offset": "0x20000",
+    "size": 4259840,
+    "end": "0x430000"
+  },
+  {
+    "name": "ota_1",
+    "offset": "0x430000",
+    "size": 4259840,
+    "end": "0x840000"
+  },
+  {
+    "name": "assets",
+    "offset": "0x840000",
+    "size": 8126464,
+    "end": "0x1000000"
+  }
+]
