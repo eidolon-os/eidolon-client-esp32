@@ -60,7 +60,7 @@ void CompanionLcdDisplay::SetupUI() {
     timer_=lv_timer_create(OnTimer,20,this);
 }
 void CompanionLcdDisplay::SetTheme(Theme* theme) {
-    // The shared default skin is monochrome; generic chat theme objects do not
+    // The companion owns its coordinated palette; generic chat theme objects do not
     // exist on this surface. Save the preference through the base contract.
     Display::SetTheme(theme);
 }

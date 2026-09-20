@@ -118,6 +118,8 @@ int main(int argc,char** argv) {
         Screenshot(screen,prefix+"-physical-input.ppm");
         model.scene=UiScene::Ready;model.status_text="Ready";model.detail_text="Start a conversation";
         model.input_hint="Press button to start";
+        // Real BOX-3 profile has no battery. Keep the touch-board fixture intact.
+        if (font==&font_noto_basic_16_4) lv_label_set_text(view.indicators().battery,"");
         view.Render(model);
         assert(!Find(screen,model.detail_text));
         auto* ready_hint=Find(screen,model.input_hint);
@@ -186,6 +188,10 @@ int main(int argc,char** argv) {
         lv_font_glyph_dsc_t glyph;
         for (uint32_t cp : {0xf013u,0xf131u,0xf1ebu,0xf240u})
             assert(lv_font_get_glyph_dsc(&font_awesome_20_4,&glyph,cp,0));
+        auto* notice=Find(screen,"Volume 60%");
+        lv_obj_update_layout(notice);
+        lv_area_t notice_bounds;lv_obj_get_coords(notice,&notice_bounds);
+        assert(notice_bounds.x1==12 && notice_bounds.x2==307);
         Screenshot(screen,prefix+"-icons-notification.ppm");
         model.show_mute_icon=false;view.Render(model);
         assert(!lv_obj_is_visible(mute));
@@ -222,6 +228,9 @@ int main(int argc,char** argv) {
         CompanionFaceView view;view.Build({screen,&font_noto_basic_16_4,&display,&font_awesome_20_4});
         assert(gate.Start({"chinese",1,expression|dialogue,true},"chinese"));
         EidolonUiModel model;model.scene=UiScene::Conversation;model.status_text="Speaking";
+        lv_label_set_text(view.indicators().network,FONT_AWESOME_WIFI);
+        model.primary_presentation=UiActionPresentation::InputHint;
+        model.input_hint="Press button to end";
         model.turn=TurnPhase::AgentSpeaking;model.subtitle="我叫小何。";
         view.Render(model);
         lv_font_glyph_dsc_t glyph;
@@ -234,7 +243,7 @@ int main(int argc,char** argv) {
             assert(lv_font_get_glyph_dsc(resource.font(),&glyph,cp,0));
             assert(!glyph.is_placeholder && glyph.box_w>0);
         }
-        const companion::Layout chinese_layout(320,240,false,true,std::max<int>(52,2*resource.font()->line_height+4));
+        const companion::Layout chinese_layout(320,240,true,true,std::max<int>(52,2*resource.font()->line_height+4));
         auto* captions=lv_obj_get_parent(caption);
         Within(captions,chinese_layout.information);
         assert(lv_obj_get_scroll_bottom(captions)==0);
@@ -264,6 +273,9 @@ int main(int argc,char** argv) {
         lv_tick_inc(4000);view.Advance(0);
         assert(lv_obj_get_scroll_y(captions)==stream_y);
         Screenshot(screen,std::string(argv[1])+"/box3-streaming-chinese.ppm");
+        model.subtitle="我叫小何，很高兴见到你。\n今天想聊点什么？";
+        lv_tick_inc(250);view.Render(model);
+        Screenshot(screen,std::string(argv[1])+"/box3-design-conversation.ppm");
         model.subtitle="Streaming captions now follow speech. Smaller text uses the full screen width with balanced margins.";
         lv_tick_inc(250);view.Render(model);
         Screenshot(screen,std::string(argv[1])+"/box3-streaming-english.ppm");

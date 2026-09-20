@@ -110,3 +110,25 @@ events, actual 16px resource glyphs, 304px width and streaming scroll position.
 These checks do not measure device speaker-to-screen timing; that still depends
 on server pacing and device audio buffering. Stream-open/first-chunk/close logs
 contain timing and byte counts without logging dialogue content.
+
+## Warm companion visual theme
+
+The canvas uses warm stone, with an evergreen expression stage, mint facial
+features and a paper caption surface. Status colors distinguish normal,
+attention and error states while preserving their text labels. Physical-button
+hints use a centered sage strip; touch actions use a filled green primary
+button and a muted terracotta end action. Recovery text uses an inset paper
+panel, and transient notices keep their separate high-contrast banner.
+
+Palette constants live in `companion_palette.h`. Rounded flat fills and a
+shorter, rounded neutral mouth supply the visual treatment without images,
+shadows or extra animation timers. Captions retain the 16px resource font,
+304px text width, 8px margins and streaming behavior. A six-pixel gap separates
+the face from the caption surface. The renderer checks both board fonts and
+all existing interaction/output gates; screenshots include the actual BOX-3
+physical-button profile without a fictitious battery indicator.
+
+Validation: host renderer regression checks and the ESP-IDF build passed.
+The repository flash script verified the installed firmware version. Subsequent
+USB console checks were inconclusive; the user subsequently confirmed that
+physical-device testing was completed and requested this change be committed.

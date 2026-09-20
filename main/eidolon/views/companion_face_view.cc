@@ -1,5 +1,6 @@
 #include "companion_face_view.h"
 #include "companion_layout.h"
+#include "companion_palette.h"
 #include <algorithm>
 #include <cstring>
 #include <esp_timer.h>
@@ -13,6 +14,7 @@
 #include "eidolon/avatar/skins/default/default.h"
 namespace eidolon {
 namespace {
+namespace palette = companion::palette;
 uint64_t NowMs() { return esp_timer_get_time() / 1000; }
 void Visible(lv_obj_t* obj, bool visible) {
     if (visible) lv_obj_remove_flag(obj, LV_OBJ_FLAG_HIDDEN);
@@ -25,7 +27,7 @@ void Text(lv_obj_t* label, const char* text) {
 lv_obj_t* Label(lv_obj_t* parent, const lv_font_t* font, lv_align_t align, int x, int y) {
     auto* label=lv_label_create(parent);
     lv_obj_set_style_text_font(label,font,0);
-    lv_obj_set_style_text_color(label,lv_color_white(),0);
+    lv_obj_set_style_text_color(label,lv_color_hex(palette::Ink),0);
     lv_label_set_text(label,"");
     lv_obj_align(label,align,x,y);
     return label;
@@ -38,7 +40,7 @@ void CompanionFaceView::Build(const BuildContext& ctx) {
     font_=ctx.font;
     lv_obj_update_layout(ctx.parent);
     const companion::Layout layout(lv_obj_get_width(ctx.parent),lv_obj_get_height(ctx.parent));
-    lv_obj_set_style_bg_color(ctx.parent,lv_color_black(),0);
+    lv_obj_set_style_bg_color(ctx.parent,lv_color_hex(palette::Canvas),0);
     lv_obj_remove_flag(ctx.parent,LV_OBJ_FLAG_SCROLLABLE);
     auto panel=[&](companion::Rect r) {
         auto* obj=lv_obj_create(ctx.parent);
@@ -49,7 +51,15 @@ void CompanionFaceView::Build(const BuildContext& ctx) {
     };
     viewport_=panel(layout.face);
     avatar_=std::make_unique<stackchan::avatar::DefaultAvatar>();
+    avatar_->primaryColor=lv_color_hex(palette::Expression);
+    avatar_->secondaryColor=lv_color_hex(palette::Stage);
     avatar_->init(viewport_,ctx.font,false);
+    auto* stage=avatar_->getPanel()->get();
+    lv_obj_set_style_radius(stage,22,0);
+    lv_obj_set_style_border_width(stage,1,0);
+    lv_obj_set_style_border_color(stage,lv_color_hex(palette::StageEdge),0);
+    // Features sit well inside the rounded background; no full-panel clipping
+    // layer or shadow is needed for this small display.
     state_dot_=panel({12,14,6,6});
     lv_obj_set_style_radius(state_dot_,LV_RADIUS_CIRCLE,0);
     lv_obj_set_style_bg_opa(state_dot_,LV_OPA_COVER,0);
@@ -58,7 +68,7 @@ void CompanionFaceView::Build(const BuildContext& ctx) {
     lv_label_set_long_mode(status_,LV_LABEL_LONG_DOT);
     auto indicator=[&](int x) {
         auto* item=Label(ctx.parent,ctx.icon_font,LV_ALIGN_TOP_LEFT,x,4);
-        lv_obj_set_style_text_color(item,lv_color_hex(0x71808D),0);
+        lv_obj_set_style_text_color(item,lv_color_hex(palette::Muted),0);
         lv_obj_set_size(item,28,28);
         lv_obj_set_style_text_align(item,LV_TEXT_ALIGN_CENTER,0);
         lv_label_set_long_mode(item,LV_LABEL_LONG_CLIP);
@@ -67,7 +77,7 @@ void CompanionFaceView::Build(const BuildContext& ctx) {
     const auto width=lv_obj_get_width(ctx.parent);
     indicators_={indicator(width-96),indicator(width-68),indicator(width-40)};
     // Pack only populated indicators; BOX-3 has no battery telemetry.
-    lv_obj_set_style_text_color(indicators_.microphone,lv_color_hex(0xE5BE78),0);
+    lv_obj_set_style_text_color(indicators_.microphone,lv_color_hex(palette::Attention),0);
     setup_=indicator(width-124);
     lv_label_set_text(setup_,FONT_AWESOME_GEAR);
     lv_obj_set_ext_click_area(setup_,2);
@@ -79,16 +89,25 @@ void CompanionFaceView::Build(const BuildContext& ctx) {
     lv_obj_set_scroll_dir(detail_panel_,LV_DIR_VER);
     lv_obj_set_scrollbar_mode(detail_panel_,LV_SCROLLBAR_MODE_AUTO);
     lv_obj_set_style_width(detail_panel_,3,LV_PART_SCROLLBAR);
-    lv_obj_set_style_bg_color(detail_panel_,lv_color_hex(0x71808D),LV_PART_SCROLLBAR);
+    lv_obj_set_style_bg_color(detail_panel_,lv_color_hex(palette::Muted),LV_PART_SCROLLBAR);
     lv_obj_set_style_bg_opa(detail_panel_,LV_OPA_60,LV_PART_SCROLLBAR);
     lv_obj_set_style_radius(detail_panel_,2,LV_PART_SCROLLBAR);
+    lv_obj_set_style_bg_color(detail_panel_,lv_color_hex(palette::Paper),0);
+    lv_obj_set_style_bg_opa(detail_panel_,LV_OPA_COVER,0);
+    lv_obj_set_style_radius(detail_panel_,12,0);
+    lv_obj_set_style_pad_all(detail_panel_,8,0);
     detail_=Label(detail_panel_,ctx.font,LV_ALIGN_TOP_LEFT,0,0);
-    lv_obj_set_width(detail_,layout.detail.w-8);
+    lv_obj_set_width(detail_,layout.detail.w-20);
     lv_label_set_long_mode(detail_,LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_line_space(detail_,5,0);
+    caption_card_=panel({4,layout.information.y-4,lv_obj_get_width(ctx.parent)-8,layout.information.h+8});
+    lv_obj_set_style_bg_color(caption_card_,lv_color_hex(palette::Paper),0);
+    lv_obj_set_style_bg_opa(caption_card_,LV_OPA_COVER,0);
+    lv_obj_set_style_radius(caption_card_,12,0);
+    Visible(caption_card_,false);
     information_=Label(ctx.parent,ctx.font,LV_ALIGN_TOP_LEFT,layout.information.x,layout.information.y);
     lv_obj_set_size(information_,layout.information.w,layout.information.h);
-    lv_obj_set_style_text_color(information_,lv_color_hex(0x9AA9B5),0);
+    lv_obj_set_style_text_color(information_,lv_color_hex(palette::Muted),0);
     lv_label_set_long_mode(information_,LV_LABEL_LONG_WRAP);
     subtitle_panel_=panel(layout.information);
     lv_obj_set_scrollbar_mode(subtitle_panel_,LV_SCROLLBAR_MODE_OFF);
@@ -99,24 +118,29 @@ void CompanionFaceView::Build(const BuildContext& ctx) {
     lv_obj_set_style_text_align(subtitle_,LV_TEXT_ALIGN_LEFT,0);
     lv_label_set_long_mode(subtitle_,LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_line_space(subtitle_,4,0);
-    lv_obj_set_style_text_color(subtitle_,lv_color_hex(0xD5E0E8),0);
+    lv_obj_set_style_text_color(subtitle_,lv_color_hex(palette::Ink),0);
     Visible(subtitle_panel_,false);
-    notification_=Label(ctx.parent,ctx.font,LV_ALIGN_TOP_MID,0,36);
-    lv_obj_set_size(notification_,layout.information.w,28);
+    notification_=Label(ctx.parent,ctx.font,LV_ALIGN_TOP_LEFT,12,36);
+    lv_obj_set_size(notification_,layout.header.w,28);
     lv_label_set_long_mode(notification_,LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_align(notification_,LV_TEXT_ALIGN_CENTER,0);
-    lv_obj_set_style_bg_color(notification_,lv_color_hex(0x172A30),0);
+    lv_obj_set_style_bg_color(notification_,lv_color_hex(palette::Accent),0);
     lv_obj_set_style_bg_opa(notification_,LV_OPA_COVER,0);
-    lv_obj_set_style_radius(notification_,6,0);
+    lv_obj_set_style_radius(notification_,8,0);
+    lv_obj_set_style_text_color(notification_,lv_color_hex(palette::Paper),0);
     Visible(notification_,false);
     input_hint_=Label(ctx.parent,ctx.font,LV_ALIGN_TOP_LEFT,12,layout.actions.y+2);
     lv_obj_set_size(input_hint_,layout.actions.w,28);
     lv_label_set_long_mode(input_hint_,LV_LABEL_LONG_DOT);
-    lv_obj_set_style_text_color(input_hint_,lv_color_hex(0x9AA9B5),0);
+    lv_obj_set_style_text_color(input_hint_,lv_color_hex(palette::Muted),0);
+    lv_obj_set_style_bg_color(input_hint_,lv_color_hex(palette::Soft),0);
+    lv_obj_set_style_bg_opa(input_hint_,LV_OPA_COVER,0);
+    lv_obj_set_style_radius(input_hint_,10,0);
+    lv_obj_set_style_text_align(input_hint_,LV_TEXT_ALIGN_CENTER,0);
     Visible(input_hint_,false);
     mode_=Label(ctx.parent,ctx.font,LV_ALIGN_TOP_LEFT,12,layout.actions.y+6);
     lv_obj_set_size(mode_,72,28);
-    lv_obj_set_style_text_color(mode_,lv_color_hex(0x71808D),0);
+    lv_obj_set_style_text_color(mode_,lv_color_hex(palette::Muted),0);
     lv_label_set_long_mode(mode_,LV_LABEL_LONG_DOT);
     auto button=[&](int x,int width) {
         auto* obj=lv_button_create(ctx.parent);
@@ -125,18 +149,19 @@ void CompanionFaceView::Build(const BuildContext& ctx) {
         lv_obj_set_style_shadow_width(obj,0,0);
         lv_obj_set_style_border_width(obj,0,0);
         lv_obj_set_style_pad_all(obj,0,0);
-        lv_obj_set_style_bg_color(obj,lv_color_hex(0x172A30),0);
-        lv_obj_set_style_bg_color(obj,lv_color_hex(0x28515A),LV_STATE_PRESSED);
+        lv_obj_set_style_bg_color(obj,lv_color_hex(palette::Accent),0);
+        lv_obj_set_style_bg_color(obj,lv_color_hex(palette::Pressed),LV_STATE_PRESSED);
         return obj;
     };
     primary_=button(88,layout.actions.w-148);
     primary_label_=Label(primary_,ctx.font,LV_ALIGN_CENTER,0,0);
-    lv_obj_set_style_text_color(primary_label_,lv_color_hex(0xA3E5DA),0);
+    lv_obj_set_style_text_color(primary_label_,lv_color_hex(palette::Paper),0);
     lv_obj_add_event_cb(primary_,OnPrimary,LV_EVENT_ALL,this);
     close_=button(layout.actions.w-44,56);
-    lv_obj_set_style_bg_color(close_,lv_color_hex(0x242A30),0);
+    lv_obj_set_style_bg_color(close_,lv_color_hex(palette::ErrorSoft),0);
     auto* close_label=Label(close_,ctx.font,LV_ALIGN_CENTER,0,0);
     lv_label_set_text(close_label,"END");
+    lv_obj_set_style_text_color(close_label,lv_color_hex(palette::Error),0);
     lv_obj_add_event_cb(close_,OnClose,LV_EVENT_CLICKED,this);
     Visible(primary_,false);Visible(close_,false);Visible(detail_panel_,false);
 }
@@ -253,6 +278,9 @@ void CompanionFaceView::UpdateLayout() {
     lv_obj_set_pos(information_,layout.information.x,layout.information.y);
     lv_obj_set_pos(subtitle_panel_,layout.information.x,layout.information.y);
     lv_obj_set_height(subtitle_panel_,layout.information.h);
+    lv_obj_set_pos(caption_card_,4,layout.information.y-4);
+    lv_obj_set_size(caption_card_,lv_obj_get_width(parent)-8,layout.information.h+8);
+    Visible(caption_card_,dialogue_visible_ || information);
     Visible(information_,information);
     Visible(subtitle_panel_,dialogue_visible_);
     // On a detail page the toast uses the footer, leaving recovery instructions readable.
@@ -381,9 +409,10 @@ void CompanionFaceView::Render(const EidolonUiModel& model) {
     dialogue_visible_=model.scene==UiScene::Conversation &&
         CurrentOutputGate().Allows(presentation::Output::DialogueText);
     agent_speaking_=model.turn==TurnPhase::AgentSpeaking;
-    const auto color=model.severity==UiSeverity::Error ? 0xF58D8D :
-        model.severity==UiSeverity::Attention ? 0xE5BE78 : 0x91D8CA;
+    const auto color=model.severity==UiSeverity::Error ? palette::Error :
+        model.severity==UiSeverity::Attention ? palette::Attention : palette::Accent;
     lv_obj_set_style_bg_color(state_dot_,lv_color_hex(color),0);
+    lv_obj_set_style_text_color(status_,lv_color_hex(color),0);
     Text(status_,model.status_text);
     Text(mode_,model.mode_label);
     const bool touch=model.primary_presentation==UiActionPresentation::TouchControl;

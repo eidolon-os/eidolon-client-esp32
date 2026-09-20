@@ -56,6 +56,7 @@ private:
     lv_obj_t* detail_panel_ = nullptr;
     lv_obj_t* detail_ = nullptr;
     lv_obj_t* information_ = nullptr;
+    lv_obj_t* caption_card_ = nullptr;
     lv_obj_t* subtitle_panel_ = nullptr;
     lv_obj_t* subtitle_ = nullptr;
     lv_obj_t* notification_ = nullptr;
