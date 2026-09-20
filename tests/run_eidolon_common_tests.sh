@@ -52,7 +52,7 @@ EOF
 chmod +x "${fake_idf_python}/bin/python"
 
 matched="$(
-  EIDOLON_TEST_ACTUAL='EIDOLON-BUILDSTAMP git=abcdef123 branch=test sdk=1234567890abcdef idf=6.1' \
+  EIDOLON_TEST_ACTUAL=$'EIDOLON-STORAGE owner_trust=ready bytes=65536\nEIDOLON-BUILDSTAMP git=abcdef123 branch=test sdk=1234567890abcdef idf=6.1' \
     IDF_PYTHON_ENV_PATH="${fake_idf_python}" \
     eidolon_verify_flashed "${verify_root}" /dev/test 0 2>&1
 )"
@@ -67,7 +67,7 @@ if EIDOLON_TEST_ACTUAL='' IDF_PYTHON_ENV_PATH="${fake_idf_python}" \
   exit 1
 fi
 
-if EIDOLON_TEST_ACTUAL='EIDOLON-BUILDSTAMP git=deadbeef0 branch=test sdk=1234567890abcdef idf=6.1' \
+if EIDOLON_TEST_ACTUAL=$'EIDOLON-STORAGE owner_trust=ready bytes=65536\nEIDOLON-BUILDSTAMP git=deadbeef0 branch=test sdk=1234567890abcdef idf=6.1' \
   IDF_PYTHON_ENV_PATH="${fake_idf_python}" \
   eidolon_verify_flashed "${verify_root}" /dev/test 0 >/dev/null 2>&1; then
   echo "mismatched build stamp was accepted" >&2
@@ -77,6 +77,12 @@ fi
 if IDF_PYTHON_ENV_PATH='' \
   eidolon_verify_flashed "${verify_root}" /dev/test 0 >/dev/null 2>&1; then
   echo "verification accepted an unresolved IDF Python environment" >&2
+  exit 1
+fi
+
+if EIDOLON_TEST_ACTUAL='EIDOLON-BUILDSTAMP git=abcdef123 branch=test sdk=1234567890abcdef idf=6.1' IDF_PYTHON_ENV_PATH="${fake_idf_python}" \
+  eidolon_verify_flashed "${verify_root}" /dev/test 0 >/dev/null 2>&1; then
+  echo "missing storage readiness was accepted" >&2
   exit 1
 fi
 

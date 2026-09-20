@@ -332,6 +332,8 @@ except Exception:
 port, tmo = sys.argv[1], float(sys.argv[2])
 deadline = time.monotonic() + tmo
 reset_sent = False
+storage = ""
+stamp = ""
 p = None
 try:
     while time.monotonic() < deadline:
@@ -350,9 +352,15 @@ try:
                     time.sleep(0.1)
                     p.rts = False
             line = p.readline().decode("utf-8", "replace")
+            i = line.find("EIDOLON-STORAGE owner_trust=ready ")
+            if i != -1:
+                storage = line[i:].strip()
             i = line.find("EIDOLON-BUILDSTAMP")
             if i != -1:
-                print(line[i:].strip())
+                stamp = line[i:].strip()
+            if storage and stamp:
+                print(storage)
+                print(stamp)
                 break
         except (serial.SerialException, OSError):
             if p is not None:
@@ -368,8 +376,8 @@ finally:
 PY
 )"
 
-  if [[ -z "${actual}" ]]; then
-    eidolon__warn "Could not auto-read the build stamp (pyserial/port busy?)."
+  if [[ -z "${actual}" || "${actual}" != *"EIDOLON-STORAGE owner_trust=ready "* ]]; then
+    eidolon__warn "Could not confirm both Owner storage initialization and build stamp (pyserial/port busy or storage unavailable?)."
     eidolon__warn "Open a monitor and look for a line containing: EIDOLON-BUILDSTAMP"
     eidolon__warn "It must match: ${expected:-<unknown>}"
     return 1

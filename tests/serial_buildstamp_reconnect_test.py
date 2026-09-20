@@ -11,7 +11,7 @@ SOURCE = (Path(__file__).resolve().parents[1] / 'scripts/eidolon/eidolon-common.
 CODE = SOURCE.split("<<'PY' 2>/dev/null || true\n", 1)[1].split('\nPY\n)', 1)[0]
 
 class ReconnectTest(unittest.TestCase):
-    def run_probe(self, *, never_returns=False):
+    def run_probe(self, *, never_returns=False, storage_ready=True):
         clock = [0.0]
         instances = []
         class SerialException(OSError):
@@ -20,6 +20,7 @@ class ReconnectTest(unittest.TestCase):
             def __init__(self, **kw):
                 self.rts = False
                 self.closed = False
+                self.read_count = 0
                 self.index = len(instances)
                 instances.append(self)
             def open(self):
@@ -29,6 +30,9 @@ class ReconnectTest(unittest.TestCase):
                 clock[0] += .1
                 if self.index == 0:
                     raise SerialException('USB re-enumerated after reset')
+                self.read_count += 1
+                if self.read_count == 1 and storage_ready:
+                    return b'I (100) EIDOLON-STORAGE owner_trust=ready bytes=65536\n'
                 return b'I (500) EIDOLON-BUILDSTAMP git=test sdk=test idf=5.5.4\n'
             def close(self):
                 self.closed = True
@@ -44,6 +48,10 @@ class ReconnectTest(unittest.TestCase):
         self.assertIn('EIDOLON-BUILDSTAMP git=test', out)
         self.assertEqual(len(instances), 3)
         self.assertTrue(all(p.closed for p in instances))
+
+    def test_missing_storage_is_not_success(self):
+        out, _, _ = self.run_probe(storage_ready=False)
+        self.assertEqual(out, '')
 
     def test_missing_port_remains_a_bounded_failure(self):
         out, instances, elapsed = self.run_probe(never_returns=True)
