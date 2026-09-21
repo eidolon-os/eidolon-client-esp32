@@ -21,6 +21,7 @@
 
 #include <esp_log.h>
 #include <esp_random.h>
+#include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <freertos/semphr.h>
@@ -115,6 +116,7 @@ struct RuntimeState {
     bool identity_replaced = false;
     bool station_restore_requested = false;
     std::string failure_hint;
+    int64_t terminal_deadline_us = 0;
 };
 
 RuntimeState& State()
@@ -262,15 +264,16 @@ void PublishEvidence(RuntimeState& state)
 // failed", and neither device, app nor Host could name the missing fact. That
 // silence is what let a wrong descriptor route survive — the request 404'd on
 // every Host and the transaction rolled back with nothing written down.
-bool ValidateStagedOwnerRoute(uint32_t generation)
+device_foundation::v1::CommissioningFailureCode ValidateStagedOwnerRoute(uint32_t generation)
 {
+    using Failure = device_foundation::v1::CommissioningFailureCode;
     OwnerTrustBundle trust;
     if (!OwnerTrustStore().LoadStaged(generation, trust)) {
         ESP_LOGE(TAG,
                  "Owner route rejected: staged Owner trust for generation %lu "
                  "is unreadable",
                  static_cast<unsigned long>(generation));
-        return false;
+        return Failure::StorageUnavailable;
     }
     device_foundation::v1::OwnerDomainDescriptor staged;
     std::string staged_canonical;
@@ -279,14 +282,14 @@ bool ValidateStagedOwnerRoute(uint32_t generation)
         ESP_LOGE(TAG,
                  "Owner route rejected: staged Owner Domain descriptor does not "
                  "parse against the canonical contract");
-        return false;
+        return Failure::OwnerIdentityMismatch;
     }
     if (staged.owner_domain_id != trust.owner_domain_id) {
         ESP_LOGE(TAG,
                  "Owner route rejected: staged descriptor names Owner Domain "
                  "'%s' but the staged trust names '%s'",
                  staged.owner_domain_id.c_str(), trust.owner_domain_id.c_str());
-        return false;
+        return Failure::OwnerIdentityMismatch;
     }
     if (VerifyOwnerDomainDescriptor(
             staged, staged_canonical, trust.owner_root_certificate_pem,
@@ -294,7 +297,7 @@ bool ValidateStagedOwnerRoute(uint32_t generation)
         ESP_LOGE(TAG,
                  "Owner route rejected: staged descriptor signature does not "
                  "verify under the staged Owner root");
-        return false;
+        return Failure::OwnerIdentityMismatch;
     }
     // The parser already requires an absolute https route, so this restates the
     // invariant where the request is actually built: a URL handed to the HTTP
@@ -303,7 +306,7 @@ bool ValidateStagedOwnerRoute(uint32_t generation)
         ESP_LOGE(TAG,
                  "Owner route rejected: staged descriptor publishes no absolute "
                  "https descriptor_uri");
-        return false;
+        return Failure::OwnerIdentityMismatch;
     }
     HubHttpResponse response;
     const esp_err_t transport =
@@ -314,7 +317,7 @@ bool ValidateStagedOwnerRoute(uint32_t generation)
                  "Owner route rejected: GET %s failed (transport=%s status=%d)",
                  staged.descriptor_uri.c_str(), esp_err_to_name(transport),
                  response.status);
-        return false;
+        return Failure::OwnerRouteUnavailable;
     }
     device_foundation::v1::OwnerDomainDescriptor observed;
     std::string canonical;
@@ -330,9 +333,9 @@ bool ValidateStagedOwnerRoute(uint32_t generation)
                  staged.descriptor_uri.c_str(), observed.owner_domain_id.c_str(),
                  static_cast<unsigned long>(observed.directory_revision),
                  static_cast<unsigned long>(staged.directory_revision));
-        return false;
+        return Failure::OwnerIdentityMismatch;
     }
-    return true;
+    return Failure::None;
 }
 
 
@@ -440,7 +443,7 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
             Enqueue(CommissioningEventType::WifiConnected, generation);
         };
         events.wifi_connection_failed = [](uint32_t generation) {
-            Enqueue(CommissioningEventType::OwnerRouteValidationFailed,
+            Enqueue(CommissioningEventType::WifiConnectionFailed,
                     generation);
         };
         events.window_expired = [](uint32_t generation) {
@@ -469,13 +472,17 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
                     ack.session_id != current.evidence.session_id ||
                     ack.setup_generation != current.evidence.setup_generation ||
                     ack.observed_state_revision != current.evidence.state_revision ||
-                    current.evidence.state !=
-                        device_foundation::v1::CommissioningStatusState::Committed) {
+                    (current.evidence.state !=
+                        device_foundation::v1::CommissioningStatusState::Committed &&
+                     current.evidence.state !=
+                        device_foundation::v1::CommissioningStatusState::RolledBack)) {
                     return false;
                 }
             }
-            return Enqueue(CommissioningEventType::ControllerObservedTerminal,
-                           generation);
+            return true;
+        };
+        events.terminal_ack_response_finished = [](uint32_t generation) {
+            Enqueue(CommissioningEventType::ControllerObservedTerminal, generation);
         };
         // The trust store, not the caller of RequestOpen, decides whether this
         // act is a first claim or an Owner reopening setup on a device that is
@@ -499,12 +506,18 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
         completion.type = CommissioningEventType::NetworkCandidateStaged;
         Apply(state, completion);
         break;
-    case CommissioningActionType::ValidateOwnerRoute:
-        completion.type = ValidateStagedOwnerRoute(action.generation)
+    case CommissioningActionType::ValidateOwnerRoute: {
+        const auto failure = ValidateStagedOwnerRoute(action.generation);
+        {
+            std::lock_guard<std::mutex> lock(state.evidence_mutex);
+            state.evidence.failure_code = failure;
+        }
+        completion.type = failure == device_foundation::v1::CommissioningFailureCode::None
                               ? CommissioningEventType::OwnerRouteValidated
                               : CommissioningEventType::OwnerRouteValidationFailed;
         Apply(state, completion);
         break;
+    }
     case CommissioningActionType::CommitCommissioningTransaction: {
         const auto result = CommitCommissioningTransaction(
             action.generation, state.candidate_ssid, state.candidate_password,
@@ -577,6 +590,7 @@ void Apply(RuntimeState& state, const CommissioningEvent& event)
         state.identity_replaced = false;
         state.station_restore_requested = false;
         state.failure_hint.clear();
+        state.terminal_deadline_us = 0;
         state.session_id.clear();
         state.candidate_ssid.clear();
         state.candidate_password.clear();
@@ -589,16 +603,42 @@ void Apply(RuntimeState& state, const CommissioningEvent& event)
          state.core.state() == CommissioningRuntimeState::Idle)) return;
     if (!event.candidate_id.empty() && !state.candidate_id.empty() &&
         event.candidate_id != state.candidate_id) return;
+    // Late radio/validation callbacks must not rewrite a terminal snapshot.
+    switch (event.type) {
+    case CommissioningEventType::WifiConnected:
+    case CommissioningEventType::WifiConnectionFailed:
+    case CommissioningEventType::OwnerRouteValidated:
+    case CommissioningEventType::OwnerRouteValidationFailed:
+    case CommissioningEventType::CommissioningTransactionCommitFailed:
+        if (state.core.state() != CommissioningRuntimeState::ApplyingConfiguration ||
+            state.core.transaction_committed()) return;
+        break;
+    default:
+        break;
+    }
     CommissioningEvent resolved = event;
     if ((resolved.type == CommissioningEventType::WifiConnected ||
-         resolved.type == CommissioningEventType::OwnerRouteValidationFailed) &&
+         resolved.type == CommissioningEventType::OwnerRouteValidationFailed ||
+         resolved.type == CommissioningEventType::WifiConnectionFailed) &&
         resolved.candidate_id.empty()) {
         resolved.candidate_id = state.candidate_id;
     }
     {
         std::lock_guard<std::mutex> lock(state.evidence_mutex);
         using Status = device_foundation::v1::CommissioningStatusState;
+        using Failure = device_foundation::v1::CommissioningFailureCode;
         switch (resolved.type) {
+        case CommissioningEventType::WifiConnectionFailed:
+            state.evidence.failure_code = Failure::NetworkRejected;
+            state.failure_hint = "Setup failed: Wi-Fi rejected. Previous setup retained";
+            break;
+        case CommissioningEventType::OwnerRouteValidationFailed:
+            state.failure_hint = "Setup failed: selected Host validation failed. Previous setup retained";
+            break;
+        case CommissioningEventType::CommissioningTransactionCommitFailed:
+            state.evidence.failure_code = Failure::StorageUnavailable;
+            state.failure_hint = "Setup failed: storage unavailable. Previous setup retained";
+            break;
         case CommissioningEventType::WifiConnected:
             state.evidence.conditions.wifi_connected = true;
             break;
@@ -609,17 +649,19 @@ void Apply(RuntimeState& state, const CommissioningEvent& event)
             state.evidence.conditions.trust_committed = true;
             state.evidence.conditions.network_committed = true;
             state.evidence.state = Status::Committed;
+            state.terminal_deadline_us = esp_timer_get_time() + 30 * 1000000LL;
             break;
         case CommissioningEventType::CommissioningTransactionRolledBack: {
             // UI/status acknowledgments share this revision. Rollback clears
             // candidate conditions, but must not reuse an earlier revision in
             // the same generation and accidentally accept its queued snapshot.
             const auto revision = state.evidence.state_revision;
+            const auto failure = state.evidence.failure_code;
             state.evidence = {};
             state.evidence.state_revision = revision;
             state.evidence.state = Status::RolledBack;
-            state.evidence.failure_code =
-                device_foundation::v1::CommissioningFailureCode::Internal;
+            state.evidence.failure_code = failure == Failure::None ? Failure::Cancelled : failure;
+            state.terminal_deadline_us = esp_timer_get_time() + 30 * 1000000LL;
             break;
         }
         default:
@@ -673,8 +715,19 @@ void Actor(void*)
 {
     RuntimeState& state = State();
     while (true) {
+        if (state.terminal_deadline_us != 0 &&
+            esp_timer_get_time() >= state.terminal_deadline_us) {
+            state.terminal_deadline_us = 0;
+            CommissioningEvent expired;
+            expired.type = CommissioningEventType::TerminalDeliveryExpired;
+            expired.generation = state.core.generation();
+            Apply(state, expired);
+            if (RetireIfIdle(state)) break;
+        }
         RuntimeMessage* raw = nullptr;
-        if (xQueueReceive(state.queue, &raw, portMAX_DELAY) != pdTRUE || raw == nullptr) continue;
+        const TickType_t wait = state.terminal_deadline_us == 0
+            ? portMAX_DELAY : pdMS_TO_TICKS(250);
+        if (xQueueReceive(state.queue, &raw, wait) != pdTRUE || raw == nullptr) continue;
         std::unique_ptr<RuntimeMessage> message(raw);
         if (message->trust_request != nullptr) {
             TrustActorRequest* request = message->trust_request;

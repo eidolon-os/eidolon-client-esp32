@@ -38,6 +38,7 @@ enum class CommissioningEventType {
     NetworkCandidateReceived,
     NetworkCandidateStaged,
     WifiConnected,
+    WifiConnectionFailed,
     OwnerRouteValidated,
     OwnerRouteValidationFailed,
     CommissioningTransactionCommitted,
@@ -45,6 +46,7 @@ enum class CommissioningEventType {
     CommissioningTransactionRecoveryRequired,
     CommissioningTransactionRolledBack,
     ControllerObservedTerminal,
+    TerminalDeliveryExpired,
     WindowExpired,
     CancelRequested,
     TransportStopped,
@@ -115,6 +117,8 @@ private:
     bool commit_requested_ = false;
     bool transaction_committed_ = false;
     bool rollback_requested_ = false;
+    bool report_failure_ = false;
+    bool rollback_complete_ = false;
     bool stop_requested_ = false;
     bool radio_restore_requested_ = false;
 };

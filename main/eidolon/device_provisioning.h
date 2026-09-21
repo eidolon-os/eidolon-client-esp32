@@ -45,6 +45,7 @@ public:
         std::function<void(uint32_t)> transport_ended_unexpectedly;
         std::function<std::string(uint32_t)> commissioning_status;
         std::function<bool(uint32_t, const std::string&)> terminal_ack;
+        std::function<void(uint32_t)> terminal_ack_response_finished;
     };
 
     static DeviceProvisioningService& GetInstance();

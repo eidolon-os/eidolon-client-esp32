@@ -236,9 +236,30 @@ esp_err_t DeviceProvisioningService::HandleTerminalAck(
                               static_cast<size_t>(inlen));
     const bool accepted = self.events_.terminal_ack(
         self.transport_generation_, payload);
-    return Answer(accepted ? "{\"acknowledged\":true}"
-                           : "{\"acknowledged\":false}",
-                  outbuf, outlen);
+    const esp_err_t result = Answer(accepted ? "{\"acknowledged\":true}"
+                                            : "{\"acknowledged\":false}",
+                                    outbuf, outlen);
+    if (!accepted || result != ESP_OK) return result;
+#if CONFIG_EIDOLON_PROVISIONING_TRANSPORT_BLE
+    // BLE does not expose an HTTP response boundary; the bounded terminal
+    // delivery deadline releases this transport if no completion is observed.
+#else
+    // Run after protocomm has encrypted and sent this response, on the same
+    // HTTP server task. Teardown must never race the active endpoint handler.
+    const uint32_t generation = self.transport_generation_.load();
+    const esp_err_t queued = httpd_queue_work(
+        static_cast<httpd_handle_t>(self.httpd_handle_),
+        [](void* value) {
+            auto& service = GetInstance();
+            const auto generation = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(value));
+            if (service.transport_generation_.load() == generation &&
+                service.events_.terminal_ack_response_finished) {
+                service.events_.terminal_ack_response_finished(generation);
+            }
+        }, reinterpret_cast<void*>(static_cast<uintptr_t>(generation)));
+    if (queued != ESP_OK) ESP_LOGW(TAG, "Terminal response completion could not be queued");
+#endif
+    return result;
 }
 
 void DeviceProvisioningService::HandleProvisioningEvent(void*, const char* event_base, int32_t event_id,

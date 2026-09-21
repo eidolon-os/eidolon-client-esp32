@@ -57,6 +57,8 @@ void CommissioningOrchestratorCore::ResetToIdle(
     commit_requested_ = false;
     transaction_committed_ = false;
     rollback_requested_ = false;
+    report_failure_ = false;
+    rollback_complete_ = false;
     stop_requested_ = false;
     radio_restore_requested_ = false;
     Transition(actions, CommissioningRuntimeState::Idle);
@@ -188,6 +190,7 @@ std::vector<CommissioningAction> CommissioningOrchestratorCore::Handle(
     case CommissioningEventType::CommissioningTransactionCommitFailed:
         if (state_ == CommissioningRuntimeState::ApplyingConfiguration &&
             event.candidate_id == candidate_id_) {
+            report_failure_ = true;
             BeginRestore(actions);
         }
         break;
@@ -195,11 +198,17 @@ std::vector<CommissioningAction> CommissioningOrchestratorCore::Handle(
         if (state_ == CommissioningRuntimeState::ApplyingConfiguration &&
             transaction_committed_) {
             BeginReturn(actions);
+        } else if (state_ == CommissioningRuntimeState::RestoringPreviousMode &&
+                   rollback_complete_ && !stop_requested_) {
+            stop_requested_ = true;
+            Act(actions, CommissioningActionType::StopTransport);
         }
         break;
+    case CommissioningEventType::WifiConnectionFailed:
     case CommissioningEventType::OwnerRouteValidationFailed:
         if (state_ == CommissioningRuntimeState::ApplyingConfiguration &&
             event.candidate_id == candidate_id_) {
+            report_failure_ = true;
             BeginRestore(actions);
         }
         break;
@@ -208,14 +217,24 @@ std::vector<CommissioningAction> CommissioningOrchestratorCore::Handle(
             event.candidate_id == candidate_id_) {
             trust_staged_ = false;
             candidate_staged_ = false;
-            if (!stop_requested_) {
+            rollback_complete_ = true;
+            if (report_failure_) {
+                Act(actions, CommissioningActionType::PublishConfirmedState);
+            } else if (!stop_requested_) {
                 stop_requested_ = true;
                 Act(actions, CommissioningActionType::StopTransport);
             }
         }
         break;
+    case CommissioningEventType::TerminalDeliveryExpired:
     case CommissioningEventType::WindowExpired:
     case CommissioningEventType::CancelRequested:
+        report_failure_ = false;
+        if (state_ == CommissioningRuntimeState::RestoringPreviousMode &&
+            rollback_complete_ && !stop_requested_) {
+            stop_requested_ = true;
+            Act(actions, CommissioningActionType::StopTransport);
+        }
         if (transaction_committed_) BeginReturn(actions);
         else BeginRestore(actions);
         break;
@@ -234,6 +253,12 @@ std::vector<CommissioningAction> CommissioningOrchestratorCore::Handle(
         // The SDK may report an unsolicited transport end from its event task.
         // It is evidence only: the actor still owns the one idempotent cleanup
         // path for this generation.
+        report_failure_ = false;
+        if (state_ == CommissioningRuntimeState::RestoringPreviousMode &&
+            rollback_complete_ && !stop_requested_) {
+            stop_requested_ = true;
+            Act(actions, CommissioningActionType::StopTransport);
+        }
         if (transaction_committed_) BeginReturn(actions);
         else BeginRestore(actions);
         break;

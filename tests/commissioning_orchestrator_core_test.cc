@@ -174,11 +174,13 @@ void TestValidationFailureRollsBackBeforeTransportAndRadioRelease()
         CommissioningEventType::OwnerRouteValidationFailed, generation, "candidate-1"));
     assert(Has(actions, CommissioningActionType::RollbackCommissioningTransaction));
     assert(!Has(actions, CommissioningActionType::StopTransport));
-    assert(core.Handle(Event(CommissioningEventType::WindowExpired,
-                             generation)).empty());
     actions = core.Handle(Event(
         CommissioningEventType::CommissioningTransactionRolledBack,
         generation, "candidate-1"));
+    assert(!Has(actions, CommissioningActionType::StopTransport));
+    assert(Has(actions, CommissioningActionType::PublishConfirmedState));
+    actions = core.Handle(Event(CommissioningEventType::ControllerObservedTerminal,
+                                generation));
     assert(Has(actions, CommissioningActionType::StopTransport));
     // Neither an early mode callback nor candidate connectivity releases the
     // actor before transport cleanup has handed the radio back.
@@ -313,11 +315,36 @@ void TestDurableDecisionIgnoresCancelAndRetriesForward() {
     assert(!Has(finished, CommissioningActionType::RollbackCommissioningTransaction));
 }
 
+void TestFailureTerminalHasBoundedDeliveryAndRejectsStaleAck()
+{
+    for (const auto failure : {CommissioningEventType::WifiConnectionFailed,
+                              CommissioningEventType::OwnerRouteValidationFailed,
+                              CommissioningEventType::CommissioningTransactionCommitFailed}) {
+        CommissioningOrchestratorCore core;
+        const auto generation = OpenToSession(core);
+        StageTrust(core, generation);
+        core.Handle(Event(CommissioningEventType::NetworkCandidateReceived, generation, "candidate-1"));
+        core.Handle(Event(CommissioningEventType::NetworkCandidateStaged, generation, "candidate-1"));
+        auto actions = core.Handle(Event(failure, generation, "candidate-1"));
+        assert(Has(actions, CommissioningActionType::RollbackCommissioningTransaction));
+        assert(!Has(actions, CommissioningActionType::StopTransport));
+        assert(core.Handle(Event(CommissioningEventType::ControllerObservedTerminal, generation)).empty());
+        actions = core.Handle(Event(CommissioningEventType::CommissioningTransactionRolledBack, generation, "candidate-1"));
+        assert(Has(actions, CommissioningActionType::PublishConfirmedState));
+        assert(!Has(actions, CommissioningActionType::StopTransport));
+        assert(core.Handle(Event(CommissioningEventType::ControllerObservedTerminal, generation - 1)).empty());
+        actions = core.Handle(Event(CommissioningEventType::TerminalDeliveryExpired, generation));
+        assert(Has(actions, CommissioningActionType::StopTransport));
+        assert(core.Handle(Event(CommissioningEventType::ControllerObservedTerminal, generation)).empty());
+    }
+}
+
 
 }  // namespace
 
 int main()
 {
+    TestFailureTerminalHasBoundedDeliveryAndRejectsStaleAck();
     TestDurableDecisionIgnoresCancelAndRetriesForward();
     TestReadyRequiresEvidenceAndCallbacksAreGenerationFenced();
     TestCandidateCommitsOnlyAfterWifiAndOwnerValidation();

@@ -427,7 +427,9 @@ void Application::Initialize() {
                 case State::RestoringPreviousMode:
                     SetEidolonRuntimeUi(
                         eidolon::RuntimePhase::NetworkConnecting,
-                        "Finishing device setup...");
+                        snapshot.failure_hint.empty()
+                            ? "Finishing device setup..."
+                            : snapshot.failure_hint);
                     break;
                 case State::Idle:
                     if (!snapshot.failure_hint.empty()) {
