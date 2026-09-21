@@ -47,24 +47,32 @@ public:
 
     void OnAttemptStarted() { phase_ = Phase::Connecting; }
     void OnConnecting() { phase_ = Phase::Connecting; }
-    void OnReconnecting() { phase_ = Phase::Reconnecting; }
+    void OnReconnecting(uint64_t now_ms = 0)
+    {
+        NoteConnectionLost(now_ms);
+        phase_ = Phase::Reconnecting;
+    }
 
-    void OnConnected()
+    void OnConnected(uint64_t now_ms = 0)
     {
         address_attempt_ = last_address_;
+        if (phase_ != Phase::Connected) connected_since_ms_ = now_ms;
         phase_ = Phase::Connected;
         reconnect_pending_ = false;
-        reconnect_attempts_ = 0;
+        // A brief successful handshake does not prove that a flapping link has
+        // recovered. Reset the budget only after a sustained connection.
     }
 
-    void OnConversationStarted()
+    void OnConversationStarted(uint64_t now_ms = 0)
     {
-        phase_ = Phase::Idle;
-        reconnect_pending_ = false;
-        reconnect_attempts_ = 0;
+        OnConnected(now_ms);
     }
 
-    void OnDisconnected() { phase_ = Phase::Idle; }
+    void OnDisconnected(uint64_t now_ms = 0)
+    {
+        NoteConnectionLost(now_ms);
+        phase_ = Phase::Idle;
+    }
 
     // A deliberate teardown owns the next action. Cancel an ordinary recovery
     // timer so a queued tick cannot race it.
@@ -94,7 +102,8 @@ public:
             reconnect_pending_ = false;
             return false;
         }
-        *attempt = reconnect_attempts_++;
+        *attempt = reconnect_attempts_;
+        if (reconnect_attempts_ < 6) ++reconnect_attempts_;
         return true;
     }
 
@@ -119,6 +128,16 @@ public:
     Phase phase() const { return phase_; }
 
 private:
+    void NoteConnectionLost(uint64_t now_ms)
+    {
+        if (phase_ != Phase::Connected) return;
+        if (now_ms >= connected_since_ms_ && now_ms - connected_since_ms_ >= 60000) {
+            reconnect_attempts_ = 0;
+        } else if (reconnect_attempts_ < 6) {
+            ++reconnect_attempts_;
+        }
+    }
+    uint64_t connected_since_ms_ = 0;
     size_t address_attempt_ = 0;
     size_t last_address_ = 0;
     bool network_available_ = true;

@@ -108,8 +108,31 @@ void TestConnectedTerminalSchedulesAndRecovers()
     const uint32_t recovered_generation = h.generation;
     h.OnControlConnected(recovered_generation);
     assert(h.recovery.connected());
-    assert(h.recovery.reconnect_attempts() == 0);
+    assert(h.recovery.reconnect_attempts() > 0);
     assert(!h.recovery.reconnect_pending());
+}
+
+void TestFlappingConnectionPreservesBackoffUntilStable()
+{
+    eidolon::ChannelRecovery recovery;
+    recovery.OnConnected(1000);
+    for (int i = 0; i < 8; ++i) {
+        recovery.OnReconnecting(2000 + i * 10000);
+        const int failures = recovery.reconnect_attempts();
+        recovery.OnReconnecting(2001 + i * 10000);
+        recovery.OnDisconnected(2002 + i * 10000);
+        assert(recovery.reconnect_attempts() == failures);
+        recovery.OnConnected(3000 + i * 10000);
+        recovery.OnConversationStarted(3500 + i * 10000);
+        assert(recovery.reconnect_attempts() == failures);
+    }
+    assert(eidolon::ChannelReconnectDelayMs(recovery.reconnect_attempts()) == 30000);
+    recovery.OnDisconnected(133000);  // 60 seconds since the last connect
+    assert(recovery.reconnect_attempts() == 0);
+    recovery.OnNetworkLost();
+    assert(!recovery.TrySchedule(false, true));
+    recovery.OnNetworkRestored();
+    assert(recovery.TrySchedule(false, true));
 }
 
 void TestInitialSynchronousFailureRetries()
@@ -216,7 +239,7 @@ void TestBackoffRediscoveryAndServerUnreachable()
     assert(h.server_unreachable);
     h.OnControlConnected(h.generation);
     h.server_unreachable = false;
-    assert(h.recovery.reconnect_attempts() == 0);
+    assert(h.recovery.reconnect_attempts() > 0);
 }
 
 void TestConversationRecoveryNeverBecomesStandbyUnreachable()
@@ -258,6 +281,7 @@ void TestRegistrationCredentialsWinAndGenerationNeverRollsBack()
 
 int main()
 {
+    TestFlappingConnectionPreservesBackoffUntilStable();
     {
         eidolon::ChannelRecovery recovery;
         assert(recovery.NextAddressIndex(2) == 0);

@@ -118,9 +118,9 @@ const char* UiSceneDetail(UiScene scene, EndReason end_reason)
     case UiScene::Conversation:
         return "Listening...";
     case UiScene::Reconnecting:
-        return "Restoring Channel connection...";
+        return "Connection interrupted. Trying to resume...";
     case UiScene::Ended:
-        return end_reason == EndReason::Error ? "Conversation ended with an error"
+        return end_reason == EndReason::Error ? "Could not continue. Ready to try again."
                                               : "Ready for another conversation";
     case UiScene::Removed:
         return "Voice service disabled; reset is required";

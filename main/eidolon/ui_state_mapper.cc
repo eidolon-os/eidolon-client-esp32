@@ -187,10 +187,11 @@ void ResolveRecoveryPresentation(const EidolonRuntimeStatus& status,
         return;
     }
     model.state_label = "RETRY";
-    model.status_text = "Restoring service";
-    if (status.service_detail.empty()) {
-        model.detail_text = "Retrying Channel connection...";
-    }
+    model.status_text = status.service == ServicePhase::Unreachable
+        ? "Host unavailable" : "Reconnecting to Host";
+    model.detail_text = status.service == ServicePhase::Unreachable
+        ? "Check Host and Wi-Fi. Retrying automatically."
+        : "Please wait. Reconnecting automatically.";
 }
 
 void ResolveActions(const EidolonRuntimeStatus& status, EidolonUiModel& model)
@@ -203,9 +204,12 @@ void ResolveActions(const EidolonRuntimeStatus& status, EidolonUiModel& model)
         model.primary_enabled = true;
         break;
     case UiScene::OpeningConversation:
-    case UiScene::Reconnecting:
         model.primary_label = "...";
         model.end_allowed = true;
+        break;
+    case UiScene::Reconnecting:
+        model.primary_label = "...";
+        model.end_allowed = status.conversation == ConversationPhase::Reconnecting;
         break;
     case UiScene::Conversation:
         model.end_allowed = true;

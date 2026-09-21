@@ -104,15 +104,18 @@ void TestRecoverableServiceLossIsNotADeviceError()
     assert(model.scene == UiScene::Reconnecting);
     assert(model.severity == UiSeverity::Attention);
     Expect(model.state_label, "RETRY");
-    Expect(model.status_text, "Restoring service");
-    Expect(model.detail_text, "Retrying Channel connection...");
+    Expect(model.status_text, "Host unavailable");
+    assert(!model.end_allowed);
+    assert(!model.show_end_action);
+    Expect(model.detail_text, "Check Host and Wi-Fi. Retrying automatically.");
     assert(!model.primary_enabled);
 
     status.conversation = ConversationPhase::Reconnecting;
     model = ProjectWithTouch(status);
     Expect(model.state_label, "REJOIN");
+    assert(model.end_allowed);
     Expect(model.status_text, "Reconnecting");
-    Expect(model.detail_text, "Restoring Channel connection...");
+    Expect(model.detail_text, "Connection interrupted. Trying to resume...");
 
     status.conversation = ConversationPhase::Ended;
     status.end_reason = EndReason::IdleNormalEnd;
@@ -220,7 +223,7 @@ void TestEndReasonAndDetailOwnership()
     auto model = ProjectWithTouch(status);
     assert(model.scene == UiScene::Ended);
     assert(model.severity == UiSeverity::Error);
-    Expect(model.detail_text, "Conversation ended with an error");
+    Expect(model.detail_text, "Could not continue. Ready to try again.");
 
     status.runtime = RuntimePhase::NetworkConnecting;
     model = ProjectWithTouch(status);

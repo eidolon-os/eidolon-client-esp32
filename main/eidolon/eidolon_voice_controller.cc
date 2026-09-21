@@ -903,7 +903,12 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
             ArmConnectWatchdog();
             break;
         case LiveKitConnectionState::Connected:
-            channel_recovery_.OnConnected();
+            channel_recovery_.OnConnected(esp_timer_get_time() / 1000);
+            // Recovery makes standby actionable again; the historical error
+            // remains in logs rather than reappearing after every reconnect.
+            if (current_conversation_id_.empty() && last_end_reason_ == EndReason::Error) {
+                last_end_reason_ = EndReason::None;
+            }
             SetOperationalReady(true, "channel_connected");
             if (reconnect_timer_ != nullptr) {
                 esp_timer_stop(reconnect_timer_);
@@ -928,7 +933,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
                 if (open_err == ESP_OK) {
                     if (conversation_confirmed_) {
                         standby_ = false;
-                        channel_recovery_.OnConversationStarted();
+                        channel_recovery_.OnConversationStarted(esp_timer_get_time() / 1000);
                         SetState(VoiceSessionState::InRoom,
                                  "channel_reconnected_conversation_restored");
                         OpenConversationAudio();
@@ -950,7 +955,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
 #endif
             break;
         case LiveKitConnectionState::Failed:
-            channel_recovery_.OnDisconnected();
+            channel_recovery_.OnDisconnected(esp_timer_get_time() / 1000);
             SetOperationalReady(false, "channel_failed");
             DisarmConnectWatchdog();
             ESP_LOGW(TAG, "Channel connection failed");
@@ -961,7 +966,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
             ScheduleChannelReconnect("channel_failed");
             break;
         case LiveKitConnectionState::Disconnected:
-            channel_recovery_.OnDisconnected();
+            channel_recovery_.OnDisconnected(esp_timer_get_time() / 1000);
             SetOperationalReady(false, "channel_disconnected");
             DisarmConnectWatchdog();
             if (!current_conversation_id_.empty()) {
@@ -975,7 +980,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
             // attempt: if it never reaches Connected/Failed/Disconnected, the
             // same watchdog forces the ordinary recovery loop.
             SetOperationalReady(false, "channel_reconnecting");
-            channel_recovery_.OnReconnecting();
+            channel_recovery_.OnReconnecting(esp_timer_get_time() / 1000);
             if (!current_conversation_id_.empty()) {
                 SetState(VoiceSessionState::Reconnecting,
                          "channel_reconnecting_during_conversation");
@@ -993,7 +998,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         SetState(VoiceSessionState::Connecting, "voice_connecting");
         break;
     case LiveKitConnectionState::Connected:
-        channel_recovery_.OnConversationStarted();
+        channel_recovery_.OnConversationStarted(esp_timer_get_time() / 1000);
         SetOperationalReady(true, "voice_connected");
         SetState(VoiceSessionState::InRoom, "voice_connected");
         SetPresenceWakePhase(PresenceWakePhase::Idle);
@@ -1010,10 +1015,12 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         }
         break;
     case LiveKitConnectionState::Reconnecting:
+        channel_recovery_.OnReconnecting(esp_timer_get_time() / 1000);
         SetOperationalReady(false, "voice_reconnecting");
         SetState(VoiceSessionState::Reconnecting, "voice_reconnecting");
         break;
     case LiveKitConnectionState::Failed:
+        channel_recovery_.OnDisconnected(esp_timer_get_time() / 1000);
         SetOperationalReady(false, "voice_failed");
         SetPresenceWakePhase(PresenceWakePhase::Idle);
         CloseConversationAudio();
@@ -1047,6 +1054,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         }
         break;
     case LiveKitConnectionState::Disconnected:
+        channel_recovery_.OnDisconnected(esp_timer_get_time() / 1000);
         SetOperationalReady(false, "voice_disconnected");
         SetPresenceWakePhase(PresenceWakePhase::Idle);
         // A control-room teardown during a JOIN handoff is now dropped by the
@@ -1285,13 +1293,15 @@ void EidolonVoiceController::DoConnectTimeout()
     // Drop the in-flight guards so ScheduleChannelReconnect isn't suppressed, then
     // tear down the hung session and fall back to a stable base state.
     switching_to_voice_ = false;
-    channel_recovery_.OnDisconnected();
+    channel_recovery_.OnDisconnected(esp_timer_get_time() / 1000);
     channel_recovery_.FinishRetry();
     session_.Disconnect();
     standby_ = true;
+    // A standby channel timeout is not a failed conversation. Preserve the
+    // previous outcome unless an actual conversation was interrupted.
+    if (!current_conversation_id_.empty()) last_end_reason_ = EndReason::Error;
     current_conversation_id_.clear();
     conversation_confirmed_ = false;
-    last_end_reason_ = EndReason::Error;
     // Supersede the hung attempt so any of its late callbacks are dropped rather
     // than accepted after we fall back (the next ConnectChannel bumps again).
     MarkSessionSuperseded("connect_timeout");
@@ -1759,7 +1769,7 @@ void EidolonVoiceController::DoSessionControl(const std::string& payload, uint32
         cJSON_Delete(root);
         standby_ = false;
         conversation_confirmed_ = true;
-        channel_recovery_.OnConversationStarted();
+        channel_recovery_.OnConversationStarted(esp_timer_get_time() / 1000);
         SetOperationalReady(true, "session_started");
         SetState(VoiceSessionState::InRoom, "session_started");
         SetPresenceWakePhase(PresenceWakePhase::Idle);
@@ -3118,7 +3128,7 @@ esp_err_t EidolonVoiceController::ConnectChannel()
         // Keep standby_ true: it denotes the plane owned by this generation,
         // not connection health. Superseding drops any Connecting/Disconnected
         // callback queued before the synchronous failure was returned.
-        channel_recovery_.OnDisconnected();
+        channel_recovery_.OnDisconnected(esp_timer_get_time() / 1000);
         SetOperationalReady(false, "control_connect_sync_failed");
         MarkSessionSuperseded("control_connect_sync_failed");
         ESP_LOGW(TAG, "Connect channel failed: %s", esp_err_to_name(err));
