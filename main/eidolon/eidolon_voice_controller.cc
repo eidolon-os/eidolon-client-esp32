@@ -212,13 +212,7 @@ bool ParseAmbientPresenceState(const std::string& payload,
 
 bool ProviderBindingExpired(const eidolon::Esp32HubConfig& config)
 {
-    if (config.expires_at_ms <= 0) {
-        return true;
-    }
-    const int64_t now = config.clock.Now(esp_timer_get_time() / 1000);
-    // Cached NVS configuration has no boot-local time anchor. Refresh online;
-    // never treat an unknown clock as proof that a credential has expired.
-    return now > 0 && now >= config.expires_at_ms;
+    return eidolon::ChannelBindingExpired(config, esp_timer_get_time() / 1000);
 }
 }  // namespace
 
@@ -631,6 +625,12 @@ bool EidolonVoiceController::HasChannelConfig() const
     }
     return config_.session.usable() && !config_.session.room_name.empty() &&
            !ProviderBindingExpired(config_);
+}
+
+bool EidolonVoiceController::CanRecoverChannel() const
+{
+    return ChannelRecoveryAllowed(config_.status, !device_control_uri_.empty(),
+                                  state_ == VoiceSessionState::Unauthorized);
 }
 
 const char* EidolonVoiceController::VoiceStateName(VoiceSessionState state)
@@ -1126,6 +1126,8 @@ void EidolonVoiceController::DoOnboardingPoll()
     ESP_LOGI(TAG, "Administrator approval complete; provider binding is ready");
     if (HasChannelConfig()) {
         ConnectChannel();
+    } else {
+        ScheduleChannelReconnect("approval_credentials_unavailable");
     }
 }
 
@@ -1152,9 +1154,12 @@ void EidolonVoiceController::ScheduleChannelReconnect(const char* reason)
         }
         return;
     }
-    if (!channel_recovery_.TrySchedule(switching_to_voice_, HasChannelConfig())) {
+    if (!channel_recovery_.TrySchedule(switching_to_voice_, CanRecoverChannel())) {
         return;
     }
+    // Backoff owns the next attempt. Its wait is not a connection attempt and
+    // must not race the previous attempt's watchdog.
+    DisarmConnectWatchdog();
     const int scheduled_attempt = channel_recovery_.reconnect_attempts();
     const uint32_t delay_ms = ChannelReconnectDelayMs(scheduled_attempt);
     ESP_LOGI(TAG,
@@ -1173,6 +1178,7 @@ void EidolonVoiceController::ScheduleChannelReconnect(const char* reason)
             reconnect_timer_ = nullptr;
             channel_recovery_.OnScheduleFailed();
             ESP_LOGW(TAG, "Failed to create reconnect timer");
+            SetState(VoiceSessionState::Error, "reconnect_timer_create_failed");
             return;
         }
     }
@@ -1181,6 +1187,7 @@ void EidolonVoiceController::ScheduleChannelReconnect(const char* reason)
     if (esp_timer_start_once(reconnect_timer_, delay_us) != ESP_OK) {
         channel_recovery_.OnScheduleFailed();
         ESP_LOGW(TAG, "Failed to start reconnect timer");
+        SetState(VoiceSessionState::Error, "reconnect_timer_start_failed");
     }
 }
 
@@ -1198,17 +1205,34 @@ void EidolonVoiceController::DoReconnectTick()
     if (!channel_recovery_.BeginRetry(&attempt)) {
         return;
     }
+    if (!CanRecoverChannel()) {
+        channel_recovery_.FinishRetry();
+        return;
+    }
     ESP_LOGI(TAG, "[lifecycle] channel reconnect tick attempt=%d gen=%lu",
              attempt, static_cast<unsigned long>(session_generation_));
-    if (ShouldRediscoverChannelConfig(attempt)) {
+    if (ShouldRediscoverChannelConfig(attempt, HasChannelConfig())) {
         // The Hub address may have changed; re-query mDNS and re-fetch config
         // before reconnecting. Authorization/config-status changes terminate
         // this recovery owner instead of reviving stale cached credentials.
         const esp_err_t refresh_err = RediscoverHub();
-        if (refresh_err == ESP_ERR_NOT_ALLOWED || !HasChannelConfig()) {
-            ESP_LOGW(TAG, "Control recovery stopped after credential refresh: %s",
+        if (refresh_err == ESP_ERR_NOT_ALLOWED) {
+            channel_recovery_.FinishRetry();
+            SetState(VoiceSessionState::Unauthorized, "channel_refresh_rejected");
+            return;
+        }
+        if (!CanRecoverChannel()) {
+            channel_recovery_.FinishRetry();
+            return; // Pending approval/binding has its own onboarding poll.
+        }
+        if (refresh_err != ESP_OK || !HasChannelConfig()) {
+            ESP_LOGW(TAG, "Channel credentials unavailable; retrying: %s",
                      esp_err_to_name(refresh_err));
             channel_recovery_.FinishRetry();
+            if (current_conversation_id_.empty()) {
+                SetState(VoiceSessionState::ServerUnreachable, "channel_refresh_unavailable");
+            }
+            ScheduleChannelReconnect("channel_refresh_unavailable");
             return;
         }
     }
@@ -1243,8 +1267,11 @@ void EidolonVoiceController::ArmConnectWatchdog()
             return;
         }
     }
-    esp_timer_stop(connect_watchdog_);  // restart the window for this attempt
-    esp_timer_start_once(connect_watchdog_, kConnectWatchdogUs);
+    // SDK retry callbacks belong to the same attempt; they must not keep
+    // extending its deadline until the SDK's retry budget is exhausted.
+    if (!esp_timer_is_active(connect_watchdog_)) {
+        esp_timer_start_once(connect_watchdog_, kConnectWatchdogUs);
+    }
 }
 
 void EidolonVoiceController::DisarmConnectWatchdog()
@@ -1297,16 +1324,15 @@ void EidolonVoiceController::DoConnectTimeout()
     channel_recovery_.FinishRetry();
     session_.Disconnect();
     standby_ = true;
-    // A standby channel timeout is not a failed conversation. Preserve the
-    // previous outcome unless an actual conversation was interrupted.
-    if (!current_conversation_id_.empty()) last_end_reason_ = EndReason::Error;
-    current_conversation_id_.clear();
-    conversation_confirmed_ = false;
+    // A transport timeout does not cancel the user's conversation intent.
+    // Connected re-announces it; an explicit Leave/session-end cancels it.
     // Supersede the hung attempt so any of its late callbacks are dropped rather
     // than accepted after we fall back (the next ConnectChannel bumps again).
     MarkSessionSuperseded("connect_timeout");
-    // leaves (Re)connecting -> disarms watchdog
-    SetState(StateForConfig(config_), "connect_timeout");
+    DisarmConnectWatchdog();
+    SetState(current_conversation_id_.empty() ? StateForConfig(config_)
+                                            : VoiceSessionState::Reconnecting,
+             "connect_timeout");
     ScheduleChannelReconnect("connect_timeout");
 }
 
@@ -2871,7 +2897,9 @@ void EidolonVoiceController::DoActivation()
     }
 #endif
     if (HasChannelConfig()) {
-        ConnectChannel();
+        if (ConnectChannel() != ESP_OK) ScheduleChannelReconnect("activation_connect_failed");
+    } else {
+        ScheduleChannelReconnect("activation_credentials_unavailable");
     }
 }
 
@@ -2952,6 +2980,7 @@ void EidolonVoiceController::DoNetworkRestored()
     esp_err_t err = RediscoverHub();
     if (err == ESP_ERR_NOT_ALLOWED) {
         ESP_LOGW(TAG, "Network restore stopped: Hub rejected device identity");
+        SetState(VoiceSessionState::Unauthorized, "network_restore_rejected");
         return;
     }
     if (err != ESP_OK) {
@@ -2986,6 +3015,7 @@ void EidolonVoiceController::DoNetworkRestored()
     }
 
     SetState(StateForConfig(config_), "network_restored");
+    ScheduleChannelReconnect("network_restore_credentials_unavailable");
 }
 
 esp_err_t EidolonVoiceController::DoJoinRoom()

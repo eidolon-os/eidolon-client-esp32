@@ -236,6 +236,7 @@ private:
     std::string NewConversationId();
     bool HasActiveConfig() const;
     bool HasChannelConfig() const;
+    bool CanRecoverChannel() const;
     VoiceSessionState StateForConfig(const Esp32HubConfig& config) const;
     void SetState(VoiceSessionState state, const char* reason = "unspecified");
     void SetOperationalReady(bool ready, const char* reason);

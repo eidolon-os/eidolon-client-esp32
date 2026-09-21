@@ -93,6 +93,62 @@ eidolon::RoomConfig Room(const char* token, const char* identity = "device")
     };
 }
 
+void TestExpiredCredentialsStillRecoverAfterRefreshFailures()
+{
+    using namespace eidolon;
+    Esp32HubConfig config;
+    config.status = HubConfigStatus::Active;
+    config.expires_at_ms = 1700000010000LL;
+    config.clock.Observe(1700000000000LL, 0, 0);
+    assert(!ChannelBindingExpired(config, 1000));
+    assert(ChannelBindingExpired(config, 10000));
+    ChannelRecovery recovery;
+    recovery.OnConnected(0);
+    recovery.OnDisconnected(10000);
+    const auto allowed = [&] { return ChannelRecoveryAllowed(config.status, true, false); };
+    assert(recovery.TrySchedule(false, allowed()));
+    // The authority stays unreachable across repeated attempts; expiry cannot
+    // stop admission, and each next attempt still refreshes before connecting.
+    for (int failure = 0; failure < 12; ++failure) {
+        int attempt = -1;
+        assert(recovery.BeginRetry(&attempt));
+        assert(ShouldRediscoverChannelConfig(attempt, false));
+        recovery.FinishRetry();
+        assert(recovery.TrySchedule(false, allowed()));
+        assert(ChannelReconnectDelayMs(recovery.reconnect_attempts()) <= 30000);
+    }
+    int attempt = -1;
+    assert(recovery.BeginRetry(&attempt));
+    config.expires_at_ms = 1700000100000LL;
+    assert(!ChannelBindingExpired(config, 20000));
+    recovery.OnAttemptStarted();
+    recovery.FinishRetry();
+    recovery.OnConnected(20000);
+    assert(recovery.connected());
+    assert(!recovery.reconnect_pending());
+    assert(ShouldRediscoverChannelConfig(0, false));
+    assert(!ShouldRediscoverChannelConfig(0, true));
+}
+
+void TestRecoveryRespectsAuthorityAndNetworkBoundaries()
+{
+    using namespace eidolon;
+    for (auto status : {HubConfigStatus::PendingApproval, HubConfigStatus::WaitingBinding,
+                        HubConfigStatus::Revoked, HubConfigStatus::RecoveryRequired}) {
+        assert(!ChannelRecoveryAllowed(status, true, false));
+    }
+    assert(!ChannelRecoveryAllowed(HubConfigStatus::Active, false, false));
+    assert(!ChannelRecoveryAllowed(HubConfigStatus::Active, true, true));
+    ChannelRecovery recovery;
+    assert(recovery.TrySchedule(false, true));
+    recovery.OnNetworkLost();
+    int attempt = -1;
+    assert(!recovery.BeginRetry(&attempt));
+    assert(!recovery.TrySchedule(false, true));
+    recovery.OnNetworkRestored();
+    assert(recovery.TrySchedule(false, true));
+}
+
 void TestConnectedTerminalSchedulesAndRecovers()
 {
     RecoveryHarness h;
@@ -281,6 +337,8 @@ void TestRegistrationCredentialsWinAndGenerationNeverRollsBack()
 
 int main()
 {
+    TestExpiredCredentialsStillRecoverAfterRefreshFailures();
+    TestRecoveryRespectsAuthorityAndNetworkBoundaries();
     TestFlappingConnectionPreservesBackoffUntilStable();
     {
         eidolon::ChannelRecovery recovery;

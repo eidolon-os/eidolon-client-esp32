@@ -8,6 +8,22 @@
 
 namespace eidolon {
 
+inline bool ChannelBindingExpired(const Esp32HubConfig& config, int64_t monotonic_ms)
+{
+    if (config.expires_at_ms <= 0) return true;
+    const int64_t now = config.clock.Now(monotonic_ms);
+    // A persisted configuration has no boot-local clock anchor.
+    return now > 0 && now >= config.expires_at_ms;
+}
+
+// Enrollment permits recovery; disposable transport credentials permit only
+// connecting. Expiry must never prevent obtaining their replacement.
+inline bool ChannelRecoveryAllowed(HubConfigStatus status, bool has_authority,
+                                   bool identity_rejected)
+{
+    return status == HubConfigStatus::Active && has_authority && !identity_rejected;
+}
+
 // Platform-independent recovery state for the device's one channel. The
 // controller owns one of these on its actor task; keeping the retry admission
 // rules here makes the Failed/Disconnected/network/handoff races testable
@@ -82,10 +98,10 @@ public:
         reconnect_pending_ = false;
     }
 
-    bool TrySchedule(bool switching_to_voice, bool has_channel_config)
+    bool TrySchedule(bool switching_to_voice, bool recovery_allowed)
     {
         if (!network_available_ || switching_to_voice || reconnect_pending_ ||
-            !has_channel_config) {
+            !recovery_allowed) {
             return false;
         }
         reconnect_pending_ = true;
@@ -157,9 +173,9 @@ inline uint32_t ChannelReconnectDelayMs(int attempt)
     return delay_ms > kMaxDelayMs ? kMaxDelayMs : delay_ms;
 }
 
-inline bool ShouldRediscoverChannelConfig(int attempt)
+inline bool ShouldRediscoverChannelConfig(int attempt, bool credentials_usable = true)
 {
-    return attempt >= 1;
+    return !credentials_usable || attempt >= 1;
 }
 
 inline bool ShouldSurfaceChannelServerUnreachable(int attempt)
