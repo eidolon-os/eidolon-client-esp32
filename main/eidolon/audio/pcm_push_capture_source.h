@@ -45,7 +45,8 @@ public:
     esp_capture_audio_src_if_t* Interface() { return &base_; }
 
     // Push processed mono int16 PCM. Non-blocking; on overflow the excess is
-    // dropped (logged, throttled) rather than blocking the AFE task.
+    // dropped in whole int16 samples (logged, throttled) rather than blocking
+    // the AFE task. The byte stream must never split a sample on overflow.
     void Push(const int16_t* samples, size_t sample_count);
 
     // Drop any buffered audio (e.g. on playback flush / session reset).

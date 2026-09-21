@@ -7,6 +7,7 @@
 #include <freertos/idf_additions.h>
 
 #include <cstring>
+#include <algorithm>
 
 #define TAG "PcmPushSrc"
 
@@ -74,7 +75,14 @@ void PcmPushCaptureSource::Push(const int16_t* samples, size_t sample_count) {
         return;
     }
     const size_t bytes = sample_count * sizeof(int16_t);
-    size_t sent = xStreamBufferSend(ring_, samples, bytes, /*ticks_to_wait=*/0);
+    // A stream buffer may accept a partial write. In particular, IDF's
+    // WithCaps constructor uses static storage: a 16000-byte allocation has
+    // only 15999 usable bytes. Never enqueue half an int16 sample on overflow,
+    // or all subsequent PCM is byte-shifted until the stream is reset.
+    // With one producer, the consumer can only increase this free space.
+    size_t writable = std::min(bytes, xStreamBufferSpacesAvailable(ring_));
+    writable -= writable % sizeof(int16_t);
+    size_t sent = writable ? xStreamBufferSend(ring_, samples, writable, /*ticks_to_wait=*/0) : 0;
     if (sent < bytes) {
         // Consumer is behind; drop the overflow rather than block the AFE task.
         static uint32_t dropped_logs = 0;
@@ -139,6 +147,10 @@ esp_capture_err_t PcmPushCaptureSource::Start(esp_capture_audio_src_if_t* h) {
 
 esp_capture_err_t PcmPushCaptureSource::ReadFrame(esp_capture_audio_src_if_t* h,
                                                   esp_capture_stream_frame_t* frame) {
+    if (frame == nullptr || frame->data == nullptr || frame->size <= 0 ||
+        frame->size % sizeof(int16_t) != 0) {
+        return ESP_CAPTURE_ERR_INVALID_ARG;
+    }
     auto* self = From(h);
     if (!self->running_ || self->ring_ == nullptr) {
         return ESP_CAPTURE_ERR_NOT_SUPPORTED;
