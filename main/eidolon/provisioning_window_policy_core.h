@@ -40,17 +40,9 @@ enum class ProvisioningWindowTrigger {
 struct ProvisioningWindowPolicy {
     // False means the device keeps advertising until it is claimed, cancelled
     // or powered off. True means it closes itself after `seconds`.
-    bool bounded = true;
+    bool bounded = false;
     // Only meaningful when bounded.
     int seconds = 0;
-};
-
-// Mirrors the range on EIDOLON_PROVISIONING_WINDOW_SECONDS. Kept here so this
-// core can be reasoned about without Kconfig; device_provisioning.cc asserts
-// the two cannot drift apart.
-struct ProvisioningWindowBounds {
-    static constexpr int kMinSeconds = 60;
-    static constexpr int kMaxSeconds = 3600;
 };
 
 // The trust store is the authority on whether this device has an Owner: an
@@ -59,41 +51,13 @@ struct ProvisioningWindowBounds {
 ProvisioningWindowTrigger ProvisioningWindowTriggerFor(
     const std::string& commissioned_owner_domain_id);
 
-// Whether a setup window that no person asked for may open on this device.
-//
-// Forbidden path D8 in docs/设备与Body/设备生命周期状态机与恢复边.md:
-// 连不上网络后自动开设置窗口 → 只进入 NetworkRecoveryRequired；物理在场或已认证
-// 管理员才能开有界窗口. §6.3 and §6.4 say it twice more: 网络故障只产生
-// recovery_required，不会自动进入 open.
-//
-// Why the trust store is the fact that decides it. A device with no
-// commissioned Owner Domain has nothing to give away and nobody to ask, and
-// its automatic window is the only way it can ever be set up: refusing there
-// would leave a board out of the box that cannot be set up at all. A device
-// that holds Owner trust has everything to give away, and a router that
-// rebooted or a Wi-Fi password somebody changed is not its Owner asking for
-// anything. Reading the two as one act is what turns taking the network away
-// — an unplugged router, a deauth, a jammer — into a way to make the device
-// offer itself to whoever is nearby, which is why D8 is a forbidden path and
-// not a preference.
-//
-// This reads the same fact through the same function as the window-bounding
-// decision, so a device cannot be commissioned enough to be given a bounded
-// window and uncommissioned enough to open one for itself. Refusing is not
-// giving up on the network: the caller leaves Station retrying, which is
-// §6.3's other exit edge — 网络自行恢复后由设备证据回到 connected — and the
-// physical-presence gesture is the first one.
+// Network failure must not open setup on an owned device. Authorization to
+// open and the lifetime of an explicitly opened window are independent.
 bool AutomaticSetupOpenIsForbidden(ProvisioningWindowTrigger trigger);
 
-// A bounded window protects a commissioned device from being taken over by
-// whoever is nearby, and the physical gesture that opened it is the Owner
-// saying so. An uncommissioned device has nothing to take over — but a device
-// that closes its only setup offer and cannot reopen it without somebody
-// physically holding a button is, from the Owner's side, indistinguishable from
-// broken hardware. So the window is bounded exactly when there is something to
-// protect, and never on a device still waiting to be claimed.
-ProvisioningWindowPolicy DecideProvisioningWindow(
-    ProvisioningWindowTrigger trigger, int configured_window_seconds);
+// Once authorized, keep setup available until completion, cancellation or
+// shutdown. Request/transaction deadlines remain independent of this policy.
+ProvisioningWindowPolicy DecideProvisioningWindow(ProvisioningWindowTrigger trigger);
 
 // How long the descriptor may tell the controller this offer lasts — and
 // nothing at all when it does not end. "There is a deadline" and "there is no

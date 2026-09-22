@@ -17,7 +17,7 @@ void AnEmptyTrustStoreMeansThisDeviceBelongsToNobodyYet()
 }
 
 // Forbidden path D8: 连不上网络后自动开设置窗口 → 只进入 NetworkRecoveryRequired；
-// 物理在场或已认证管理员才能开有界窗口. The two automatic doors into setup — a boot
+// Opening still requires physical presence or an authenticated administrator. A boot
 // that found no network profile, and sixty seconds of Station failing — ask this
 // before they ask for a window.
 
@@ -40,104 +40,23 @@ void ACommissionedDeviceMayNotOpenAWindowBecauseItsNetworkWentAway()
         ProvisioningWindowTrigger::OwnerPresenceReopen));
 }
 
-void OneFactDecidesBothOrTheyCanDisagreeAboutTheSameDevice()
+void AuthorizedWindowsRemainAvailableWithoutAnAdvertisedDeadline()
 {
-    // "May this device open a window by itself" and "must that window be
-    // bounded" are the same question about the trust store, asked twice. If
-    // they ever read it differently, a device could be commissioned enough to
-    // be given a bounded window and uncommissioned enough to open one with
-    // nobody present — which is exactly the shape of the failure D8 names.
-    for (const std::string& owner : {std::string{}, std::string("owner-domain-7f3a")}) {
-        const ProvisioningWindowTrigger trigger =
-            ProvisioningWindowTriggerFor(owner);
-        assert(AutomaticSetupOpenIsForbidden(trigger) ==
-               DecideProvisioningWindow(trigger, 600).bounded);
-    }
-}
-
-void AFactoryDeviceKeepsOfferingItselfUntilSomebodyClaimsIt()
-{
-    const ProvisioningWindowPolicy policy = DecideProvisioningWindow(
-        ProvisioningWindowTrigger::NeverCommissioned, 600);
-    assert(!policy.bounded);
-    assert(policy.seconds == 0);
-}
-
-void AnUnboundedWindowIgnoresTheConfiguredDurationEntirely()
-{
-    for (const int configured : {0, 60, 600, 3600, 99999}) {
-        const ProvisioningWindowPolicy policy = DecideProvisioningWindow(
-            ProvisioningWindowTrigger::NeverCommissioned, configured);
+    for (const auto trigger : {ProvisioningWindowTrigger::NeverCommissioned,
+                               ProvisioningWindowTrigger::OwnerPresenceReopen}) {
+        const auto policy = DecideProvisioningWindow(trigger);
         assert(!policy.bounded);
         assert(policy.seconds == 0);
+        assert(!AdvertisedWindowSeconds(policy).has_value());
     }
+    // An indefinite manual window must not enable automatic reopening.
+    assert(AutomaticSetupOpenIsForbidden(ProvisioningWindowTrigger::OwnerPresenceReopen));
 }
 
-void AnOwnerReopeningSetupGetsTheConfiguredBoundedWindow()
+void ExplicitBoundedWireDurationsStillRequirePositiveSeconds()
 {
-    const ProvisioningWindowPolicy policy = DecideProvisioningWindow(
-        ProvisioningWindowTrigger::OwnerPresenceReopen, 600);
-    assert(policy.bounded);
-    assert(policy.seconds == 600);
-}
-
-void TheConfiguredRangeEndpointsPassThroughUntouched()
-{
-    const ProvisioningWindowPolicy shortest = DecideProvisioningWindow(
-        ProvisioningWindowTrigger::OwnerPresenceReopen,
-        ProvisioningWindowBounds::kMinSeconds);
-    assert(shortest.bounded);
-    assert(shortest.seconds == 60);
-
-    const ProvisioningWindowPolicy longest = DecideProvisioningWindow(
-        ProvisioningWindowTrigger::OwnerPresenceReopen,
-        ProvisioningWindowBounds::kMaxSeconds);
-    assert(longest.bounded);
-    assert(longest.seconds == 3600);
-}
-
-void ADurationOutsideTheConfiguredRangeStillLeavesAUsableWindow()
-{
-    // A window of zero or a negative one would close the moment it opened,
-    // which on the Owner's side is indistinguishable from a device that never
-    // came up at all — the failure this whole policy exists to prevent.
-    for (const int configured : {-3600, -1, 0, 1, 59}) {
-        const ProvisioningWindowPolicy policy = DecideProvisioningWindow(
-            ProvisioningWindowTrigger::OwnerPresenceReopen, configured);
-        assert(policy.bounded);
-        assert(policy.seconds == ProvisioningWindowBounds::kMinSeconds);
-    }
-    const ProvisioningWindowPolicy policy = DecideProvisioningWindow(
-        ProvisioningWindowTrigger::OwnerPresenceReopen, 86400);
-    assert(policy.bounded);
-    assert(policy.seconds == ProvisioningWindowBounds::kMaxSeconds);
-}
-
-void TheAdvertisedDurationSaysWhatTheDeviceWillActuallyDo()
-{
-    // The controller computes its own expiry from this number, so an unbounded
-    // offer must not advertise one: a device that announced 600 seconds and
-    // then kept listening would be lying in the direction that makes the
-    // controller give up while the device is still reachable.
-    const auto advertised = AdvertisedWindowSeconds(DecideProvisioningWindow(
-        ProvisioningWindowTrigger::OwnerPresenceReopen, 600));
-    assert(advertised.has_value());
-    assert(advertised->seconds() == 600);
-}
-
-void AnUnboundedWindowHasNoDurationToAdvertiseAtAll()
-{
-    // Not "zero seconds" — no number. A factory device once advertised 0 here
-    // and the controller, which requires a positive duration, refused every
-    // brand new device on the grounds that its descriptor broke the contract.
-    // "There is a deadline" and "there is no deadline" are two different facts,
-    // so the absent one must not be reachable as a number — the canonical
-    // duration type has no representation for one, and this returns nothing.
-    const auto advertised = AdvertisedWindowSeconds(
-        DecideProvisioningWindow(ProvisioningWindowTrigger::NeverCommissioned, 600));
-    assert(!advertised.has_value());
-    assert(!device_foundation::v1::SetupWindowRemainingSeconds::FromPositiveSeconds(0)
-                .has_value());
+    assert(AdvertisedWindowSeconds({true, 60})->seconds() == 60);
+    assert(!AdvertisedWindowSeconds({true, 0}).has_value());
 }
 
 // The state a removed device is parked in must be able to open setup, or the
@@ -196,14 +115,8 @@ int main()
     AnEmptyTrustStoreMeansThisDeviceBelongsToNobodyYet();
     ADeviceNobodyHasClaimedYetStillOpensItsOwnWindow();
     ACommissionedDeviceMayNotOpenAWindowBecauseItsNetworkWentAway();
-    OneFactDecidesBothOrTheyCanDisagreeAboutTheSameDevice();
-    AFactoryDeviceKeepsOfferingItselfUntilSomebodyClaimsIt();
-    AnUnboundedWindowIgnoresTheConfiguredDurationEntirely();
-    AnOwnerReopeningSetupGetsTheConfiguredBoundedWindow();
-    TheConfiguredRangeEndpointsPassThroughUntouched();
-    ADurationOutsideTheConfiguredRangeStillLeavesAUsableWindow();
-    TheAdvertisedDurationSaysWhatTheDeviceWillActuallyDo();
-    AnUnboundedWindowHasNoDurationToAdvertiseAtAll();
+    AuthorizedWindowsRemainAvailableWithoutAnAdvertisedDeadline();
+    ExplicitBoundedWireDurationsStillRequirePositiveSeconds();
     SetupOpensFromEveryStateAFailedActivationCanLeaveTheDeviceIn();
     ShortClickKeepsItsSetupMeaningAsBootAdvances();
     SetupOpensFromAWorkingDevice();

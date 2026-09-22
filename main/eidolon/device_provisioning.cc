@@ -1,4 +1,5 @@
 #include "device_provisioning.h"
+#include "commissioning_http_socket_policy.h"
 
 #include "device_identity.h"
 #include "device_provisioning_protocol.h"
@@ -194,6 +195,8 @@ esp_err_t DeviceProvisioningService::HandleTrust(uint32_t, const uint8_t* inbuf,
                                                 uint8_t** outbuf, ssize_t* outlen, void*)
 {
     auto& self = GetInstance();
+    const int64_t started = esp_timer_get_time();
+    ESP_LOGI(TAG, "Trust HTTP enter generation=%lu bytes=%d", static_cast<unsigned long>(self.transport_generation_.load()), static_cast<int>(inlen));
     std::string response;
     bool staged = false;
     const size_t payload_size =
@@ -212,7 +215,13 @@ esp_err_t DeviceProvisioningService::HandleTrust(uint32_t, const uint8_t* inbuf,
     if (staged) {
         ESP_LOGI(TAG, "Owner trust is durable staging, not active trust");
     }
-    return Answer(response, outbuf, outlen);
+    const esp_err_t answer = Answer(response, outbuf, outlen);
+    ESP_LOGI(TAG, "Trust HTTP handler done generation=%lu elapsed_ms=%lu answer=%s bytes=%u",
+             static_cast<unsigned long>(self.transport_generation_.load()),
+             static_cast<unsigned long>((esp_timer_get_time() - started) / 1000), esp_err_to_name(answer),
+             static_cast<unsigned>(response.size()));
+
+    return answer;
 }
 
 esp_err_t DeviceProvisioningService::HandleStatus(
@@ -269,6 +278,21 @@ void DeviceProvisioningService::HandleProvisioningEvent(void*, const char* event
     const uint32_t generation =
         self.transport_generation_.load(std::memory_order_acquire);
     if (generation == 0) return;
+    if (event_base == ESP_HTTP_SERVER_EVENT) {
+        if (event_id == HTTP_SERVER_EVENT_SENT_DATA && event_data != nullptr) {
+            const auto* data = static_cast<const esp_http_server_event_data*>(event_data);
+            ESP_LOGI(TAG, "HTTP response queued generation=%lu fd=%d bytes=%d",
+                     static_cast<unsigned long>(generation), data->fd, data->data_len);
+        }
+        return;
+    }
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_SCAN_DONE) {
+        const auto* data = static_cast<const wifi_event_sta_scan_done_t*>(event_data);
+        if (data) ESP_LOGI(TAG, "Wi-Fi scan done generation=%lu status=%lu count=%u",
+                          static_cast<unsigned long>(generation),
+                          static_cast<unsigned long>(data->status), static_cast<unsigned>(data->number));
+        return;
+    }
     if (event_base == PROTOCOMM_SECURITY_SESSION_EVENT) {
         if (event_id == PROTOCOMM_SECURITY_SESSION_SETUP_OK &&
             self.events_.authenticated_session_started) {
@@ -341,7 +365,12 @@ esp_err_t DeviceProvisioningService::RegisterEventHandlers()
     err = esp_event_handler_instance_register(
         PROTOCOMM_SECURITY_SESSION_EVENT, ESP_EVENT_ANY_ID,
         &HandleProvisioningEvent, nullptr, &security_event_instance_);
-    return err;
+    if (err != ESP_OK) return err;
+    err = esp_event_handler_instance_register(ESP_HTTP_SERVER_EVENT, HTTP_SERVER_EVENT_SENT_DATA,
+        &HandleProvisioningEvent, nullptr, &http_event_instance_);
+    if (err != ESP_OK) return err;
+    return esp_event_handler_instance_register(WIFI_EVENT, WIFI_EVENT_SCAN_DONE,
+        &HandleProvisioningEvent, nullptr, &scan_event_instance_);
 }
 
 esp_err_t DeviceProvisioningService::StartOwnedHttpServer()
@@ -350,6 +379,21 @@ esp_err_t DeviceProvisioningService::StartOwnedHttpServer()
     return ESP_OK;
 #else
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.open_fn = [](httpd_handle_t, int socket) -> esp_err_t {
+        // IDF writes headers, the terminating CRLF and body separately. Do not
+        // hold the latter writes behind an ACK for an earlier small segment.
+        // Fail this socket if its required transport policy cannot be applied.
+        if (!ConfigureCommissioningHttpSocket(socket)) {
+            ESP_LOGW(TAG, "Could not configure commissioning HTTP socket");
+            return ESP_FAIL;
+        }
+        return ESP_OK;
+    };
+    config.uri_match_fn = [](const char* pattern, const char* uri, size_t length) {
+        const bool matches = httpd_uri_match_wildcard(pattern, uri, length);
+        if (matches) ESP_LOGI(TAG, "HTTP request matched endpoint=%s", pattern);
+        return matches;
+    };
     config.max_uri_handlers =
         CommissioningTransportEndpointBudget::kRequiredUriHandlers;
     // One Controller at a time, but not one socket at a time. A phone that
@@ -545,14 +589,7 @@ esp_err_t DeviceProvisioningService::Start(
     running_.store(true, std::memory_order_release);
 
     if (!window_.bounded) {
-        // A device nobody has claimed yet keeps the offer open. Closing it
-        // would leave a board that is not commissioned, cannot be
-        // commissioned, and has no way to say so — recoverable only by
-        // somebody standing in front of it holding a button. Security here is
-        // the SRP6a setup secret the handshake already requires, not a
-        // deadline; there is no Owner trust material on this device for an open
-        // window to give away.
-        ESP_LOGI(TAG, "Awaiting setup indefinitely: this device has no Owner yet");
+        ESP_LOGI(TAG, "Awaiting setup indefinitely until completion or cancellation");
         return ESP_OK;
     }
 
@@ -656,6 +693,14 @@ void DeviceProvisioningService::CleanupTransport(uint32_t generation)
         network_prov_mgr_deinit();
     }
     if (cleanup.event_handlers) {
+        if (http_event_instance_ != nullptr) {
+            esp_event_handler_instance_unregister(ESP_HTTP_SERVER_EVENT, HTTP_SERVER_EVENT_SENT_DATA, http_event_instance_);
+            http_event_instance_ = nullptr;
+        }
+        if (scan_event_instance_ != nullptr) {
+            esp_event_handler_instance_unregister(WIFI_EVENT, WIFI_EVENT_SCAN_DONE, scan_event_instance_);
+            scan_event_instance_ = nullptr;
+        }
         if (security_event_instance_ != nullptr) {
             esp_event_handler_instance_unregister(
                 PROTOCOMM_SECURITY_SESSION_EVENT, ESP_EVENT_ANY_ID,

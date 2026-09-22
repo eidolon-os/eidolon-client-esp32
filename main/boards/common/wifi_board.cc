@@ -215,12 +215,10 @@ void WifiBoard::OpenSetupWithoutAnyonePresent() {
     // The window was bounded, which is not the point: a bounded offer is still
     // an offer, and the attacker chooses when it opens.
     //
-    // The trust store decides it, read through the same function as the
-    // window-bounding decision — a device cannot be commissioned enough to get
-    // a bounded window and uncommissioned enough to open one for itself. A
-    // device with no commissioned Owner Domain keeps the old behaviour, because
-    // that is the out-of-the-box path and refusing there would leave a board
-    // that cannot be set up at all.
+    // The trust store decides whether automatic opening is authorized. Window
+    // lifetime is independent: both initial setup and a manually reopened
+    // window remain available until completion, cancellation or shutdown.
+    // An unowned device still opens automatically for first-time setup.
     //
     // Refusing is not giving up. Station keeps scanning on its own backoff, so
     // §6.3's other exit edge is live — 网络自行恢复后由设备证据回到 connected — and

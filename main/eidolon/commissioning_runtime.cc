@@ -42,22 +42,6 @@ namespace {
 constexpr size_t kQueueDepth = 8;
 constexpr size_t kRuntimeStackBytes = 16384;
 
-// How long a device that already has an Owner reoffers itself after the
-// physical-presence gesture. A device still waiting to be claimed does not use
-// this at all; the policy core says why.
-constexpr int kConfiguredWindowSeconds =
-    CONFIG_EIDOLON_PROVISIONING_WINDOW_SECONDS;
-
-// The policy core carries its own copy of the range so it can be tested without
-// Kconfig. Were the two to disagree, the tested rules would stop describing what
-// this build actually does, so the disagreement has to stop the build instead.
-static_assert(kConfiguredWindowSeconds >=
-                  ProvisioningWindowBounds::kMinSeconds &&
-              kConfiguredWindowSeconds <=
-                  ProvisioningWindowBounds::kMaxSeconds,
-              "EIDOLON_PROVISIONING_WINDOW_SECONDS left the range mirrored in "
-              "ProvisioningWindowBounds; update both together.");
-
 struct RuntimeMessage {
     CommissioningEvent event;
     std::string ssid;
@@ -492,8 +476,7 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
         // window that was armed from it.
         const ProvisioningWindowPolicy window = DecideProvisioningWindow(
             ProvisioningWindowTriggerFor(
-                OwnerTrustStore().CommissionedOwnerDomainId()),
-            kConfiguredWindowSeconds);
+                OwnerTrustStore().CommissionedOwnerDomainId()));
         const esp_err_t result = DeviceProvisioningService::GetInstance().Start(
             action.generation, state.session_id, window, std::move(events));
         if (result != ESP_OK) {

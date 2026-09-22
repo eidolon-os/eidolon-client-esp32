@@ -103,6 +103,8 @@ private:
     CommissioningTransportResourceCore resources_;
     esp_event_handler_instance_t provisioning_event_instance_ = nullptr;
     esp_event_handler_instance_t security_event_instance_ = nullptr;
+    esp_event_handler_instance_t http_event_instance_ = nullptr;
+    esp_event_handler_instance_t scan_event_instance_ = nullptr;
     // The security parameters and the buffers they point at must stay alive until
     // provisioning ends, because protocomm reads them when a controller actually
     // connects — which is whenever a person gets around to it, long after the

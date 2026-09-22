@@ -180,17 +180,16 @@ void AFactoryDeviceAdvertisesAnOfferTheControllerCanAccept()
     // whether there is a deadline at all, and only a deadline that exists
     // reaches the wire. A device that has never been commissioned keeps its
     // offer open, so its descriptor names no duration; an Owner reopening setup
-    // on a commissioned device gets the bounded window it advertised.
+    // on a commissioned device also keeps its authorized window open.
     SetupDescriptor factory = SampleDescriptor();
     factory.expires_in = AdvertisedWindowSeconds(DecideProvisioningWindow(
-        ProvisioningWindowTrigger::NeverCommissioned, 600));
+        ProvisioningWindowTrigger::NeverCommissioned));
     assert(!Contains(BuildSetupDescriptorJson(factory), "expires_in_seconds"));
 
     SetupDescriptor reopened = SampleDescriptor();
     reopened.expires_in = AdvertisedWindowSeconds(DecideProvisioningWindow(
-        ProvisioningWindowTrigger::OwnerPresenceReopen, 600));
-    assert(Contains(BuildSetupDescriptorJson(reopened),
-                    "\"expires_in_seconds\":600"));
+        ProvisioningWindowTrigger::OwnerPresenceReopen));
+    assert(!Contains(BuildSetupDescriptorJson(reopened), "expires_in_seconds"));
 }
 
 void DeclaresDevelopmentAndProductionTrustAsOneField()
