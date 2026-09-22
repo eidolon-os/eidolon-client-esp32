@@ -11,9 +11,6 @@
 #include <esp_log.h>
 #include <esp_timer.h>
 #include <lwip/dns.h>
-#include <lwip/netdb.h>
-#include <lwip/inet.h>
-#include <lwip/sockets.h>
 #include <lwip/tcpip.h>
 
 #include <strings.h>
@@ -62,41 +59,31 @@ esp_http_client_method_t MethodFor(const std::string& method)
     return HTTP_METHOD_GET;
 }
 
-// Where a URL's host actually resolves to, for the log line that reports a
-// failure to reach it.
-//
-// "Failed to connect" without an address cannot be acted on: a Host that is up
-// and a name that resolves somewhere else produce the identical message, and
-// only the second one is the device looking at the wrong machine. Resolution
-// here uses the same family this transport binds to, so what is reported is
-// what was attempted.
-std::string ResolvedAddressOf(const std::string& url)
+// Read transport evidence before close/cleanup destroys it. Do not resolve the
+// name again here: a later lookup is not evidence of the attempted address.
+// The open phase includes DNS, TCP and TLS; the SDK error distinguishes them
+// when available. Zero TLS evidence must not be interpreted as a successful TLS
+// handshake (the failure may have occurred before one was attempted).
+void LogRequestFailure(esp_http_client_handle_t client,
+                       const std::string& method, const std::string& url,
+                       const char* phase, esp_err_t error, int raw_result,
+                       int64_t started_ms)
 {
-    const std::string host = HostOfUrl(url);
-    if (host.empty()) {
-        return "unparsable-url";
-    }
-    addrinfo hints = {};
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    addrinfo* results = nullptr;
-    if (getaddrinfo(host.c_str(), nullptr, &hints, &results) != 0 || results == nullptr) {
-        return host + " does not resolve";
-    }
-    std::string reported = host + " does not resolve";
-    for (addrinfo* entry = results; entry != nullptr; entry = entry->ai_next) {
-        if (entry->ai_family != AF_INET || entry->ai_addr == nullptr) {
-            continue;
-        }
-        char text[INET_ADDRSTRLEN] = {};
-        const auto* address = reinterpret_cast<const sockaddr_in*>(entry->ai_addr);
-        if (inet_ntop(AF_INET, &address->sin_addr, text, sizeof(text)) != nullptr) {
-            reported = host + " -> " + text;
-            break;
-        }
-    }
-    freeaddrinfo(results);
-    return reported;
+    const int socket_error = client ? esp_http_client_get_errno(client) : 0;
+    int tls_code = 0;
+    int tls_flags = 0;
+    const esp_err_t tls_error = client
+        ? esp_http_client_get_and_clear_last_tls_error(client, &tls_code, &tls_flags)
+        : ESP_OK;
+    const int status = client ? esp_http_client_get_status_code(client) : 0;
+    // Use 32-bit formats supported by the production newlib nano printf.
+    ESP_LOGE(TAG,
+             "%s %s phase=%s error=%s raw=%d elapsed_ms=%lu status=%d "
+             "socket_errno=%d tls_error=0x%x tls_code=%d tls_flags=0x%x",
+             method.c_str(), url.c_str(), phase, esp_err_to_name(error), raw_result,
+             static_cast<unsigned long>(esp_timer_get_time() / 1000 - started_ms),
+             status, socket_error, static_cast<unsigned int>(tls_error), tls_code,
+             static_cast<unsigned int>(tls_flags));
 }
 
 // dns_table is TCPIP-thread state and this build has no core locking
@@ -118,7 +105,7 @@ void DropCachedResolutionIfStale(const std::string& host, HubRequestFailure fail
     if (!ShouldDropCachedResolution(host, failure)) {
         return;
     }
-    ESP_LOGW(TAG, "Dropping the cached address for %s so the next attempt resolves again",
+    ESP_LOGW(TAG, "Clearing DNS cache after connection failure for %s",
              host.c_str());
     // Never called from the TCPIP thread itself, which would deadlock here.
     tcpip_callback_wait(ClearDnsCacheOnTcpipThread, nullptr);
@@ -162,8 +149,10 @@ esp_err_t HubHttpRequest(const std::string& method,
     config.event_handler = CaptureHubDate;
     config.user_data = &out.hub_utc_millis;
 
+    const int64_t diagnostic_start_ms = esp_timer_get_time() / 1000;
     esp_http_client_handle_t client = esp_http_client_init(&config);
     if (client == nullptr) {
+        LogRequestFailure(nullptr, method, url, "init", ESP_ERR_NO_MEM, 0, diagnostic_start_ms);
         return ESP_ERR_NO_MEM;
     }
 
@@ -178,8 +167,7 @@ esp_err_t HubHttpRequest(const std::string& method,
     const int64_t request_start_ms = esp_timer_get_time() / 1000;
     err = esp_http_client_open(client, request_body.size());
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s %s failed to open: %s (%s)", method.c_str(), url.c_str(),
-                 esp_err_to_name(err), ResolvedAddressOf(url).c_str());
+        LogRequestFailure(client, method, url, "open", err, err, diagnostic_start_ms);
         esp_http_client_cleanup(client);
         DropCachedResolutionIfStale(HostOfUrl(url),
                                     HubRequestFailure::ConnectionNotOpened);
@@ -190,6 +178,8 @@ esp_err_t HubHttpRequest(const std::string& method,
         const int written =
             esp_http_client_write(client, request_body.data(), request_body.size());
         if (written != static_cast<int>(request_body.size())) {
+            LogRequestFailure(client, method, url, "write-body", ESP_FAIL, written,
+                              diagnostic_start_ms);
             esp_http_client_close(client);
             esp_http_client_cleanup(client);
             return ESP_FAIL;
@@ -198,13 +188,15 @@ esp_err_t HubHttpRequest(const std::string& method,
 
     const int64_t content_length = esp_http_client_fetch_headers(client);
     if (content_length < 0) {
+        LogRequestFailure(client, method, url, "read-headers", ESP_FAIL,
+                          static_cast<int>(content_length), diagnostic_start_ms);
         esp_http_client_close(client);
         esp_http_client_cleanup(client);
         return ESP_FAIL;
     }
     if (content_length > static_cast<int64_t>(kMaxResponseBytes)) {
-        ESP_LOGE(TAG, "Hub response of %lld bytes exceeds what this firmware reads",
-                 static_cast<long long>(content_length));
+        LogRequestFailure(client, method, url, "response-size", ESP_ERR_INVALID_SIZE,
+                          0, diagnostic_start_ms);
         esp_http_client_close(client);
         esp_http_client_cleanup(client);
         return ESP_ERR_INVALID_SIZE;
@@ -215,13 +207,21 @@ esp_err_t HubHttpRequest(const std::string& method,
     while (true) {
         const int read = esp_http_client_read(client, chunk, sizeof(chunk));
         if (read < 0) {
+            LogRequestFailure(client, method, url, "read-body", ESP_FAIL, read,
+                              diagnostic_start_ms);
             err = ESP_FAIL;
             break;
         }
         if (read == 0) {
+            if (!esp_http_client_is_complete_data_received(client)) {
+                LogRequestFailure(client, method, url, "incomplete-body",
+                                  ESP_ERR_HTTP_INCOMPLETE_DATA, read, diagnostic_start_ms);
+            }
             break;
         }
         if (body.size() + static_cast<size_t>(read) > kMaxResponseBytes) {
+            LogRequestFailure(client, method, url, "response-size", ESP_ERR_INVALID_SIZE,
+                              read, diagnostic_start_ms);
             err = ESP_ERR_INVALID_SIZE;
             break;
         }
