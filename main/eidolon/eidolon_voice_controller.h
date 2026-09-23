@@ -160,6 +160,7 @@ private:
     };
     struct Event {
         EventType type;
+        int64_t enqueued_us = 0;
         uint64_t motion_token=0;
         HeadMotionResult motion{HeadMotionStatus::Failed,""};
 #if CONFIG_EIDOLON_COMPANION_FACE
@@ -186,7 +187,8 @@ private:
                   "FreeRTOS queue events must be safe for raw byte copies");
     static void TaskTrampoline(void* arg);
     void ControllerLoop();
-    void Enqueue(Event ev);  // thread-safe; frees owned pointers if the queue is full
+    // ESP_OK means accepted, not executed. Frees owned pointers on rejection.
+    esp_err_t Enqueue(Event ev);
     void Dispatch(const Event& ev);
 
     // ---- Handlers (run only on the controller task) ----

@@ -316,14 +316,22 @@ void EidolonVoiceController::ControllerLoop()
     Event ev;
     for (;;) {
         if (xQueueReceive(event_queue_, &ev, portMAX_DELAY) == pdTRUE) {
+            const int64_t started_us = esp_timer_get_time();
             Dispatch(ev);
+            const int64_t elapsed_us = esp_timer_get_time() - started_us;
+            if (elapsed_us >= 80000) {
+                ESP_LOGW(TAG, "[dispatch] type=%d wait_ms=%lld run_ms=%lld pending=%u",
+                         static_cast<int>(ev.type),
+                         (started_us - ev.enqueued_us) / 1000, elapsed_us / 1000,
+                         static_cast<unsigned>(uxQueueMessagesWaiting(event_queue_)));
+            }
             delete ev.payload;
             delete ev.completion;
         }
     }
 }
 
-void EidolonVoiceController::Enqueue(Event ev)
+esp_err_t EidolonVoiceController::Enqueue(Event ev)
 {
     if (event_queue_ == nullptr) {
         delete ev.payload;
@@ -331,18 +339,29 @@ void EidolonVoiceController::Enqueue(Event ev)
             (*ev.completion)(false);
             delete ev.completion;
         }
-        return;
+        return ESP_ERR_INVALID_STATE;
     }
     // The queue copies the struct (including the payload pointer); on success the
     // loop owns and frees it, on failure we free it here.
+    ev.enqueued_us = esp_timer_get_time();
     if (xQueueSend(event_queue_, &ev, 0) != pdTRUE) {
         ESP_LOGW(TAG, "Event queue full; dropped event type=%d", static_cast<int>(ev.type));
+        if (ev.type == EventType::ControlCommand && ev.payload != nullptr) {
+            cJSON* json = cJSON_Parse(ev.payload->c_str());
+            const cJSON* op = cJSON_GetObjectItemCaseSensitive(json, "op");
+            ESP_LOGW(TAG, "[dispatch] dropped control op=%s generation=%lu",
+                     cJSON_IsString(op) ? op->valuestring : "unknown",
+                     static_cast<unsigned long>(ev.generation));
+            cJSON_Delete(json);
+        }
         delete ev.payload;
         if (ev.completion != nullptr) {
             (*ev.completion)(false);
             delete ev.completion;
         }
+        return ESP_ERR_NO_MEM;
     }
+    return ESP_OK;
 }
 
 void EidolonVoiceController::Dispatch(const Event& ev)
@@ -524,8 +543,7 @@ esp_err_t EidolonVoiceController::JoinRoom()
              static_cast<unsigned long>(session_generation_));
     Event ev;
     ev.type = EventType::Join;
-    Enqueue(ev);
-    return ESP_OK;
+    return Enqueue(ev);
 }
 
 esp_err_t EidolonVoiceController::LeaveRoom()
@@ -535,8 +553,7 @@ esp_err_t EidolonVoiceController::LeaveRoom()
              static_cast<unsigned long>(session_generation_));
     Event ev;
     ev.type = EventType::Leave;
-    Enqueue(ev);
-    return ESP_OK;
+    return Enqueue(ev);
 }
 
 esp_err_t EidolonVoiceController::SetMicEnabled(bool enabled)
@@ -544,8 +561,7 @@ esp_err_t EidolonVoiceController::SetMicEnabled(bool enabled)
     Event ev;
     ev.type = EventType::SetMic;
     ev.flag = enabled;
-    Enqueue(ev);
-    return ESP_OK;
+    return Enqueue(ev);
 }
 
 bool EidolonVoiceController::RegisterDeviceEventHandler(
@@ -565,8 +581,7 @@ esp_err_t EidolonVoiceController::PublishDeviceEvent(const std::string& payload)
     if (ev.payload == nullptr) {
         return ESP_ERR_NO_MEM;
     }
-    Enqueue(ev);
-    return ESP_OK;
+    return Enqueue(ev);
 }
 
 #if CONFIG_EIDOLON_SMARTHOME_PANEL

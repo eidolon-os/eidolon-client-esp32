@@ -642,7 +642,14 @@ esp_err_t LiveKitSession::PublishData(const std::string& topic, const std::strin
         .destination_identities = nullptr,
         .destination_identities_count = 0,
     };
-    if (livekit_room_publish_data(room_handle_, &options) != LIVEKIT_ERR_NONE) {
+    const int64_t started_us = esp_timer_get_time();
+    const auto result = livekit_room_publish_data(room_handle_, &options);
+    const int64_t elapsed_us = esp_timer_get_time() - started_us;
+    if (elapsed_us >= 80000) {
+        ESP_LOGW(TAG, "[publish] topic=%s reliable=%d elapsed_ms=%lld result=%d",
+                 topic.c_str(), reliable, elapsed_us / 1000, static_cast<int>(result));
+    }
+    if (result != LIVEKIT_ERR_NONE) {
         return ESP_FAIL;
     }
     return ESP_OK;

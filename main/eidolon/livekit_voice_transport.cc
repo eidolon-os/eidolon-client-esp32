@@ -121,14 +121,20 @@ void LiveKitVoiceTransport::JoinSession()
 {
     ESP_LOGI(TAG, "[voice_request] JoinSession state=%s",
              EidolonVoiceController::VoiceStateName(controller_->GetState()));
-    controller_->JoinRoom();
+    const auto err = controller_->JoinRoom();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Join request rejected: %s", esp_err_to_name(err));
+    }
 }
 
 void LiveKitVoiceTransport::LeaveSession()
 {
     ESP_LOGI(TAG, "[voice_request] LeaveSession state=%s",
              EidolonVoiceController::VoiceStateName(controller_->GetState()));
-    controller_->LeaveRoom();
+    const auto err = controller_->LeaveRoom();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Leave request rejected: %s", esp_err_to_name(err));
+    }
 }
 
 void LiveKitVoiceTransport::PttPress()
@@ -181,9 +187,13 @@ bool LiveKitVoiceTransport::IsInSession() const
 
 void LiveKitVoiceTransport::SetMicrophoneEnabled(bool enabled)
 {
+    const auto err = controller_->SetMicEnabled(enabled);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Microphone request rejected: %s", esp_err_to_name(err));
+        return;
+    }
     mic_enabled_ = enabled;
     device_store_.SaveMicEnabled(enabled);
-    controller_->SetMicEnabled(enabled);
     NotifyRuntimeStatus(controller_->GetState());
 }
 
