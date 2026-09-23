@@ -96,7 +96,6 @@ constexpr uint64_t kFullDuplexIdleFallbackUs =
     static_cast<uint64_t>(CONFIG_EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS) * 1000ULL;
 // Single controller task: drains the event queue, serializing all state mutation.
 constexpr UBaseType_t kControllerTaskPriority = 5;
-constexpr UBaseType_t kEventQueueLen = 24;
 // Let the control-room ack flush before switching to the voice room.
 constexpr TickType_t kRoomJoinSettleDelay = pdMS_TO_TICKS(500);
 // Let the "succeeded" ack flush before reconnecting the channel.
@@ -233,8 +232,7 @@ namespace eidolon {
 EidolonVoiceController::EidolonVoiceController(GuardService* guard_service)
     : guard_service_(guard_service)
 {
-    event_queue_ = xQueueCreate(kEventQueueLen, sizeof(Event));
-    if (event_queue_ == nullptr) {
+    if (!inbox_.Valid()) {
         ESP_LOGE(TAG, "Failed to create controller event queue");
         return;
     }
@@ -242,8 +240,6 @@ EidolonVoiceController::EidolonVoiceController(GuardService* guard_service)
                     kControllerWorkerStackBytes, this, kControllerTaskPriority,
                     &task_) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create controller task");
-        vQueueDelete(event_queue_);
-        event_queue_ = nullptr;
     }
 #if CONFIG_EIDOLON_AMBIENT_PRESENCE_OWNER_AUTH
     esp_timer_create_args_t presence_timer_args = {};
@@ -291,17 +287,15 @@ EidolonVoiceController::~EidolonVoiceController()
         vTaskDelete(task_);
         task_ = nullptr;
     }
-    if (event_queue_ != nullptr) {
+    if (inbox_.Valid()) {
         Event ev;
-        while (xQueueReceive(event_queue_, &ev, 0) == pdTRUE) {
+        while (inbox_.Take(ev)) {
             delete ev.payload;
             if (ev.completion != nullptr) {
                 (*ev.completion)(false);
                 delete ev.completion;
             }
         }
-        vQueueDelete(event_queue_);
-        event_queue_ = nullptr;
     }
 }
 
@@ -313,27 +307,47 @@ void EidolonVoiceController::TaskTrampoline(void* arg)
 
 void EidolonVoiceController::ControllerLoop()
 {
-    Event ev;
     for (;;) {
-        if (xQueueReceive(event_queue_, &ev, portMAX_DELAY) == pdTRUE) {
-            const int64_t started_us = esp_timer_get_time();
-            Dispatch(ev);
-            const int64_t elapsed_us = esp_timer_get_time() - started_us;
-            if (elapsed_us >= 80000) {
-                ESP_LOGW(TAG, "[dispatch] type=%d wait_ms=%lld run_ms=%lld pending=%u",
-                         static_cast<int>(ev.type),
-                         (started_us - ev.enqueued_us) / 1000, elapsed_us / 1000,
-                         static_cast<unsigned>(uxQueueMessagesWaiting(event_queue_)));
-            }
-            delete ev.payload;
-            delete ev.completion;
+        const uint32_t signals = inbox_.Wait();
+        Event ev;
+        if (inbox_.Take(ev)) {
+            DispatchAndRelease(ev);
+        }
+        // Bound work on both sides: a command flood cannot starve maintenance,
+        // and repeated timer/activity callbacks cannot consume FIFO capacity.
+        if (signals & ControllerEventInbox<Event>::kSessionActivity) {
+            ev = {};
+            ev.type = EventType::SessionActivity;
+            DispatchAndRelease(ev);
+        }
+        if (signals & ControllerEventInbox<Event>::kAudioTick) {
+            ev = {};
+            ev.type = EventType::AudioTick;
+            DispatchAndRelease(ev);
         }
     }
 }
 
+void EidolonVoiceController::DispatchAndRelease(const Event& ev)
+{
+    const int64_t started_us = esp_timer_get_time();
+    Dispatch(ev);
+    const int64_t elapsed_us = esp_timer_get_time() - started_us;
+    const int64_t wait_us = ev.enqueued_us ? started_us - ev.enqueued_us : -1000;
+    if (elapsed_us >= 80000 || wait_us >= 80000) {
+        // Notification bits do not retain individual enqueue timestamps.
+        ESP_LOGW(TAG, "[dispatch] type=%d wait_ms=%lld run_ms=%lld pending=%u",
+                 static_cast<int>(ev.type),
+                 wait_us / 1000,
+                 elapsed_us / 1000, static_cast<unsigned>(inbox_.Pending()));
+    }
+    delete ev.payload;
+    delete ev.completion;
+}
+
 esp_err_t EidolonVoiceController::Enqueue(Event ev)
 {
-    if (event_queue_ == nullptr) {
+    if (!inbox_.Valid() || task_ == nullptr) {
         delete ev.payload;
         if (ev.completion != nullptr) {
             (*ev.completion)(false);
@@ -341,10 +355,19 @@ esp_err_t EidolonVoiceController::Enqueue(Event ev)
         }
         return ESP_ERR_INVALID_STATE;
     }
+    if (ev.type == EventType::AudioTick || ev.type == EventType::SessionActivity) {
+        // These handlers sample current state/reset activity, not historical
+        // edges. All commands, phase changes and receipts retain FIFO semantics.
+        configASSERT(ev.payload == nullptr && ev.completion == nullptr);
+        inbox_.Signal(task_, ev.type == EventType::AudioTick
+            ? ControllerEventInbox<Event>::kAudioTick
+            : ControllerEventInbox<Event>::kSessionActivity);
+        return ESP_OK;
+    }
     // The queue copies the struct (including the payload pointer); on success the
     // loop owns and frees it, on failure we free it here.
     ev.enqueued_us = esp_timer_get_time();
-    if (xQueueSend(event_queue_, &ev, 0) != pdTRUE) {
+    if (!inbox_.Post(ev, task_)) {
         ESP_LOGW(TAG, "Event queue full; dropped event type=%d", static_cast<int>(ev.type));
         if (ev.type == EventType::ControlCommand && ev.payload != nullptr) {
             cJSON* json = cJSON_Parse(ev.payload->c_str());

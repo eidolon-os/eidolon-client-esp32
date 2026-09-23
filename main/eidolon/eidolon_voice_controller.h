@@ -15,6 +15,7 @@
 #include "sdkconfig.h"
 #include "ambient_presence_state.h"
 #include "control_protocol.h"
+#include "controller_event_inbox.h"
 #include "pending_room_join.h"
 #include <optional>
 #include "shared_transport_lease.h"
@@ -190,6 +191,7 @@ private:
     // ESP_OK means accepted, not executed. Frees owned pointers on rejection.
     esp_err_t Enqueue(Event ev);
     void Dispatch(const Event& ev);
+    void DispatchAndRelease(const Event& ev);
 
     // ---- Handlers (run only on the controller task) ----
     void DoActivation();
@@ -460,7 +462,7 @@ private:
     SessionPlaybackState session_playback_;
     AgentPhase agent_phase_ = AgentPhase::Silent;
 
-    QueueHandle_t event_queue_ = nullptr;
+    ControllerEventInbox<Event> inbox_{24};
     TaskHandle_t task_ = nullptr;
     esp_timer_handle_t audio_timer_ = nullptr;
     esp_timer_handle_t reconnect_timer_ = nullptr;
