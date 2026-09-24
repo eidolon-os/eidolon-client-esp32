@@ -25,7 +25,8 @@ bool ParseDeviceConfigurationResponse(
     HubConfigStatus& status,
     HubChannelAssignment& assignment,
     AcceptedManifestRef& accepted_manifest,
-    DeviceOutputPolicy* output_policy = nullptr);
+    DeviceOutputPolicy* output_policy = nullptr,
+    const char** rejection_reason = nullptr);
 
 
 bool ParseLiveKitBinding(const std::string& body, Esp32HubConfig& out);

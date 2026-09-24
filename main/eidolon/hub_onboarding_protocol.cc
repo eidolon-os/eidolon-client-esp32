@@ -405,21 +405,26 @@ bool ParseDeviceConfigurationResponse(
     HubConfigStatus& status,
     HubChannelAssignment& assignment,
     AcceptedManifestRef& accepted_manifest,
-    DeviceOutputPolicy* output_policy)
+    DeviceOutputPolicy* output_policy,
+    const char** rejection_reason)
 {
+    if (rejection_reason) *rejection_reason = nullptr;
     cJSON* root = cJSON_ParseWithLength(body.data(), body.size());
-    device_foundation::v1::DeviceRef ref;
-    const std::string lifecycle = JsonString(root, "lifecycle_state");
-    const bool valid = cJSON_IsObject(root) &&
-        JsonString(root, "operation") == "device-control.configuration" &&
-        JsonString(root, "nonce") == expected_nonce &&
-        ParseDeviceRef(cJSON_GetObjectItemCaseSensitive(root, "device_ref"), ref) &&
-        SameDeviceRef(ref, expected.device_ref) &&
-        ParseOneChannel(root, assignment);
-    if (!valid || (lifecycle != "approved" && lifecycle != "revoked")) {
+    // Fixed labels only: never return a nonce, identity, binding or response.
+    const auto reject = [&](const char* reason) {
+        if (rejection_reason) *rejection_reason = reason;
         cJSON_Delete(root);
         return false;
-    }
+    };
+    device_foundation::v1::DeviceRef ref;
+    const std::string lifecycle = JsonString(root, "lifecycle_state");
+    if (!cJSON_IsObject(root)) return reject("document");
+    if (JsonString(root, "operation") != "device-control.configuration") return reject("operation");
+    if (JsonString(root, "nonce") != expected_nonce) return reject("nonce");
+    if (!ParseDeviceRef(cJSON_GetObjectItemCaseSensitive(root, "device_ref"), ref)) return reject("device_ref");
+    if (!SameDeviceRef(ref, expected.device_ref)) return reject("lifecycle_mismatch");
+    if (!ParseOneChannel(root, assignment)) return reject("channels");
+    if (lifecycle != "approved" && lifecycle != "revoked") return reject("lifecycle_state");
     status = lifecycle == "revoked"
                  ? HubConfigStatus::Revoked
                  : (assignment.opaque_binding.empty()
@@ -429,7 +434,7 @@ bool ParseDeviceConfigurationResponse(
     // valid answer and is reported as such, never as "it holds nothing".
     DeviceOutputPolicy policy;
     if (!ParseOutputPolicy(cJSON_GetObjectItemCaseSensitive(root,"output_policy"),policy)) {
-        cJSON_Delete(root);return false;
+        return reject("output_policy");
     }
     if (output_policy) *output_policy=policy;
     accepted_manifest = AcceptedManifestRef{};

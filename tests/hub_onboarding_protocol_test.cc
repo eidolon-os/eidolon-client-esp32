@@ -350,8 +350,10 @@ void TestConfigurationResponseMatchesTheGoldenVector()
         HubConfigStatus status = HubConfigStatus::PendingApproval;
         eidolon::HubChannelAssignment assignment;
         eidolon::AcceptedManifestRef accepted_manifest;
+        const char* reason = "previous failure";
         assert(eidolon::ParseDeviceConfigurationResponse(
-            body, nonce, claim, status, assignment, accepted_manifest));
+            body, nonce, claim, status, assignment, accepted_manifest, nullptr, &reason));
+        assert(reason == nullptr);
         if (body_state == "active") {
             assert(status == HubConfigStatus::Active);
             assert(!assignment.opaque_binding.empty());
@@ -378,8 +380,13 @@ void TestConfigurationResponseMatchesTheGoldenVector()
         HubConfigStatus status = HubConfigStatus::PendingApproval;
         eidolon::HubChannelAssignment assignment;
         eidolon::AcceptedManifestRef accepted_manifest;
+        const char* reason = nullptr;
         assert(!eidolon::ParseDeviceConfigurationResponse(
-            encoded, nonce, claim, status, assignment, accepted_manifest));
+            encoded, nonce, claim, status, assignment, accepted_manifest, nullptr, &reason));
+        assert(reason != nullptr);
+        const std::string label(reason);
+        assert(label == "nonce" || label == "lifecycle_mismatch" ||
+               label == "channels" || label == "device_ref");
         cJSON_free(encoded);
         ++refused;
     }
