@@ -385,8 +385,8 @@ void TestConfigurationResponseMatchesTheGoldenVector()
             encoded, nonce, claim, status, assignment, accepted_manifest, nullptr, &reason));
         assert(reason != nullptr);
         const std::string label(reason);
-        assert(label == "nonce" || label == "lifecycle_mismatch" ||
-               label == "channels" || label == "device_ref");
+        assert(label == "operation" || label == "lifecycle_state" ||
+               label == "channels");
         cJSON_free(encoded);
         ++refused;
     }
