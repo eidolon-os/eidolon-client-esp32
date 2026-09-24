@@ -15,6 +15,7 @@
 #include "sdkconfig.h"
 #include "ambient_presence_state.h"
 #include "control_protocol.h"
+#include "pending_room_join.h"
 #include "channel_recovery.h"
 #include "device_event_bus.h"
 #include "eidolon_device_profile.h"
@@ -399,9 +400,7 @@ private:
     // ConnectChannel, each of which asks to reschedule; repeating a terminal
     // diagnosis three times makes it read like three different problems.
     bool memory_ceiling_announced_ = false;
-    bool pending_room_join_command_active_ = false;
-    uint32_t pending_room_join_generation_ = 0;
-    ControlCommand pending_room_join_command_;
+    PendingRoomJoin pending_room_join_;
     // Monotonic attempt id, bumped at the start of every voice/control connect.
     // The state-changed callback snapshots it into the event so a late teardown
     // from a superseded connection can be recognised (Phase 0 logs the mismatch;

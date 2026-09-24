@@ -942,6 +942,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
                                  "channel_connected_session_open_sent");
                     }
                 } else {
+                    CompletePendingRoomJoinCommand("failed", "ROOM_JOIN_FAILED");
                     current_conversation_id_.clear();
                     conversation_confirmed_ = false;
                     last_end_reason_ = EndReason::Error;
@@ -1003,9 +1004,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         SetState(VoiceSessionState::InRoom, "voice_connected");
         SetPresenceWakePhase(PresenceWakePhase::Idle);
         StartAudioStatePublisher();
-        if (pending_room_join_command_active_ &&
-            (pending_room_join_generation_ == 0 ||
-             pending_room_join_generation_ == event_generation)) {
+        if (pending_room_join_.Matches(event_generation)) {
             char result[192];
             snprintf(result, sizeof(result),
                      "{\"status\":\"in_room\",\"room_name\":\"%s\",\"generation\":%lu}",
@@ -1497,13 +1496,8 @@ void EidolonVoiceController::CompletePendingRoomJoinCommand(const char* status,
                                                             const char* detail,
                                                             const char* result)
 {
-    if (!pending_room_join_command_active_) {
-        return;
-    }
-    AckCommand(pending_room_join_command_, status, code, detail, result);
-    pending_room_join_command_active_ = false;
-    pending_room_join_generation_ = 0;
-    pending_room_join_command_ = ControlCommand{};
+    const auto command = pending_room_join_.Complete();
+    if (command) AckCommand(*command, status, code, detail, result);
 }
 
 const char* EidolonVoiceController::JoinBlockedCode() const
@@ -1818,7 +1812,7 @@ void EidolonVoiceController::DoSessionControl(const std::string& payload, uint32
         SetState(VoiceSessionState::InRoom, "session_started");
         SetPresenceWakePhase(PresenceWakePhase::Idle);
         OpenConversationAudio();
-        if (pending_room_join_command_active_) {
+        if (pending_room_join_.active()) {
             char result[224];
             snprintf(result, sizeof(result),
                      "{\"status\":\"in_room\",\"conversation_id\":\"%s\","
@@ -2391,16 +2385,16 @@ void EidolonVoiceController::HandleRoomJoinCommand(const std::string& command_id
     // derives opening and idle behavior from the exact intent.
     // A user-initiated room.join may omit the payload or explicitly carry
     // "user_initiated"; in both cases pending stays empty.
-    pending_session_intent_.clear();
+    std::string intent;
     if (!payload.empty()) {
         cJSON* root = cJSON_Parse(payload.c_str());
         if (root != nullptr) {
-            const cJSON* intent = cJSON_GetObjectItem(root, kSessionIntentField);
-            if (cJSON_IsString(intent) && intent->valuestring != nullptr) {
-                const char* value = intent->valuestring;
+            const cJSON* intent_item = cJSON_GetObjectItem(root, kSessionIntentField);
+            if (cJSON_IsString(intent_item) && intent_item->valuestring != nullptr) {
+                const char* value = intent_item->valuestring;
                 if (strcmp(value, kSessionIntentPresence) == 0 ||
                     strcmp(value, kSessionIntentProactive) == 0) {
-                    pending_session_intent_ = value;
+                    intent = value;
                 } else if (strcmp(value, kSessionIntentUserInitiated) != 0) {
                     ESP_LOGW(TAG, "Ignoring unsupported session_intent=%s", value);
                 }
@@ -2409,15 +2403,19 @@ void EidolonVoiceController::HandleRoomJoinCommand(const std::string& command_id
         }
     }
     ESP_LOGI(TAG, "Control command -> join voice room (intent=%s)",
-             pending_session_intent_.empty() ? "user" : pending_session_intent_.c_str());
+             intent.empty() ? "user" : intent.c_str());
     ControlCommand command;
     command.id = command_id;
     command.op = kControlOpRoomJoin;
+    const auto admission = pending_room_join_.Begin(command, intent);
+    if (admission == PendingRoomJoin::Admission::Retry) return;
+    if (admission != PendingRoomJoin::Admission::Started) {
+        AckCommand(command, "failed", admission == PendingRoomJoin::Admission::Busy
+            ? "ROOM_JOIN_BUSY" : "ROOM_JOIN_CONFLICT");
+        return;
+    }
+    pending_session_intent_ = intent;
     vTaskDelay(kRoomJoinSettleDelay);
-
-    pending_room_join_command_ = command;
-    pending_room_join_command_active_ = true;
-    pending_room_join_generation_ = 0;
     esp_err_t err = DoJoinRoom();
     // One-shot: clear after the JOIN (incl. DoJoinRoom's internal connect-retry,
     // which re-fetches) so the intent never leaks into a later reconnect/refresh.
@@ -2427,7 +2425,7 @@ void EidolonVoiceController::HandleRoomJoinCommand(const std::string& command_id
         CompletePendingRoomJoinCommand("failed", JoinBlockedCode(), esp_err_to_name(err));
         return;
     }
-    pending_room_join_generation_ = session_generation_;
+    pending_room_join_.BindGeneration(session_generation_);
     if (state_ == VoiceSessionState::InRoom) {
         char result[192];
         snprintf(result, sizeof(result),
@@ -2797,6 +2795,7 @@ void EidolonVoiceController::HandleIdleTimeoutCommand()
 
 void EidolonVoiceController::HandleSessionEnd(EndReason reason)
 {
+    CompletePendingRoomJoinCommand("failed", "ROOM_JOIN_ENDED");
     static const char* kReasonNames[] = {"none",
                                          kSessionEndIdleNormal,
                                          kSessionEndProactiveDone,
@@ -2963,6 +2962,7 @@ void EidolonVoiceController::DoNetworkLost()
 
 bool EidolonVoiceController::DoCommissioningQuiesce()
 {
+    CompletePendingRoomJoinCommand("failed", "ROOM_JOIN_CANCELLED");
     ESP_LOGI(TAG,
              "[commissioning] quiescing operational runtime before RadioLease");
     // Commissioning is an explicit product-mode boundary, not a transient
@@ -3448,6 +3448,7 @@ uint64_t EidolonVoiceController::GuardEventTimestampMs(uint64_t monotonic_ms)
 
 esp_err_t EidolonVoiceController::DoLeaveRoom()
 {
+    CompletePendingRoomJoinCommand("failed", "ROOM_JOIN_CANCELLED");
     bool playback_recent = PlaybackActiveRecently();
     ESP_LOGI(TAG,
              "[lifecycle] leave executing state=%s room_kind=%s gen=%lu connected=%d "
