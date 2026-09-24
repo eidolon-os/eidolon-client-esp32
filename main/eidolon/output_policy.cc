@@ -49,19 +49,32 @@ constexpr uint32_t kLegacyOutputs=OutputBit(presentation::Output::Speech)|
     OutputBit(presentation::Output::DialogueText)|OutputBit(presentation::Output::AudioCue);
 constexpr uint32_t kResponseOutputs=OutputBit(presentation::Output::Speech)|
     OutputBit(presentation::Output::DialogueText)|OutputBit(presentation::Output::Expression);
+bool Input(const cJSON* json,bool& microphone) {
+    if (!Keys(json,{"microphone"})) return false;
+    const auto* value=cJSON_GetObjectItemCaseSensitive(json,"microphone");
+    if (value && !cJSON_IsBool(value)) return false;
+    microphone=cJSON_IsTrue(value);return true;
+}
 }
 bool ParseOutputPolicy(const cJSON* json,DeviceOutputPolicy& output) {
     if (!json || cJSON_IsNull(json)) { output={};return true; }
     DeviceOutputPolicy candidate;
-    if (!Keys(json,{"schema_version","revision","allowed"}) || !Version(json) ||
+    if (!Keys(json,{"schema_version","revision","allowed","inputs"}) || !Version(json) ||
         !Uint(cJSON_GetObjectItemCaseSensitive(json,"revision"),candidate.revision) ||
         !Mask(cJSON_GetObjectItemCaseSensitive(json,"allowed"),candidate.allowed)) return false;
+    const auto* inputs=cJSON_GetObjectItemCaseSensitive(json,"inputs");
+    if (inputs && !cJSON_IsNull(inputs)) {
+        if (!Input(inputs,candidate.microphone)) return false;
+        candidate.inputs_known=true;
+    }
     candidate.known=true;output=candidate;return true;
 }
 bool ParseSessionOutputPlan(const cJSON* json,SessionOutputPlan& output) {
-    if (!Keys(json,{"schema_version","session_id","policy_revision","outputs","expression_profile"}) ||
+    if (!Keys(json,{"schema_version","session_id","policy_revision","outputs","expression_profile","inputs"}) ||
         !Version(json)) return false;
     SessionOutputPlan plan;
+    const auto* inputs=cJSON_GetObjectItemCaseSensitive(json,"inputs");
+    if (inputs && !Input(inputs,plan.microphone)) return false;
     auto* session=cJSON_GetObjectItemCaseSensitive(json,"session_id");
     if (!cJSON_IsString(session) || !session->valuestring) return false;
     plan.session_id=session->valuestring;
@@ -88,18 +101,24 @@ bool DeviceOutputGate::Bind(const DeviceOutputPolicy& policy) {
 bool DeviceOutputGate::Start(const SessionOutputPlan& plan,const std::string& expected_session) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (!policy_.known || plan.session_id!=expected_session || plan.policy_revision!=policy_.revision ||
+        (plan.microphone && policy_.inputs_known && !policy_.microphone) ||
         !(plan.selected&kResponseOutputs) || (plan.selected&~policy_.allowed) ||
         (plan.selected&~supported_outputs_) ||
         plan.face_profile!=bool(plan.selected&OutputBit(presentation::Output::Expression))) {
         active_=false;selected_=0;return false;
     }
-    active_=true;selected_=plan.selected;return true;
+    active_=true;selected_=plan.selected;microphone_=plan.microphone;return true;
 }
 void DeviceOutputGate::Close() {
     std::lock_guard<std::mutex> lock(mutex_);active_=false;selected_=0;
 }
 bool DeviceOutputGate::Allows(presentation::Output output) const {
     return AllowsAny(OutputBit(output));
+}
+bool DeviceOutputGate::AllowsMicrophone() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return policy_.known ? (active_ && microphone_ &&
+        (!policy_.inputs_known || policy_.microphone)) : legacy_;
 }
 bool DeviceOutputGate::AllowsAny(uint32_t outputs) const {
     std::lock_guard<std::mutex> lock(mutex_);

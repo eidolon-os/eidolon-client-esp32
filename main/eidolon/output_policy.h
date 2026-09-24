@@ -25,14 +25,18 @@ struct DeviceOutputPolicy {
     bool known=false;
     uint32_t revision=0;
     uint32_t allowed=0;
+    bool inputs_known=false;
+    bool microphone=false;
     bool operator==(const DeviceOutputPolicy& other) const {
-        return known==other.known && revision==other.revision && allowed==other.allowed;
+        return known==other.known && revision==other.revision && allowed==other.allowed &&
+            inputs_known==other.inputs_known && microphone==other.microphone;
     }
 };
 struct SessionOutputPlan {
     std::string session_id;
     uint32_t policy_revision=0, selected=0;
     bool face_profile=false;
+    bool microphone=true;
 };
 bool ParseOutputPolicy(const cJSON* json,DeviceOutputPolicy& output);
 bool ParseSessionOutputPlan(const cJSON* json,SessionOutputPlan& output);
@@ -48,11 +52,13 @@ public:
     void Close();
     bool Allows(presentation::Output output) const;
     bool AllowsAny(uint32_t outputs) const;
+    bool AllowsMicrophone() const;
 private:
     mutable std::mutex mutex_;
     bool legacy_=false, active_=false;
     DeviceOutputPolicy policy_;
     uint32_t selected_=0;
+    bool microphone_=false;
     const uint32_t supported_outputs_;
 };
 DeviceOutputGate& CurrentOutputGate();

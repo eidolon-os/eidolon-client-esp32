@@ -3612,6 +3612,9 @@ void EidolonVoiceController::PublishClientAudioState(bool playback_active)
         mic_muted = !mic_enabled_;
     }
 
+    if (!CurrentOutputGate().AllowsMicrophone()) {
+        capture_on=false;mic_muted=true;ptt_held=false;
+    }
     if (head_deadline_us_ && now_us>=head_deadline_us_) {
         Board::GetInstance().HeadStop();
         DoHeadMotionResult(head_token_,{HeadMotionStatus::Failed,"MOTION_TIMEOUT"});
@@ -3746,7 +3749,7 @@ void EidolonVoiceController::DoSetMicEnabled(bool enabled)
     if (session_.IsConnected() && !standby_) {
         PublishClientAudioState(AgentOutputActiveRecently());
     } else {
-        eidolon_livekit_board_set_capture_enabled(enabled);
+        eidolon_livekit_board_set_capture_enabled(enabled && CurrentOutputGate().AllowsMicrophone());
     }
     ESP_LOGI(TAG, "Mic enabled=%d", enabled ? 1 : 0);
 }

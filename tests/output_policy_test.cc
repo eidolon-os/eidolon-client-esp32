@@ -6,6 +6,14 @@
 using namespace eidolon;
 using presentation::Output;
 int main() {
+    // SDK serializes an absent input override as null on existing policies.
+    for (const char* raw : {
+        R"({"schema_version":1,"revision":1,"allowed":{"speech":true},"inputs":null})",
+        R"({"schema_version":1,"revision":1,"allowed":{"speech":true},"inputs":{"microphone":false}})"
+    }) {
+        auto* json=cJSON_Parse(raw); DeviceOutputPolicy policy;
+        assert(ParseOutputPolicy(json,policy)); cJSON_Delete(json);
+    }
 #if CONFIG_EIDOLON_OUTPUT_POLICY_V1
     static_assert(kOutputPolicyRequired);
     assert(!CurrentOutputGate().Allows(Output::Speech));
@@ -14,6 +22,44 @@ int main() {
     assert(!gate.Allows(Output::Speech));
     const auto expression=OutputBit(Output::Expression);
     const auto speech=OutputBit(Output::Speech);
+    DeviceOutputGate input_gate(false);
+    DeviceOutputPolicy receive_only{true,1,speech,true,false};
+    assert(input_gate.Bind(receive_only));
+    assert(!input_gate.AllowsMicrophone());
+    SessionOutputPlan listening{"listen",1,speech,false,true};
+    assert(!input_gate.Start(listening,"listen")); // no input escalation
+    listening.microphone=false;
+    assert(input_gate.Start(listening,"listen"));
+    assert(input_gate.Allows(Output::Speech)); // input and output are independent
+    assert(!input_gate.AllowsMicrophone());
+    auto enabled=receive_only;enabled.microphone=true;
+    assert(!input_gate.Bind(enabled)); // cannot reuse revision with new inputs
+    enabled.revision=2;
+    assert(input_gate.Bind(enabled));
+    listening.policy_revision=2;
+    listening.microphone=true;
+    assert(input_gate.Start(listening,"listen"));
+    assert(input_gate.AllowsMicrophone());
+    input_gate.Close();
+    assert(!input_gate.AllowsMicrophone());
+    for (const char* raw : {
+        R"({"revision":1,"allowed":{},"inputs":{"microphone":1}})",
+        R"({"revision":1,"allowed":{},"inputs":{"microphone":true,"microphone":false}})",
+        R"({"revision":1,"allowed":{},"inputs":{"camera":true}})"
+    }) {
+        auto* json=cJSON_Parse(raw);DeviceOutputPolicy policy;
+        assert(!ParseOutputPolicy(json,policy));cJSON_Delete(json);
+    }
+    for (const char* raw : {
+        R"({"schema_version":1,"session_id":"listen","policy_revision":2,"outputs":{"speech":true},"inputs":{"microphone":false}})",
+        R"({"schema_version":1,"session_id":"listen","policy_revision":2,"outputs":{"speech":true},"inputs":{}})"
+    }) {
+        auto* json=cJSON_Parse(raw);SessionOutputPlan parsed;
+        assert(ParseSessionOutputPlan(json,parsed));cJSON_Delete(json);
+        assert(!parsed.microphone);
+    }
+    auto* invalid_inputs=cJSON_Parse(R"({"session_id":"listen","policy_revision":2,"outputs":{"speech":true},"inputs":null})");
+    assert(!ParseSessionOutputPlan(invalid_inputs,listening));cJSON_Delete(invalid_inputs);
     assert(gate.Bind({true,1,expression|speech}));
     SessionOutputPlan plan{"session-1",1,expression,true};
     assert(!gate.Start(plan,"other"));

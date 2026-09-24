@@ -130,6 +130,10 @@ esp_err_t HubConfigStore::SaveHubConfig(const Esp32HubConfig& config) {
         auto* policy=cJSON_AddObjectToObject(root,"output_policy");
         cJSON_AddNumberToObject(policy,"schema_version",1);
         cJSON_AddNumberToObject(policy,"revision",config.output_policy.revision);
+        if (config.output_policy.inputs_known) {
+            auto* inputs=cJSON_AddObjectToObject(policy,"inputs");
+            cJSON_AddBoolToObject(inputs,"microphone",config.output_policy.microphone);
+        }
         auto* allowed=cJSON_AddObjectToObject(policy,"allowed");
         for (size_t i=0;i<presentation::kOutputNames.size();++i)
             cJSON_AddBoolToObject(allowed,presentation::kOutputNames[i].data(),config.output_policy.allowed&(1u<<i));
