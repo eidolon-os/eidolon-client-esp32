@@ -69,6 +69,7 @@ enum class EndReason {
     UserLeft,
     Superseded,
     Error,
+    Busy,
 };
 
 struct VoiceRuntimeStatus {

@@ -247,6 +247,8 @@ void TestPresenceDoesNotOverrideConversation()
 
 int main()
 {
+    Expect(UiSceneDetail(UiScene::Ended, EndReason::Busy),
+           "Device busy. End the current conversation first.");
     Expect(EidolonBrandLabel(), "EIDOLON");
     TestStartupDoesNotClaimReadinessOrOwnershipEarly();
     TestSafetyAndRuntimePrecedence();

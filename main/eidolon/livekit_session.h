@@ -107,6 +107,7 @@ private:
 
     livekit_room_handle_t room_handle_ = nullptr;
     std::string identity_;
+    std::string provider_identity_;
     bool connected_ = false;
     bool using_media_ = false;
     bool media_board_initialized_ = false;

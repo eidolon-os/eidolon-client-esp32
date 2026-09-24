@@ -120,6 +120,8 @@ const char* UiSceneDetail(UiScene scene, EndReason end_reason)
     case UiScene::Reconnecting:
         return "Connection interrupted. Trying to resume...";
     case UiScene::Ended:
+        if (end_reason == EndReason::Busy)
+            return "Device busy. End the current conversation first.";
         return end_reason == EndReason::Error ? "Could not continue. Ready to try again."
                                               : "Ready for another conversation";
     case UiScene::Removed:

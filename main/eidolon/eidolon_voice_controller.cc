@@ -1763,6 +1763,24 @@ void EidolonVoiceController::DoSessionControl(const std::string& payload, uint32
         return;
     }
 
+    if (strcmp(type, kSessionRejectedType) == 0) {
+        const auto* reason = cJSON_GetObjectItem(root, "reason");
+        const bool pending = !conversation_confirmed_ &&
+            (state_ == VoiceSessionState::Opening ||
+             state_ == VoiceSessionState::Connecting ||
+             state_ == VoiceSessionState::Reconnecting);
+        const bool conflict = cJSON_IsString(reason) &&
+            strcmp(reason->valuestring, kSessionRejectionConflict) == 0;
+        cJSON_Delete(root);
+        // The transport only passes non-Agent controls from the exact Provider.
+        // Never close accepted work, including a same-ID retry refused later.
+        if (!agent && pending && conflict) {
+            CompletePendingRoomJoinCommand("failed", "ROOM_JOIN_CONFLICT");
+            HandleSessionEnd(EndReason::Busy);
+        }
+        return;
+    }
+
     if (strcmp(type, kSessionStartedType) == 0) {
         if (state_ != VoiceSessionState::Opening &&
             state_ != VoiceSessionState::Connecting &&
@@ -2784,7 +2802,8 @@ void EidolonVoiceController::HandleSessionEnd(EndReason reason)
                                          kSessionEndProactiveDone,
                                          kSessionEndUserLeft,
                                          kSessionEndSuperseded,
-                                         kSessionEndError};
+                                         kSessionEndError,
+                                         kSessionRejectionConflict};
     const char* reason_name = kReasonNames[static_cast<int>(reason)];
     // Record the reason so the UI can show "已结束待命" / error chrome instead of an
     // unexplained return to JOIN, then tear the voice room down gracefully and

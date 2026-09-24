@@ -191,16 +191,29 @@ void LiveKitSession::OnDataReceived(const livekit_data_received_t* data, void* c
         std::string payload(reinterpret_cast<const char*>(data->payload.bytes),
                             data->payload.size);
         bool agent=false;
+        bool provider=false;
         uint32_t generation;
         {
             std::lock_guard<std::mutex> lock(session->peers_mutex_);
             generation=session->generation_;
             if (data->sender_identity) {
+                provider = !session->provider_identity_.empty() &&
+                           session->provider_identity_ == data->sender_identity;
                 for (const auto& peer:session->agent_peers_)
                     if (!peer.empty() && peer==data->sender_identity) { agent=true;break; }
-                if (!agent) session->pending_session_control_.Stage(
+                if (!agent && !provider) session->pending_session_control_.Stage(
                     data->sender_identity,payload,generation,esp_timer_get_time()/1000);
             }
+        }
+        // Provider can reject a pending request, but never authorize a start/end.
+        // Identity comes from LiveKit's authenticated transport, not packet JSON.
+        if (provider) {
+            cJSON* root = cJSON_Parse(payload.c_str());
+            const char* type = root ? JsonString(root, "type") : nullptr;
+            const bool rejection = type && strcmp(type, kSessionRejectedType) == 0;
+            cJSON_Delete(root);
+            if (rejection) session->on_session_control_(payload, generation, false);
+            return;
         }
         if (!agent) {
             ESP_LOGI(TAG,"Session control awaits authenticated Agent signalling");
@@ -409,6 +422,8 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
 
     transcription_stream_.Clear();
     identity_ = config.session.identity;
+    provider_identity_ = config.session.room_name.empty()
+        ? "" : "channel-provider-" + config.session.room_name;
     generation_ = generation;
 
     const auto local_audio = CompiledDeviceCapabilities().OutputMask() & kAudioOutputs;
@@ -530,6 +545,7 @@ esp_err_t LiveKitSession::Disconnect()
             pending_session_control_.Clear();
         }
         identity_.clear();
+        provider_identity_.clear();
         last_failure_reason_ = LIVEKIT_FAILURE_REASON_NONE;
         if (media_board_initialized_) {
             ESP_LOGI(TAG, "Releasing LiveKit media board without active room");
@@ -572,6 +588,7 @@ esp_err_t LiveKitSession::Disconnect()
     room_handle_ = nullptr;
     transcription_stream_.Clear();
     identity_.clear();
+    provider_identity_.clear();
     last_failure_reason_ = LIVEKIT_FAILURE_REASON_NONE;
     if (media_board_initialized_) {
         ReleaseMediaBoard();
