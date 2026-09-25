@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import sys
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -129,6 +130,37 @@ def check_device(build, port, allow_blank=False, after=False):
             esp.hard_reset()
         finally:
             esp._port.close()
+
+
+def application_partition(build):
+    """Resolve the written app from IDF artifacts, before any device mutation."""
+    args, table, _ = validate_build(Path(build))
+    app = args['app']
+    offset = int(app['offset'], 0)
+    files = {int(address, 0): filename for address, filename in args['flash_files'].items()}
+    part = next((p for p in table if p.offset == offset), None)
+    gen = parser()
+    if (files.get(offset) != app['file'] or part is None or part.type != gen.APP_TYPE
+            or not gen.MIN_PARTITION_SUBTYPE_APP_OTA <= part.subtype
+            < gen.MIN_PARTITION_SUBTYPE_APP_OTA + gen.NUM_PARTITION_SUBTYPE_APP_OTA):
+        raise ValueError('Application artifact must name the written OTA partition')
+    return part.name
+
+
+def activate_application(build, port, partition_name):
+    """Use IDF's OTA implementation; never implement sequence/CRC handling here.
+
+    Invoked only after successful application write and partition readback.
+    This updates boot selection, not Owner storage or the other application.
+    """
+    args = json.loads((Path(build) / 'flasher_args.json').read_text())
+    tool = Path(os.environ['IDF_PATH']) / 'components/app_update/otatool.py'
+    subprocess.run([
+        sys.executable, str(tool), '--port', port,
+        '--partition-table-offset', args['partition-table']['offset'],
+        'switch_ota_partition', '--name', partition_name,
+    ], check=True, timeout=120)
+    print(f'EIDOLON application boot selection activated: {partition_name}')
 
 
 def main():

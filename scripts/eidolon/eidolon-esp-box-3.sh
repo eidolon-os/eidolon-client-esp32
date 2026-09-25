@@ -289,7 +289,7 @@ Usage: $0 <command>
 
 Commands:
   build       Build ESP-BOX-3 Eidolon firmware
-  flash       Flash ESP-BOX-3 Eidolon firmware (auto-verifies the build stamp)
+  flash [--app-only]  Flash firmware (auto-verifies the build stamp)
   monitor     Open idf.py monitor
   verify      Read the boot build stamp over serial and diff vs the last build
   clean       Remove ${BUILD_DIR}
@@ -320,10 +320,15 @@ case "${cmd}" in
     run_idf build
     ;;
   flash)
+    [[ $# -le 2 && ( $# -eq 1 || "${2}" == "--app-only" ) ]] || die "Usage: $0 flash [--app-only]"
     PORT="$(detect_port)"
     info "Using serial port: ${PORT}"
     eidolon_prepare_build "${PROJECT_ROOT}"
-    run_idf -p "${PORT}" flash
+    if [[ "${2:-}" == "--app-only" ]]; then
+      run_idf -p "${PORT}" app-flash
+    else
+      run_idf -p "${PORT}" flash
+    fi
     eidolon_verify_flashed "${PROJECT_ROOT}" "${PORT}"
     ;;
   monitor)
@@ -338,6 +343,7 @@ case "${cmd}" in
     list_ports
     ;;
   verify)
+    require_idf
     PORT="$(detect_port)"
     eidolon_verify_flashed "${PROJECT_ROOT}" "${PORT}"
     ;;

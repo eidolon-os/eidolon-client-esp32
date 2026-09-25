@@ -24,9 +24,13 @@ def action_extensions(base_actions, project_path):
             args.port = args.port or get_default_serial_port()
             full = action == 'flash'
             try:
+                app_partition = (partition_contract.application_partition(build)
+                                 if action in ('flash', 'app-flash') else None)
                 partition_contract.check_device(build, args.port, allow_blank=full)
                 original(action, ctx, args, **kwargs)
                 partition_contract.check_device(build, args.port, after=True)
+                if app_partition is not None:
+                    partition_contract.activate_application(build, args.port, app_partition)
             except Exception as error:
                 raise FatalError(f'Eidolon flash verification failed: {error}') from error
         return checked

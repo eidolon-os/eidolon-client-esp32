@@ -116,21 +116,71 @@ class StorageContractTest(unittest.TestCase):
         args = types.SimpleNamespace(build_dir='/unused', port='test-port')
         ctx = types.SimpleNamespace(info_name='idf.py')
         with patch.dict(sys.modules, {'idf_py_actions.tools': tools, 'idf_py_actions.errors': errors}), \
-             patch.object(contract, 'build_config', return_value={'CONFIG_EIDOLON_HUB_MODE': 'y'}):
+             patch.object(contract, 'build_config', return_value={'CONFIG_EIDOLON_HUB_MODE': 'y'}), \
+             patch.object(contract, 'application_partition', return_value='ota_0'), \
+             patch.object(contract, 'activate_application', side_effect=lambda *a: events.append('activate')) as activate:
             for name in names[:4]:
                 events.clear()
                 with patch.object(contract, 'check_device', side_effect=lambda *a, **kw: events.append('post' if kw.get('after') else 'pre')) as check:
                     actions['actions'][name]['callback'](name, ctx, args)
-                    self.assertEqual(events, ['build', 'pre', 'write', 'post'])
+                    self.assertEqual(events, ['build', 'pre', 'write', 'post'] +
+                                     (['activate'] if name in ('flash', 'app-flash') else []))
                     self.assertEqual(check.call_args_list[0].kwargs['allow_blank'], name == 'flash')
             events.clear()
             with patch.object(contract, 'check_device', side_effect=ValueError('layout mismatch')):
                 with self.assertRaises(RuntimeError): actions['actions']['flash']['callback']('flash', ctx, args)
             self.assertEqual(events, ['build'])
+            for failure in ('write', 'post', 'activate'):
+                events.clear()
+                def check(*a, **kw):
+                    phase = 'post' if kw.get('after') else 'pre'
+                    events.append(phase)
+                    if phase == failure:
+                        raise ValueError('failed readback')
+                def write(*a, **kw):
+                    events.append('write')
+                    if failure == 'write':
+                        raise ValueError('failed application write')
+                isolated = {'actions': {n: {'callback': write} for n in names}}
+                ext.action_extensions(isolated, str(ROOT))
+                activate.reset_mock()
+                activate.side_effect = ValueError('failed activation') if failure == 'activate' else lambda *a: events.append('activate')
+                with patch.object(contract, 'check_device', side_effect=check):
+                    with self.assertRaises(RuntimeError):
+                        isolated['actions']['app-flash']['callback']('app-flash', ctx, args)
+                self.assertEqual(activate.call_count, 1 if failure == 'activate' else 0)
             for name in names[4:]:
                 events.clear()
                 with self.assertRaises(RuntimeError): actions['actions'][name]['callback'](name, ctx, args)
                 self.assertNotIn('write', events)
+
+    def test_written_application_selects_actual_slot_for_both_layouts(self):
+        for layout in ('16m_eidolon.csv', '16m_eidolon_box3.csv'):
+            table = contract.load_table(self.path.parent / layout)
+            for name in ('ota_0', 'ota_1'):
+                part = next(p for p in table if p.name == name)
+                args = {'app': {'offset': hex(part.offset), 'file': 'app.bin'},
+                        'flash_files': {hex(part.offset): 'app.bin'}}
+                with patch.object(contract, 'validate_build', return_value=(args, table, None)):
+                    self.assertEqual(contract.application_partition('/unused'), name)
+                    args['flash_files'][hex(part.offset)] = 'other.bin'
+                    with self.assertRaises(ValueError):
+                        contract.application_partition('/unused')
+
+    def test_activation_delegates_to_official_tool_and_propagates_failure(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as temp:
+            Path(temp, 'flasher_args.json').write_text(json.dumps({
+                'partition-table': {'offset': '0x8000'}}))
+            with patch('subprocess.run') as run:
+                contract.activate_application(temp, 'test-port', 'ota_1')
+                command = run.call_args.args[0]
+                self.assertTrue(command[1].endswith('/components/app_update/otatool.py'))
+                self.assertEqual(command[-3:], ['switch_ota_partition', '--name', 'ota_1'])
+                self.assertTrue(run.call_args.kwargs['check'])
+                run.side_effect = subprocess.CalledProcessError(1, command)
+                with self.assertRaises(subprocess.CalledProcessError):
+                    contract.activate_application(temp, 'test-port', 'ota_1')
 
 
 if __name__ == '__main__': unittest.main()

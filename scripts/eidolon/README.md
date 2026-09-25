@@ -20,6 +20,12 @@ flashers are outside this verified entry point.
 4. Connect hardware and flash through the same script. The shared gate checks
    actual chip, flash capacity and existing binary partition table before
    invoking IDF's writer, then reads the partition table back. The board
+   independent gate then activates the application partition named by IDF's
+   build artifacts using the official `otatool`, for `flash` and `app-flash`.
+   Bootloader-only and partition-table-only writes do not switch applications.
+   Activation happens only after a successful write and readback; activation
+   failures fail the command. No private OTA sequence/CRC implementation or
+   board-specific slot offsets are used. The board
    script additionally checks the running build fingerprint. Startup reports
    `EIDOLON-STORAGE owner_trust=ready bytes=...` after successful initialization.
 5. Verify factory-empty provisioning and normal interaction on hardware.
@@ -38,6 +44,19 @@ Plan a data-preserving migration, or explicitly authorize and perform a full
 erase before the complete flash. Application-only flashing cannot install a new
 partition layout. Read-only compatibility in the firmware does not bypass this
 release/flash requirement.
+
+Application-only writes previously left OTA selection unchanged. Any dual-slot
+board booting the other slot could therefore keep running old firmware despite
+successful write/hash verification; this was observed on BOX-3, not specific to
+BOX-3. The shared gate now completes write + boot selection; running build-stamp
+verification remains mandatory in board scripts. This is a local maintenance
+flash flow, not a power-loss-atomic OTA update or a guaranteed rollback scheme.
+It updates `otadata`; it does not erase Owner trust/NVS/assets or rewrite the
+other application slot. Direct `idf.py` gets activation but does not itself
+perform the board script's runtime build-stamp check.
+
+BOX-3 supports the same application-only operation without sourcing its shell
+internals: `EIDOLON_PORT=/dev/cu.usbmodemXXXX bash scripts/eidolon/eidolon-esp-box-3.sh flash --app-only`.
 
 Encrypted flash and extra raw esptool write arguments are refused by this gate
 until an explicit verification flow exists for them. The old
