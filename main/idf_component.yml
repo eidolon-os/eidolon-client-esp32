@@ -137,17 +137,18 @@ dependencies:
 
   # Our fork of livekit/client-sdk-esp32, pinned to a commit: managed_components/
   # is not tracked, so the fork is the only place a fix to this SDK survives.
-  # It is upstream v0.3.10 (the newest release) plus two fixes, both of which
-  # this firmware depends on:
+  # Based on upstream v0.3.10 with the lifecycle fixes this firmware needs:
   #   - the engine releases a subscribed audio track when it goes away, so a
   #     connection can carry more than one conversation;
   #   - a data channel is only started on a connection that negotiates one, so
   #     the subscriber can reach connected instead of retrying SCTP INIT forever.
+  #   - close/leave terminate reconnect backoff, and transitions run the old
+  #     state's exit hook before the new state's enter hook.
   # https over ssh so a build needs no SSH access to the fork.
   livekit/livekit:
     git: https://github.com/eidolon-os/client-sdk-esp32.git
     path: components/livekit
-    version: 312ce4742b35f92e47915a161d271f7ef027ce5a
+    version: "3396a5df29e3d35bc44622e3164efd90591ed120"
     rules:
     - if: target in [esp32s3, esp32p4, esp32s31]
 
