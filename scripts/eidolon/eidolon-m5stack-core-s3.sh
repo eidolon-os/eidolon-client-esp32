@@ -603,8 +603,7 @@ cmd_flash() {
   fi
 
   if [[ "${APP_ONLY}" -eq 1 ]]; then
-    idf app-flash || return 1
-    eidolon_verify_flashed "${PROJECT_ROOT}" "${PORT}"
+    eidolon_flash "${PROJECT_ROOT}" "${PROJECT_ROOT}/build" "${PORT}" app-flash idf
     return $?
   fi
 
@@ -612,8 +611,7 @@ cmd_flash() {
     die "This IDF does not support --only-flash-partition; use --app-only or a complete flash. No data was written."
   fi
 
-  idf flash || return 1
-  eidolon_verify_flashed "${PROJECT_ROOT}" "${PORT}"
+  eidolon_flash "${PROJECT_ROOT}" "${PROJECT_ROOT}/build" "${PORT}" flash idf
 }
 
 cmd_monitor() {

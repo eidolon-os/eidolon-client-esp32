@@ -45,6 +45,7 @@ eidolon_prepare_build() {{ :; }}
 detect_port() {{ echo test-port; }}
 idf() {{ echo "write:$1"; [[ {failure} != write ]]; }}
 eidolon_verify_flashed() {{ echo verify; [[ {failure} != verify ]]; }}
+eidolon_flash() {{ shift 4; "$@" {'app-flash' if app_only else 'flash'} || return 1; eidolon_verify_flashed; }}
 {function}
 status=0
 # Menus call through an OR-list, which disables implicit errexit in functions.

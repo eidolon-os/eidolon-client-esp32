@@ -310,6 +310,22 @@ eidolon_prepare_build() {
   eidolon_write_build_stamp "$1"
 }
 
+# One supported flash lifecycle for every board script. The callback supplies
+# only board-specific IDF build arguments; storage and activation stay here.
+eidolon_flash() {
+  local root="$1" build="$2" port="$3" action="$4"
+  shift 4
+  [[ "$build" == /* ]] || build="$root/$build"
+  case "$action" in flash|app-flash) ;; *) return 2 ;; esac
+  local python
+  python="$(eidolon_idf_python)" || return 1
+  "$@" build || return 1
+  "$python" "$root/scripts/eidolon/partition_contract.py" preflight "$build" --port "$port" --action "$action" || return 1
+  "$@" "$action" || return 1
+  "$python" "$root/scripts/eidolon/partition_contract.py" finish "$build" --port "$port" --action "$action" || return 1
+  eidolon_verify_flashed "$root" "$port"
+}
+
 # Read the EIDOLON-BUILDSTAMP boot line back over serial and diff vs expected.
 # Resets the board and captures for a bounded time. Verification is a gate: an
 # unreadable or mismatched stamp returns non-zero instead of turning a manual

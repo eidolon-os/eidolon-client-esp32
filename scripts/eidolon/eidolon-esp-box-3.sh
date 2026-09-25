@@ -325,11 +325,10 @@ case "${cmd}" in
     info "Using serial port: ${PORT}"
     eidolon_prepare_build "${PROJECT_ROOT}"
     if [[ "${2:-}" == "--app-only" ]]; then
-      run_idf -p "${PORT}" app-flash
+      eidolon_flash "${PROJECT_ROOT}" "${BUILD_DIR}" "${PORT}" app-flash run_idf -p "${PORT}"
     else
-      run_idf -p "${PORT}" flash
+      eidolon_flash "${PROJECT_ROOT}" "${BUILD_DIR}" "${PORT}" flash run_idf -p "${PORT}"
     fi
-    eidolon_verify_flashed "${PROJECT_ROOT}" "${PORT}"
     ;;
   monitor)
     PORT="$(detect_port)"

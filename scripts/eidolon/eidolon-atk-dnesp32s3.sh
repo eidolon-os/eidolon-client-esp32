@@ -326,8 +326,7 @@ case "${cmd}" in
     PORT="$(detect_port)"
     info "Using serial port: ${PORT}"
     eidolon_prepare_build "${PROJECT_ROOT}"
-    run_idf -p "${PORT}" flash
-    eidolon_verify_flashed "${PROJECT_ROOT}" "${PORT}"
+    eidolon_flash "${PROJECT_ROOT}" "${BUILD_DIR}" "${PORT}" flash run_idf -p "${PORT}"
     ;;
   monitor)
     PORT="$(detect_port)"

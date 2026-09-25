@@ -1,9 +1,10 @@
 # Eidolon board build and flash contract
 
-Use the board's existing script, or `idf.py` from this project. The project
-`idf_ext.py` applies the same verification to full, application, bootloader and
-partition-table flash actions. Raw esptool, Ninja flash targets and external
-flashers are outside this verified entry point.
+Use the board's script under `scripts/eidolon/`. All six board scripts call
+`eidolon_flash` in `eidolon-common.sh`: build → preflight → IDF write → partition
+readback → official OTA activation → runtime build-stamp verification. There is
+no project `idf_ext.py` hook. Direct `idf.py`, raw esptool, Ninja flash targets and
+external flashers are outside this verified entry point.
 
 ## New board
 
@@ -22,7 +23,7 @@ flashers are outside this verified entry point.
    invoking IDF's writer, then reads the partition table back. The board
    independent gate then activates the application partition named by IDF's
    build artifacts using the official `otatool`, for `flash` and `app-flash`.
-   Bootloader-only and partition-table-only writes do not switch applications.
+   This entry supports complete or application-only maintenance flashing.
    Activation happens only after a successful write and readback; activation
    failures fail the command. No private OTA sequence/CRC implementation or
    board-specific slot offsets are used. The board
@@ -52,8 +53,7 @@ BOX-3. The shared gate now completes write + boot selection; running build-stamp
 verification remains mandatory in board scripts. This is a local maintenance
 flash flow, not a power-loss-atomic OTA update or a guaranteed rollback scheme.
 It updates `otadata`; it does not erase Owner trust/NVS/assets or rewrite the
-other application slot. Direct `idf.py` gets activation but does not itself
-perform the board script's runtime build-stamp check.
+other application slot. Direct `idf.py` does not provide these script-level guarantees.
 
 BOX-3 supports the same application-only operation without sourcing its shell
 internals: `EIDOLON_PORT=/dev/cu.usbmodemXXXX bash scripts/eidolon/eidolon-esp-box-3.sh flash --app-only`.
@@ -74,6 +74,8 @@ With the pinned ESP-IDF environment exported:
 
 ```sh
 python tests/partition_contract_test.py
+python tests/flash_lifecycle_test.py
+python tests/board_flash_entry_test.py
 bash tests/run_fresh_owner_trust_tests.sh
 bash tests/run_owner_trust_storage_policy_tests.sh
 bash tests/run_owner_trust_commissioner_tests.sh

@@ -176,6 +176,11 @@ def main():
     field.add_argument('field', choices=['offset', 'size'])
     built = sub.add_parser('build')
     built.add_argument('path')
+    for command in ('preflight', 'finish'):
+        gate = sub.add_parser(command)
+        gate.add_argument('path')
+        gate.add_argument('--port', required=True)
+        gate.add_argument('--action', choices=('flash', 'app-flash'), required=True)
     args = cli.parse_args()
     if args.command == 'csv':
         require_contract(load_table(args.path, args.offset), args.flash_bytes)
@@ -184,6 +189,14 @@ def main():
         if part is None:
             raise ValueError(f'Unknown partition: {args.name}')
         print(hex(getattr(part, args.field)))
+    elif args.command in ('preflight', 'finish'):
+        build = Path(args.path)
+        if build_config(build).get('CONFIG_EIDOLON_HUB_MODE') == 'y':
+            name = application_partition(build)
+            check_device(build, args.port, allow_blank=args.action == 'flash',
+                         after=args.command == 'finish')
+            if args.command == 'finish':
+                activate_application(build, args.port, name)
     else:
         validate_build(Path(args.path))
 

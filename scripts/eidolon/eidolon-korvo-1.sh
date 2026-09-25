@@ -198,8 +198,7 @@ case "${cmd}" in
     info "Using serial port: ${PORT}"
     verify_target_chip "${PORT}"
     eidolon_prepare_build "${PROJECT_ROOT}" "${BOARD_IDF_VERSION}"
-    run_idf -p "${PORT}" flash
-    eidolon_verify_flashed "${PROJECT_ROOT}" "${PORT}"
+    eidolon_flash "${PROJECT_ROOT}" "${BUILD_DIR}" "${PORT}" flash run_idf -p "${PORT}"
     ;;
   monitor)
     PORT="$(detect_port)"
