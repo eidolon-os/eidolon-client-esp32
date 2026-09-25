@@ -29,6 +29,18 @@ bool ParseDeviceConfigurationResponse(
     const char** rejection_reason = nullptr);
 
 
+// Temporary invitation only. Parsing never writes a Claim or cached configuration.
+// Caller must authenticate the sender before using this payload.
+struct SharedSessionInvitation {
+    std::string session_id;
+    int64_t deadline_ms = 0;
+    HubChannelAssignment channel;
+};
+bool ParseSharedSessionInvitation(const std::string& body,
+                                  const ActiveClaimState& expected,
+                                  int64_t now_ms,
+                                  SharedSessionInvitation& out);
+
 bool ParseLiveKitBinding(const std::string& body, Esp32HubConfig& out);
 
 // Does this Authority answer mean the Proposal is finished for good?

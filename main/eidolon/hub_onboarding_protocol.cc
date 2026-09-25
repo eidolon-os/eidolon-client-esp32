@@ -197,6 +197,23 @@ bool SameDeviceRef(const device_foundation::v1::DeviceRef& left,
            left.trust_epoch == right.trust_epoch;
 }
 
+bool ParseChannelAssignment(const cJSON* item, HubChannelAssignment& assignment)
+{
+    assignment = HubChannelAssignment{};
+    if (!cJSON_IsObject(item) || JsonString(item, "binding_format") != kLiveKitBindingFormat) {
+        return false;
+    }
+    assignment.channel_id = JsonString(item, "channel_id");
+    assignment.binding_format = JsonString(item, "binding_format");
+    assignment.opaque_binding = JsonString(item, "opaque_binding");
+    if (!assignment.channel_id.empty() && !assignment.opaque_binding.empty() &&
+        ReadInt64(item, "expires_at_ms", assignment.expires_at_ms) && assignment.expires_at_ms > 0) {
+        return true;
+    }
+    assignment = HubChannelAssignment{};
+    return false;
+}
+
 bool ParseOneChannel(const cJSON* root, HubChannelAssignment& assignment)
 {
     assignment = HubChannelAssignment{};
@@ -208,16 +225,7 @@ bool ParseOneChannel(const cJSON* root, HubChannelAssignment& assignment)
             JsonString(item, "binding_format") != kLiveKitBindingFormat) {
             continue;
         }
-        assignment.channel_id = JsonString(item, "channel_id");
-        assignment.binding_format = JsonString(item, "binding_format");
-        assignment.opaque_binding = JsonString(item, "opaque_binding");
-        if (!assignment.channel_id.empty() &&
-            !assignment.opaque_binding.empty() &&
-            ReadInt64(item, "expires_at_ms", assignment.expires_at_ms) &&
-            assignment.expires_at_ms > 0) {
-            return true;
-        }
-        assignment = HubChannelAssignment{};
+        if (ParseChannelAssignment(item, assignment)) return true;
     }
     return cJSON_GetArraySize(channels) == 0;
 }
@@ -449,6 +457,45 @@ bool ParseDeviceConfigurationResponse(
         }
     }
     cJSON_Delete(root);
+    return true;
+}
+
+bool ParseSharedSessionInvitation(const std::string& body,
+                                  const ActiveClaimState& expected,
+                                  int64_t now_ms,
+                                  SharedSessionInvitation& out)
+{
+    out = SharedSessionInvitation{};
+    if (now_ms <= 0 || body.empty() || body.size() > 160 * 1024) return false;
+    cJSON* root = cJSON_ParseWithLength(body.data(), body.size());
+    const auto reject = [&]() { cJSON_Delete(root); return false; };
+    int64_t version = 0, issued = 0;
+    device_foundation::v1::DeviceRef ref;
+    SharedSessionInvitation parsed;
+    if (!ExactObjectSize(root, 5) || !ReadInt64(root, "schema_version", version) || version != 1 ||
+        !ParseDeviceRef(cJSON_GetObjectItemCaseSensitive(root, "device_ref"), ref) ||
+        !SameDeviceRef(ref, expected.device_ref)) return reject();
+    parsed.session_id = JsonString(root, "session_id");
+    if (parsed.session_id.empty() || parsed.session_id.size() > 64 ||
+        parsed.session_id.find_first_not_of(
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.:-") != std::string::npos) {
+        return reject();
+    }
+    const cJSON* channel = cJSON_GetObjectItemCaseSensitive(root, "channel");
+    const cJSON* kinds = cJSON_GetObjectItemCaseSensitive(channel, "kinds");
+    if (!ExactObjectSize(channel, 7) || JsonString(channel, "purpose") != "shared-session" ||
+        !cJSON_IsArray(kinds) || cJSON_GetArraySize(kinds) < 1 || cJSON_GetArraySize(kinds) > 8 ||
+        !ParseChannelAssignment(channel, parsed.channel) || parsed.channel.channel_id.size() > 128 ||
+        parsed.channel.opaque_binding.size() > 131072 ||
+        !ReadInt64(channel, "issued_at_ms", issued) || issued < 0 || issued > now_ms ||
+        !ReadInt64(root, "deadline_ms", parsed.deadline_ms) || parsed.deadline_ms <= now_ms ||
+        parsed.deadline_ms <= issued || parsed.deadline_ms > parsed.channel.expires_at_ms) return reject();
+    const cJSON* kind = nullptr;
+    cJSON_ArrayForEach(kind, kinds) {
+        if (!cJSON_IsString(kind)) return reject();
+    }
+    cJSON_Delete(root);
+    out = std::move(parsed);
     return true;
 }
 

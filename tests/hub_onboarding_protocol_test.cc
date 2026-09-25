@@ -330,6 +330,49 @@ eidolon::ActiveClaimState ClaimFrom(const cJSON* device_ref)
     return claim;
 }
 
+void TestSharedInvitationIsTemporaryAndLifecycleFenced()
+{
+    cJSON* vector = cJSON_Parse(ReadConfigurationResponseVector().c_str());
+    const cJSON* ref = cJSON_GetObjectItemCaseSensitive(vector, "device_ref");
+    const auto claim = ClaimFrom(ref);
+    cJSON* root = cJSON_Parse(R"({"schema_version":1,"session_id":"team-1","deadline_ms":2000,
+      "channel":{"channel_id":"temporary-1","purpose":"shared-session","kinds":["audio"],
+      "binding_format":"application/vnd.eidolon.livekit-session+json;v=2",
+      "issued_at_ms":1000,"expires_at_ms":3000,"opaque_binding":"dGVzdA=="}})");
+    cJSON_AddItemToObject(root, "device_ref", cJSON_Duplicate(ref, true));
+    cJSON* channel = cJSON_GetObjectItemCaseSensitive(root, "channel");
+    const auto parse = [&](int64_t now, eidolon::SharedSessionInvitation& out,
+                           const eidolon::ActiveClaimState& current) {
+        char* raw = cJSON_PrintUnformatted(root);
+        const bool accepted = eidolon::ParseSharedSessionInvitation(raw, current, now, out);
+        cJSON_free(raw);
+        return accepted;
+    };
+    eidolon::SharedSessionInvitation out;
+    assert(parse(1500, out, claim));
+    assert(out.session_id == "team-1" && out.channel.channel_id == "temporary-1");
+    assert(!parse(2000, out, claim));
+    assert(out.session_id.empty() && out.channel.opaque_binding.empty());
+    assert(!parse(0, out, claim));
+    assert(!parse(999, out, claim));
+    auto changed = claim;
+    ++changed.device_ref.trust_epoch;
+    assert(!parse(1500, out, changed));
+    cJSON_ReplaceItemInObject(channel, "purpose", cJSON_CreateString("device-session"));
+    assert(!parse(1500, out, claim));
+    cJSON_ReplaceItemInObject(channel, "purpose", cJSON_CreateString("shared-session"));
+    cJSON_AddStringToObject(root, "return_channel", "do-not-persist");
+    assert(!parse(1500, out, claim));
+    cJSON_DeleteItemFromObject(root, "return_channel");
+    cJSON_ReplaceItemInObject(root, "schema_version", cJSON_CreateBool(true));
+    assert(!parse(1500, out, claim));
+    cJSON_ReplaceItemInObject(root, "schema_version", cJSON_CreateNumber(1));
+    cJSON_ReplaceItemInObject(root, "deadline_ms", cJSON_CreateNumber(3001));
+    assert(!parse(1500, out, claim));
+    cJSON_Delete(root);
+    cJSON_Delete(vector);
+}
+
 void TestConfigurationResponseMatchesTheGoldenVector()
 {
     const std::string raw = ReadConfigurationResponseVector();
@@ -542,6 +585,7 @@ int main()
     TestCanonicalManifest();
     TestLiveKitBindingMatchesTheGoldenVector();
     TestConfigurationResponseMatchesTheGoldenVector();
+    TestSharedInvitationIsTemporaryAndLifecycleFenced();
     TestActiveClaimConfigurationAndProviderBinding();
     TestFinishedProposalIsRecognizedOnlyFromTheAuthoritysOwnWords();
     TestOperationalKeyIsPresentedInTheFormTheClaimRecords();
