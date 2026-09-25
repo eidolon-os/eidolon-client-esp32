@@ -82,7 +82,8 @@ bool ParseSessionOutputPlan(const cJSON* json,SessionOutputPlan& output) {
     for (char c:plan.session_id) if (!(c>='a' && c<='z') && !(c>='A' && c<='Z') &&
         !(c>='0' && c<='9') && c!='-' && c!='_' && c!='.' && c!=':') return false;
     if (!Uint(cJSON_GetObjectItemCaseSensitive(json,"policy_revision"),plan.policy_revision) ||
-        !Mask(cJSON_GetObjectItemCaseSensitive(json,"outputs"),plan.selected) || !(plan.selected&kResponseOutputs)) return false;
+        !Mask(cJSON_GetObjectItemCaseSensitive(json,"outputs"),plan.selected) ||
+        (!plan.microphone && !(plan.selected&kResponseOutputs))) return false;
     auto* profile=cJSON_GetObjectItemCaseSensitive(json,"expression_profile");
     plan.face_profile=cJSON_IsString(profile) && !std::strcmp(profile->valuestring,expression::kProfile);
     if ((profile && !cJSON_IsNull(profile) && !plan.face_profile) ||
@@ -102,7 +103,7 @@ bool DeviceOutputGate::Start(const SessionOutputPlan& plan,const std::string& ex
     std::lock_guard<std::mutex> lock(mutex_);
     if (!policy_.known || plan.session_id!=expected_session || plan.policy_revision!=policy_.revision ||
         (plan.microphone && policy_.inputs_known && !policy_.microphone) ||
-        !(plan.selected&kResponseOutputs) || (plan.selected&~policy_.allowed) ||
+        (!plan.microphone && !(plan.selected&kResponseOutputs)) || (plan.selected&~policy_.allowed) ||
         (plan.selected&~supported_outputs_) ||
         plan.face_profile!=bool(plan.selected&OutputBit(presentation::Output::Expression))) {
         active_=false;selected_=0;return false;

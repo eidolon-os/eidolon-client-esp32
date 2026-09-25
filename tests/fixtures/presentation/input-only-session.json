@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "session_id": "input-session",
+  "policy_revision": 2,
+  "outputs": {
+    "speech": false,
+    "dialogue_text": false,
+    "expression": false,
+    "audio_cue": false,
+    "motion": false
+  },
+  "inputs": {
+    "microphone": true
+  },
+  "expression_profile": null
+}

@@ -110,7 +110,25 @@ int main() {
     assert(!legacy.Allows(Output::Expression));
     assert(legacy.Bind({true,1,0}));
     assert(!legacy.Allows(Output::Speech));
-    assert(!legacy.Start({"s",1,0,false},"s"));
+    assert(!legacy.Start({"s",1,0,false,false},"s"));
+    // A prepared input endpoint captures speech without enabling any output.
+    std::ifstream input_file("tests/fixtures/presentation/input-only-session.json");
+    std::ostringstream input_buffer; input_buffer<<input_file.rdbuf();
+    auto* input_json=cJSON_Parse(input_buffer.str().c_str());
+    SessionOutputPlan input_plan;
+    assert(ParseSessionOutputPlan(input_json,input_plan));cJSON_Delete(input_json);
+    DeviceOutputGate capture_only(false);
+    assert(capture_only.Bind({true,2,speech,true,true}));
+    assert(capture_only.Start(input_plan,"input-session"));
+    assert(capture_only.AllowsMicrophone());
+    assert(!capture_only.AllowsAny(UINT32_MAX));
+    capture_only.Close();
+    assert(!capture_only.AllowsMicrophone());
+    assert(capture_only.Bind({true,3,speech,true,false}));
+    input_plan.policy_revision=3;
+    assert(!capture_only.Start(input_plan,"input-session"));
+    auto* empty_plan=cJSON_Parse(R"({"session_id":"empty","policy_revision":1,"outputs":{},"inputs":{"microphone":false}})");
+    assert(!ParseSessionOutputPlan(empty_plan,input_plan));cJSON_Delete(empty_plan);
     for (const char* raw : {R"({"revision":true,"allowed":{}})",
             R"({"revision":1,"allowed":{"speech":1}})",
             R"({"revision":1,"allowed":{"speech":true,"speech":false}})",
