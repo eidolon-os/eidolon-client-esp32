@@ -37,6 +37,7 @@ inline constexpr const char* kCompanionFlowNodeType = "companion.flow.node";
 // connected no longer says whether it wants to be heard; it says so itself.
 inline constexpr const char* kSessionOpenType = "session_open";
 inline constexpr const char* kSessionCloseType = "session_close";
+inline constexpr const char* kChannelProviderIdentityPrefix = "channel-provider-";
 inline constexpr const char* kSessionRejectedType = "session_rejected";
 inline constexpr const char* kSessionRejectionConflict = "conflict";
 inline constexpr const char* kSessionStartedType = "session_started";

@@ -430,7 +430,7 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
     transcription_stream_.Clear();
     identity_ = config.session.identity;
     provider_identity_ = config.session.room_name.empty()
-        ? "" : "channel-provider-" + config.session.room_name;
+        ? "" : std::string(kChannelProviderIdentityPrefix) + config.session.room_name;
     generation_ = generation;
 
     const auto local_audio = CompiledDeviceCapabilities().OutputMask() & kAudioOutputs;
