@@ -912,8 +912,12 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
             }
             AckCommand(shared_visit_->command, "completed", "OK", "", "{\"joined\":true}");
             SetState(VoiceSessionState::ConfigReady, "shared_transport_connected");
-        } else if (lk_state == LiveKitConnectionState::Failed ||
+        } else if (lk_state == LiveKitConnectionState::Reconnecting ||
+                   lk_state == LiveKitConnectionState::Failed ||
                    lk_state == LiveKitConnectionState::Disconnected) {
+            // A temporary visit cannot reconnect with its old room grant:
+            // after Provider deletion that would recreate the revoked room.
+            // Return through the original Device Control refresh instead.
             FinishSharedVisit("shared_transport_lost");
         }
         return;
