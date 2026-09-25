@@ -39,5 +39,14 @@ int main() {
     assert(pending.Begin(Command(""), "") == PendingRoomJoin::Admission::Started);
     assert(pending.Begin(Command(""), "") == PendingRoomJoin::Admission::Busy);
     assert(pending.Complete());
+    assert(pending.Begin(Command("prepared"), "", true) == PendingRoomJoin::Admission::Started);
+    assert(pending.control_request_id() == "prepared");
+    assert(pending.Begin(Command("prepared"), "", false) == PendingRoomJoin::Admission::Conflict);
+    assert(pending.Begin(Command("prepared"), "", true) == PendingRoomJoin::Admission::Retry);
+    assert(pending.Complete()->id == "prepared");
+    assert(pending.control_request_id().empty());
+    assert(pending.Begin(Command("ordinary"), "") == PendingRoomJoin::Admission::Started);
+    assert(pending.control_request_id().empty());
+    assert(pending.Complete());
     std::puts("pending_room_join: PASS");
 }

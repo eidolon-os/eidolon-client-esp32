@@ -1863,6 +1863,10 @@ esp_err_t EidolonVoiceController::PublishSessionRequest(
     cJSON_AddNumberToObject(root, "schema_v", kWireSchemaVersion);
     cJSON_AddStringToObject(root, "type", type);
     cJSON_AddStringToObject(root, kSessionConversationIdField, conversation_id.c_str());
+    const auto control_request_id = pending_room_join_.control_request_id();
+    if (!control_request_id.empty()) {
+        cJSON_AddStringToObject(root, kSessionControlRequestIdField, control_request_id.c_str());
+    }
     char* printed = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
     if (!printed) {
@@ -2541,9 +2545,11 @@ void EidolonVoiceController::HandleRoomJoinCommand(const std::string& command_id
     // A user-initiated room.join may omit the payload or explicitly carry
     // "user_initiated"; in both cases pending stays empty.
     std::string intent;
+    bool preparation = false;
     if (!payload.empty()) {
         cJSON* root = cJSON_Parse(payload.c_str());
         if (root != nullptr) {
+            preparation = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(root, "prepare_only"));
             const cJSON* intent_item = cJSON_GetObjectItem(root, kSessionIntentField);
             if (cJSON_IsString(intent_item) && intent_item->valuestring != nullptr) {
                 const char* value = intent_item->valuestring;
@@ -2562,7 +2568,7 @@ void EidolonVoiceController::HandleRoomJoinCommand(const std::string& command_id
     ControlCommand command;
     command.id = command_id;
     command.op = kControlOpRoomJoin;
-    const auto admission = pending_room_join_.Begin(command, intent);
+    const auto admission = pending_room_join_.Begin(command, intent, preparation);
     if (admission == PendingRoomJoin::Admission::Retry) return;
     if (admission != PendingRoomJoin::Admission::Started) {
         AckCommand(command, "failed", admission == PendingRoomJoin::Admission::Busy
