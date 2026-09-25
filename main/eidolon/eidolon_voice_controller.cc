@@ -3046,7 +3046,10 @@ void EidolonVoiceController::DoActivation()
         // HubActivator just performed the first handoff. Avoid immediately
         // repeating it; the normal bounded poll owns the next attempt.
         ScheduleOnboardingPoll();
-    } else if (!HasActiveConfig()) {
+    } else {
+        // Stored credentials can reconnect transport, but their boot-local
+        // authenticated clock is deliberately not persisted. Refresh on every
+        // activation before treating the device as ready for timed commands.
         const esp_err_t refresh_err = RefreshHubConfig();
         if (refresh_err != ESP_OK) {
             ESP_LOGW(TAG, "Initial Hub config refresh failed: %s", esp_err_to_name(refresh_err));
