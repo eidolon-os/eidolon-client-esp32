@@ -31,7 +31,7 @@ public:
     using StateCallback = std::function<void(LiveKitConnectionState, uint32_t generation)>;
     using TranscriptionCallback = std::function<void(const TranscriptionEvent& event)>;
     using AgentPhaseCallback = std::function<void(AgentPhase phase)>;
-    using ControlCommandCallback = std::function<void(const std::string& payload, uint32_t generation, bool agent)>;
+    using ControlCommandCallback = std::function<void(const std::string& payload, uint32_t generation, bool agent, bool provider)>;
     using SessionControlCallback = std::function<void(const std::string& payload, uint32_t generation, bool agent)>;
     using DeviceEventCallback =
         std::function<void(const std::string& payload, uint32_t generation)>;

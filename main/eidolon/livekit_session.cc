@@ -233,9 +233,16 @@ void LiveKitSession::OnDataReceived(const livekit_data_received_t* data, void* c
     if (strcmp(topic, kControlTopic) != 0 || !session->on_control_command_) {
         return;
     }
-    if (data->payload.size > 4096) return;
+    bool provider = false;
+    {
+        std::lock_guard<std::mutex> lock(session->peers_mutex_);
+        provider = data->sender_identity && !session->provider_identity_.empty() &&
+                   session->provider_identity_ == data->sender_identity;
+    }
+    // Larger temporary bindings are accepted only from the authenticated Provider.
+    if (data->payload.size > (provider ? 160 * 1024U : 4096U)) return;
     std::string payload(reinterpret_cast<const char*>(data->payload.bytes), data->payload.size);
-    session->on_control_command_(payload, session->generation_, session->IsAgent(data->sender_identity));
+    session->on_control_command_(payload, session->generation_, session->IsAgent(data->sender_identity), provider);
 }
 
 void LiveKitSession::HandleStateChanged(livekit_connection_state_t state)

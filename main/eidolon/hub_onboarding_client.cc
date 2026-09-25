@@ -310,6 +310,18 @@ std::string WithCommandEnvelope(const std::string& command_id,
 
 }  // namespace
 
+bool HubOnboardingClient::DecodeChannelAssignment(const HubChannelAssignment& assignment,
+                                                  Esp32HubConfig& out)
+{
+    std::string binding;
+    if (assignment.binding_format != kLiveKitBindingFormat ||
+        !Base64Decode(assignment.opaque_binding, binding) || !ParseLiveKitBinding(binding, out)) {
+        return false;
+    }
+    out.expires_at_ms = assignment.expires_at_ms;
+    return true;
+}
+
 esp_err_t HubOnboardingClient::FetchDescriptor(
     const AuthorityCandidateRecord& candidate,
     device_foundation::v1::OwnerDomainDescriptor& out)
@@ -434,9 +446,7 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
     out.status = status;
     out.output_policy = output_policy;
     if (status == HubConfigStatus::Active) {
-        std::string binding;
-        if (!Base64Decode(assignment.opaque_binding, binding) ||
-            !ParseLiveKitBinding(binding, out)) {
+        if (!DecodeChannelAssignment(assignment, out)) {
             ESP_LOGW(TAG, "Configuration validation failed stage=livekit_binding");
             return ESP_ERR_INVALID_RESPONSE;
         }

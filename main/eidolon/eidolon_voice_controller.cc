@@ -35,6 +35,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <chrono>
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <ctime>
@@ -347,6 +348,9 @@ void EidolonVoiceController::Dispatch(const Event& ev)
             (*ev.completion)(DoCommissioningQuiesce());
         }
         break;
+    case EventType::SharedDeadline:
+        DoSharedDeadline();
+        break;
     case EventType::Join:
         DoJoinRoom();
         break;
@@ -393,7 +397,7 @@ void EidolonVoiceController::Dispatch(const Event& ev)
         break;
     case EventType::ControlCommand:
         if (ev.payload != nullptr) {
-            DoControlCommand(*ev.payload, ev.generation, ev.flag);
+            DoControlCommand(*ev.payload, ev.generation, ev.flag, ev.provider);
         }
         break;
     case EventType::SessionControl:
@@ -664,6 +668,7 @@ const char* EidolonVoiceController::VoiceStateName(VoiceSessionState state)
 
 const char* EidolonVoiceController::CurrentRoomKind() const
 {
+    if (shared_visit_) return "shared";
     if (standby_) {
         return "control";
     }
@@ -894,6 +899,26 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         return;
     }
 
+    if (shared_visit_) {
+        CloseConversationAudio();
+        if (lk_state == LiveKitConnectionState::Connected) {
+            if (!shared_visit_->lease.OnConnected(esp_timer_get_time())) {
+                FinishSharedVisit("shared_join_expired");
+                return;
+            }
+            if (!ArmSharedDeadline(shared_visit_->lease.deadline_us())) {
+                FinishSharedVisit("shared_timer_failed");
+                return;
+            }
+            AckCommand(shared_visit_->command, "completed", "OK", "", "{\"joined\":true}");
+            SetState(VoiceSessionState::ConfigReady, "shared_transport_connected");
+        } else if (lk_state == LiveKitConnectionState::Failed ||
+                   lk_state == LiveKitConnectionState::Disconnected) {
+            FinishSharedVisit("shared_transport_lost");
+        }
+        return;
+    }
+
     if (standby_) {
         CloseConversationAudio();
         switch (lk_state) {
@@ -1109,6 +1134,7 @@ void EidolonVoiceController::OnboardingPollTimerCb(void* arg)
 
 void EidolonVoiceController::DoOnboardingPoll()
 {
+    if (shared_visit_) return;
     if (state_ != VoiceSessionState::PendingApproval &&
         state_ != VoiceSessionState::WaitingBinding) {
         return;
@@ -1200,6 +1226,7 @@ void EidolonVoiceController::ReconnectTimerCb(void* arg)
 
 void EidolonVoiceController::DoReconnectTick()
 {
+    if (shared_visit_) return;
     int attempt = 0;
     if (!channel_recovery_.BeginRetry(&attempt)) {
         return;
@@ -1290,6 +1317,7 @@ void EidolonVoiceController::ConnectWatchdogCb(void* arg)
 
 void EidolonVoiceController::DoConnectTimeout()
 {
+    if (shared_visit_) { DoSharedDeadline(); return; }
     // The attempt may have completed between the timer firing and now.
     const bool voice_connecting =
         state_ == VoiceSessionState::Connecting || state_ == VoiceSessionState::Opening ||
@@ -1546,7 +1574,117 @@ void EidolonVoiceController::HandleExpressionCommand(const ControlCommand& comma
 }
 #endif
 
-void EidolonVoiceController::DoControlCommand(const std::string& payload, uint32_t generation, bool agent)
+void EidolonVoiceController::HandleSharedInvitation(const ControlCommand& command, bool provider)
+{
+    if (!provider || !command.is_v1 || !command.clock_known || command.id.empty()) {
+        AckCommand(command, "rejected", "SHARED_INVITATION_NOT_AUTHORIZED");
+        return;
+    }
+    if (shared_visit_) {
+        const bool same = shared_visit_->command.id == command.id &&
+                          shared_visit_->command.payload == command.payload;
+        AckCommand(command, same ? (shared_visit_->lease.connected() ? "completed" : "accepted") : "rejected",
+                   same ? "OK" : "SHARED_TRANSPORT_BUSY");
+        return;
+    }
+    if (!standby_ || !session_.IsConnected() || !current_conversation_id_.empty() ||
+        pending_room_join_.active() || config_.status != HubConfigStatus::Active) {
+        AckCommand(command, "rejected", "SHARED_TRANSPORT_BUSY");
+        return;
+    }
+    ActiveClaimState claim;
+    SharedSessionInvitation invitation;
+    const int64_t monotonic_us = esp_timer_get_time();
+    const int64_t now_ms = config_.clock.Now(monotonic_us / 1000);
+    Esp32HubConfig temporary = config_;
+    if (HubConfigStore().LoadActiveClaim(claim) != ClaimStoreLoadResult::Loaded ||
+        claim.state != ActiveClaimLocalState::Active ||
+        !ParseSharedSessionInvitation(command.payload, claim, now_ms, invitation) ||
+        !HubOnboardingClient::DecodeChannelAssignment(invitation.channel, temporary) ||
+        temporary.session.identity != claim.device_ref.device_instance_id ||
+        temporary.session.room_name == config_.session.room_name) {
+        AckCommand(command, "rejected", "INVALID_SHARED_INVITATION");
+        return;
+    }
+    SharedVisit visit;
+    visit.command = command;
+    visit.session_id = invitation.session_id;
+    visit.lease = SharedTransportLease(monotonic_us, now_ms, invitation.deadline_ms,
+                                      invitation.channel.expires_at_ms);
+    if (!ArmSharedDeadline(visit.lease.deadline_us())) {
+        AckCommand(command, "failed", "SHARED_TIMER_UNAVAILABLE");
+        return;
+    }
+    if (AckCommand(command, "accepted", "OK") != ESP_OK) {
+        esp_timer_stop(shared_timer_);
+        return;
+    }
+    shared_visit_ = std::move(visit);
+    CloseConversationAudio();
+    DisarmConnectWatchdog();
+    if (reconnect_timer_) esp_timer_stop(reconnect_timer_);
+    MarkSessionSuperseded("shared_handoff");
+    session_.Disconnect();
+    SetOperationalReady(false, "shared_transport_pending");
+    SetState(VoiceSessionState::Connecting, "shared_transport_pending");
+    const uint32_t generation = BeginSessionGeneration("shared");
+    if (session_.Connect(temporary, generation) != ESP_OK) {
+        FinishSharedVisit("shared_connect_failed");
+    }
+}
+
+bool EidolonVoiceController::ArmSharedDeadline(int64_t deadline_us)
+{
+    if (!shared_timer_) {
+        esp_timer_create_args_t args = {};
+        args.callback = &EidolonVoiceController::SharedDeadlineCb;
+        args.arg = this;
+        args.dispatch_method = ESP_TIMER_TASK;
+        args.name = "eidolon_shared";
+        if (esp_timer_create(&args, &shared_timer_) != ESP_OK) return false;
+    }
+    esp_timer_stop(shared_timer_);
+    const int64_t remaining = deadline_us - esp_timer_get_time();
+    return remaining > 0 && esp_timer_start_once(shared_timer_, remaining) == ESP_OK;
+}
+
+void EidolonVoiceController::SharedDeadlineCb(void* arg)
+{
+    auto* self = static_cast<EidolonVoiceController*>(arg);
+    Event ev;
+    ev.type = EventType::SharedDeadline;
+    self->Enqueue(ev);
+}
+
+void EidolonVoiceController::DoSharedDeadline()
+{
+    if (!shared_visit_) return;
+    const int64_t deadline = shared_visit_->lease.deadline_us();
+    if (esp_timer_get_time() < deadline && ArmSharedDeadline(deadline)) return;
+    FinishSharedVisit("shared_deadline");
+}
+
+void EidolonVoiceController::FinishSharedVisit(const char* reason, bool reconnect)
+{
+    if (!shared_visit_) return;
+    shared_visit_.reset();
+    if (shared_timer_) esp_timer_stop(shared_timer_);
+    DisarmConnectWatchdog();
+    CloseConversationAudio();
+    MarkSessionSuperseded(reason);
+    session_.Disconnect();
+    standby_ = true;
+    SetOperationalReady(false, reason);
+    SetState(StateForConfig(config_), reason);
+    if (!reconnect || !channel_recovery_.network_available()) return;
+    // config_ has remained the original configuration throughout the visit.
+    // Refresh through Device Control to observe revocation/rotation before return.
+    const esp_err_t refreshed = RefreshHubConfig(/*persist=*/false);
+    if (refreshed == ESP_ERR_NOT_ALLOWED) return;
+    if (ConnectChannel() != ESP_OK) ScheduleChannelReconnect(reason);
+}
+
+void EidolonVoiceController::DoControlCommand(const std::string& payload, uint32_t generation, bool agent, bool provider)
 {
     if (generation != session_generation_) return;
     ControlCommand command = ParseControlCommand(
@@ -1558,6 +1696,14 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload, uint32
     if (command.expired) {
         ESP_LOGW(TAG, "Ignoring expired control command op=%s", command.op.c_str());
         AckCommand(command, "expired", "COMMAND_EXPIRED");
+        return;
+    }
+    if (command.op == "shared-session.invite") {
+        HandleSharedInvitation(command, provider);
+        return;
+    }
+    if (shared_visit_) {
+        AckCommand(command, "rejected", "SHARED_TRANSPORT_BUSY");
         return;
     }
 #if CONFIG_EIDOLON_COMPANION_FACE
@@ -1724,6 +1870,7 @@ esp_err_t EidolonVoiceController::PublishSessionRequest(
 
 void EidolonVoiceController::DoSessionControl(const std::string& payload, uint32_t generation, bool agent)
 {
+    if (shared_visit_) return;
     if (generation != session_generation_) return;
     cJSON* root = cJSON_Parse(payload.c_str());
     if (root == nullptr) {
@@ -2795,6 +2942,7 @@ void EidolonVoiceController::HandleIdleTimeoutCommand()
 
 void EidolonVoiceController::HandleSessionEnd(EndReason reason)
 {
+    if (shared_visit_) { FinishSharedVisit("shared_session_ended"); return; }
     CompletePendingRoomJoinCommand("failed", "ROOM_JOIN_ENDED");
     static const char* kReasonNames[] = {"none",
                                          kSessionEndIdleNormal,
@@ -2829,6 +2977,7 @@ void EidolonVoiceController::HandleSessionEnd(EndReason reason)
 
 void EidolonVoiceController::DoActivation()
 {
+    if (shared_visit_) FinishSharedVisit("shared_reactivation", false);
     channel_recovery_.OnActivation();
     // Activation rebuilds the device's whole operational picture, so any
     // internal-memory ceiling measured before it describes a device that no
@@ -2855,9 +3004,10 @@ void EidolonVoiceController::DoActivation()
             Enqueue(ev);
         }
     });
-    session_.SetOnControlCommand([this](const std::string& payload, uint32_t generation, bool agent) {
+    session_.SetOnControlCommand([this](const std::string& payload, uint32_t generation, bool agent, bool provider) {
         Event ev;
         ev.type = EventType::ControlCommand;
+        ev.provider = provider;
         ev.generation = generation;
         ev.flag = agent;
         ev.payload = new std::string(payload);
@@ -2923,6 +3073,7 @@ void EidolonVoiceController::DoActivation()
 
 void EidolonVoiceController::DoNetworkLost()
 {
+    if (shared_visit_) FinishSharedVisit("shared_network_lost", false);
     ESP_LOGW(TAG,
              "[lifecycle] network_lost executing state=%s room_kind=%s gen=%lu "
              "connected=%d room=%s",
@@ -3039,6 +3190,7 @@ void EidolonVoiceController::DoNetworkRestored()
 
 esp_err_t EidolonVoiceController::DoJoinRoom()
 {
+    if (shared_visit_) return ESP_ERR_INVALID_STATE;
     // The user is asking for a conversation now. Never answer that
     // with a refusal cached from an earlier attempt: measure the heap again and
     // let the attempt fail on today's numbers if it must.
@@ -3144,6 +3296,7 @@ esp_err_t EidolonVoiceController::DoJoinRoom()
 
 esp_err_t EidolonVoiceController::ConnectChannel()
 {
+    if (shared_visit_) return ESP_ERR_INVALID_STATE;
     if (!channel_recovery_.network_available() || !HasChannelConfig()) {
         return ESP_ERR_INVALID_STATE;
     }
@@ -3448,6 +3601,7 @@ uint64_t EidolonVoiceController::GuardEventTimestampMs(uint64_t monotonic_ms)
 
 esp_err_t EidolonVoiceController::DoLeaveRoom()
 {
+    if (shared_visit_) { FinishSharedVisit("shared_user_left"); return ESP_OK; }
     CompletePendingRoomJoinCommand("failed", "ROOM_JOIN_CANCELLED");
     bool playback_recent = PlaybackActiveRecently();
     ESP_LOGI(TAG,
@@ -3745,6 +3899,7 @@ esp_err_t EidolonVoiceController::StopLocalPlayback(const char* reason)
 
 void EidolonVoiceController::DoSetMicEnabled(bool enabled)
 {
+    if (shared_visit_) return;
     mic_enabled_ = enabled;
     if (session_.IsConnected() && !standby_) {
         PublishClientAudioState(AgentOutputActiveRecently());
@@ -3756,6 +3911,7 @@ void EidolonVoiceController::DoSetMicEnabled(bool enabled)
 
 void EidolonVoiceController::DoPttPressed()
 {
+    if (shared_visit_) return;
     if (!ptt_mode_) {
         return;
     }

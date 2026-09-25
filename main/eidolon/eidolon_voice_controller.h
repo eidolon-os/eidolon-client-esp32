@@ -16,6 +16,8 @@
 #include "ambient_presence_state.h"
 #include "control_protocol.h"
 #include "pending_room_join.h"
+#include <optional>
+#include "shared_transport_lease.h"
 #include "channel_recovery.h"
 #include "device_event_bus.h"
 #include "eidolon_device_profile.h"
@@ -137,6 +139,7 @@ private:
         OnboardingPoll,
         ReconnectTick,
         ConnectTimeout,
+        SharedDeadline,
         IdleLeave,
         FullDuplexIdleFallback,
     };
@@ -150,6 +153,7 @@ private:
         LiveKitConnectionState lk_state = LiveKitConnectionState::Disconnected;
         AgentPhase phase = AgentPhase::Silent;
         bool flag = false;
+        bool provider = false;
 #if CONFIG_EIDOLON_GUARD_SERVICE
         GuardObservation guard_observation;
         OwnerPresenceObservation owner_presence_observation;
@@ -191,7 +195,7 @@ private:
 #if CONFIG_EIDOLON_OWNER_FACE_PROFILE
     void DoOwnerFaceProfileCompleted(const std::string& payload);
 #endif
-    void DoControlCommand(const std::string& payload, uint32_t generation, bool agent);
+    void DoControlCommand(const std::string& payload, uint32_t generation, bool agent, bool provider);
 #if CONFIG_EIDOLON_COMPANION_FACE
     expression::Delivery presentations_{[this](const std::string& id, const std::string& receipt) {
         PublishPresentationReceipt(id, receipt);
@@ -401,6 +405,19 @@ private:
     // diagnosis three times makes it read like three different problems.
     bool memory_ceiling_announced_ = false;
     PendingRoomJoin pending_room_join_;
+    struct SharedVisit {
+        ControlCommand command;
+        std::string session_id;
+        SharedTransportLease lease;
+    };
+    std::optional<SharedVisit> shared_visit_;
+    esp_timer_handle_t shared_timer_ = nullptr;
+    void HandleSharedInvitation(const ControlCommand& command, bool provider);
+    void FinishSharedVisit(const char* reason, bool reconnect = true);
+    void DoSharedDeadline();
+    bool ArmSharedDeadline(int64_t deadline_us);
+    static void SharedDeadlineCb(void* arg);
+
     // Monotonic attempt id, bumped at the start of every voice/control connect.
     // The state-changed callback snapshots it into the event so a late teardown
     // from a superseded connection can be recognised (Phase 0 logs the mismatch;
