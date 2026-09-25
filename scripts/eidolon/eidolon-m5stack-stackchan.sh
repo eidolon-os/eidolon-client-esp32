@@ -614,15 +614,17 @@ cmd_flash() {
   fi
 
   if [[ "${APP_ONLY}" -eq 1 ]]; then
-    idf app-flash
-    return
+    idf app-flash || return 1
+    eidolon_verify_flashed "${PROJECT_ROOT}" "${PORT}"
+    return $?
   fi
 
   if ((${#FLASH_PARTITIONS[@]} > 0)); then
     die "This IDF does not support --only-flash-partition; use --app-only or a complete flash. No data was written."
   fi
 
-  idf flash
+  idf flash || return 1
+  eidolon_verify_flashed "${PROJECT_ROOT}" "${PORT}"
 }
 
 cmd_monitor() {
@@ -965,7 +967,6 @@ dispatch_cli() {
       auto_configure_board 1 || true
       parse_flash_args "$@"
       cmd_flash
-      eidolon_verify_flashed "${PROJECT_ROOT}" "${PORT}"
       ;;
     verify)
       if ! PORT="$(detect_port)"; then die "未找到串口"; fi
