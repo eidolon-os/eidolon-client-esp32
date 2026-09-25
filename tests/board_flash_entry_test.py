@@ -7,6 +7,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class BoardFlashEntryTest(unittest.TestCase):
+    def test_idf_global_port_precedes_build_and_flash_actions(self):
+        for board in ('m5stack-stackchan', 'm5stack-core-s3', 'esp32-s3-touch-amoled-2.06'):
+            source = (ROOT / f'scripts/eidolon/eidolon-{board}.sh').read_text()
+            function = 'idf() {' + source.split('\nidf() {', 1)[1].split('\n}', 1)[0] + '\n}'
+            for action in ('build', 'app-flash', 'flash'):
+                script = f"PORT=test-port\nrun() {{ printf '%s\\n' \"$@\"; }}\n{function}\nidf {action}"
+                result = subprocess.run(['bash', '-c', script], capture_output=True, text=True, check=True)
+                self.assertEqual(result.stdout.splitlines(), ['idf.py', '-p', 'test-port', action])
+
     def test_run_does_not_hide_failed_build_or_flash_by_starting_monitor(self):
         for board in ('m5stack-stackchan', 'm5stack-core-s3', 'esp32-s3-touch-amoled-2.06'):
             source = (ROOT / f'scripts/eidolon/eidolon-{board}.sh').read_text()

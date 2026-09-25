@@ -92,8 +92,9 @@ run() {
 }
 
 idf() {
-  local args=("idf.py" "$@")
+  local args=("idf.py")
   [[ -n "${PORT}" ]] && args+=("-p" "${PORT}")
+  args+=("$@")
   run "${args[@]}"
 }
 
