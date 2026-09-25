@@ -1580,8 +1580,12 @@ void EidolonVoiceController::HandleExpressionCommand(const ControlCommand& comma
 
 void EidolonVoiceController::HandleSharedInvitation(const ControlCommand& command, bool provider)
 {
-    if (!provider || !command.is_v1 || !command.clock_known || command.id.empty()) {
+    if (!provider || !command.is_v1 || command.id.empty()) {
         AckCommand(command, "rejected", "SHARED_INVITATION_NOT_AUTHORIZED");
+        return;
+    }
+    if (!command.clock_known) {
+        AckCommand(command, "rejected", "SHARED_CLOCK_UNAVAILABLE");
         return;
     }
     if (shared_visit_) {
