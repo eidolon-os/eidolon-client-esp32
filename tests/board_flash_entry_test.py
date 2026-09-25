@@ -7,6 +7,26 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class BoardFlashEntryTest(unittest.TestCase):
+    def test_run_does_not_hide_failed_build_or_flash_by_starting_monitor(self):
+        for board in ('m5stack-stackchan', 'm5stack-core-s3', 'esp32-s3-touch-amoled-2.06'):
+            source = (ROOT / f'scripts/eidolon/eidolon-{board}.sh').read_text()
+            function = 'cmd_run() {' + source.split('cmd_run() {', 1)[1].split('\n}', 1)[0] + '\n}'
+            for failure in ('build', 'flash'):
+                script = f'''
+set -euo pipefail
+SKIP_BUILD=0
+cmd_build() {{ echo build; [[ {failure} != build ]]; }}
+cmd_flash() {{ echo flash; [[ {failure} != flash ]]; }}
+cmd_monitor() {{ echo monitor; }}
+{function}
+status=0
+cmd_run || status=$?
+echo status:$status
+'''
+                result = subprocess.run(['bash', '-c', script], capture_output=True, text=True, check=True)
+                self.assertNotIn('monitor', result.stdout)
+                self.assertTrue(result.stdout.endswith('status:1\n'))
+
     def test_all_callers_observe_write_and_runtime_verification_failures(self):
         for board in ('m5stack-stackchan', 'm5stack-core-s3', 'esp32-s3-touch-amoled-2.06'):
             source = (ROOT / f'scripts/eidolon/eidolon-{board}.sh').read_text()

@@ -690,8 +690,10 @@ cmd_merge_bin() {
 }
 
 cmd_run() {
-  [[ "${SKIP_BUILD}" -eq 0 ]] && cmd_build
-  cmd_flash
+  if [[ "${SKIP_BUILD}" -eq 0 ]]; then
+    cmd_build || return 1
+  fi
+  cmd_flash || return 1
   cmd_monitor
 }
 
