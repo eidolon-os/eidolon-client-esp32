@@ -425,3 +425,144 @@ eidolon_partition_field() {
   eidolon_require_idf "${BOARD_IDF_VERSION:-}" >&2
   "$(eidolon_idf_python)" "$1/scripts/eidolon/partition_contract.py" field "$1/$2" "$3" "$4"
 }
+
+# ---- declared boards ---------------------------------------------------------
+# The helpers below let a board script DECLARE its board instead of carrying a
+# copy of it. Boards that still keep their own heredoc overlay and port globbing
+# are untouched by them; each can move over on its own.
+
+# Write a board's sdkconfig overlay from builds[].sdkconfig_append in
+# main/boards/<board>/config.json — the list scripts/release.py already builds
+# from — so a script build and a release build of one board cannot drift apart
+# the way hand-copied heredocs did. The board type comes from the script.
+#
+#   eidolon_board_overlay <project_root> <board_path> <board_kconfig> <out_file> [build_name]
+eidolon_board_overlay() {
+  local root="$1" board="$2" symbol="$3" out="$4" build="${5:-$2}"
+  local config="${root}/main/boards/${board}/config.json"
+  [[ -f "${config}" ]] || { eidolon__warn "missing ${config}"; return 1; }
+  mkdir -p "$(dirname "${out}")"
+  "${EIDOLON_PYTHON:-python3}" - "${config}" "${build}" "${symbol}" "${out}" <<'PY'
+import json
+import sys
+
+config, build, symbol, out = sys.argv[1:5]
+builds = json.load(open(config, encoding="utf-8")).get("builds", [])
+entry = next((b for b in builds if b.get("name") == build), None)
+if entry is None:
+    sys.exit(f"{config} has no build named {build!r}")
+lines = entry.get("sdkconfig_append", [])
+declared = [line for line in lines if line.startswith("CONFIG_BOARD_TYPE_")]
+if declared and declared != [f"{symbol}=y"]:
+    sys.exit(f"{config} declares {declared}, but this script builds {symbol}")
+with open(out, "w", encoding="utf-8") as f:
+    f.write(f"# Generated from {config} (build {build!r}). Edit that file, not this one.\n")
+    if not declared:
+        f.write(f"{symbol}=y\n")
+    f.writelines(line + "\n" for line in lines)
+PY
+}
+
+# ESP-IDF applies sdkconfig defaults only to symbols an existing sdkconfig does
+# not already hold, so an edited overlay is silently ignored by an old build
+# directory. Record which inputs produced the sdkconfig and discard it when they
+# change; IDF then regenerates it from the current inputs. Hand edits made with
+# menuconfig survive until the declared inputs change, and no longer.
+#
+#   eidolon_sdkconfig_track <sdkconfig_file> <defaults_file>...
+eidolon_sdkconfig_track() {
+  local sdkconfig="$1"
+  shift
+  local stamp="${sdkconfig}.inputs" current recorded=""
+  current="$(cat "$@" 2>/dev/null | shasum -a 256 | cut -d' ' -f1)"
+  [[ -f "${stamp}" ]] && recorded="$(cat "${stamp}")"
+  if [[ -f "${sdkconfig}" && "${recorded}" != "${current}" ]]; then
+    eidolon__info "sdkconfig inputs changed; regenerating $(basename "${sdkconfig}") from them"
+    rm -f "${sdkconfig}"
+  fi
+  mkdir -p "$(dirname "${stamp}")"
+  printf '%s\n' "${current}" >"${stamp}"
+}
+
+# Serial ports behind one USB bridge. Several Espressif boards share this desk
+# and /dev names follow the hub socket, not the board, so a board script names
+# the bridge its console sits behind (a fact of the board's schematic) and may
+# narrow to one unit's USB serial number. Enumeration goes through the OS USB
+# registry and never opens a port, so it cannot reset a board running firmware
+# other people are using. Needs the resolved IDF environment (pyserial).
+#
+#   eidolon_usb_ports <vid:pid> [usb_serial]
+eidolon_usb_ports() {
+  local python
+  python="$(eidolon_idf_python)" || return 1
+  "${python}" - "$1" "${2:-}" <<'PY'
+import sys
+
+from serial.tools import list_ports
+
+vid, pid = (int(part, 16) for part in sys.argv[1].split(":"))
+serial = sys.argv[2].lower()
+for port in sorted(list_ports.comports(), key=lambda p: p.device):
+    if port.vid == vid and port.pid == pid and (not serial or (port.serial_number or "").lower() == serial):
+        print(port.device)
+PY
+}
+
+# Every USB serial port with its bridge and serial number, marking the ones a
+# board script would consider. Read-only, like eidolon_usb_ports.
+#
+#   eidolon_usb_port_table <vid:pid>
+eidolon_usb_port_table() {
+  local python
+  python="$(eidolon_idf_python)" || return 1
+  "${python}" - "$1" <<'PY'
+import sys
+
+from serial.tools import list_ports
+
+vid, pid = (int(part, 16) for part in sys.argv[1].split(":"))
+for port in sorted(list_ports.comports(), key=lambda p: p.device):
+    if port.vid is None:
+        continue
+    mark = "*" if (port.vid, port.pid) == (vid, pid) else " "
+    print(f"{mark} {port.device:28} {port.vid:04x}:{port.pid:04x}  {port.serial_number or '-':34} {port.description}")
+PY
+}
+
+# Capture a board's serial console for a bounded time, without an interactive
+# monitor. Line levels are set before the port opens (as eidolon_verify_flashed
+# does) so opening it cannot hold the chip in reset or the ROM loader; with
+# reset=y one RTS pulse restarts the app so the capture starts at boot.
+#
+#   eidolon_serial_capture <port> <seconds> <reset y|n> [log_file]
+eidolon_serial_capture() {
+  local port="$1" seconds="$2" reset="$3" log="${4:-/dev/null}" python
+  python="$(eidolon_idf_python)" || return 1
+  mkdir -p "$(dirname "${log}")"
+  "${python}" - "${port}" "${seconds}" "${reset}" <<'PY' | tee "${log}"
+import sys
+import time
+
+import serial
+
+port, seconds, reset = sys.argv[1], float(sys.argv[2]), sys.argv[3] == "y"
+p = serial.Serial(port=None, baudrate=115200, timeout=0.3)
+p.dtr = False
+p.rts = False
+p.port = port
+p.open()
+try:
+    if reset:
+        p.rts = True
+        time.sleep(0.1)
+        p.rts = False
+    start = time.monotonic()
+    while time.monotonic() - start < seconds:
+        line = p.readline()
+        if line:
+            text = line.decode("utf-8", "replace").rstrip("\r\n")
+            print(f"[{time.monotonic() - start:7.2f}] {text}", flush=True)
+finally:
+    p.close()
+PY
+}
