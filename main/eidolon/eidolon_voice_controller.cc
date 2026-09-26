@@ -1375,7 +1375,8 @@ void EidolonVoiceController::DoConnectTimeout()
 
 void EidolonVoiceController::UpdateIdleAutoLeave()
 {
-    if (!ptt_mode_ || kPttIdleFallbackUs == 0) {
+    if (!ptt_mode_ || kPttIdleFallbackUs == 0 ||
+        !CurrentOutputGate().AllowsMicrophone()) {
         if (idle_leave_timer_ != nullptr) {
             esp_timer_stop(idle_leave_timer_);
         }
@@ -1435,7 +1436,8 @@ void EidolonVoiceController::DoIdleAutoLeave()
     // Activity may have resumed between the timer firing and now.
     bool agent_output_active = agent_phase_ != AgentPhase::Silent ||
                                local_playback_ui_active_ || PlaybackActiveRecently();
-    if (!(ptt_mode_ && kPttIdleFallbackUs > 0 && state_ == VoiceSessionState::InRoom &&
+    if (!(ptt_mode_ && kPttIdleFallbackUs > 0 && CurrentOutputGate().AllowsMicrophone() &&
+          state_ == VoiceSessionState::InRoom &&
           !standby_ && !ptt_active_ && !agent_output_active)) {
         return;
     }
@@ -1452,7 +1454,12 @@ void EidolonVoiceController::ResetFullDuplexIdleFallback(const char* reason)
     // Presence-managed sessions are externally bounded by the renewable owner
     // lease. The 75s client safety fallback is only for normal voice sessions;
     // applying it here would still eject a silent/stationary owner.
-    if (ptt_mode_ || kFullDuplexIdleFallbackUs == 0) {
+    // A presentation-only endpoint cannot infer conversation inactivity from
+    // its silent microphone. Its input/coordinator owns session termination.
+    // The session output gate resets on close, so ordinary conversations retain
+    // their existing local safety timeout on their next authorized start.
+    if (ptt_mode_ || kFullDuplexIdleFallbackUs == 0 ||
+        !CurrentOutputGate().AllowsMicrophone()) {
         DisarmFullDuplexIdleFallback();
         return;
     }
@@ -1497,7 +1504,8 @@ void EidolonVoiceController::FullDuplexIdleFallbackCb(void* arg)
 
 void EidolonVoiceController::DoFullDuplexIdleFallback()
 {
-    if (ptt_mode_ || state_ != VoiceSessionState::InRoom || standby_ ||
+    if (ptt_mode_ || !CurrentOutputGate().AllowsMicrophone() ||
+        state_ != VoiceSessionState::InRoom || standby_ ||
         !session_.IsConnected()) {
         return;
     }
