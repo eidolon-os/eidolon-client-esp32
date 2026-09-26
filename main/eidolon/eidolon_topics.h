@@ -62,6 +62,8 @@ inline constexpr const char* kSessionEndSuperseded = "superseded";
 
 // Device control ops — carried as "op" in the eidolon.control envelope.
 inline constexpr const char* kControlOpRoomJoin = "room.join";
+// SDK Body capability; Provider-scoped conversation teardown.
+inline constexpr const char* kControlOpRoomLeave = "room.leave";
 inline constexpr const char* kControlOpPlaybackStop = "playback.stop";
 inline constexpr const char* kControlOpPttTurnStatus = "ptt.turn_status";
 inline constexpr const char* kControlOpConfigRefresh = "config.refresh";

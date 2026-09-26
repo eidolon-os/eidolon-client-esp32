@@ -979,6 +979,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
                 } else {
                     CompletePendingRoomJoinCommand("failed", "ROOM_JOIN_FAILED");
                     current_conversation_id_.clear();
+                    conversation_control_request_id_.clear();
                     conversation_confirmed_ = false;
                     last_end_reason_ = EndReason::Error;
                     SetState(VoiceSessionState::Error,
@@ -1345,6 +1346,7 @@ void EidolonVoiceController::DoConnectTimeout()
     if (state_ == VoiceSessionState::Opening && session_.IsConnected()) {
         const std::string expired_conversation_id = current_conversation_id_;
         current_conversation_id_.clear();
+        conversation_control_request_id_.clear();
         conversation_confirmed_ = false;
         if (!expired_conversation_id.empty()) {
             PublishSessionRequest(kSessionCloseType, expired_conversation_id);
@@ -1726,6 +1728,44 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload, uint32
     }
     if (shared_visit_) {
         AckCommand(command, "rejected", "SHARED_TRANSPORT_BUSY");
+        return;
+    }
+    if (command.op == kControlOpRoomLeave) {
+        // This authority can revoke only the correlated conversation it prepared.
+        // It cannot authorize output plans or terminate a later unrelated session.
+        if (!provider || !command.is_v1 || command.capability_version != 1 ||
+            !command.clock_known || !command.bounded_deadline) {
+            AckCommand(command, "rejected", "SESSION_CLOSE_NOT_AUTHORIZED");
+            return;
+        }
+        auto* json = cJSON_Parse(command.payload.c_str());
+        auto* sid = cJSON_GetObjectItemCaseSensitive(json, kSessionConversationIdField);
+        auto* join = cJSON_GetObjectItemCaseSensitive(json, "control_request_id");
+        const std::string expected = cJSON_IsString(sid) ? sid->valuestring : "";
+        const std::string preparation = cJSON_IsString(join) ? join->valuestring : "";
+        cJSON_Delete(json);
+        if (expected.empty() && preparation.empty()) {
+            AckCommand(command, "rejected", "SESSION_CLOSE_SCOPE_REQUIRED");
+            return;
+        }
+        const bool matches = !expected.empty()
+            ? expected == current_conversation_id_
+            : preparation == conversation_control_request_id_;
+        if (matches) {
+            // Close the gate before flushing so late RTP cannot refill playback.
+            // Retain correlation on failure: the owner must be able to retry.
+            CloseConversationAudio();
+            const esp_err_t stopped = StopLocalPlayback("provider_session_close");
+            // No renderer means there is no buffered playback to flush.
+            if (stopped != ESP_OK && stopped != ESP_ERR_INVALID_STATE) {
+                AckCommand(command, "failed", "PLAYBACK_FLUSH_FAILED");
+                return;
+            }
+            CompletePendingRoomJoinCommand("failed", "ROOM_JOIN_CANCELLED");
+            HandleSessionEnd(EndReason::UserLeft);
+        }
+        // No matching owner means this old command has no IO left to revoke.
+        AckCommand(command, "succeeded", matches ? "OK" : "SESSION_ALREADY_ENDED");
         return;
     }
 #if CONFIG_EIDOLON_COMPANION_FACE
@@ -2582,6 +2622,11 @@ void EidolonVoiceController::HandleRoomJoinCommand(const std::string& command_id
     ControlCommand command;
     command.id = command_id;
     command.op = kControlOpRoomJoin;
+    if (preparation && state_ == VoiceSessionState::InRoom) {
+        AckCommand(command, "failed", "ROOM_JOIN_BUSY",
+                   "end the current conversation before preparing another");
+        return;
+    }
     const auto admission = pending_room_join_.Begin(command, intent, preparation);
     if (admission == PendingRoomJoin::Admission::Retry) return;
     if (admission != PendingRoomJoin::Admission::Started) {
@@ -2590,6 +2635,7 @@ void EidolonVoiceController::HandleRoomJoinCommand(const std::string& command_id
         return;
     }
     pending_session_intent_ = intent;
+    conversation_control_request_id_ = preparation ? command_id : std::string{};
     vTaskDelay(kRoomJoinSettleDelay);
     esp_err_t err = DoJoinRoom();
     // One-shot: clear after the JOIN (incl. DoJoinRoom's internal connect-retry,
@@ -2997,6 +3043,7 @@ void EidolonVoiceController::HandleSessionEnd(EndReason reason)
     CloseConversationAudio();
     standby_ = true;
     current_conversation_id_.clear();
+    conversation_control_request_id_.clear();
     conversation_confirmed_ = false;
     SetState(StateForConfig(config_), "session_end");
 }
@@ -3158,6 +3205,7 @@ bool EidolonVoiceController::DoCommissioningQuiesce()
     // network interruption. Do not resurrect the old conversation after the
     // Owner finishes setup and the operational channel reconnects.
     current_conversation_id_.clear();
+    conversation_control_request_id_.clear();
     conversation_confirmed_ = false;
     last_end_reason_ = EndReason::UserLeft;
     DoNetworkLost();
@@ -3306,6 +3354,7 @@ esp_err_t EidolonVoiceController::DoJoinRoom()
         }
         if (connect_err != ESP_OK) {
             current_conversation_id_.clear();
+            conversation_control_request_id_.clear();
             conversation_confirmed_ = false;
             SetState(VoiceSessionState::Error, "join_connect_failed");
             ScheduleChannelReconnect("channel_connect_sync_failed");
@@ -3322,6 +3371,7 @@ esp_err_t EidolonVoiceController::DoJoinRoom()
         // The request never left the device, so nobody is coming. Say so rather
         // than sit in a conversation the server was never asked for.
         current_conversation_id_.clear();
+        conversation_control_request_id_.clear();
         conversation_confirmed_ = false;
         SetState(VoiceSessionState::Error, "join_request_failed");
         return err;
@@ -3668,6 +3718,7 @@ esp_err_t EidolonVoiceController::DoLeaveRoom()
         err = PublishSessionRequest(kSessionCloseType, current_conversation_id_);
     }
     current_conversation_id_.clear();
+    conversation_control_request_id_.clear();
     conversation_confirmed_ = false;
     last_end_reason_ = EndReason::UserLeft;
     standby_ = true;

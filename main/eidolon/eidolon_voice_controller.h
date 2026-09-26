@@ -371,6 +371,7 @@ private:
     // the token fetch as X-Device-Session-Intent. Empty for a normal user JOIN.
     // Controller-task only.
     std::string pending_session_intent_;
+    std::string conversation_control_request_id_;
     std::string pending_session_flow_id_;
     // Connected to the channel, but not in a conversation. It intentionally
     // covers Connecting/Reconnecting/Connected; actual health is tracked by
