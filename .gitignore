@@ -1,5 +1,6 @@
 tmp/
-/components/
+/components/*
+!/components/av_render/
 /managed_components/
 build/
 dist/

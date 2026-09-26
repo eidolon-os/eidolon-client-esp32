@@ -1,5 +1,8 @@
 ## IDF Component Manager Manifest File
 dependencies:
+  tempotian/av_render:
+    version: "1.0.0"
+    override_path: ../components/av_render
   waveshare/esp_lcd_sh8601: 1.0.2
   espressif/esp_lcd_co5300: ^2.0.3
   # Pinned to versions that predate the esp_lcd_panel_dev_config_t field rename
