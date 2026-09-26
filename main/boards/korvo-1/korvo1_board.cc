@@ -21,6 +21,7 @@
 #if CONFIG_EIDOLON_HUB_MODE
 #include "lvgl_theme.h"
 #include "eidolon/eidolon_view.h"
+#include "eidolon/provisioning_window_policy_core.h"
 #include "eidolon/views/home_panel_view.h"
 
 #include <memory>
@@ -227,19 +228,36 @@ private:
         volume_down_button_ =
             MakeAdcButton(3, BUTTON_ADC_VOL_DOWN_MIN_MV, BUTTON_ADC_VOL_DOWN_MAX_MV);
 
-        // SET stands in for the BOOT button the other boards use: a click while
-        // the device is still starting opens setup, which is the only way back
-        // into provisioning once credentials are committed. Long press keeps it
-        // reachable afterwards, since that boot window is short.
+        // SET stands in for the BOOT button the other boards use, with the same
+        // handlers as esp-box-3. Button callbacks run on the esp_timer task:
+        // physical recovery generates keys and writes NVS, so the setup act is
+        // scheduled onto the application task. Calling it here directly
+        // overflowed the timer task and rebooted the board on every long press,
+        // which left a removed ("recovery required") panel no way back in.
+#if CONFIG_EIDOLON_HUB_MODE
+        eidolon::SetEidolonSetupHandler([this]() { EnterWifiConfigMode(); });
+        eidolon::SetEidolonInputAvailable(eidolon::UiInputSource::SessionButton, true);
+#endif
         set_button_->OnClick([this]() {
             auto& app = Application::GetInstance();
+#if CONFIG_EIDOLON_HUB_MODE
+            if (eidolon::HubSetupButtonClickOpensSetup(app.GetDeviceState())) {
+#else
             if (app.GetDeviceState() == kDeviceStateStarting) {
-                EnterWifiConfigMode();
+#endif
+                app.Schedule([this]() { EnterWifiConfigMode(); });
                 return;
             }
+#if CONFIG_EIDOLON_HUB_MODE
+            eidolon::DispatchEidolonUiInput(eidolon::UiInputSource::SessionButton, eidolon::UiInputGesture::Click);
+#else
             app.ToggleChatState();
+#endif
         });
-        set_button_->OnLongPress([this]() { EnterWifiConfigMode(); });
+        // Long press opens setup from an operational or removed device too.
+        set_button_->OnLongPress([this]() {
+            Application::GetInstance().Schedule([this]() { EnterWifiConfigMode(); });
+        });
 
 #if CONFIG_USE_DEVICE_AEC
         mode_button_->OnClick([this]() {
