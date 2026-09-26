@@ -133,6 +133,11 @@ elseif(CONFIG_BOARD_TYPE_DF_S3_AI_CAM)
     set(BOARD_TYPE "df-s3-ai-cam")
 elseif(CONFIG_BOARD_TYPE_KORVO_1)
     set(BOARD_TYPE "korvo-1")
+    # 20 px text for the 800x480 smart home panel. The compact builtin font only
+    # carries boot text; FLASH_DEFAULT_ASSETS packs font_puhui_common_20_4 (same
+    # 5258-hanzi coverage as the full font_puhui_14_1 it replaces) into assets.
+    set(BUILTIN_TEXT_FONT font_puhui_basic_20_4)
+    set(BUILTIN_ICON_FONT font_awesome_20_4)
 elseif(CONFIG_BOARD_TYPE_ESP_BOX_3)
     set(BOARD_TYPE "esp-box-3")
     set(BUILTIN_TEXT_FONT font_noto_basic_16_4)
@@ -1199,6 +1204,17 @@ if(CONFIG_EIDOLON_HUB_MODE)
         )
     else()
         list(APPEND SOURCES "eidolon/views/amoled_206_ptt_view.cc")
+    endif()
+
+    # korvo-1 is a smart home panel: its view renders the host's smarthome.*
+    # snapshots (eidolon_sdk biz.smarthome v1). No other board compiles this.
+    if(CONFIG_BOARD_TYPE_KORVO_1)
+        list(APPEND SOURCES
+            "eidolon/smarthome/smarthome_store.cc"
+            "eidolon/smarthome/smarthome_tiles.cc"
+            "eidolon/smarthome/smarthome_wire.cc"
+            "eidolon/views/home_panel_view.cc"
+        )
     endif()
 
     if(CONFIG_EIDOLON_WAKE_WORD_ENABLE)
