@@ -57,6 +57,10 @@ public:
     void SetWallClock(int64_t utc_ms) override;
     void SetSink(smarthome::PanelSink* sink) override;
 
+    // Network state for the top bar, as the board reports it (a static
+    // FontAwesome string); fed on the legacy status bar's cadence.
+    void SetNetworkIcon(const char* icon);
+
 private:
     static constexpr size_t kTileSlots = 12;  // 4 columns x 3 rows
     static constexpr size_t kSceneSlots = 4;
@@ -137,6 +141,7 @@ private:
     lv_obj_t* home_label_ = nullptr;
     lv_obj_t* area_label_ = nullptr;
     lv_obj_t* clock_label_ = nullptr;
+    lv_obj_t* net_icon_ = nullptr;
     lv_obj_t* conn_dot_ = nullptr;
     lv_obj_t* conn_label_ = nullptr;
     lv_obj_t* mic_ = nullptr;

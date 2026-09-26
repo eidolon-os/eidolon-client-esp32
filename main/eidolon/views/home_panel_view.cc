@@ -83,7 +83,7 @@ constexpr uint32_t Error = 0xFF6B6B;
 // Shared styles: one lv_style_t per look instead of local style arrays on
 // every object, since small LVGL allocations land in internal SRAM here.
 struct Styles {
-    lv_style_t root, bar, muted, clock, conn, dot, dot_on, mic, mic_live, mic_busy;
+    lv_style_t root, bar, muted, clock, conn, net, dot, dot_on, mic, mic_live, mic_busy;
     lv_style_t nav, nav_on, count, tile, tile_on, tile_pressed, glyph, glyph_on, name, state, state_on;
     lv_style_t step, step_pressed, pager, dim, scene, scene_pressed, activity;
     lv_style_t card, heard, message, message_attention, message_error, choice, toast;
@@ -218,6 +218,8 @@ void HomePanelView::BuildStyles() {
     ink(s.clock, color::Clock);
     init(s.conn);
     ink(s.conn, color::Conn);
+    init(s.net);
+    ink(s.net, color::Conn);
     init(s.dot);
     lv_style_set_radius(&s.dot, LV_RADIUS_CIRCLE);
     fill(s.dot, color::Offline);
@@ -352,6 +354,7 @@ void HomePanelView::Build(const BuildContext& ctx) {
     BuildStyles();
     lv_style_set_text_font(&S().root, font_);
     lv_style_set_text_font(&S().mic, icon_font_);
+    lv_style_set_text_font(&S().net, icon_font_);
     lv_style_set_text_font(&S().pager, icon_font_);
 
     root_ = NewBox(ctx.parent, &S().root);
@@ -407,6 +410,8 @@ void HomePanelView::BuildTopBar() {
     lv_obj_set_flex_align(right, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(right, 6, 0);
     lv_obj_align(right, LV_ALIGN_RIGHT_MID, -12, 0);
+    net_icon_ = NewLabel(right, &S().net);
+    lv_obj_set_style_margin_right(net_icon_, 6, 0);
     conn_dot_ = NewBox(right, &S().dot);
     lv_obj_add_style(conn_dot_, &S().dot_on, LV_STATE_CHECKED);
     lv_obj_set_size(conn_dot_, 8, 8);
@@ -484,7 +489,7 @@ void HomePanelView::BuildGrid() {
     }
 
     empty_label_ = NewLabel(grid_, &S().muted);
-    lv_label_set_text_static(empty_label_, "还没有家居设备 · 请在手机「智能家居」里添加");
+    lv_label_set_text_static(empty_label_, "");
     lv_obj_align(empty_label_, LV_ALIGN_CENTER, 0, -20);
 
     page_prev_ = NewLabel(grid_, &S().pager);
@@ -665,6 +670,12 @@ void HomePanelView::SetLinkUp(bool up) {
     store_.SetLinkUp(up);
     if (up) RequestSync();
     if (built_) RenderScene();
+}
+
+void HomePanelView::SetNetworkIcon(const char* icon) {
+    ViewLock lock(display_);
+    if (icon == nullptr || !built_) return;
+    TextStatic(net_icon_, icon);
 }
 
 void HomePanelView::SetWallClock(int64_t utc_ms) {
@@ -859,16 +870,17 @@ void HomePanelView::RenderTopBar() {
     }
     Text(area_label_, area);
 
+    // The dot and its text answer "is this panel connected to Eidolon": the
+    // dashboard is only on screen once it is. Whether the home has synced is
+    // the grid's business (its empty state and dimming), not this label's.
     const char* link = "已连接";
-    bool online = false;
-    if (scene_ == UiScene::Reconnecting || (store_.has_snapshot() && !store_.link_up())) {
+    bool online = true;
+    if (scene_ == UiScene::Reconnecting) {
+        link = "重连中";
+        online = false;
+    } else if (Stale()) {
         link = "离线 · 上次状态";
-    } else if (!store_.has_snapshot()) {
-        link = store_.link_up() ? "同步中" : "未同步";
-    } else if (store_.awaiting_snapshot()) {
-        link = "同步中";
-    } else {
-        online = true;
+        online = false;
     }
     Text(conn_label_, link);
     SetState(conn_dot_, LV_STATE_CHECKED, online);
@@ -948,6 +960,11 @@ void HomePanelView::RenderGrid() {
         Visible(tiles_[slot].box, false);
     }
 
+    if (!store_.has_snapshot()) {
+        TextStatic(empty_label_, "家居数据尚未同步");
+    } else if (devices.empty()) {
+        TextStatic(empty_label_, "还没有家居设备 · 请在手机「智能家居」里添加");
+    }
     Visible(empty_label_, devices.empty());
     const bool paged = pages > 1;
     Visible(page_prev_, paged);

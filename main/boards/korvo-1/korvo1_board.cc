@@ -80,6 +80,13 @@ public:
     void ShowNotification(const char* text, int duration_ms = 3000) override {
         panel_.ShowNotification(text, duration_ms);
     }
+    // The legacy status bar is hidden, so the network state it used to show is
+    // handed to the panel's top bar instead, on the same 10-second cadence
+    // (Application calls this every second from its main loop).
+    void UpdateStatusBar(bool update_all = false) override {
+        if (!update_all && status_ticks_++ % 10 != 0) return;
+        panel_.SetNetworkIcon(Board::GetInstance().GetNetworkStateIcon());
+    }
     void ShowNotification(const std::string& text, int duration_ms = 3000) override {
         ShowNotification(text.c_str(), duration_ms);
     }
@@ -92,6 +99,7 @@ public:
 
 private:
     eidolon::HomePanelView panel_;
+    unsigned status_ticks_ = 0;
     std::shared_ptr<LvglFont> builtin_font_;
     std::shared_ptr<LvglFont> font_;
 };
@@ -163,6 +171,9 @@ private:
             .data_width = 16,
             .num_fbs = 2,
             .bounce_buffer_size_px = DISPLAY_WIDTH * 10,
+            // As in Espressif's own Korvo-1 board definition (esp_boards,
+            // esp-claw): 64-byte bursts keep the PSRAM reads of scan-out short.
+            .dma_burst_size = 64,
             .hsync_gpio_num = DISPLAY_LCD_HSYNC,
             .vsync_gpio_num = DISPLAY_LCD_VSYNC,
             .de_gpio_num = DISPLAY_LCD_DE,

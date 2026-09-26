@@ -23,6 +23,8 @@
                 "CONFIG_USE_CUSTOM_WAKE_WORD=n",
                 "CONFIG_PARTITION_TABLE_CUSTOM_FILENAME=\"partitions/v2/16m_eidolon.csv\"",
                 "CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y",
+                "CONFIG_SPIRAM_XIP_FROM_PSRAM=y",
+                "CONFIG_LCD_RGB_ISR_IRAM_SAFE=y",
                 "CONFIG_LWIP_DNS_SUPPORT_MDNS_QUERIES=y",
                 "CONFIG_MDNS_MAX_SERVICES=10",
                 "CONFIG_ESP_WS_CLIENT_ENABLE_DYNAMIC_BUFFER=y",

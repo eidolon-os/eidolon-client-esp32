@@ -146,7 +146,9 @@ Commands:
   verify           Read the boot build stamp over serial and diff vs the last build
   logs [SECONDS] [noreset]
                    Capture the serial console (default 30 s, resetting the board
-                   first) to ${BUILD_DIR}/logs/ and the terminal
+                   first) to ${BUILD_DIR}/logs/ and the terminal. On this board
+                   the CP2102N resets the chip whenever the port opens, so
+                   noreset only skips the extra pulse
   erase-flash --yes
                    Erase the whole chip (Wi-Fi, device identity, claim, Owner
                    trust). The documented way onto a new partition layout; the
