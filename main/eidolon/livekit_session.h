@@ -30,6 +30,7 @@ class LiveKitSession {
 public:
     using StateCallback = std::function<void(LiveKitConnectionState, uint32_t generation)>;
     using TranscriptionCallback = std::function<void(const TranscriptionEvent& event)>;
+    using AgentPlaybackCallback = std::function<void(bool speaking, uint32_t generation)>;
     using AgentPhaseCallback = std::function<void(AgentPhase phase)>;
     using ControlCommandCallback = std::function<void(const std::string& payload, uint32_t generation, bool agent, bool provider)>;
     using SessionControlCallback = std::function<void(const std::string& payload, uint32_t generation, bool agent)>;
@@ -69,6 +70,7 @@ public:
 
     void SetOnStateChanged(StateCallback cb) { on_state_changed_ = std::move(cb); }
     void SetOnTranscription(TranscriptionCallback cb) { on_transcription_ = std::move(cb); }
+    void SetOnAgentPlayback(AgentPlaybackCallback cb) { on_agent_playback_ = std::move(cb); }
     void SetOnAgentPhase(AgentPhaseCallback cb) { on_agent_phase_ = std::move(cb); }
     void SetOnControlCommand(ControlCommandCallback cb) { on_control_command_ = std::move(cb); }
     void SetOnSessionControl(SessionControlCallback cb) { on_session_control_ = std::move(cb); }
@@ -119,6 +121,7 @@ private:
     StateCallback on_state_changed_;
     TranscriptionCallback on_transcription_;
     AgentPhaseCallback on_agent_phase_;
+    AgentPlaybackCallback on_agent_playback_;
     ControlCommandCallback on_control_command_;
     SessionControlCallback on_session_control_;
     DeviceEventCallback on_device_event_;

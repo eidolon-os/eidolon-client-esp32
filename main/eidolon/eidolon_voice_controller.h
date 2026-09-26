@@ -28,6 +28,7 @@
 #endif
 #include "hub_types.h"
 #include "livekit_session.h"
+#include "session_playback_state.h"
 #include "voice_session_state.h"
 
 #if CONFIG_EIDOLON_COMPANION_FACE
@@ -134,6 +135,7 @@ private:
 
         AmbientPresenceTimer,
         AgentPhaseChanged,
+        AgentPlaybackChanged,
         SessionActivity,
         AudioTick,
         OnboardingPoll,
@@ -436,6 +438,7 @@ private:
     bool last_audio_mic_muted_ = false;
     bool last_audio_ptt_ = false;
     int64_t last_audio_publish_us_ = 0;
+    SessionPlaybackState session_playback_;
     AgentPhase agent_phase_ = AgentPhase::Silent;
 
     QueueHandle_t event_queue_ = nullptr;

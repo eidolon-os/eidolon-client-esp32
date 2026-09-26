@@ -1,5 +1,6 @@
 #include "device_capabilities.h"
 #include "livekit_session.h"
+#include "session_playback_state.h"
 
 #include "eidolon_topics.h"
 #include "internal_memory_report.h"
@@ -276,7 +277,7 @@ void LiveKitSession::HandleStateChanged(livekit_connection_state_t state)
 
 void LiveKitSession::HandleUiStatePayload(const char* payload, size_t size)
 {
-    if (!on_agent_phase_ || !payload || size == 0) {
+    if (!payload || size == 0) {
         return;
     }
     std::string json(payload, size);
@@ -289,14 +290,18 @@ void LiveKitSession::HandleUiStatePayload(const char* payload, size_t size)
         state = JsonString(root, "phase");
     }
     if (state) {
-        auto phase=PhaseFromUiState(state, JsonString(root, "reason"));
-        if (phase==AgentPhase::AgentSpeaking && !CurrentOutputGate().AllowsAny(kAudioOutputs))
-            phase=AgentPhase::Silent;
+        const char* reason = JsonString(root, "reason");
+        const auto playback = SessionPlaybackSignal(state, reason);
+        if (playback.has_value() && on_agent_playback_) {
+            on_agent_playback_(*playback, generation_);
+        }
+        // Session activity is true even when this device is input-only.
+        auto phase = PhaseFromUiState(state, reason);
         if ((phase == AgentPhase::UserSpeaking || phase == AgentPhase::AgentThinking) &&
             transcription_source_ == TranscriptionSource::Agent) {
             transcription_stream_.Clear(); // Discard late chunks from the interrupted turn.
         }
-        on_agent_phase_(phase);
+        if (on_agent_phase_) on_agent_phase_(phase);
     }
     cJSON_Delete(root);
 }

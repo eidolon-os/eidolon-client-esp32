@@ -418,6 +418,12 @@ void EidolonVoiceController::Dispatch(const Event& ev)
     case EventType::AmbientPresenceTimer:
         DoAmbientPresenceTimer();
         break;
+    case EventType::AgentPlaybackChanged:
+        if (ev.generation == session_generation_ && !standby_ && audio_publisher_active_) {
+            session_playback_.SetSpeaking(ev.flag, esp_timer_get_time());
+            PublishClientAudioState(AgentOutputActiveRecently());
+        }
+        break;
     case EventType::AgentPhaseChanged:
         DoAgentPhase(ev.phase);
         break;
@@ -3009,6 +3015,13 @@ void EidolonVoiceController::DoActivation()
         ev.generation = generation;
         Enqueue(ev);
     });
+    session_.SetOnAgentPlayback([this](bool speaking, uint32_t generation) {
+        Event ev;
+        ev.type = EventType::AgentPlaybackChanged;
+        ev.flag = speaking;
+        ev.generation = generation;
+        Enqueue(ev);
+    });
     session_.SetOnDeviceEvent([this](const std::string& payload, uint32_t generation) {
         Event ev;
         ev.type = EventType::DeviceEvent;
@@ -3675,6 +3688,7 @@ void EidolonVoiceController::OpenConversationAudio()
 
 void EidolonVoiceController::CloseConversationAudio()
 {
+    session_playback_.Reset();
 #if CONFIG_EIDOLON_COMPANION_FACE
     if (auto* view=GetEidolonView(); view && view->Expressions()) presentations_.Close(*view->Expressions());
 #endif
@@ -3768,7 +3782,7 @@ void EidolonVoiceController::PublishClientAudioState(bool playback_active)
         // edge remains the explicit "I'm done" turn boundary.
         capture_on = mic_enabled_ && ptt_active_;
         mic_muted = !capture_on;
-    } else if (half_duplex_mode_) {
+    } else if (half_duplex_mode_ || !CurrentOutputGate().AllowsAny(kAudioOutputs)) {
         // Half-duplex: auto open-mic, but CLOSED while the agent is speaking (and
         // the playback hangover). This board has no device AEC, so muting the mic
         // during playback is what stops it recording its own output / self-
@@ -3871,10 +3885,7 @@ bool EidolonVoiceController::PlaybackActiveRecently() const
 
 bool EidolonVoiceController::AgentOutputActiveRecently() const
 {
-    if (agent_phase_ == AgentPhase::AgentSpeaking) {
-        return true;
-    }
-    return PlaybackActiveRecently();
+    return session_playback_.Active(esp_timer_get_time()) || PlaybackActiveRecently();
 }
 
 void EidolonVoiceController::UpdateLocalPlaybackPhase(bool playback_active)
