@@ -233,6 +233,11 @@ esp_err_t HubHttpRequest(const std::string& method,
 
     if (err == ESP_OK) {
         out.status = esp_http_client_get_status_code(client);
+        if (out.status >= 400) {
+            ESP_LOGW(TAG, "%s request rejected phase=http-response status=%d elapsed_ms=%lu",
+                     method.c_str(), out.status,
+                     static_cast<unsigned long>(esp_timer_get_time() / 1000 - diagnostic_start_ms));
+        }
         out.body = std::move(body);
         out.clock.Observe(out.hub_utc_millis, request_start_ms, esp_timer_get_time() / 1000);
     }

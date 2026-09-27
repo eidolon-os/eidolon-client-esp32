@@ -9,6 +9,7 @@
 #include "device_claim_consumer_core.h"
 #include "device_manifest_assertion_core.h"
 #include "hub_types.h"
+#include "hub_onboarding_diagnostic.h"
 #include "hub_trust_store.h"
 
 namespace eidolon {
@@ -22,7 +23,13 @@ public:
     esp_err_t Run(const std::string& device_id, Esp32HubConfig& out);
     esp_err_t Resume(const std::string& device_id, Esp32HubConfig& out);
 
+    const HubOnboardingDiagnostic& diagnostic() const { return diagnostic_; }
+
 private:
+    esp_err_t Attempt(const std::string& device_id, Esp32HubConfig& out, bool discover);
+    esp_err_t RunAttempt(const std::string& device_id, Esp32HubConfig& out);
+    esp_err_t ResumeAttempt(const std::string& device_id, Esp32HubConfig& out);
+    HubOnboardingDiagnostic diagnostic_;
     // Loaded once per run from what commissioning left behind. Empty means this
     // device has no commissioned Owner Domain and must not accept discovery.
     esp_err_t LoadCommissionedTrust();

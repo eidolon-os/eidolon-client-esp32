@@ -93,8 +93,10 @@ bool HubActivator::Run() {
     HubOnboardingClient client;
     HubConfigStore store;
     auto& identity = DeviceIdentity::GetInstance();
-    if (identity.EnsureKeypair() != ESP_OK) {
-        ESP_LOGE(TAG, "Operational identity is unavailable; refusing activation");
+    const esp_err_t identity_error = identity.EnsureKeypair();
+    if (identity_error != ESP_OK) {
+        ESP_LOGE(TAG, "Operational identity unavailable stage=identity-load error=%s code=0x%x",
+                 esp_err_to_name(identity_error), static_cast<unsigned int>(identity_error));
         return false;
     }
     const std::string device_id = identity.DeviceInstanceId();
@@ -175,12 +177,13 @@ bool HubActivator::Run() {
         // needed a power cycle to try again. What ends this loop is success, a
         // commissioning generation taking the radio, or a terminal Claim.
         const int retry_delay = retry.delay_seconds();
-        char buffer[96];
-        snprintf(buffer, sizeof(buffer), "Looking for the Hub again in %ds", retry_delay);
-        app.SetEidolonServiceUi(ServicePhase::DiscoveringAuthority, buffer);
+        const auto& diagnostic = client.diagnostic();
+        app.SetEidolonServiceUi(ServicePhase::DiscoveringAuthority,
+            diagnostic.RetryDetail(esp_err_to_name(err), retry.retryable_attempts(), retry_delay));
 
-        ESP_LOGW(TAG, "Hub activation failed (%s), attempt %d, retry in %ds",
-                 esp_err_to_name(err), retry.retryable_attempts(), retry_delay);
+        ESP_LOGW(TAG, "Hub activation failed stage=%s error=%s code=0x%x http=%d attempt=%d retry_s=%d",
+                 diagnostic.stage, esp_err_to_name(err), static_cast<unsigned int>(err),
+                 diagnostic.http_status, retry.retryable_attempts(), retry_delay);
 
         for (int i = 0; i < retry_delay; ++i) {
             vTaskDelay(pdMS_TO_TICKS(1000));

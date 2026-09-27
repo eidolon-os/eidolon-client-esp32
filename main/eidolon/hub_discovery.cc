@@ -148,7 +148,13 @@ esp_err_t HubDiscovery::RefreshOwnerDirectory(
     AuthorityCandidateRecord discovered;
     const esp_err_t discovery = Discover(discovered, commissioned.owner_domain_id);
     // Keep the useful route/verification error if no relocation was found.
-    if (discovery != ESP_OK) return direct;
+    if (discovery != ESP_OK) {
+        ESP_LOGW(TAG, "Owner discovery exhausted error=%s code=0x%x; "
+                      "returning original route error=%s code=0x%x",
+                 esp_err_to_name(discovery), static_cast<unsigned int>(discovery),
+                 esp_err_to_name(direct), static_cast<unsigned int>(direct));
+        return direct;
+    }
     return accept(discovered);
 }
 
