@@ -7,7 +7,7 @@ registry. It takes it from our fork, at one commit:
   livekit/livekit:
     git: https://github.com/eidolon-os/client-sdk-esp32.git
     path: components/livekit
-    version: 4287db84d3249ce46dd2d3f7cf61e44aba8407d2
+    version: 912cf55f26dc83f78e7bd2f934fc68821d187e9f
     rules:
     - if: target in [esp32s3, esp32p4]
 ```
@@ -25,13 +25,13 @@ on every join, so the LiveKit server's own logs name the exact SDK a device is
 running:
 
 ```
-"clientInfo":{"sdk":"ESP32","version":"4287db84d3249ce46dd2d3f7cf61e44aba8407d2", ...}
+"clientInfo":{"sdk":"ESP32","version":"912cf55f26dc83f78e7bd2f934fc68821d187e9f", ...}
 ```
 
 ## Why the fork exists
 
 The fork started from upstream `v0.3.10` to address the two defects below.
-Its current `main` also includes build/dependency compatibility, lifecycle
+Its current `eidolon_dev` also includes build/dependency compatibility, lifecycle
 shutdown fixes, and SDP failure handling; it is no longer just two fixes.
 
 **The subscription slot was never released.** `engine.c` recorded the one remote
@@ -75,7 +75,7 @@ were removed in one commit for this reason; keep them together.
 
 ## Changing the SDK
 
-1. Edit `components/livekit/` in a clone of the fork, on `main`.
+1. Edit `components/livekit/` in a clone of the fork, on `eidolon_dev`.
 2. Commit and push (see *Pushing* below).
 3. Put the new commit SHA in `main/idf_component.yml`.
 4. Rebuild. The component manager re-resolves the git source on its own;
@@ -85,7 +85,7 @@ were removed in one commit for this reason; keep them together.
 ## Taking an upstream update
 
 Check the upstream release and compatibility before updating. Prepare any
-rebase on a review branch, never rewrite published `main`:
+rebase on a review branch, never rewrite published branches:
 
 ```bash
 git fetch upstream --tags
@@ -93,7 +93,7 @@ git rebase --onto vX.Y.Z <old-base> <review-branch>
 ```
 
 The example is for preparing a review branch only. Integrate the reviewed
-result into `main` without rewriting published history. Resolve the component
+result into `eidolon_dev` without rewriting published history. Resolve the component
 version marker against the new upstream version plus our `~N` suffix.
 
 Then check whether upstream has fixed either defect itself, and drop our commit
