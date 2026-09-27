@@ -36,6 +36,25 @@ int main() {
     presenter.OnTranscription({TranscriptionSource::User,"interim",false});
     assert(presenter.runtime_status().last_transcription.empty());
     presenter.OnTranscription({TranscriptionSource::Agent,"Next response",true});
+    // A silent semantic decision still terminates the committed PTT round.
+    if (IsPushToTalk(CurrentInteractionMode())) {
+    presenter.ApplyVoiceStatus(voice);
+    presenter.SetPttRecording(false);
+    assert(presenter.runtime_status().turn==TurnPhase::Committing);
+    presenter.OnAgentPhase(AgentPhase::AwaitingInput);
+    assert(presenter.runtime_status().turn==TurnPhase::Idle);
+    presenter.OnAgentPhase(AgentPhase::ResponseUnavailable);
+    assert(presenter.runtime_status().last_transcription.find("try again")!=std::string::npos);
+    presenter.SetPttRecording(true);
+    assert(presenter.runtime_status().last_transcription.empty());
+    // Late completion cannot clear recording in progress.
+    presenter.OnAgentPhase(AgentPhase::ReplyLimitReached);
+    assert(presenter.runtime_status().turn==TurnPhase::Recording);
+    presenter.SetPttRecording(false);
+    presenter.OnAgentPhase(AgentPhase::ReplyLimitReached);
+    assert(presenter.runtime_status().turn==TurnPhase::Idle);
+    assert(presenter.runtime_status().last_transcription.find("limit")!=std::string::npos);
+    }
     voice.conversation=ConversationPhase::Closed;presenter.ApplyVoiceStatus(voice);
     assert(presenter.runtime_status().last_transcription.empty());
 }

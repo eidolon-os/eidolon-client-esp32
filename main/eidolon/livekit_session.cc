@@ -47,6 +47,16 @@ const char* JsonString(cJSON* root, const char* key)
 
 AgentPhase PhaseFromUiState(const char* value, const char* reason)
 {
+    if (value && strcmp(value, "waiting") == 0) {
+        if (reason && (strcmp(reason, "team:error") == 0 ||
+                       strcmp(reason, "team:abstained") == 0)) {
+            return AgentPhase::ResponseUnavailable;
+        }
+        if (reason && strcmp(reason, "team:budget_exhausted") == 0) {
+            return AgentPhase::ReplyLimitReached;
+        }
+        return AgentPhase::AwaitingInput;
+    }
     if (!value || strcmp(value, "idle") == 0) {
         return AgentPhase::Silent;
     }

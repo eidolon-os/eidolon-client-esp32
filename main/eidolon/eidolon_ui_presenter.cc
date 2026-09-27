@@ -141,6 +141,17 @@ void EidolonUiPresenter::OnAgentPhase(AgentPhase phase)
         status_.last_transcription.clear();
     }
     switch (phase) {
+    case AgentPhase::AwaitingInput:
+        status_.turn = TurnPhase::Idle;
+        break;
+    case AgentPhase::ResponseUnavailable:
+    case AgentPhase::ReplyLimitReached:
+        status_.turn = TurnPhase::Idle;
+        status_.last_transcription_role = "system";
+        status_.last_transcription = phase == AgentPhase::ResponseUnavailable
+            ? "No response available. Hold to try again."
+            : "Reply limit reached. Hold to continue.";
+        break;
     case AgentPhase::UserSpeaking:
         status_.turn = TurnPhase::UserSpeaking;
         break;
@@ -192,6 +203,9 @@ void EidolonUiPresenter::SetPttRecording(bool recording)
         return;
     }
     status_.turn = recording ? TurnPhase::Recording : TurnPhase::Committing;
+    if (recording && std::strcmp(status_.last_transcription_role, "system") == 0) {
+        status_.last_transcription.clear();
+    }
     Reapply();
 }
 

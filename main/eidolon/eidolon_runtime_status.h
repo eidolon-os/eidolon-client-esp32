@@ -54,6 +54,9 @@ enum class AgentPhase {
     UserSpeaking,
     AgentThinking,
     AgentSpeaking,
+    AwaitingInput,
+    ResponseUnavailable,
+    ReplyLimitReached,
 };
 
 enum class PresenceWakePhase {
