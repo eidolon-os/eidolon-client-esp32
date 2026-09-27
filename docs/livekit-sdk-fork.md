@@ -7,7 +7,7 @@ registry. It takes it from our fork, at one commit:
   livekit/livekit:
     git: https://github.com/eidolon-os/client-sdk-esp32.git
     path: components/livekit
-    version: 912cf55f26dc83f78e7bd2f934fc68821d187e9f
+    version: 502ce391bf01c47dea74e1dd651c5b8945ca8906
     rules:
     - if: target in [esp32s3, esp32p4]
 ```
@@ -25,14 +25,13 @@ on every join, so the LiveKit server's own logs name the exact SDK a device is
 running:
 
 ```
-"clientInfo":{"sdk":"ESP32","version":"912cf55f26dc83f78e7bd2f934fc68821d187e9f", ...}
+"clientInfo":{"sdk":"ESP32","version":"502ce391bf01c47dea74e1dd651c5b8945ca8906", ...}
 ```
 
 ## Why the fork exists
 
-The fork started from upstream `v0.3.10` to address the two defects below.
-Its current `eidolon_dev` also includes build/dependency compatibility, lifecycle
-shutdown fixes, and SDP failure handling; it is no longer just two fixes.
+Upstream `v0.3.10` — the newest release — has two defects this firmware cannot
+live with. The fork is that release plus exactly two fixes and a version marker.
 
 **The subscription slot was never released.** `engine.c` recorded the one remote
 audio track a connection was subscribed to and refused every later track while
@@ -84,17 +83,19 @@ were removed in one commit for this reason; keep them together.
 
 ## Taking an upstream update
 
-Check the upstream release and compatibility before updating. Prepare any
-rebase on a review branch, never rewrite published branches:
+Upstream releases are infrequent and `v0.3.10` is still the newest. When one
+lands:
 
 ```bash
 git fetch upstream --tags
-git rebase --onto vX.Y.Z <old-base> <review-branch>
+git rebase --onto vX.Y.Z <old-base> eidolon_dev
 ```
 
-The example is for preparing a review branch only. Integrate the reviewed
-result into `eidolon_dev` without rewriting published history. Resolve the component
-version marker against the new upstream version plus our `~N` suffix.
+**Rebase, not merge.** Our three commits are meant to become an upstream pull
+request one day, so they need to stay a clean series on top of upstream rather
+than a tangle of merge commits. Expect the version-marker commit to conflict on
+`idf_component.yml` — resolve it to the new upstream version plus our `~N`
+suffix.
 
 Then check whether upstream has fixed either defect itself, and drop our commit
 if so. As of `v0.3.10` neither is fixed: upstream `main` is the tag plus four
