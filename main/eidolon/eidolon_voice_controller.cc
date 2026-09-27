@@ -130,6 +130,12 @@ const char* AgentPhaseName(eidolon::AgentPhase phase)
         return "agent_thinking";
     case eidolon::AgentPhase::AgentSpeaking:
         return "agent_speaking";
+    case eidolon::AgentPhase::AwaitingInput:
+        return "awaiting_input";
+    case eidolon::AgentPhase::ResponseUnavailable:
+        return "response_unavailable";
+    case eidolon::AgentPhase::ReplyLimitReached:
+        return "reply_limit_reached";
     }
     return "unknown";
 }
