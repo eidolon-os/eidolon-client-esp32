@@ -1210,6 +1210,14 @@ menu "Eidolon Hub"
             Declares the cue executor, not permission to play sounds. Owner must
             allow AudioCue separately from Speech; duplex is independent.
 
+    config EIDOLON_SMARTHOME_PANEL
+        bool "Enable smart-home panel transport"
+        depends on EIDOLON_HUB_MODE
+        default n
+        help
+            Build the shared smart-home panel message path. A board that selects
+            this must provide a view implementing SmartHomePanel().
+
     config EIDOLON_UI_TOUCH_CONTROLS
         bool "Use registered touch input for on-screen controls"
         depends on EIDOLON_HUB_MODE

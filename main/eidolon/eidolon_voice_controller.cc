@@ -10,7 +10,7 @@
 #include "eidolon_topics.h"
 #include "eidolon_view.h"
 #include "eidolon_local_feedback.h"
-#if CONFIG_BOARD_TYPE_KORVO_1
+#if CONFIG_EIDOLON_SMARTHOME_PANEL
 #include "smarthome/smarthome_wire.h"
 #endif
 #if CONFIG_EIDOLON_GUARD_SERVICE
@@ -271,7 +271,7 @@ EidolonVoiceController::EidolonVoiceController(GuardService* guard_service)
 
 EidolonVoiceController::~EidolonVoiceController()
 {
-#if CONFIG_BOARD_TYPE_KORVO_1
+#if CONFIG_EIDOLON_SMARTHOME_PANEL
     if (auto* view = GetEidolonView(); view && view->SmartHomePanel()) {
         view->SmartHomePanel()->SetSink(nullptr);
     }
@@ -429,7 +429,7 @@ void EidolonVoiceController::Dispatch(const Event& ev)
             DoPublishDeviceEvent(*ev.payload);
         }
         break;
-#if CONFIG_BOARD_TYPE_KORVO_1
+#if CONFIG_EIDOLON_SMARTHOME_PANEL
     case EventType::PanelRequest:
         if (ev.payload != nullptr) DoPanelRequest(*ev.payload);
         break;
@@ -569,7 +569,7 @@ esp_err_t EidolonVoiceController::PublishDeviceEvent(const std::string& payload)
     return ESP_OK;
 }
 
-#if CONFIG_BOARD_TYPE_KORVO_1
+#if CONFIG_EIDOLON_SMARTHOME_PANEL
 void EidolonVoiceController::SendRequest(const std::string& request_json)
 {
     if (request_json.empty() || request_json.size() > 16 * 1024) return;
@@ -945,7 +945,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         return;
     }
 
-#if CONFIG_BOARD_TYPE_KORVO_1
+#if CONFIG_EIDOLON_SMARTHOME_PANEL
     if (auto* view = GetEidolonView(); view && view->SmartHomePanel()) {
         auto* panel = view->SmartHomePanel();
         panel->SetLinkUp(lk_state == LiveKitConnectionState::Connected && !shared_visit_);
@@ -1770,7 +1770,7 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload, uint32
         AckCommand(command, "expired", "COMMAND_EXPIRED");
         return;
     }
-#if CONFIG_BOARD_TYPE_KORVO_1
+#if CONFIG_EIDOLON_SMARTHOME_PANEL
     if (smarthome::IsSmartHomeOp(command.op)) {
         if (!provider || !command.is_v1 || command.capability_version != smarthome::kCapabilityVersion ||
             !command.clock_known || !command.bounded_deadline || shared_visit_) {
@@ -3120,7 +3120,7 @@ void EidolonVoiceController::HandleSessionEnd(EndReason reason)
 
 void EidolonVoiceController::DoActivation()
 {
-#if CONFIG_BOARD_TYPE_KORVO_1
+#if CONFIG_EIDOLON_SMARTHOME_PANEL
     if (auto* view = GetEidolonView(); view && view->SmartHomePanel()) {
         view->SmartHomePanel()->SetSink(this);
     }
@@ -3231,7 +3231,7 @@ void EidolonVoiceController::DoActivation()
 
 void EidolonVoiceController::DoNetworkLost()
 {
-#if CONFIG_BOARD_TYPE_KORVO_1
+#if CONFIG_EIDOLON_SMARTHOME_PANEL
     if (auto* view = GetEidolonView(); view && view->SmartHomePanel()) {
         view->SmartHomePanel()->SetLinkUp(false);
     }

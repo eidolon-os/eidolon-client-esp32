@@ -1206,15 +1206,16 @@ if(CONFIG_EIDOLON_HUB_MODE)
         list(APPEND SOURCES "eidolon/views/amoled_206_ptt_view.cc")
     endif()
 
-    # korvo-1 is a smart home panel: its view renders the host's smarthome.*
-    # snapshots (eidolon_sdk biz.smarthome v1). No other board compiles this.
-    if(CONFIG_BOARD_TYPE_KORVO_1)
+    # The panel transport and state model are shared by any board that opts in.
+    if(CONFIG_EIDOLON_SMARTHOME_PANEL)
         list(APPEND SOURCES
             "eidolon/smarthome/smarthome_store.cc"
             "eidolon/smarthome/smarthome_tiles.cc"
             "eidolon/smarthome/smarthome_wire.cc"
-            "eidolon/views/home_panel_view.cc"
         )
+    endif()
+    if(CONFIG_BOARD_TYPE_KORVO_1)
+        list(APPEND SOURCES "eidolon/views/home_panel_view.cc")
     endif()
 
     if(CONFIG_EIDOLON_WAKE_WORD_ENABLE)
