@@ -5,6 +5,8 @@
             "name": "korvo-1",
             "sdkconfig_append": [
                 "CONFIG_EIDOLON_HUB_MODE=y",
+                "CONFIG_EIDOLON_OUTPUT_POLICY_V1=n",
+                "CONFIG_EIDOLON_CAP_SPEAKER=n",
                 "CONFIG_USE_AUDIO_PROCESSOR=n",
                 "CONFIG_USE_SERVER_AEC=n",
                 "CONFIG_EIDOLON_AUTO_JOIN_ON_ACTIVATION=n",
