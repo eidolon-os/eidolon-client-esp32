@@ -8,6 +8,7 @@
 #include "ui_input_profile.h"
 
 namespace eidolon {
+namespace smarthome { class PanelSurface; }
 
 // Device-agnostic view interface. The presenter renders a fully-resolved
 // EidolonUiModel to whatever per-device view the board registered; it no longer
@@ -21,6 +22,7 @@ public:
     // Project the snapshot onto the screen: status/emotion, mode badge, the
     // talk/start button, and any flow-specific chrome.
     virtual expression::Surface* Expressions() { return nullptr; }
+    virtual smarthome::PanelSurface* SmartHomePanel() { return nullptr; }
     virtual void Render(const EidolonUiModel& model) = 0;
     virtual void SetMotionDiagnostic(const char*, const char*, const char*) {}
 

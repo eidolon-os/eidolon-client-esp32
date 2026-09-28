@@ -10,6 +10,9 @@
 #include "eidolon_topics.h"
 #include "eidolon_view.h"
 #include "eidolon_local_feedback.h"
+#if CONFIG_BOARD_TYPE_KORVO_1
+#include "smarthome/smarthome_wire.h"
+#endif
 #if CONFIG_EIDOLON_GUARD_SERVICE
 #include "guard/guard_service.h"
 #endif
@@ -268,6 +271,11 @@ EidolonVoiceController::EidolonVoiceController(GuardService* guard_service)
 
 EidolonVoiceController::~EidolonVoiceController()
 {
+#if CONFIG_BOARD_TYPE_KORVO_1
+    if (auto* view = GetEidolonView(); view && view->SmartHomePanel()) {
+        view->SmartHomePanel()->SetSink(nullptr);
+    }
+#endif
     // Best-effort teardown; in practice the controller lives for the app lifetime.
     for (esp_timer_handle_t* t :
          {&audio_timer_, &reconnect_timer_, &connect_watchdog_, &idle_leave_timer_,
@@ -421,6 +429,11 @@ void EidolonVoiceController::Dispatch(const Event& ev)
             DoPublishDeviceEvent(*ev.payload);
         }
         break;
+#if CONFIG_BOARD_TYPE_KORVO_1
+    case EventType::PanelRequest:
+        if (ev.payload != nullptr) DoPanelRequest(*ev.payload);
+        break;
+#endif
     case EventType::AmbientPresenceTimer:
         DoAmbientPresenceTimer();
         break;
@@ -555,6 +568,27 @@ esp_err_t EidolonVoiceController::PublishDeviceEvent(const std::string& payload)
     Enqueue(ev);
     return ESP_OK;
 }
+
+#if CONFIG_BOARD_TYPE_KORVO_1
+void EidolonVoiceController::SendRequest(const std::string& request_json)
+{
+    if (request_json.empty() || request_json.size() > 16 * 1024) return;
+    Event ev;
+    ev.type = EventType::PanelRequest;
+    ev.payload = new (std::nothrow) std::string(request_json);
+    if (ev.payload != nullptr) Enqueue(ev);
+}
+
+void EidolonVoiceController::DoPanelRequest(const std::string& payload)
+{
+    if (!session_.IsConnected() || shared_visit_) return;
+    const esp_err_t err = session_.PublishData(
+        smarthome::kPanelRequestTopic, payload, /*reliable=*/true);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "[smarthome] panel request publish failed: %s", esp_err_to_name(err));
+    }
+}
+#endif
 
 void EidolonVoiceController::OnPttPressed()
 {
@@ -910,6 +944,14 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
                  static_cast<unsigned long>(session_generation_));
         return;
     }
+
+#if CONFIG_BOARD_TYPE_KORVO_1
+    if (auto* view = GetEidolonView(); view && view->SmartHomePanel()) {
+        auto* panel = view->SmartHomePanel();
+        panel->SetLinkUp(lk_state == LiveKitConnectionState::Connected && !shared_visit_);
+        panel->SetWallClock(config_.clock.Now(esp_timer_get_time() / 1000));
+    }
+#endif
 
     if (shared_visit_) {
         CloseConversationAudio();
@@ -1728,6 +1770,26 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload, uint32
         AckCommand(command, "expired", "COMMAND_EXPIRED");
         return;
     }
+#if CONFIG_BOARD_TYPE_KORVO_1
+    if (smarthome::IsSmartHomeOp(command.op)) {
+        if (!provider || !command.is_v1 || command.capability_version != smarthome::kCapabilityVersion ||
+            !command.clock_known || !command.bounded_deadline || shared_visit_) {
+            ESP_LOGW(TAG, "[smarthome] rejected unauthorized panel command");
+            return;
+        }
+        auto* view = GetEidolonView();
+        auto* panel = view ? view->SmartHomePanel() : nullptr;
+        if (panel == nullptr) return;
+        smarthome::Message message;
+        std::string error;
+        if (!smarthome::ParseMessage(command.op, command.payload, message, &error)) {
+            ESP_LOGW(TAG, "[smarthome] rejected panel payload: %s", error.c_str());
+            return;
+        }
+        panel->Apply(std::move(message));
+        return;
+    }
+#endif
     if (command.op == "shared-session.invite") {
         HandleSharedInvitation(command, provider);
         return;
@@ -3058,6 +3120,11 @@ void EidolonVoiceController::HandleSessionEnd(EndReason reason)
 
 void EidolonVoiceController::DoActivation()
 {
+#if CONFIG_BOARD_TYPE_KORVO_1
+    if (auto* view = GetEidolonView(); view && view->SmartHomePanel()) {
+        view->SmartHomePanel()->SetSink(this);
+    }
+#endif
     if (shared_visit_) FinishSharedVisit("shared_reactivation", false);
     channel_recovery_.OnActivation();
     // Activation rebuilds the device's whole operational picture, so any
@@ -3164,6 +3231,11 @@ void EidolonVoiceController::DoActivation()
 
 void EidolonVoiceController::DoNetworkLost()
 {
+#if CONFIG_BOARD_TYPE_KORVO_1
+    if (auto* view = GetEidolonView(); view && view->SmartHomePanel()) {
+        view->SmartHomePanel()->SetLinkUp(false);
+    }
+#endif
     if (shared_visit_) FinishSharedVisit("shared_network_lost", false);
     ESP_LOGW(TAG,
              "[lifecycle] network_lost executing state=%s room_kind=%s gen=%lu "

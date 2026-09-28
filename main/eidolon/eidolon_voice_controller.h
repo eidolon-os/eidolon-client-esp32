@@ -30,6 +30,9 @@
 #include "livekit_session.h"
 #include "session_playback_state.h"
 #include "voice_session_state.h"
+#if CONFIG_BOARD_TYPE_KORVO_1
+#include "smarthome/smarthome_panel.h"
+#endif
 
 #if CONFIG_EIDOLON_COMPANION_FACE
 #include "expression/delivery.h"
@@ -45,7 +48,11 @@ class GuardService;
 // there are no data races and no scattered per-command/reconnect/audio tasks.
 // Mode-agnostic: half-duplex (PTT) and full-duplex (barge-in) share this loop and
 // differ only inside a few handlers (mic gating, PTT events, idle fallback).
-class EidolonVoiceController {
+class EidolonVoiceController
+#if CONFIG_BOARD_TYPE_KORVO_1
+    : public smarthome::PanelSink
+#endif
+{
 public:
     using StateCallback = std::function<void(VoiceSessionState)>;
     using OperationalReadyCallback = std::function<void(bool)>;
@@ -102,6 +109,9 @@ public:
     }
     bool RegisterDeviceEventHandler(const std::string& type, DeviceEventBus::Handler handler);
     esp_err_t PublishDeviceEvent(const std::string& payload);
+#if CONFIG_BOARD_TYPE_KORVO_1
+    void SendRequest(const std::string& request_json) override;
+#endif
 
 private:
     // ---- Event loop ----
@@ -132,6 +142,9 @@ private:
         SessionControl,
         DeviceEvent,
         PublishDeviceEvent,
+#if CONFIG_BOARD_TYPE_KORVO_1
+        PanelRequest,
+#endif
 
         AmbientPresenceTimer,
         AgentPhaseChanged,
@@ -208,6 +221,9 @@ private:
     void DoSessionControl(const std::string& payload, uint32_t generation, bool agent);
     void DoDeviceEvent(const std::string& payload, uint32_t event_generation);
     void DoPublishDeviceEvent(const std::string& payload);
+#if CONFIG_BOARD_TYPE_KORVO_1
+    void DoPanelRequest(const std::string& payload);
+#endif
     void DoAmbientPresenceTimer();
     void OpenConversationAudio();
     void CloseConversationAudio();

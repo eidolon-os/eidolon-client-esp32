@@ -50,6 +50,7 @@ public:
 
     // EidolonView (application task).
     void Render(const EidolonUiModel& model) override;
+    smarthome::PanelSurface* SmartHomePanel() override { return this; }
 
     // smarthome::PanelSurface (application task).
     smarthome::ApplyOutcome Apply(smarthome::Message&& message) override;

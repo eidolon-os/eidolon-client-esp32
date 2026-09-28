@@ -4,6 +4,9 @@
 #include "device_capabilities.h"
 
 #include "eidolon_device_profile.h"
+#if CONFIG_BOARD_TYPE_KORVO_1
+#include "smarthome/smarthome_wire.h"
+#endif
 
 #include <cJSON.h>
 
@@ -396,6 +399,12 @@ std::string BuildDeviceManifestJson(const std::string& board_name, const DeviceC
 
     if (capabilities.motion)
         properties += ",{\"name\":\"output.motion\",\"observable\":false,\"schema\":{\"const\":true,\"type\":\"boolean\"},\"writable\":false}";
+
+#if CONFIG_BOARD_TYPE_KORVO_1
+    properties += std::string(",{\"name\":\"") + smarthome::kPanelProfileProperty +
+        "\",\"observable\":false,\"schema\":{\"const\":\"" +
+        smarthome::kPanelProfile + "\",\"type\":\"string\"},\"writable\":false}";
+#endif
 
     // Keep a compact deterministic representation for the manifest wire
     // contract: keys stay sorted so the Host's manifest revision is stable

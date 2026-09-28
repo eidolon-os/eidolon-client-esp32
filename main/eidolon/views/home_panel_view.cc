@@ -1036,6 +1036,9 @@ void HomePanelView::OnTimer(lv_timer_t* timer) {
 // LVGL task, lock held. Cheap by construction: string compares, no layout.
 void HomePanelView::Tick() {
     const int64_t now = MonoMs();
+    if (store_.link_up() && (!store_.has_snapshot() || store_.awaiting_snapshot())) {
+        RequestSync();
+    }
     Text(clock_label_, LocalClock());
     if (card_mode_ == CardMode::Result && now >= card_until_ms_) HideCard();
     if (toast_until_ms_ != 0 && now >= toast_until_ms_) {
