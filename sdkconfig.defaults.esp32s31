@@ -21,14 +21,14 @@ CONFIG_SPIRAM_USE_MALLOC=y
 #
 # RESERVE_INTERNAL rises with it: lowering the threshold sends ordinary
 # allocations to PSRAM, and what stays behind is the traffic that genuinely
-# cannot leave — I2S descriptors, the RGB panel's bounce buffers, Wi-Fi's DMA
+# cannot leave — I2S descriptors, LCD DMA descriptors, Wi-Fi's DMA
 # buffers — so the pool kept back for them has to be the larger one.
 CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=2048
 CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=98304
 
-# RGB scanout copies from PSRAM framebuffers in the GDMA bounce-buffer ISR.
-# When a flash write disables cache, that PSRAM read is unsafe even if the ISR
-# itself resides in IRAM. Defer the ISR until cache is available again.
+# Korvo uses direct PSRAM DMA: scanout no longer needs an ISR to refill pixels.
+# Keep completion callbacks deferred during cache disable; LVGL waits for actual
+# frame completion before reusing the old framebuffer.
 CONFIG_LCD_RGB_ISR_IRAM_SAFE=n
 
 # TLS record buffers are 16 kB in and 4 kB out per connection, and this board

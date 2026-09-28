@@ -247,6 +247,10 @@ RgbLcdDisplay::RgbLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
 
     const lvgl_port_display_rgb_cfg_t rgb_cfg = {
         .flags = {
+            // On IDF 6 this selects on_frame_buf_complete, including S31
+            // direct PSRAM DMA (despite the historical bb_mode name). Keep it:
+            // raw VSYNC does not guarantee AXI DMA has released the old buffer.
+            // On older IDF it selects the bounce-frame completion callback.
             .bb_mode = true,
             .avoid_tearing = true,
         }

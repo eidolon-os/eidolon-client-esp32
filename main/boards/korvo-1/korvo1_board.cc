@@ -145,9 +145,10 @@ private:
 
     // ST7262E43 is a plain RGB TFT driver: there is no vendor register set to
     // push, so the panel is created straight from the timing block. The
-    // framebuffers live in PSRAM and are fed through a small internal-SRAM
-    // bounce buffer, which is how the RGB peripheral is meant to be driven —
-    // unlike a SPI panel, where an LVGL draw buffer in PSRAM would break.
+    // S31 AXI DMA reads the PSRAM framebuffers directly, matching Espressif's
+    // esp32_s31_korvo1 board configuration. A bounce buffer would require the
+    // CPU to refill every 10 lines; delayed EOF interrupts can leave its software
+    // cursor out of step with scanout. IDF's bounce restart is S3-only.
     void InitializeRgbDisplay() {
         esp_lcd_panel_handle_t panel = nullptr;
 
@@ -171,7 +172,7 @@ private:
             // alone describes an RGB565 panel.
             .data_width = 16,
             .num_fbs = 2,
-            .bounce_buffer_size_px = DISPLAY_WIDTH * 10,
+            .bounce_buffer_size_px = 0,
             // As in Espressif's own Korvo-1 board definition (esp_boards,
             // esp-claw): 64-byte bursts keep the PSRAM reads of scan-out short.
             .dma_burst_size = 64,
@@ -193,6 +194,8 @@ private:
 
         ESP_ERROR_CHECK(esp_lcd_new_rgb_panel(&rgb_config, &panel));
         ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
+        ESP_LOGI(TAG, "RGB scanout: direct PSRAM DMA, 2 framebuffers, pclk=%d Hz",
+                 DISPLAY_PCLK_HZ);
 
         display_ = new Korvo1Display(nullptr, panel,
             DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y,
