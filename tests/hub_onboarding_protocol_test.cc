@@ -387,6 +387,59 @@ void TestConfigurationResponseMatchesTheGoldenVector()
     cJSON_Delete(vector);
 }
 
+void TestConfigurationDeviceRefAllowsOnlyForwardAuthorityCorrections()
+{
+    using eidolon::DeviceRefVerdict;
+    auto expected = eidolon::device_foundation::v1::DeviceRef{};
+    expected.device_instance_id = "device-instance_01";
+    expected.owner_domain_id.value = "owner-domain_01";
+    expected.owner_domain_generation = 3;
+    expected.claim_generation = 7;
+    expected.trust_epoch = 4;
+
+    assert(eidolon::ClassifyConfigurationDeviceRef(expected, expected) ==
+           DeviceRefVerdict::Equal);
+
+    auto corrected = expected;
+    corrected.claim_generation = 8;
+    assert(eidolon::ClassifyConfigurationDeviceRef(expected, corrected) ==
+           DeviceRefVerdict::AuthoritativeUpdate);
+    corrected = expected;
+    corrected.owner_domain_generation = 4;
+    assert(eidolon::ClassifyConfigurationDeviceRef(expected, corrected) ==
+           DeviceRefVerdict::AuthoritativeUpdate);
+    corrected = expected;
+    corrected.trust_epoch = 5;
+    assert(eidolon::ClassifyConfigurationDeviceRef(expected, corrected) ==
+           DeviceRefVerdict::AuthoritativeUpdate);
+
+    corrected = expected;
+    corrected.device_instance_id = "device-instance_02";
+    assert(eidolon::ClassifyConfigurationDeviceRef(expected, corrected) ==
+           DeviceRefVerdict::Reject);
+    corrected = expected;
+    corrected.owner_domain_id.value = "owner-domain_02";
+    assert(eidolon::ClassifyConfigurationDeviceRef(expected, corrected) ==
+           DeviceRefVerdict::Reject);
+    corrected = expected;
+    corrected.owner_domain_generation--;
+    assert(eidolon::ClassifyConfigurationDeviceRef(expected, corrected) ==
+           DeviceRefVerdict::Reject);
+    corrected = expected;
+    corrected.claim_generation--;
+    assert(eidolon::ClassifyConfigurationDeviceRef(expected, corrected) ==
+           DeviceRefVerdict::Reject);
+    corrected = expected;
+    corrected.trust_epoch--;
+    assert(eidolon::ClassifyConfigurationDeviceRef(expected, corrected) ==
+           DeviceRefVerdict::Reject);
+    corrected = expected;
+    corrected.claim_generation++;
+    corrected.trust_epoch--;
+    assert(eidolon::ClassifyConfigurationDeviceRef(expected, corrected) ==
+           DeviceRefVerdict::Reject);
+}
+
 void TestActiveClaimConfigurationAndProviderBinding()
 {
     HubConfigStatus status = HubConfigStatus::Active;
@@ -422,6 +475,32 @@ void TestActiveClaimConfigurationAndProviderBinding()
     // An answer that says nothing about the Manifest says nothing: it is not a
     // statement that the Authority holds none, and must not read as one.
     assert(!accepted_manifest.known);
+
+    std::string corrected_configuration = configuration;
+    const auto generation = corrected_configuration.find("\"claim_generation\":1");
+    assert(generation != std::string::npos);
+    corrected_configuration.replace(generation, 20, "\"claim_generation\":2");
+    eidolon::device_foundation::v1::DeviceRef accepted_ref;
+    assert(eidolon::ParseDeviceConfigurationResponse(
+        corrected_configuration, "configuration-nonce", active_claim, status,
+        assignment, accepted_manifest, nullptr, &accepted_ref));
+    assert(accepted_ref.device_instance_id == "aa:bb");
+    assert(accepted_ref.owner_domain_id.value == "owner-domain_01");
+    assert(accepted_ref.claim_generation == 2);
+
+    const std::string with_nullable_inputs =
+        "{\"operation\":\"device-control.configuration\","
+        "\"nonce\":\"configuration-nonce\",\"device_ref\":{"
+        "\"device_instance_id\":\"aa:bb\",\"owner_domain_id\":\"owner-domain_01\","
+        "\"owner_domain_generation\":3,\"claim_generation\":1,\"trust_epoch\":1},"
+        "\"lifecycle_state\":\"approved\",\"output_policy\":{"
+        "\"schema_version\":1,\"revision\":1,\"allowed\":{"
+        "\"speech\":true,\"dialogue_text\":true,\"expression\":true,"
+        "\"audio_cue\":true,\"motion\":false},\"inputs\":null},"
+        "\"channels\":[]}";
+    assert(eidolon::ParseDeviceConfigurationResponse(
+        with_nullable_inputs, "configuration-nonce", active_claim, status,
+        assignment, accepted_manifest));
 
     // When it does report one, that is what the device measures itself against.
     const std::string with_manifest =
@@ -535,6 +614,7 @@ int main()
     TestCanonicalManifest();
     TestLiveKitBindingMatchesTheGoldenVector();
     TestConfigurationResponseMatchesTheGoldenVector();
+    TestConfigurationDeviceRefAllowsOnlyForwardAuthorityCorrections();
     TestActiveClaimConfigurationAndProviderBinding();
     TestFinishedProposalIsRecognizedOnlyFromTheAuthoritysOwnWords();
     TestOperationalKeyIsPresentedInTheFormTheClaimRecords();

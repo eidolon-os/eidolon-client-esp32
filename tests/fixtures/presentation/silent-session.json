@@ -9,5 +9,8 @@
     "audio_cue": false,
     "motion": false
   },
+  "inputs": {
+    "microphone": true
+  },
   "expression_profile": "eidolon.face.v1"
 }

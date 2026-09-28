@@ -28,7 +28,7 @@ private:
     esp_err_t FetchDescriptor(
         const AuthorityCandidateRecord& candidate,
         device_foundation::v1::OwnerDomainDescriptor& out);
-    esp_err_t PullActiveConfiguration(const ActiveClaimState& claim,
+    esp_err_t PullActiveConfiguration(ActiveClaimState& claim,
                                       Esp32HubConfig& out);
     // Tell the Authority what this build declares, when it differs from what
     // the Authority just said it holds. Best effort on purpose: a device whose

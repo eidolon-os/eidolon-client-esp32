@@ -9,6 +9,16 @@
 
 namespace eidolon {
 
+enum class DeviceRefVerdict {
+    Equal,
+    AuthoritativeUpdate,
+    Reject,
+};
+
+DeviceRefVerdict ClassifyConfigurationDeviceRef(
+    const device_foundation::v1::DeviceRef& expected,
+    const device_foundation::v1::DeviceRef& returned);
+
 bool ParseOwnerDomainDescriptor(
     const std::string& body,
     device_foundation::v1::OwnerDomainDescriptor& out,
@@ -25,7 +35,8 @@ bool ParseDeviceConfigurationResponse(
     HubConfigStatus& status,
     HubChannelAssignment& assignment,
     AcceptedManifestRef& accepted_manifest,
-    DeviceOutputPolicy* output_policy = nullptr);
+    DeviceOutputPolicy* output_policy = nullptr,
+    device_foundation::v1::DeviceRef* accepted_device_ref = nullptr);
 
 
 bool ParseLiveKitBinding(const std::string& body, Esp32HubConfig& out);

@@ -224,6 +224,22 @@ bool ParseOneChannel(const cJSON* root, HubChannelAssignment& assignment)
 
 }  // namespace
 
+DeviceRefVerdict ClassifyConfigurationDeviceRef(
+    const device_foundation::v1::DeviceRef& expected,
+    const device_foundation::v1::DeviceRef& returned)
+{
+    if (expected.device_instance_id != returned.device_instance_id ||
+        expected.owner_domain_id.value != returned.owner_domain_id.value ||
+        returned.owner_domain_generation < expected.owner_domain_generation ||
+        returned.claim_generation < expected.claim_generation ||
+        returned.trust_epoch < expected.trust_epoch) {
+        return DeviceRefVerdict::Reject;
+    }
+    return SameDeviceRef(expected, returned)
+        ? DeviceRefVerdict::Equal
+        : DeviceRefVerdict::AuthoritativeUpdate;
+}
+
 bool ParseOwnerDomainDescriptor(
     const std::string& body,
     device_foundation::v1::OwnerDomainDescriptor& out,
@@ -405,7 +421,8 @@ bool ParseDeviceConfigurationResponse(
     HubConfigStatus& status,
     HubChannelAssignment& assignment,
     AcceptedManifestRef& accepted_manifest,
-    DeviceOutputPolicy* output_policy)
+    DeviceOutputPolicy* output_policy,
+    device_foundation::v1::DeviceRef* accepted_device_ref)
 {
     cJSON* root = cJSON_ParseWithLength(body.data(), body.size());
     device_foundation::v1::DeviceRef ref;
@@ -414,7 +431,8 @@ bool ParseDeviceConfigurationResponse(
         JsonString(root, "operation") == "device-control.configuration" &&
         JsonString(root, "nonce") == expected_nonce &&
         ParseDeviceRef(cJSON_GetObjectItemCaseSensitive(root, "device_ref"), ref) &&
-        SameDeviceRef(ref, expected.device_ref) &&
+        ClassifyConfigurationDeviceRef(expected.device_ref, ref) !=
+            DeviceRefVerdict::Reject &&
         ParseOneChannel(root, assignment);
     if (!valid || (lifecycle != "approved" && lifecycle != "revoked")) {
         cJSON_Delete(root);
@@ -432,6 +450,7 @@ bool ParseDeviceConfigurationResponse(
         cJSON_Delete(root);return false;
     }
     if (output_policy) *output_policy=policy;
+    if (accepted_device_ref) *accepted_device_ref = ref;
     accepted_manifest = AcceptedManifestRef{};
     const cJSON* manifest = cJSON_GetObjectItemCaseSensitive(root, "manifest");
     if (cJSON_IsObject(manifest)) {

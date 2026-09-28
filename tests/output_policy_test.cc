@@ -79,4 +79,8 @@ int main() {
     auto* json=cJSON_Parse(buffer.str().c_str());
     assert(ParseSessionOutputPlan(json,plan)); cJSON_Delete(json);
     assert(plan.face_profile && plan.selected==expression && plan.session_id=="session-1");
+    auto* server_plan=cJSON_Parse(
+        R"({"schema_version":1,"session_id":"session-1","policy_revision":1,"outputs":{"speech":false,"dialogue_text":false,"expression":true,"audio_cue":false,"motion":false},"inputs":{"microphone":true},"expression_profile":"eidolon.face.v1"})");
+    assert(ParseSessionOutputPlan(server_plan, plan));
+    cJSON_Delete(server_plan);
 }

@@ -62,3 +62,4 @@ logs/
 *.sqlite3-shm
 *.db-wal
 *.db-shm
+.omo/

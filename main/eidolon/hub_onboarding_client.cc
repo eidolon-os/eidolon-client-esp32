@@ -364,7 +364,7 @@ esp_err_t HubOnboardingClient::FetchDescriptor(
 }
 
 esp_err_t HubOnboardingClient::PullActiveConfiguration(
-    const ActiveClaimState& claim,
+    ActiveClaimState& claim,
     Esp32HubConfig& out)
 {
     if (!claim.valid()) return ESP_ERR_INVALID_STATE;
@@ -412,19 +412,13 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
     HubConfigStatus status = HubConfigStatus::PendingApproval;
     HubChannelAssignment assignment;
     AcceptedManifestRef accepted_manifest;
+    device_foundation::v1::DeviceRef accepted_device_ref;
     DeviceOutputPolicy output_policy;
     if (!ParseDeviceConfigurationResponse(
-            response.body, nonce, claim, status, assignment, accepted_manifest, &output_policy)) {
+            response.body, nonce, claim, status, assignment, accepted_manifest,
+            &output_policy, &accepted_device_ref)) {
         return ESP_ERR_INVALID_RESPONSE;
     }
-    // What this build can do is this device's own fact to state, and the answer
-    // just told it which of its declarations the Authority holds. If they
-    // differ, correct it now: a Manifest the Authority has outgrown is what the
-    // Channel Provider would otherwise keep provisioning from.
-    if (status != HubConfigStatus::Revoked) {
-        ReconcileDeclaredManifest(claim, accepted_manifest);
-    }
-    if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
     out = Esp32HubConfig{};
     out.clock = response.clock;
     out.status = status;
@@ -437,6 +431,21 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
         }
         out.expires_at_ms = assignment.expires_at_ms;
     }
+    if (ClassifyConfigurationDeviceRef(claim.device_ref, accepted_device_ref) ==
+        DeviceRefVerdict::AuthoritativeUpdate) {
+        ActiveClaimState adopted = claim;
+        adopted.device_ref = accepted_device_ref;
+        if (!HubConfigStore().StoreActiveClaim(adopted)) return ESP_FAIL;
+        claim = adopted;
+    }
+    // What this build can do is this device's own fact to state, and the answer
+    // just told it which of its declarations the Authority holds. If they
+    // differ, correct it now: a Manifest the Authority has outgrown is what the
+    // Channel Provider would otherwise keep provisioning from.
+    if (status != HubConfigStatus::Revoked) {
+        ReconcileDeclaredManifest(claim, accepted_manifest);
+    }
+    if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
     if (status == HubConfigStatus::Revoked) {
         ActiveClaimState revoked = claim;
         revoked.state = ActiveClaimLocalState::Revoked;
