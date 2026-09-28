@@ -100,7 +100,11 @@
 #define DISPLAY_OFFSET_X 0
 #define DISPLAY_OFFSET_Y 0
 
-#define DISPLAY_PCLK_HZ            (26 * 1000 * 1000)
+// 18 MHz is what Espressif's Korvo-1 board definitions drive this panel at
+// (esp_boards esp32_s31_korvo_1, esp-claw): about 42 Hz. The 26 MHz copied from
+// the Waveshare 4.3" template asked 44% more PSRAM bandwidth for scan-out while
+// LVGL redraws and Wi-Fi share the same bus, and the screen flickered.
+#define DISPLAY_PCLK_HZ            (18 * 1000 * 1000)
 #define DISPLAY_HSYNC_PULSE_WIDTH  1
 #define DISPLAY_HSYNC_BACK_PORCH   40
 #define DISPLAY_HSYNC_FRONT_PORCH  20

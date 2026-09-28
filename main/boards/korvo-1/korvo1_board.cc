@@ -15,9 +15,99 @@
 #include <esp_log.h>
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_panel_rgb.h>
+#include <esp_lvgl_port.h>
 #include <driver/i2c_master.h>
 
+#if CONFIG_EIDOLON_HUB_MODE
+#include "lvgl_theme.h"
+#include "eidolon/eidolon_view.h"
+#include "eidolon/provisioning_window_policy_core.h"
+#include "eidolon/views/home_panel_view.h"
+
+#include <memory>
+#endif
+
 #define TAG "Korvo1Board"
+
+#if CONFIG_EIDOLON_HUB_MODE
+// The RGB display with the smart home panel as its only surface. The generic
+// chat widgets LcdDisplay builds are hidden, not deleted: hidden objects never
+// invalidate, which matters on a panel that repaints in full on every change.
+class Korvo1PanelDisplay : public RgbLcdDisplay {
+public:
+    using RgbLcdDisplay::RgbLcdDisplay;
+
+    ~Korvo1PanelDisplay() override { eidolon::SetEidolonView(nullptr); }
+
+    void SetupUI() override {
+        if (setup_ui_called_) return;
+        RgbLcdDisplay::SetupUI();
+        DisplayLockGuard lock(this);
+        for (lv_obj_t* legacy : {container_, emoji_box_, preview_image_, top_bar_, status_bar_, bottom_bar_,
+                                 low_battery_popup_}) {
+            if (legacy != nullptr) lv_obj_add_flag(legacy, LV_OBJ_FLAG_HIDDEN);
+        }
+        auto* theme = static_cast<LvglTheme*>(current_theme_);
+        builtin_font_ = theme->text_font();
+        font_ = builtin_font_;
+        panel_.Build({lv_screen_active(), this, font_->font(), theme->icon_font()->font()});
+        eidolon::SetEidolonView(&panel_);
+    }
+
+    // The assets partition carries the full-coverage text font; the builtin
+    // one only has to get the device through boot.
+    void OnAssetsLoaded() override {
+        DisplayLockGuard lock(this);
+        auto* light = LvglThemeManager::GetInstance().GetTheme("light");
+        if (!builtin_font_ || light == nullptr || !light->text_font() || light->text_font()->font() == nullptr) {
+            return;
+        }
+        auto font = light->text_font();
+        panel_.SetFont(font->font());
+        font_ = std::move(font);  // labels hold the raw pointer; keep it alive
+    }
+
+    void OnAssetsUnloaded() override {
+        DisplayLockGuard lock(this);
+        if (!builtin_font_) return;
+        panel_.SetFont(builtin_font_->font());
+        for (const char* name : {"light", "dark"}) {
+            auto* theme = LvglThemeManager::GetInstance().GetTheme(name);
+            if (theme != nullptr && theme->text_font() == font_) theme->set_text_font(builtin_font_);
+        }
+        font_ = builtin_font_;
+    }
+
+    void ShowNotification(const char* text, int duration_ms = 3000) override {
+        panel_.ShowNotification(text, duration_ms);
+    }
+    // The legacy status bar is hidden, so the network state it used to show is
+    // handed to the panel's top bar instead, on the same 10-second cadence
+    // (Application calls this every second from its main loop).
+    void UpdateStatusBar(bool update_all = false) override {
+        if (!update_all && status_ticks_++ % 10 != 0) return;
+        panel_.SetNetworkIcon(Board::GetInstance().GetNetworkStateIcon());
+    }
+    void ShowNotification(const std::string& text, int duration_ms = 3000) override {
+        ShowNotification(text.c_str(), duration_ms);
+    }
+    // Lifecycle text reaches the panel through the projected UI model only; the
+    // hidden chat widgets must stay hidden (and their scroll animations idle).
+    void SetStatus(const char*) override {}
+    void SetEmotion(const char*) override {}
+    void SetChatMessage(const char*, const char*) override {}
+    void ClearChatMessages() override {}
+
+private:
+    eidolon::HomePanelView panel_;
+    unsigned status_ticks_ = 0;
+    std::shared_ptr<LvglFont> builtin_font_;
+    std::shared_ptr<LvglFont> font_;
+};
+using Korvo1Display = Korvo1PanelDisplay;
+#else
+using Korvo1Display = RgbLcdDisplay;
+#endif
 
 // ESP32-S31-Korvo-1.
 //
@@ -82,6 +172,9 @@ private:
             .data_width = 16,
             .num_fbs = 2,
             .bounce_buffer_size_px = DISPLAY_WIDTH * 10,
+            // As in Espressif's own Korvo-1 board definition (esp_boards,
+            // esp-claw): 64-byte bursts keep the PSRAM reads of scan-out short.
+            .dma_burst_size = 64,
             .hsync_gpio_num = DISPLAY_LCD_HSYNC,
             .vsync_gpio_num = DISPLAY_LCD_VSYNC,
             .de_gpio_num = DISPLAY_LCD_DE,
@@ -101,13 +194,11 @@ private:
         ESP_ERROR_CHECK(esp_lcd_new_rgb_panel(&rgb_config, &panel));
         ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
 
-        display_ = new RgbLcdDisplay(nullptr, panel,
+        display_ = new Korvo1Display(nullptr, panel,
             DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y,
             DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
     }
 
-    // Touch is not required for any Eidolon flow on this board, so a GT1151
-    // that does not answer is logged and stepped over rather than fatal.
     // The four keys share one ADC ladder, so each is a window around its
     // centre rather than a pin. Every button passes a null adc_handle: the
     // driver keeps one unit per ADC and the first device to ask creates it.
@@ -137,19 +228,36 @@ private:
         volume_down_button_ =
             MakeAdcButton(3, BUTTON_ADC_VOL_DOWN_MIN_MV, BUTTON_ADC_VOL_DOWN_MAX_MV);
 
-        // SET stands in for the BOOT button the other boards use: a click while
-        // the device is still starting opens setup, which is the only way back
-        // into provisioning once credentials are committed. Long press keeps it
-        // reachable afterwards, since that boot window is short.
+        // SET stands in for the BOOT button the other boards use, with the same
+        // handlers as esp-box-3. Button callbacks run on the esp_timer task:
+        // physical recovery generates keys and writes NVS, so the setup act is
+        // scheduled onto the application task. Calling it here directly
+        // overflowed the timer task and rebooted the board on every long press,
+        // which left a removed ("recovery required") panel no way back in.
+#if CONFIG_EIDOLON_HUB_MODE
+        eidolon::SetEidolonSetupHandler([this]() { EnterWifiConfigMode(); });
+        eidolon::SetEidolonInputAvailable(eidolon::UiInputSource::SessionButton, true);
+#endif
         set_button_->OnClick([this]() {
             auto& app = Application::GetInstance();
+#if CONFIG_EIDOLON_HUB_MODE
+            if (eidolon::HubSetupButtonClickOpensSetup(app.GetDeviceState())) {
+#else
             if (app.GetDeviceState() == kDeviceStateStarting) {
-                EnterWifiConfigMode();
+#endif
+                app.Schedule([this]() { EnterWifiConfigMode(); });
                 return;
             }
+#if CONFIG_EIDOLON_HUB_MODE
+            eidolon::DispatchEidolonUiInput(eidolon::UiInputSource::SessionButton, eidolon::UiInputGesture::Click);
+#else
             app.ToggleChatState();
+#endif
         });
-        set_button_->OnLongPress([this]() { EnterWifiConfigMode(); });
+        // Long press opens setup from an operational or removed device too.
+        set_button_->OnLongPress([this]() {
+            Application::GetInstance().Schedule([this]() { EnterWifiConfigMode(); });
+        });
 
 #if CONFIG_USE_DEVICE_AEC
         mode_button_->OnClick([this]() {
@@ -182,6 +290,9 @@ private:
         GetDisplay()->ShowNotification(Lang::Strings::VOLUME + std::to_string(volume));
     }
 
+    // Touch is the smart home panel's input, but no provisioning or lifecycle
+    // flow depends on it, so a GT1151 that does not answer is logged and
+    // stepped over rather than fatal.
     void InitializeTouch() {
         esp_lcd_panel_io_handle_t tp_io_handle = nullptr;
         esp_lcd_panel_io_i2c_config_t tp_io_config = ESP_LCD_TOUCH_IO_I2C_GT1151_CONFIG();
@@ -213,6 +324,19 @@ private:
             return;
         }
         ESP_LOGI(TAG, "[ui] GT1151 touch ready");
+
+        const lvgl_port_touch_cfg_t touch_config = {
+            .disp = lv_display_get_default(),
+            .handle = touch_,
+        };
+        if (lvgl_port_add_touch(&touch_config) == nullptr) {
+            ESP_LOGE(TAG, "[ui] LVGL touch registration failed");
+            return;
+        }
+        ESP_LOGI(TAG, "[ui] LVGL touch ready");
+#if CONFIG_EIDOLON_HUB_MODE
+        eidolon::SetEidolonInputAvailable(eidolon::UiInputSource::Touch, true);
+#endif
     }
 
 public:

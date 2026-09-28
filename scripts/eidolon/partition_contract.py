@@ -132,6 +132,39 @@ def check_device(build, port, allow_blank=False, after=False):
             esp._port.close()
 
 
+def describe(table):
+    return [(p.name, p.type, p.subtype, p.offset, p.size) for p in table]
+
+
+def diff_device(build, port):
+    """Read the device's partition table and set it beside the build's. Read-only."""
+    args, table, _ = validate_build(build)
+    from esptool.cmds import detect_chip
+    esp = detect_chip(port, connect_attempts=3)
+    try:
+        esp = esp.run_stub()
+        raw = esp.read_flash(int(args['partition-table']['offset'], 0), 0x1000)
+    finally:
+        try:
+            esp.hard_reset()
+        finally:
+            esp._port.close()
+    if all(b == 0xff for b in raw):
+        print('device: no partition table')
+        return
+    device = describe(parser().PartitionTable.from_binary(raw))
+    built = describe(table)
+    width = max(len(row[0]) for row in device + built)
+    print(f"{'':2}{'name':{width}}  {'device (offset, size)':26}  build (offset, size)")
+    for name in dict.fromkeys([row[0] for row in device + built]):
+        d = next((r for r in device if r[0] == name), None)
+        b = next((r for r in built if r[0] == name), None)
+        mark = '  ' if d == b else '! '
+        cell = lambda r: f"{r[3]:#09x}, {r[4]:#09x}" if r else '-'
+        print(f"{mark}{name:{width}}  {cell(d):26}  {cell(b)}")
+    print('same layout' if device == built else 'layouts differ (! rows)')
+
+
 def application_partition(build):
     """Resolve the written app from IDF artifacts, before any device mutation."""
     args, table, _ = validate_build(Path(build))
@@ -176,6 +209,9 @@ def main():
     field.add_argument('field', choices=['offset', 'size'])
     built = sub.add_parser('build')
     built.add_argument('path')
+    compare = sub.add_parser('diff')
+    compare.add_argument('path')
+    compare.add_argument('--port', required=True)
     for command in ('preflight', 'finish'):
         gate = sub.add_parser(command)
         gate.add_argument('path')
@@ -189,6 +225,8 @@ def main():
         if part is None:
             raise ValueError(f'Unknown partition: {args.name}')
         print(hex(getattr(part, args.field)))
+    elif args.command == 'diff':
+        diff_device(Path(args.path), args.port)
     elif args.command in ('preflight', 'finish'):
         build = Path(args.path)
         if build_config(build).get('CONFIG_EIDOLON_HUB_MODE') == 'y':
