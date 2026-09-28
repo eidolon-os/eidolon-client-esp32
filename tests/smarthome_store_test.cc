@@ -307,6 +307,10 @@ void TestSnapshotReplacesAndLinkStaleness() {
 }
 
 void TestVoiceResults() {
+    const Message clarification = Receive("voice-result-clarification.json");
+    CHECK(clarification.result.outcome == VoiceOutcome::Clarification);
+    CHECK(OutcomeTone(clarification.result.outcome) == ResultTone::Normal);
+    CHECK(clarification.result.candidates.empty() && !clarification.result.has_command);
     const Message executed = Receive("voice-result-executed.json");
     CHECK(executed.kind == MessageKind::Result);
     CHECK(executed.result.outcome == VoiceOutcome::Executed);

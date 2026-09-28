@@ -40,7 +40,7 @@ enum class ThermostatMode : uint8_t { Unknown, Cool, Heat, Auto, Fan, Dry };
 enum class RunState : uint8_t { Unknown, Idle, Running, Paused, Docked };
 enum class OriginKind : uint8_t { Voice, Text, Touch, Scene, Mobile, Automation };
 enum class VoiceOutcome : uint8_t {
-    Executed, Partial, Answered, Ambiguous, NotFound, Unrelated, Failed, Unavailable,
+    Executed, Partial, Answered, Ambiguous, NotFound, Unrelated, Failed, Unavailable, Clarification,
 };
 
 // A state value that may be absent from the wire or sent as JSON null. The

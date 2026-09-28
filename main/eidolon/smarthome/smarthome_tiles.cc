@@ -298,6 +298,7 @@ ResultTone OutcomeTone(VoiceOutcome outcome) {
     case VoiceOutcome::Executed:
     case VoiceOutcome::Answered:
     case VoiceOutcome::Ambiguous:
+    case VoiceOutcome::Clarification:
         return ResultTone::Normal;
     case VoiceOutcome::Partial:
         return ResultTone::Attention;

@@ -141,6 +141,7 @@ bool ParseOutcome(const std::string& text, VoiceOutcome& out) {
     else if (text == "partial") out = VoiceOutcome::Partial;
     else if (text == "answered") out = VoiceOutcome::Answered;
     else if (text == "ambiguous") out = VoiceOutcome::Ambiguous;
+    else if (text == "clarification") out = VoiceOutcome::Clarification;
     else if (text == "not_found") out = VoiceOutcome::NotFound;
     else if (text == "unrelated") out = VoiceOutcome::Unrelated;
     else if (text == "failed") out = VoiceOutcome::Failed;
