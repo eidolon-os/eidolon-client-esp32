@@ -228,8 +228,8 @@ private:
         volume_down_button_ =
             MakeAdcButton(3, BUTTON_ADC_VOL_DOWN_MIN_MV, BUTTON_ADC_VOL_DOWN_MAX_MV);
 
-        // SET stands in for the BOOT button the other boards use, with the same
-        // handlers as esp-box-3. Button callbacks run on the esp_timer task:
+        // SET follows the Box-3 setup and session gestures. Button callbacks
+        // run on the esp_timer task:
         // physical recovery generates keys and writes NVS, so the setup act is
         // scheduled onto the application task. Calling it here directly
         // overflowed the timer task and rebooted the board on every long press,
@@ -249,7 +249,8 @@ private:
                 return;
             }
 #if CONFIG_EIDOLON_HUB_MODE
-            eidolon::DispatchEidolonUiInput(eidolon::UiInputSource::SessionButton, eidolon::UiInputGesture::Click);
+            eidolon::DispatchEidolonUiInput(eidolon::UiInputSource::SessionButton,
+                                            eidolon::UiInputGesture::Click);
 #else
             app.ToggleChatState();
 #endif
@@ -259,7 +260,13 @@ private:
             Application::GetInstance().Schedule([this]() { EnterWifiConfigMode(); });
         });
 
-#if CONFIG_USE_DEVICE_AEC
+#if CONFIG_EIDOLON_HUB_MODE
+        // MODE offers the same conversation gesture through the shared UI input.
+        mode_button_->OnClick([]() {
+            eidolon::DispatchEidolonUiInput(eidolon::UiInputSource::SessionButton,
+                                            eidolon::UiInputGesture::Click);
+        });
+#elif CONFIG_USE_DEVICE_AEC
         mode_button_->OnClick([this]() {
             auto& app = Application::GetInstance();
             if (app.GetDeviceState() == kDeviceStateIdle) {
