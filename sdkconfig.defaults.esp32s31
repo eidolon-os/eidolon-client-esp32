@@ -26,6 +26,11 @@ CONFIG_SPIRAM_USE_MALLOC=y
 CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=2048
 CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=98304
 
+# RGB scanout uses GDMA bounce-buffer interrupts while the panel is active.
+# Keep that ISR in internal RAM so NVS/flash writes during provisioning or
+# smart-home updates cannot strand the scanout partway through a frame.
+CONFIG_LCD_RGB_ISR_IRAM_SAFE=y
+
 # TLS record buffers are 16 kB in and 4 kB out per connection, and this board
 # holds a WSS signalling socket beside two DTLS-SRTP peers. None of it is DMA.
 CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
