@@ -28,10 +28,11 @@ PcmPushCaptureSource::PcmPushCaptureSource(uint32_t sample_rate, size_t ring_cap
     base_.close = Close;
 
 #if CONFIG_BOARD_TYPE_ESP_BOX_3
-    // BOX-3 full-duplex AEC has been hardware-qualified with the PCM ring in
-    // internal SRAM. Putting this real-time producer/consumer path in PSRAM
-    // causes corrupted/noisy capture under concurrent codec, display and Wi-Fi
-    // load, which in turn prevents STT from producing a usable utterance.
+    // Retain BOX-3's previously qualified allocation policy pending a controlled
+    // comparison with the sample-boundary fix. The historical PSRAM rollback
+    // also changed usable capacity (WithCaps: N-1, dynamic: N), so it did not
+    // isolate memory placement as the cause of noise. See
+    // docs/pcm-capture-unification.md before changing this policy.
     ring_ = xStreamBufferCreate(ring_capacity_bytes, /*trigger_level=*/1);
 #else
     // Internal-SRAM-tight boards keep the ring in PSRAM so the LiveKit engine

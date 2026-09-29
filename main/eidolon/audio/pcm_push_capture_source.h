@@ -24,11 +24,12 @@ namespace eidolon {
 // the encoder pull size. Single-writer (AFE task) / single-reader (capture fetch
 // task), which the stream buffer supports without extra locking.
 //
-// Placement is board-specific. Internal-SRAM-tight boards use PSRAM so the
-// LiveKit engine can obtain its internal-only queue and stack. ESP-BOX-3 uses
-// internal SRAM because its production full-duplex AEC path has been hardware
-// qualified there and produces corrupted/noisy capture when this real-time ring
-// is moved to PSRAM.
+// PCM framing/overflow behavior is shared by all boards. Placement currently
+// retains historical board policies: SRAM-tight boards use PSRAM; ESP-BOX-3
+// retains its qualified internal allocation. Its historical rollback changed
+// both placement and usable capacity, so it does not establish that PSRAM itself
+// corrupts audio. See docs/pcm-capture-unification.md for evidence and the
+// controlled comparison needed to retire that allocation exception.
 class PcmPushCaptureSource {
 public:
     static constexpr size_t kDefaultRingBytes = 16000;
