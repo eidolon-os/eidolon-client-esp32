@@ -48,7 +48,12 @@ public:
             if (legacy != nullptr) lv_obj_add_flag(legacy, LV_OBJ_FLAG_HIDDEN);
         }
         auto* theme = static_cast<LvglTheme*>(current_theme_);
-        builtin_font_ = theme->text_font();
+        // The panel is drawn in 20 px. eidolon_dark's text font is the 30 px
+        // supplement other boards put in front of this base, which mixed 30 px
+        // characters into the panel's text and set its line height; the light
+        // theme holds the base itself.
+        auto* light = LvglThemeManager::GetInstance().GetTheme("light");
+        builtin_font_ = light != nullptr && light->text_font() ? light->text_font() : theme->text_font();
         font_ = builtin_font_;
         panel_.Build({lv_screen_active(), this, font_->font(), theme->icon_font()->font()});
         eidolon::SetEidolonView(&panel_);
