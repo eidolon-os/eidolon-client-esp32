@@ -10,7 +10,7 @@
 #endif
 namespace eidolon {
 namespace {
-bool KeysWithNullableInputs(const cJSON* obj) {
+bool KeysWithOptionalInputs(const cJSON* obj) {
     if (!cJSON_IsObject(obj)) return false;
     for (auto* item=obj->child;item;item=item->next) {
         const bool known = item->string &&
@@ -18,8 +18,13 @@ bool KeysWithNullableInputs(const cJSON* obj) {
              !std::strcmp(item->string,"revision") ||
              !std::strcmp(item->string,"allowed") ||
              !std::strcmp(item->string,"inputs"));
-        if (!known || (!std::strcmp(item->string,"inputs") &&
-                       !cJSON_IsNull(item))) return false;
+        if (!known) return false;
+        if (!std::strcmp(item->string,"inputs")) {
+            if (cJSON_IsNull(item)) continue;
+            if (!cJSON_IsObject(item) || cJSON_GetArraySize(item) != 1) return false;
+            const auto* microphone = cJSON_GetObjectItemCaseSensitive(item, "microphone");
+            if (!cJSON_IsBool(microphone)) return false;
+        }
         for (auto* prior=obj->child;prior!=item;prior=prior->next)
             if (!std::strcmp(prior->string,item->string)) return false;
     }
@@ -78,7 +83,7 @@ constexpr uint32_t kResponseOutputs=OutputBit(presentation::Output::Speech)|
 bool ParseOutputPolicy(const cJSON* json,DeviceOutputPolicy& output) {
     if (!json || cJSON_IsNull(json)) { output={};return true; }
     DeviceOutputPolicy candidate;
-    if (!KeysWithNullableInputs(json) || !Version(json) ||
+    if (!KeysWithOptionalInputs(json) || !Version(json) ||
         !Uint(cJSON_GetObjectItemCaseSensitive(json,"revision"),candidate.revision) ||
         !Mask(cJSON_GetObjectItemCaseSensitive(json,"allowed"),candidate.allowed)) return false;
     candidate.known=true;output=candidate;return true;

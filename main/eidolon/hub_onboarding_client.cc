@@ -417,6 +417,8 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
     if (!ParseDeviceConfigurationResponse(
             response.body, nonce, claim, status, assignment, accepted_manifest,
             &output_policy, &accepted_device_ref)) {
+        ESP_LOGE(TAG, "Configuration response rejected status=%d bytes=%u",
+                 response.status, static_cast<unsigned>(response.body.size()));
         return ESP_ERR_INVALID_RESPONSE;
     }
     out = Esp32HubConfig{};

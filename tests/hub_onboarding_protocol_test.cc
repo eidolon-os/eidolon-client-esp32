@@ -502,6 +502,22 @@ void TestActiveClaimConfigurationAndProviderBinding()
         with_nullable_inputs, "configuration-nonce", active_claim, status,
         assignment, accepted_manifest));
 
+    // The Host can also carry the Owner's microphone permission as an explicit
+    // selection; an older parser that required null rejected the whole answer.
+    const std::string with_input_selection =
+        "{\"operation\":\"device-control.configuration\","
+        "\"nonce\":\"configuration-nonce\",\"device_ref\":{"
+        "\"device_instance_id\":\"aa:bb\",\"owner_domain_id\":\"owner-domain_01\","
+        "\"owner_domain_generation\":3,\"claim_generation\":1,\"trust_epoch\":1},"
+        "\"lifecycle_state\":\"approved\",\"output_policy\":{"
+        "\"schema_version\":1,\"revision\":1,\"allowed\":{"
+        "\"speech\":true,\"dialogue_text\":true,\"expression\":true,"
+        "\"audio_cue\":true,\"motion\":false},\"inputs\":{\"microphone\":true}},"
+        "\"channels\":[]}";
+    assert(eidolon::ParseDeviceConfigurationResponse(
+        with_input_selection, "configuration-nonce", active_claim, status,
+        assignment, accepted_manifest));
+
     // When it does report one, that is what the device measures itself against.
     const std::string with_manifest =
         "{\"operation\":\"device-control.configuration\","
