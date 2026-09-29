@@ -235,6 +235,28 @@ bool ParseOneChannel(const cJSON* root, HubChannelAssignment& assignment)
 
 }  // namespace
 
+DeviceRefCorrection ClassifyAuthorityDeviceRef(
+    const device_foundation::v1::DeviceRef& held,
+    const device_foundation::v1::DeviceRef& answered)
+{
+    if (answered.device_instance_id != held.device_instance_id ||
+        answered.owner_domain_id.value != held.owner_domain_id.value ||
+        answered.owner_domain_generation != held.owner_domain_generation) {
+        return DeviceRefCorrection::Reject;
+    }
+    if (answered.claim_generation != held.claim_generation) {
+        return answered.claim_generation > held.claim_generation
+            ? DeviceRefCorrection::Adopt
+            : DeviceRefCorrection::Reject;
+    }
+    if (answered.trust_epoch != held.trust_epoch) {
+        return answered.trust_epoch > held.trust_epoch
+            ? DeviceRefCorrection::Adopt
+            : DeviceRefCorrection::Reject;
+    }
+    return DeviceRefCorrection::None;
+}
+
 bool ParseOwnerDomainDescriptor(
     const std::string& body,
     device_foundation::v1::OwnerDomainDescriptor& out,
@@ -426,7 +448,8 @@ bool ParseDeviceConfigurationResponse(
     HubChannelAssignment& assignment,
     AcceptedManifestRef& accepted_manifest,
     DeviceOutputPolicy* output_policy,
-    const char** rejection_reason)
+    const char** rejection_reason,
+    device_foundation::v1::DeviceRef* authority_ref)
 {
     if (rejection_reason) *rejection_reason = nullptr;
     cJSON* root = cJSON_ParseWithLength(body.data(), body.size());
@@ -442,7 +465,10 @@ bool ParseDeviceConfigurationResponse(
     if (JsonString(root, "operation") != "device-control.configuration") return reject("operation");
     if (JsonString(root, "nonce") != expected_nonce) return reject("nonce");
     if (!ParseDeviceRef(cJSON_GetObjectItemCaseSensitive(root, "device_ref"), ref)) return reject("device_ref");
-    if (!SameDeviceRef(ref, expected.device_ref)) return reject("lifecycle_mismatch");
+    if (ClassifyAuthorityDeviceRef(expected.device_ref, ref) ==
+        DeviceRefCorrection::Reject) {
+        return reject("lifecycle_mismatch");
+    }
     if (!ParseOneChannel(root, assignment)) return reject("channels");
     if (lifecycle != "approved" && lifecycle != "revoked") return reject("lifecycle_state");
     status = lifecycle == "revoked"
@@ -457,6 +483,7 @@ bool ParseDeviceConfigurationResponse(
         return reject("output_policy");
     }
     if (output_policy) *output_policy=policy;
+    if (authority_ref) *authority_ref = ref;
     accepted_manifest = AcceptedManifestRef{};
     const cJSON* manifest = cJSON_GetObjectItemCaseSensitive(root, "manifest");
     if (cJSON_IsObject(manifest)) {

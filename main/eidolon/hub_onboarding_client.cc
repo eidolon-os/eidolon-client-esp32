@@ -434,19 +434,38 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
     AcceptedManifestRef accepted_manifest;
     DeviceOutputPolicy output_policy;
     const char* rejection_reason = nullptr;
+    device_foundation::v1::DeviceRef authority_ref;
     if (!ParseDeviceConfigurationResponse(
             response.body, nonce, claim, status, assignment, accepted_manifest,
-            &output_policy, &rejection_reason)) {
+            &output_policy, &rejection_reason, &authority_ref)) {
         ESP_LOGW(TAG, "Configuration validation failed stage=%s",
                  rejection_reason ? rejection_reason : "unknown");
         return ESP_ERR_INVALID_RESPONSE;
+    }
+    // A Body re-granted while it held an older ref learns its generation here,
+    // and keeps it before signing anything else: every later request, the
+    // Manifest assertion below included, must name the ref the Authority holds.
+    ActiveClaimState current = claim;
+    if (ClassifyAuthorityDeviceRef(claim.device_ref, authority_ref) ==
+        DeviceRefCorrection::Adopt) {
+        if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
+        diagnostic_.BeginStage("claim-generation-store");
+        current.device_ref = authority_ref;
+        if (!HubConfigStore().StoreActiveClaim(current)) return ESP_FAIL;
+        ESP_LOGI(TAG, "Adopted Authority claim generation %u/%u (held %u/%u)",
+                 static_cast<unsigned>(authority_ref.claim_generation),
+                 static_cast<unsigned>(authority_ref.trust_epoch),
+                 static_cast<unsigned>(claim.device_ref.claim_generation),
+                 static_cast<unsigned>(claim.device_ref.trust_epoch));
+        diagnostic_.stage = "configuration-validate";
+        diagnostic_.http_status = response.status;
     }
     // What this build can do is this device's own fact to state, and the answer
     // just told it which of its declarations the Authority holds. If they
     // differ, correct it now: a Manifest the Authority has outgrown is what the
     // Channel Provider would otherwise keep provisioning from.
     if (status != HubConfigStatus::Revoked) {
-        ReconcileDeclaredManifest(claim, accepted_manifest);
+        ReconcileDeclaredManifest(current, accepted_manifest);
     }
     if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
     out = Esp32HubConfig{};
@@ -462,7 +481,7 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
     }
     if (status == HubConfigStatus::Revoked) {
         diagnostic_.BeginStage("claim-revocation-store");
-        ActiveClaimState revoked = claim;
+        ActiveClaimState revoked = current;
         revoked.state = ActiveClaimLocalState::Revoked;
         if (!HubConfigStore().StoreActiveClaim(revoked)) {
             return ESP_FAIL;

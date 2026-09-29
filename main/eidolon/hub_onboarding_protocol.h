@@ -18,6 +18,27 @@ struct DeviceCapabilities;
 std::string BuildDeviceManifestJson(const std::string& board_name, const DeviceCapabilities& capabilities);
 std::string BuildDeviceManifestJson(const std::string& board_name, bool has_camera);
 
+// What the DeviceRef in a configuration answer means for the one this device
+// holds. The Authority finds the Claim by device identity and answers with the
+// ref it holds, so a Body that was re-granted while it kept an older ref learns
+// its generation here instead of being refused forever.
+//
+// Only the Claim's own generations move this way. Device and Owner Domain are
+// who is asking and who answers; the Owner Domain generation changes only when
+// the Authority is reset, and that is the descriptor's to report, through the
+// recovery it requires. A re-grant restarts trust_epoch at one, so trust_epoch
+// is ordered within a claim_generation, never across one.
+enum class DeviceRefCorrection {
+    None,    // the Authority holds exactly this ref
+    Adopt,   // the Authority holds a later generation of this same Claim
+    Reject,  // another device, Owner Domain or Authority generation, or older
+};
+DeviceRefCorrection ClassifyAuthorityDeviceRef(
+    const device_foundation::v1::DeviceRef& held,
+    const device_foundation::v1::DeviceRef& answered);
+
+// On success, authority_ref is the ref the answer carries: equal to the one
+// expected, or a later generation of it (DeviceRefCorrection::Adopt).
 bool ParseDeviceConfigurationResponse(
     const std::string& body,
     const std::string& expected_nonce,
@@ -26,7 +47,8 @@ bool ParseDeviceConfigurationResponse(
     HubChannelAssignment& assignment,
     AcceptedManifestRef& accepted_manifest,
     DeviceOutputPolicy* output_policy = nullptr,
-    const char** rejection_reason = nullptr);
+    const char** rejection_reason = nullptr,
+    device_foundation::v1::DeviceRef* authority_ref = nullptr);
 
 
 // Temporary invitation only. Parsing never writes a Claim or cached configuration.

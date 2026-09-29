@@ -527,6 +527,141 @@ void TestActiveClaimConfigurationAndProviderBinding()
     assert(!eidolon::ParseLiveKitBinding(two_rooms, stale));
 }
 
+eidolon::device_foundation::v1::DeviceRef HeldRef()
+{
+    eidolon::device_foundation::v1::DeviceRef ref;
+    ref.device_instance_id = "aa:bb";
+    ref.owner_domain_id.value = "owner-domain_01";
+    ref.owner_domain_generation = 3;
+    ref.claim_generation = 7;
+    ref.trust_epoch = 2;
+    return ref;
+}
+
+void TestAuthorityCorrectsOnlyTheClaimsOwnGenerations()
+{
+    using eidolon::ClassifyAuthorityDeviceRef;
+    using eidolon::DeviceRefCorrection;
+    const auto held = HeldRef();
+    assert(ClassifyAuthorityDeviceRef(held, held) == DeviceRefCorrection::None);
+
+    // A re-grant: the Authority issues claim_generation + 1 and restarts
+    // trust_epoch at one. That is the case this correction exists for, so a
+    // lower trust_epoch under a later claim_generation must not refuse it.
+    auto answered = held;
+    ++answered.claim_generation;
+    answered.trust_epoch = 1;
+    assert(ClassifyAuthorityDeviceRef(held, answered) == DeviceRefCorrection::Adopt);
+    answered = held;
+    answered.claim_generation += 5;
+    answered.trust_epoch += 3;
+    assert(ClassifyAuthorityDeviceRef(held, answered) == DeviceRefCorrection::Adopt);
+    answered = held;
+    ++answered.trust_epoch;
+    assert(ClassifyAuthorityDeviceRef(held, answered) == DeviceRefCorrection::Adopt);
+
+    // Older than what this device holds, in either generation.
+    answered = held;
+    --answered.claim_generation;
+    answered.trust_epoch += 10;
+    assert(ClassifyAuthorityDeviceRef(held, answered) == DeviceRefCorrection::Reject);
+    answered = held;
+    --answered.trust_epoch;
+    assert(ClassifyAuthorityDeviceRef(held, answered) == DeviceRefCorrection::Reject);
+
+    // An Authority reset is the descriptor's to report, never this answer's,
+    // whichever way the Owner Domain generation moved and whatever else agrees.
+    answered = held;
+    ++answered.owner_domain_generation;
+    assert(ClassifyAuthorityDeviceRef(held, answered) == DeviceRefCorrection::Reject);
+    ++answered.claim_generation;
+    assert(ClassifyAuthorityDeviceRef(held, answered) == DeviceRefCorrection::Reject);
+    answered = held;
+    --answered.owner_domain_generation;
+    assert(ClassifyAuthorityDeviceRef(held, answered) == DeviceRefCorrection::Reject);
+
+    answered = held;
+    answered.device_instance_id = "aa:cc";
+    ++answered.claim_generation;
+    assert(ClassifyAuthorityDeviceRef(held, answered) == DeviceRefCorrection::Reject);
+    answered = held;
+    answered.owner_domain_id.value = "owner-domain_02";
+    ++answered.claim_generation;
+    assert(ClassifyAuthorityDeviceRef(held, answered) == DeviceRefCorrection::Reject);
+}
+
+std::string ConfigurationAnswer(uint64_t owner_domain_generation,
+                                uint32_t claim_generation,
+                                uint32_t trust_epoch,
+                                const char* lifecycle)
+{
+    return std::string(
+               "{\"operation\":\"device-control.configuration\","
+               "\"nonce\":\"configuration-nonce\",\"device_ref\":{"
+               "\"device_instance_id\":\"aa:bb\","
+               "\"owner_domain_id\":\"owner-domain_01\","
+               "\"owner_domain_generation\":") +
+           std::to_string(owner_domain_generation) +
+           ",\"claim_generation\":" + std::to_string(claim_generation) +
+           ",\"trust_epoch\":" + std::to_string(trust_epoch) +
+           "},\"lifecycle_state\":\"" + lifecycle + "\",\"channels\":[]}";
+}
+
+void TestConfigurationAnswerCarriesTheAuthoritysRef()
+{
+    eidolon::ActiveClaimState claim;
+    claim.device_ref = HeldRef();
+    claim.manifest_ref = {
+        "manifest_01", 1,
+        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"};
+    claim.grant_id = "grant_01";
+    struct Parsed {
+        bool ok = false;
+        HubConfigStatus status = HubConfigStatus::PendingApproval;
+        eidolon::device_foundation::v1::DeviceRef ref;
+        std::string reason;
+    };
+    const auto parse = [&](const std::string& body) {
+        Parsed parsed;
+        eidolon::HubChannelAssignment assignment;
+        eidolon::AcceptedManifestRef accepted_manifest;
+        const char* reason = nullptr;
+        parsed.ok = eidolon::ParseDeviceConfigurationResponse(
+            body, "configuration-nonce", claim, parsed.status, assignment,
+            accepted_manifest, nullptr, &reason, &parsed.ref);
+        if (reason) parsed.reason = reason;
+        return parsed;
+    };
+
+    auto parsed = parse(ConfigurationAnswer(3, 7, 2, "approved"));
+    assert(parsed.ok && parsed.status == HubConfigStatus::WaitingBinding);
+    assert(parsed.ref.claim_generation == 7 && parsed.ref.trust_epoch == 2);
+
+    // The Body fell behind a re-grant. It used to refuse this answer forever;
+    // now the answer is how it learns the ref every later request must name.
+    parsed = parse(ConfigurationAnswer(3, 8, 1, "approved"));
+    assert(parsed.ok && parsed.status == HubConfigStatus::WaitingBinding);
+    assert(parsed.ref.device_instance_id == "aa:bb");
+    assert(parsed.ref.owner_domain_id.value == "owner-domain_01");
+    assert(parsed.ref.owner_domain_generation == 3);
+    assert(parsed.ref.claim_generation == 8 && parsed.ref.trust_epoch == 1);
+
+    // A revocation of the later generation is still a revocation of this Claim.
+    parsed = parse(ConfigurationAnswer(3, 8, 1, "revoked"));
+    assert(parsed.ok && parsed.status == HubConfigStatus::Revoked);
+    assert(parsed.ref.claim_generation == 8);
+
+    for (const auto& body : {ConfigurationAnswer(4, 7, 2, "approved"),
+                             ConfigurationAnswer(2, 7, 2, "approved"),
+                             ConfigurationAnswer(4, 8, 1, "approved"),
+                             ConfigurationAnswer(3, 6, 5, "approved"),
+                             ConfigurationAnswer(3, 7, 1, "approved")}) {
+        parsed = parse(body);
+        assert(!parsed.ok);
+        assert(parsed.reason == "lifecycle_mismatch");
+    }
+}
+
 void TestFinishedProposalIsRecognizedOnlyFromTheAuthoritysOwnWords()
 {
     const auto problem = [](const char* code, const char* authority) {
@@ -588,6 +723,8 @@ int main()
     TestConfigurationResponseMatchesTheGoldenVector();
     TestSharedInvitationIsTemporaryAndLifecycleFenced();
     TestActiveClaimConfigurationAndProviderBinding();
+    TestAuthorityCorrectsOnlyTheClaimsOwnGenerations();
+    TestConfigurationAnswerCarriesTheAuthoritysRef();
     TestFinishedProposalIsRecognizedOnlyFromTheAuthoritysOwnWords();
     TestOperationalKeyIsPresentedInTheFormTheClaimRecords();
     return 0;

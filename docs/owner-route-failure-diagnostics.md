@@ -37,7 +37,8 @@ result and a failure summary. Stable stage codes distinguish `trust-load`,
 `generation-check`, `claim-restore`, `claim-cleanup`, `claim-resume`,
 `claim-propose`, `claim-proposal-store`, `claim-collect`, `claim-ack`,
 `claim-terminal`, `claim-revocation-store`, `configuration-proof`,
-`configuration-fetch`, and `configuration-validate`.
+`configuration-fetch`, `configuration-validate`, and `claim-generation-store`
+(persisting a later claim generation the configuration answer carried).
 
 The summary includes symbolic/native error, hexadecimal code, HTTP status,
 elapsed time, attempt mode (activate/resume), and the commissioning generation
