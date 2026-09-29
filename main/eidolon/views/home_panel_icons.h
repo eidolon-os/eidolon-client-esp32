@@ -32,7 +32,6 @@
 #define HOME_ICON_VIDEOCAM         "\xee\x9a\xa8"  // U+E6A8  24
 #define HOME_ICON_THERMOMETER      "\xee\x87\x89"  // U+E1C9  24
 #define HOME_ICON_MIC              "\xee\x8f\xa1"  // U+E3E1  24
-#define HOME_ICON_MIC_OFF          "\xee\x8f\xa5"  // U+E3E5  24
 #define HOME_ICON_CHECK_CIRCLE     "\xee\x85\x99"  // U+E159  24
 #define HOME_ICON_ERROR            "\xee\x88\xb7"  // U+E237  24 48
 #define HOME_ICON_WARNING          "\xee\x9b\x8b"  // U+E6CB  24

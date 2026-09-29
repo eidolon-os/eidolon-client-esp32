@@ -113,7 +113,7 @@ struct Styles {
     lv_style_t pager, empty_icon;
     lv_style_t tile_stale, glyph_stale, glyph_on_stale, state_on_stale;
     lv_style_t status_text, status_voice, status_detail;
-    lv_style_t card, disc, disc_busy, disc_ok, disc_warn, disc_bad, disc_muted;
+    lv_style_t card, disc, disc_busy, disc_ok, disc_warn, disc_bad;
     lv_style_t choice, choice_pressed;
     lv_style_t hero, hero_attention, hero_error, sys_title, bar_bg, bar_ind, sys_action, sys_ghost;
     bool ready = false;
@@ -402,9 +402,6 @@ void HomePanelView::BuildStyles() {
     init(s.disc_bad);
     bg(s.disc_bad, color::BadTint);
     ink(s.disc_bad, color::Bad);
-    init(s.disc_muted);
-    bg(s.disc_muted, color::Raised);
-    ink(s.disc_muted, color::InkDim);
 
     // The choice tray, over the grid, when a spoken command needs a pick.
     init(s.card);
@@ -655,7 +652,6 @@ void HomePanelView::BuildBottomBar() {
     lv_obj_add_style(status_icon_, &S().disc_ok, LV_STATE_USER_2);
     lv_obj_add_style(status_icon_, &S().disc_warn, LV_STATE_USER_3);
     lv_obj_add_style(status_icon_, &S().disc_bad, LV_STATE_USER_4);
-    lv_obj_add_style(status_icon_, &S().disc_muted, LV_STATE_DISABLED);
     lv_obj_set_size(status_icon_, kStatusDisc, kStatusDisc);
     Visible(status_icon_, false);
     status_text_ = NewLabel(bottom_, &S().status_text);
@@ -949,9 +945,9 @@ void HomePanelView::Render(const EidolonUiModel& model) {
     scene_ = model.scene;
     turn_ = model.turn;
     mode_ = model.interaction_mode;
-    mic_muted_ = model.show_mute_icon;
     const bool touch = model.primary_presentation == UiActionPresentation::TouchControl && model.primary_enabled;
     mic_intent_ = touch ? model.primary_intent : UiIntent::None;
+    session_intent_ = model.touch_navigation ? model.session_intent : UiIntent::None;
     subtitle_ = model.subtitle != nullptr ? model.subtitle : "";
     subtitle_from_user_ = model.subtitle_role != nullptr && std::strcmp(model.subtitle_role, "user") == 0;
 
@@ -1045,16 +1041,18 @@ void HomePanelView::RenderTopBar() {
     Text(clock_label_, LocalClock());
 }
 
+// The panel has no mute (CONFIG_EIDOLON_UI_MICROPHONE_MUTE is off for it): the
+// microphone only ever says whether a conversation is opening, listening or
+// working on what it heard.
 void HomePanelView::RenderMic() {
     const bool conversation = scene_ == UiScene::Conversation;
-    const bool live = conversation && !mic_muted_ &&
+    const bool live = conversation &&
         (IsTalking(turn_) || (turn_ == TurnPhase::Idle && !IsPushToTalk(mode_)));
     SetState(mic_, LV_STATE_CHECKED, live);
     SetState(mic_, LV_STATE_USER_1, conversation && IsBusy(turn_));
     SetState(mic_, LV_STATE_USER_2, scene_ == UiScene::OpeningConversation);
     const char* icon = HOME_ICON_MIC;
-    if (conversation && mic_muted_) icon = HOME_ICON_MIC_OFF;
-    else if (conversation && IsBusy(turn_)) icon = HOME_ICON_SPARKLE;
+    if (conversation && IsBusy(turn_)) icon = HOME_ICON_SPARKLE;
     else if (scene_ == UiScene::OpeningConversation) icon = HOME_ICON_SYNC;
     TextStatic(mic_, icon);
 }
@@ -1101,28 +1099,26 @@ void HomePanelView::RenderStatusLine() {
     } else if (scene_ == UiScene::OpeningConversation) {
         icon = HOME_ICON_SYNC;
         text = "正在连接…";
+        if (session_intent_ == UiIntent::CloseConversation) detail = "点麦克风或按 SET 取消";
     } else if (scene_ == UiScene::Conversation) {
-        if (mic_muted_) {
-            icon = HOME_ICON_MIC_OFF;
-            tone = LV_STATE_DISABLED;
-            text = "麦克风已关闭";
-        } else if (turn_ == TurnPhase::AgentSpeaking) {
+        if (turn_ == TurnPhase::AgentSpeaking) {
             icon = HOME_ICON_SPARKLE;
             tone = LV_STATE_USER_1;
             text = "正在理解…";
         } else {
             icon = HOME_ICON_MIC;
             text = IsPushToTalk(mode_) ? "按住麦克风说话" : "请说出指令";
+            if (!IsPushToTalk(mode_) && session_intent_ == UiIntent::CloseConversation) detail = "点麦克风或按 SET 结束";
         }
     } else {
         const auto lines = smarthome::FormatActivity(store_.activity(), store_.home().utc_offset_minutes);
         text = lines.what;
         detail = lines.detail;
-        if (text.empty() && mic_intent_ == UiIntent::OpenConversation) text = "轻点麦克风，说出指令";
+        if (text.empty() && session_intent_ == UiIntent::OpenConversation) text = "点麦克风或按 SET，说出指令";
     }
     Visible(status_icon_, icon != nullptr);
     if (icon != nullptr) TextStatic(status_icon_, icon);
-    for (lv_state_t state : {LV_STATE_USER_1, LV_STATE_USER_2, LV_STATE_USER_3, LV_STATE_USER_4, LV_STATE_DISABLED}) {
+    for (lv_state_t state : {LV_STATE_USER_1, LV_STATE_USER_2, LV_STATE_USER_3, LV_STATE_USER_4}) {
         SetState(status_icon_, state, tone == state);
     }
     SetState(status_text_, LV_STATE_USER_1, icon != nullptr);
@@ -1340,16 +1336,21 @@ void HomePanelView::HandleEvent(lv_event_t* event) {
     }
 }
 
+// The microphone is the panel's session control: a tap does what a click of
+// the session button (SET, MODE) does, as the projector resolves it once for
+// both (EidolonUiModel::session_intent) — start a conversation, or end the one
+// that is open. In a push-to-talk conversation it is the talk key instead,
+// held to speak, and the tap that ends each hold is not a second gesture.
 void HomePanelView::HandleMic(lv_event_code_t code) {
+    const bool talk_key = scene_ == UiScene::Conversation && IsPushToTalk(mode_);
     if (code == LV_EVENT_PRESSED && mic_intent_ == UiIntent::BeginTalk) {
         talk_active_ = true;
         DispatchEidolonUiIntent(UiIntent::BeginTalk);
     } else if ((code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) && talk_active_) {
         talk_active_ = false;
         DispatchEidolonUiIntent(UiIntent::CommitTalk);
-    } else if (code == LV_EVENT_CLICKED &&
-               (mic_intent_ == UiIntent::OpenConversation || mic_intent_ == UiIntent::ToggleMicrophone)) {
-        DispatchEidolonUiIntent(mic_intent_);
+    } else if (code == LV_EVENT_CLICKED && !talk_key && session_intent_ != UiIntent::None) {
+        DispatchEidolonUiIntent(session_intent_);
     }
 }
 

@@ -245,36 +245,34 @@ private:
 #if CONFIG_EIDOLON_HUB_MODE
         eidolon::SetEidolonSetupHandler([this]() { EnterWifiConfigMode(); });
         eidolon::SetEidolonInputAvailable(eidolon::UiInputSource::SessionButton, true);
-#endif
-        set_button_->OnClick([this]() {
+
+        // SET, MODE and the panel's microphone are one session control and do
+        // one thing on a click: before the panel is operational, open setup;
+        // after, whatever the session button's click resolves to (start a
+        // conversation, or end the open one). The microphone reaches the same
+        // resolution through EidolonUiModel::session_intent and only exists
+        // once the panel is operational, where the setup branch never applies.
+        const auto session_click = [this]() {
             auto& app = Application::GetInstance();
-#if CONFIG_EIDOLON_HUB_MODE
             if (eidolon::HubSetupButtonClickOpensSetup(app.GetDeviceState())) {
-#else
-            if (app.GetDeviceState() == kDeviceStateStarting) {
-#endif
                 app.Schedule([this]() { EnterWifiConfigMode(); });
                 return;
             }
-#if CONFIG_EIDOLON_HUB_MODE
             eidolon::DispatchEidolonUiInput(eidolon::UiInputSource::SessionButton,
                                             eidolon::UiInputGesture::Click);
+        };
+        set_button_->OnClick(session_click);
+        mode_button_->OnClick(session_click);
 #else
+        set_button_->OnClick([this]() {
+            auto& app = Application::GetInstance();
+            if (app.GetDeviceState() == kDeviceStateStarting) {
+                app.Schedule([this]() { EnterWifiConfigMode(); });
+                return;
+            }
             app.ToggleChatState();
-#endif
         });
-        // Long press opens setup from an operational or removed device too.
-        set_button_->OnLongPress([this]() {
-            Application::GetInstance().Schedule([this]() { EnterWifiConfigMode(); });
-        });
-
-#if CONFIG_EIDOLON_HUB_MODE
-        // MODE offers the same conversation gesture through the shared UI input.
-        mode_button_->OnClick([]() {
-            eidolon::DispatchEidolonUiInput(eidolon::UiInputSource::SessionButton,
-                                            eidolon::UiInputGesture::Click);
-        });
-#elif CONFIG_USE_DEVICE_AEC
+#if CONFIG_USE_DEVICE_AEC
         mode_button_->OnClick([this]() {
             auto& app = Application::GetInstance();
             if (app.GetDeviceState() == kDeviceStateIdle) {
@@ -282,6 +280,11 @@ private:
             }
         });
 #endif
+#endif
+        // Long press opens setup from an operational or removed device too.
+        set_button_->OnLongPress([this]() {
+            Application::GetInstance().Schedule([this]() { EnterWifiConfigMode(); });
+        });
 
         volume_up_button_->OnClick([this]() { ChangeVolume(10); });
         volume_up_button_->OnLongPress([this]() {

@@ -187,8 +187,8 @@ private:
     UiScene scene_ = UiScene::Starting;
     TurnPhase turn_ = TurnPhase::Idle;
     InteractionMode mode_ = CurrentInteractionMode();
-    bool mic_muted_ = false;
-    UiIntent mic_intent_ = UiIntent::None;
+    UiIntent mic_intent_ = UiIntent::None;      // the primary action (push-to-talk's talk key)
+    UiIntent session_intent_ = UiIntent::None;  // what the microphone's tap does: the session button's click
     UiIntent sys_intent_ = UiIntent::None;
     bool talk_active_ = false;
     std::string subtitle_;

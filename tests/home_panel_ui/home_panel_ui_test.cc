@@ -212,6 +212,7 @@ UiInputProfile KorvoInputs() {
     inputs.enabled_inputs = InputBit(UiInputSource::Touch) | InputBit(UiInputSource::SessionButton);
     inputs.available_inputs = inputs.enabled_inputs;
     inputs.setup_available = true;
+    inputs.microphone_mute = false;  // CONFIG_EIDOLON_UI_MICROPHONE_MUTE=n on korvo-1
     return inputs;
 }
 
@@ -253,7 +254,7 @@ void TestIconFonts() {
     for (int i = 0; i <= static_cast<int>(UiScene::Error); ++i) {
         assert(has(&font_home_icons_48, home_icons::Hero(static_cast<UiScene>(i))));
     }
-    for (const char* icon : {HOME_ICON_MIC, HOME_ICON_MIC_OFF, HOME_ICON_SPARKLE, HOME_ICON_SYNC, HOME_ICON_CHECK_CIRCLE,
+    for (const char* icon : {HOME_ICON_MIC, HOME_ICON_SPARKLE, HOME_ICON_SYNC, HOME_ICON_CHECK_CIRCLE,
                              HOME_ICON_ERROR, HOME_ICON_WARNING, HOME_ICON_QUESTION}) {
         assert(has(&font_home_icons_24, icon));
     }
@@ -368,6 +369,22 @@ int main(int argc, char** argv) {
     const auto render = [&](const EidolonRuntimeStatus& s) {
         view.Render(UiStateProjector::Project(s, inputs));
     };
+    // The microphone is the session control: its tap must be exactly what a
+    // click of SET or MODE (the session button) resolves to, in this state.
+    const auto mic_matches_session_button = [&](const EidolonRuntimeStatus& s) {
+        const UiIntent button =
+            UiStateProjector::ResolveInput(s, inputs, UiInputSource::SessionButton, UiInputGesture::Click);
+        lv_obj_t* mic = nullptr;
+        for (const char* icon : {HOME_ICON_MIC, HOME_ICON_SYNC, HOME_ICON_SPARKLE}) {
+            if (mic == nullptr) mic = FindTouchable(screen, icon);
+        }
+        assert(mic);
+        intents.clear();
+        ClickObject(mic);
+        assert(intents.size() == (button == UiIntent::None ? 0u : 1u));
+        if (button != UiIntent::None) assert(intents.back() == button);
+        return button;
+    };
     const auto shot = [&](const char* name) {
         AssertGlyphs(screen, name);
         Screenshot(screen, name);
@@ -440,7 +457,7 @@ int main(int argc, char** argv) {
     assert(Find(screen, "20:31"));
     // No scene buttons: the status line has the bar, and says how to speak
     // until something has happened.
-    assert(!Find(screen, "回家") && Find(screen, "轻点麦克风，说出指令"));
+    assert(!Find(screen, "回家") && Find(screen, "点麦克风或按 SET，说出指令"));
     shot("dash-01-living");
 
     view.Apply(Golden("panel-delta.json"));
@@ -539,28 +556,27 @@ int main(int argc, char** argv) {
     sink.requests.clear();
 
     // --- Voice ---------------------------------------------------------------
-    intents.clear();
-    ClickObject(FindTouchable(screen, HOME_ICON_MIC));
-    assert(intents.size() == 1 && intents.back() == UiIntent::OpenConversation);
+    assert(mic_matches_session_button(ready) == UiIntent::OpenConversation);
 
     EidolonRuntimeStatus voice = ready;
     voice.conversation = ConversationPhase::Opening;
     render(voice);
-    assert(Find(screen, "正在连接…") && Find(screen, HOME_ICON_SYNC));
+    assert(Find(screen, "正在连接…") && Find(screen, HOME_ICON_SYNC) && Find(screen, "点麦克风或按 SET 取消"));
+    assert(mic_matches_session_button(voice) == UiIntent::CloseConversation);
     shot("voice-00-opening");
 
     voice.conversation = ConversationPhase::Active;
     voice.turn = TurnPhase::Idle;
     render(voice);
-    assert(Find(screen, "请说出指令"));
+    assert(Find(screen, "请说出指令") && Find(screen, "点麦克风或按 SET 结束"));
     shot("voice-01-idle-listening");
-    intents.clear();
-    ClickObject(FindTouchable(screen, HOME_ICON_MIC));
-    assert(intents.size() == 1 && intents.back() == UiIntent::ToggleMicrophone);
+    // Ends the conversation, as SET does; it no longer only mutes.
+    assert(mic_matches_session_button(voice) == UiIntent::CloseConversation);
 
     voice.turn = TurnPhase::UserSpeaking;
     render(voice);
     assert(Find(screen, "正在聆听…"));
+    assert(mic_matches_session_button(voice) == UiIntent::CloseConversation);
     shot("voice-02-user-speaking");
 
     voice.turn = TurnPhase::AgentThinking;
@@ -568,6 +584,7 @@ int main(int argc, char** argv) {
     voice.last_transcription_role = "user";
     render(voice);
     assert(Find(screen, "「打开空调」") && Find(screen, "正在理解…"));
+    assert(mic_matches_session_button(voice) == UiIntent::CloseConversation);
     shot("voice-03-processing");
 
     view.Apply(Golden("voice-result-executed.json"));
@@ -604,15 +621,15 @@ int main(int argc, char** argv) {
         shot("voice-06-result-not-found");
     }
 
-    // A result holds the line for its few seconds; the microphone button shows
-    // a mute at once, and the line says so once the result has run out.
-    voice.mic_enabled = false;
-    render(voice);
-    assert(Find(screen, "家里没有投影仪") && FindTouchable(screen, HOME_ICON_MIC_OFF));
+    // The panel has no mute: once the result has run out the line is back to
+    // the conversation itself, and a stored "muted" never shows or silences.
     lv_tick_inc(7000);
     lv_timer_handler();
-    assert(Find(screen, "麦克风已关闭"));
-    shot("voice-07-muted");
+    voice.mic_enabled = false;
+    render(voice);
+    assert(Find(screen, "请说出指令") && !Find(screen, "麦克风已关闭"));
+    assert(mic_matches_session_button(voice) == UiIntent::CloseConversation);
+    voice.mic_enabled = true;
 
     // --- Toast, stale, empty -------------------------------------------------
     render(ready);
@@ -625,6 +642,7 @@ int main(int argc, char** argv) {
     EidolonRuntimeStatus reconnecting = ready;
     reconnecting.service = ServicePhase::Reconnecting;
     render(reconnecting);
+    assert(mic_matches_session_button(reconnecting) == UiIntent::None);  // nothing to start or end
     shot("dash-05-reconnecting-stale");
 
     render(ready);
