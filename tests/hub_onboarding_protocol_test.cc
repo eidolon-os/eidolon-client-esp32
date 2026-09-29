@@ -438,6 +438,66 @@ void TestConfigurationResponseMatchesTheGoldenVector()
     cJSON_Delete(vector);
 }
 
+// The SDK's classify_authority_device_ref states its conclusion for each case;
+// this Body must reach the same one, from the bytes it would receive.
+void TestConfigurationDeviceRefCorrectionsMatchTheGoldenVector()
+{
+    const std::string raw = ReadConfigurationResponseVector();
+    cJSON* vector = cJSON_ParseWithLength(raw.data(), raw.size());
+    assert(cJSON_IsObject(vector));
+    const std::string nonce =
+        cJSON_GetObjectItemCaseSensitive(vector, "request_nonce")->valuestring;
+    const eidolon::ActiveClaimState claim =
+        ClaimFrom(cJSON_GetObjectItemCaseSensitive(vector, "device_ref"));
+    const cJSON* section = cJSON_GetObjectItemCaseSensitive(vector, "device_ref_corrections");
+    assert(cJSON_IsObject(section));
+
+    int adopted = 0;
+    int refused = 0;
+    const cJSON* item = nullptr;
+    cJSON_ArrayForEach(item, cJSON_GetObjectItemCaseSensitive(section, "cases")) {
+        const std::string conclusion =
+            cJSON_GetObjectItemCaseSensitive(item, "conclusion")->valuestring;
+        const std::string body =
+            cJSON_GetObjectItemCaseSensitive(item, "canonical_utf8")->valuestring;
+        const eidolon::ActiveClaimState answered = ClaimFrom(cJSON_GetObjectItemCaseSensitive(
+            cJSON_GetObjectItemCaseSensitive(item, "response"), "device_ref"));
+        HubConfigStatus status = HubConfigStatus::PendingApproval;
+        eidolon::HubChannelAssignment assignment;
+        eidolon::AcceptedManifestRef accepted_manifest;
+        eidolon::device_foundation::v1::DeviceRef authority_ref;
+        const char* reason = nullptr;
+        const bool accepted = eidolon::ParseDeviceConfigurationResponse(
+            body, nonce, claim, status, assignment, accepted_manifest, nullptr, &reason,
+            &authority_ref);
+        const auto correction =
+            eidolon::ClassifyAuthorityDeviceRef(claim.device_ref, answered.device_ref);
+        if (conclusion == "adopt") {
+            assert(accepted && reason == nullptr);
+            assert(correction == eidolon::DeviceRefCorrection::Adopt);
+            assert(authority_ref.device_instance_id == answered.device_ref.device_instance_id);
+            assert(authority_ref.owner_domain_id.value ==
+                   answered.device_ref.owner_domain_id.value);
+            assert(authority_ref.owner_domain_generation ==
+                   answered.device_ref.owner_domain_generation);
+            assert(authority_ref.claim_generation == answered.device_ref.claim_generation);
+            assert(authority_ref.trust_epoch == answered.device_ref.trust_epoch);
+            ++adopted;
+        } else {
+            assert(conclusion == "refuse");
+            assert(!accepted && reason != nullptr &&
+                   std::string(reason) == "lifecycle_mismatch");
+            assert(correction == eidolon::DeviceRefCorrection::Reject);
+            ++refused;
+        }
+    }
+    // Both directions, or a Body that adopts everything (or nothing) passes.
+    assert(adopted > 0 && refused > 0);
+    assert(adopted + refused ==
+           cJSON_GetArraySize(cJSON_GetObjectItemCaseSensitive(section, "cases")));
+    cJSON_Delete(vector);
+}
+
 void TestActiveClaimConfigurationAndProviderBinding()
 {
     HubConfigStatus status = HubConfigStatus::Active;
@@ -721,6 +781,7 @@ int main()
     TestCanonicalManifest();
     TestLiveKitBindingMatchesTheGoldenVector();
     TestConfigurationResponseMatchesTheGoldenVector();
+    TestConfigurationDeviceRefCorrectionsMatchTheGoldenVector();
     TestSharedInvitationIsTemporaryAndLifecycleFenced();
     TestActiveClaimConfigurationAndProviderBinding();
     TestAuthorityCorrectsOnlyTheClaimsOwnGenerations();

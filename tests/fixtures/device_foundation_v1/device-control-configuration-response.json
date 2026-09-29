@@ -193,5 +193,194 @@
         ]
       }
     }
-  ]
+  ],
+  "device_ref_corrections": {
+    "rule": "Held against `device_ref`, the ref the request named. Device, Owner Domain and Owner Domain generation must be the ones held; (claim_generation, trust_epoch) compared in that order, later adopted and earlier refused. A Body that adopts stores the answered ref and names it in every later request.",
+    "conclusions": [
+      "adopt",
+      "refuse"
+    ],
+    "cases": [
+      {
+        "case_id": "DF-DEVICE-CONTROL-CONFIGURATION-REGRANT-ADOPTED",
+        "conclusion": "adopt",
+        "why": "Re-granted while the Body was away: the next claim_generation, and trust_epoch restarted at one. A lower trust_epoch under a later claim_generation is exactly this, and a Body that refuses it is stranded at a ref the Authority no longer holds.",
+        "response": {
+          "operation": "device-control.configuration",
+          "nonce": "Y29uZmlndXJhdGlvbi1ub25jZQ",
+          "device_ref": {
+            "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+            "owner_domain_id": "owner-domain_01",
+            "owner_domain_generation": 3,
+            "claim_generation": 8,
+            "trust_epoch": 1
+          },
+          "lifecycle_state": "approved",
+          "channels": []
+        },
+        "canonical_utf8": "{\"channels\":[],\"device_ref\":{\"claim_generation\":8,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":1},\"lifecycle_state\":\"approved\",\"nonce\":\"Y29uZmlndXJhdGlvbi1ub25jZQ\",\"operation\":\"device-control.configuration\"}",
+        "canonical_sha256": "sha256:53f5eca33b019a972eb45de3f173db1e19b49791e056ec7287e6f1b5f213b803"
+      },
+      {
+        "case_id": "DF-DEVICE-CONTROL-CONFIGURATION-TRUST-EPOCH-ADOPTED",
+        "conclusion": "adopt",
+        "why": "The same Claim at a later trust_epoch.",
+        "response": {
+          "operation": "device-control.configuration",
+          "nonce": "Y29uZmlndXJhdGlvbi1ub25jZQ",
+          "device_ref": {
+            "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+            "owner_domain_id": "owner-domain_01",
+            "owner_domain_generation": 3,
+            "claim_generation": 7,
+            "trust_epoch": 5
+          },
+          "lifecycle_state": "approved",
+          "channels": []
+        },
+        "canonical_utf8": "{\"channels\":[],\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":5},\"lifecycle_state\":\"approved\",\"nonce\":\"Y29uZmlndXJhdGlvbi1ub25jZQ\",\"operation\":\"device-control.configuration\"}",
+        "canonical_sha256": "sha256:55a80b865f83db74923bbe1c4d7499a86c1151e44d4b6306ff9a0a378304767e"
+      },
+      {
+        "case_id": "DF-DEVICE-CONTROL-CONFIGURATION-REVOKED-AT-A-LATER-GENERATION-ADOPTED",
+        "conclusion": "adopt",
+        "why": "Re-granted, then revoked, while the Body was away. Still this Claim: the Body records the revocation under the ref the Authority holds.",
+        "response": {
+          "operation": "device-control.configuration",
+          "nonce": "Y29uZmlndXJhdGlvbi1ub25jZQ",
+          "device_ref": {
+            "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+            "owner_domain_id": "owner-domain_01",
+            "owner_domain_generation": 3,
+            "claim_generation": 8,
+            "trust_epoch": 1
+          },
+          "lifecycle_state": "revoked",
+          "channels": []
+        },
+        "canonical_utf8": "{\"channels\":[],\"device_ref\":{\"claim_generation\":8,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":1},\"lifecycle_state\":\"revoked\",\"nonce\":\"Y29uZmlndXJhdGlvbi1ub25jZQ\",\"operation\":\"device-control.configuration\"}",
+        "canonical_sha256": "sha256:ceee94676193ee569d356ebdd673e7afe1100e0591d05835f215699a0a0f3aa0"
+      },
+      {
+        "case_id": "DF-DEVICE-CONTROL-CONFIGURATION-OLDER-CLAIM-GENERATION-REFUSED",
+        "conclusion": "refuse",
+        "why": "Behind the Claim this Body holds. The Authority does not issue generations backwards, and a higher trust_epoch does not redeem it: trust_epoch is ordered only within one claim_generation.",
+        "response": {
+          "operation": "device-control.configuration",
+          "nonce": "Y29uZmlndXJhdGlvbi1ub25jZQ",
+          "device_ref": {
+            "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+            "owner_domain_id": "owner-domain_01",
+            "owner_domain_generation": 3,
+            "claim_generation": 6,
+            "trust_epoch": 9
+          },
+          "lifecycle_state": "approved",
+          "channels": []
+        },
+        "canonical_utf8": "{\"channels\":[],\"device_ref\":{\"claim_generation\":6,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":9},\"lifecycle_state\":\"approved\",\"nonce\":\"Y29uZmlndXJhdGlvbi1ub25jZQ\",\"operation\":\"device-control.configuration\"}",
+        "canonical_sha256": "sha256:0a7ceafd5ef4c568f23cbb003c55f26bc7ed0830f1458af74ef06060ef829f53"
+      },
+      {
+        "case_id": "DF-DEVICE-CONTROL-CONFIGURATION-OLDER-TRUST-EPOCH-REFUSED",
+        "conclusion": "refuse",
+        "why": "The same Claim at an earlier trust_epoch.",
+        "response": {
+          "operation": "device-control.configuration",
+          "nonce": "Y29uZmlndXJhdGlvbi1ub25jZQ",
+          "device_ref": {
+            "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+            "owner_domain_id": "owner-domain_01",
+            "owner_domain_generation": 3,
+            "claim_generation": 7,
+            "trust_epoch": 3
+          },
+          "lifecycle_state": "approved",
+          "channels": []
+        },
+        "canonical_utf8": "{\"channels\":[],\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":3},\"lifecycle_state\":\"approved\",\"nonce\":\"Y29uZmlndXJhdGlvbi1ub25jZQ\",\"operation\":\"device-control.configuration\"}",
+        "canonical_sha256": "sha256:fdf35f5dbd11407b7ca5b22fd72b0f25d2554942639712bd5f3c62864ce87bcd"
+      },
+      {
+        "case_id": "DF-DEVICE-CONTROL-CONFIGURATION-AUTHORITY-RESET-REFUSED",
+        "conclusion": "refuse",
+        "why": "A later Owner Domain generation is an Authority reset. That is the descriptor's to report, through the recovery a reset requires; a Body that took this ref would skip it. The later claim_generation beside it does not make it a re-grant.",
+        "response": {
+          "operation": "device-control.configuration",
+          "nonce": "Y29uZmlndXJhdGlvbi1ub25jZQ",
+          "device_ref": {
+            "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+            "owner_domain_id": "owner-domain_01",
+            "owner_domain_generation": 4,
+            "claim_generation": 8,
+            "trust_epoch": 1
+          },
+          "lifecycle_state": "approved",
+          "channels": []
+        },
+        "canonical_utf8": "{\"channels\":[],\"device_ref\":{\"claim_generation\":8,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":4,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":1},\"lifecycle_state\":\"approved\",\"nonce\":\"Y29uZmlndXJhdGlvbi1ub25jZQ\",\"operation\":\"device-control.configuration\"}",
+        "canonical_sha256": "sha256:f469ede522213c0ded5260563b7b2e5e8aab05fac2e4a709d0142203bf5471a5"
+      },
+      {
+        "case_id": "DF-DEVICE-CONTROL-CONFIGURATION-AUTHORITY-ROLLBACK-REFUSED",
+        "conclusion": "refuse",
+        "why": "An earlier Owner Domain generation: an Authority rolled back behind this Claim.",
+        "response": {
+          "operation": "device-control.configuration",
+          "nonce": "Y29uZmlndXJhdGlvbi1ub25jZQ",
+          "device_ref": {
+            "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+            "owner_domain_id": "owner-domain_01",
+            "owner_domain_generation": 2,
+            "claim_generation": 7,
+            "trust_epoch": 4
+          },
+          "lifecycle_state": "approved",
+          "channels": []
+        },
+        "canonical_utf8": "{\"channels\":[],\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":2,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"lifecycle_state\":\"approved\",\"nonce\":\"Y29uZmlndXJhdGlvbi1ub25jZQ\",\"operation\":\"device-control.configuration\"}",
+        "canonical_sha256": "sha256:5c0231687e458af303896a848f15087ecd065f3b7a62e7d9a225aee7c9cfeb0d"
+      },
+      {
+        "case_id": "DF-DEVICE-CONTROL-CONFIGURATION-ANOTHER-OWNER-DOMAIN-REFUSED",
+        "conclusion": "refuse",
+        "why": "Identity is what the Claim was found by. An answer naming another Owner Domain is another Claim's configuration, and this Body cannot sign for it.",
+        "response": {
+          "operation": "device-control.configuration",
+          "nonce": "Y29uZmlndXJhdGlvbi1ub25jZQ",
+          "device_ref": {
+            "device_instance_id": "device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
+            "owner_domain_id": "owner-domain_02",
+            "owner_domain_generation": 3,
+            "claim_generation": 8,
+            "trust_epoch": 1
+          },
+          "lifecycle_state": "approved",
+          "channels": []
+        },
+        "canonical_utf8": "{\"channels\":[],\"device_ref\":{\"claim_generation\":8,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_02\",\"trust_epoch\":1},\"lifecycle_state\":\"approved\",\"nonce\":\"Y29uZmlndXJhdGlvbi1ub25jZQ\",\"operation\":\"device-control.configuration\"}",
+        "canonical_sha256": "sha256:3091a7813146946a3e76733772ee7c9e8d52b351e2558e9b19f2bd9d8004282b"
+      },
+      {
+        "case_id": "DF-DEVICE-CONTROL-CONFIGURATION-ANOTHER-DEVICE-REFUSED",
+        "conclusion": "refuse",
+        "why": "Another device's configuration, wearing this request's nonce.",
+        "response": {
+          "operation": "device-control.configuration",
+          "nonce": "Y29uZmlndXJhdGlvbi1ub25jZQ",
+          "device_ref": {
+            "device_instance_id": "device-instance-7b9eb65fb81e67551ca506fd26d887fdbba2ba33f4bc226b97069c9b3e9280f1",
+            "owner_domain_id": "owner-domain_01",
+            "owner_domain_generation": 3,
+            "claim_generation": 8,
+            "trust_epoch": 1
+          },
+          "lifecycle_state": "approved",
+          "channels": []
+        },
+        "canonical_utf8": "{\"channels\":[],\"device_ref\":{\"claim_generation\":8,\"device_instance_id\":\"device-instance-7b9eb65fb81e67551ca506fd26d887fdbba2ba33f4bc226b97069c9b3e9280f1\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":1},\"lifecycle_state\":\"approved\",\"nonce\":\"Y29uZmlndXJhdGlvbi1ub25jZQ\",\"operation\":\"device-control.configuration\"}",
+        "canonical_sha256": "sha256:505bacb4fec4466a9bb5bfa265e72e549c2726e149b9eabfce54c94ba3e24656"
+      }
+    ]
+  }
 }

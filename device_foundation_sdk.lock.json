@@ -1,5 +1,5 @@
 {
-  "sdk_commit": "bfb9441eb4bcef449ce3e2adc6e94ac44169a061",
+  "sdk_commit": "29553a3e4b8e727afe537880a703e2c844bffdbf",
   "files": [
     {
       "source": "contracts/device_foundation/v1/generated/cpp/device_foundation_v1_generated.h",
@@ -94,7 +94,7 @@
     {
       "source": "contracts/device_foundation/v1/golden/device-control-configuration-response.json",
       "target": "tests/fixtures/device_foundation_v1/device-control-configuration-response.json",
-      "sha256": "f3ba335ae394f61124b06381cd97e620ee01c65f2b645aa9e0c373b6574ec01d"
+      "sha256": "b2603b081e9eb91ff48bcafb865200479fc6490d71e8cb6ec9a8ca2795cbf8c3"
     }
   ]
 }
