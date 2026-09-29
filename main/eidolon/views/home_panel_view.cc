@@ -1130,13 +1130,20 @@ void HomePanelView::RenderStatusLine() {
     Text(status_detail_, detail);
 }
 
+// The panel shows its own area until the person picks one, so the first
+// snapshot (and any later move of the panel to another area) takes effect; a
+// picked area is kept for as long as the home still has it.
 void HomePanelView::RebuildNavigation() {
     nav_entries_ = smarthome::BuildNav(store_.home());
     const bool kept = std::any_of(nav_entries_.begin(), nav_entries_.end(),
                                   [&](const smarthome::NavEntry& e) { return e.area_id == area_; });
-    if (!kept) {
-        area_ = smarthome::DefaultArea(store_.home());
-        page_ = 0;
+    if (!kept) area_chosen_ = false;
+    if (!area_chosen_) {
+        const std::string area = smarthome::DefaultArea(store_.home());
+        if (area != area_) {
+            area_ = area;
+            page_ = 0;
+        }
     }
     for (size_t i = 0; i < nav_entries_.size(); ++i) NavSlotAt(i);
     rendered_generation_ = UINT32_MAX;
@@ -1293,6 +1300,7 @@ void HomePanelView::HandleEvent(lv_event_t* event) {
         return;
     }
     case Role::Nav:
+        if (index < nav_entries_.size()) area_chosen_ = true;
         if (index < nav_entries_.size() && nav_entries_[index].area_id != area_) {
             area_ = nav_entries_[index].area_id;
             page_ = 0;

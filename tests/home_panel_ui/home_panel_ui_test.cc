@@ -434,8 +434,9 @@ int main(int argc, char** argv) {
     view.Apply(std::move(snapshot));
     view.SetWallClock(kNow);
     render(ready);
-    ClickObject(Find(screen, "客厅"));
-    assert(NavSelected(screen, "客厅"));
+    // The panel opens on its own area (living) even though it was built, and
+    // drew its navigation, before any snapshot existed.
+    assert(NavSelected(screen, "客厅") && !NavSelected(screen, "全部"));
     assert(Find(screen, "20:31"));
     // No scene buttons: the status line has the bar, and says how to speak
     // until something has happened.
@@ -479,6 +480,39 @@ int main(int argc, char** argv) {
     }
     const size_t sent = sink.requests.size();
     shot("dash-10-living-idle");
+
+    // A picked area is kept across snapshots; the panel's own area returns
+    // when the picked one is gone, and follows the panel when it is moved.
+    ClickObject(Find(screen, "主卧"));
+    assert(NavSelected(screen, "主卧"));
+    smarthome::Message again;
+    again.kind = smarthome::MessageKind::Snapshot;
+    again.snapshot = home;
+    again.snapshot.revision += 1;
+    view.Apply(std::move(again));
+    assert(NavSelected(screen, "主卧"));
+    smarthome::Message without;
+    without.kind = smarthome::MessageKind::Snapshot;
+    without.snapshot = home;
+    without.snapshot.revision += 2;
+    for (auto& device : without.snapshot.devices) {
+        if (device.area_id == "master") device.area_id = "living";
+    }
+    view.Apply(std::move(without));
+    assert(NavSelected(screen, "客厅"));
+    smarthome::Message moved;
+    moved.kind = smarthome::MessageKind::Snapshot;
+    moved.snapshot = home;
+    moved.snapshot.revision += 3;
+    moved.snapshot.panel_area_id = "master";
+    view.Apply(std::move(moved));
+    assert(NavSelected(screen, "主卧"));
+    smarthome::Message back;
+    back.kind = smarthome::MessageKind::Snapshot;
+    back.snapshot = home;  // the golden revision again, so the golden delta applies
+    view.Apply(std::move(back));
+    view.Apply(Golden("panel-delta.json"));
+    assert(NavSelected(screen, "客厅"));
 
     // "全部": 18 devices, two pages.
     ClickObject(Find(screen, "全部"));

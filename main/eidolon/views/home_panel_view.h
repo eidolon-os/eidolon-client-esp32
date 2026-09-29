@@ -179,6 +179,7 @@ private:
     smarthome::SmartHomeStore store_;
     std::vector<smarthome::NavEntry> nav_entries_;
     std::string area_;  // selected nav entry's area id
+    bool area_chosen_ = false;  // picked on the panel, rather than the panel's own area
     size_t page_ = 0;
     uint32_t rendered_generation_ = UINT32_MAX;
 
