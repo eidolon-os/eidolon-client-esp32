@@ -191,8 +191,9 @@ void TestDeltaGoldenAndSequence() {
     CHECK_EQ(store.activity().device_name, std::string("客厅空调"));
     CHECK_EQ(store.activity().change, std::string("已打开"));
     CHECK_EQ(store.activity().source, std::string("面板语音"));
-    CHECK_EQ(FormatActivity(store.activity(), store.home().utc_offset_minutes),
-             std::string("06:13 客厅空调 已打开 · 来自 面板语音"));
+    const ActivityLines lines = FormatActivity(store.activity(), store.home().utc_offset_minutes);
+    CHECK_EQ(lines.what, std::string("客厅空调 已打开"));
+    CHECK_EQ(lines.detail, std::string("06:13 · 来自 面板语音"));
 
     // A repeat (seq at or below the last) is ignored: no sync, nothing moves.
     const uint32_t applied = store.generation();
@@ -240,7 +241,8 @@ void TestDeltaGoldenAndSequence() {
     next.changes.push_back(curtain);
     CHECK(store.ApplyDelta(next, 0) == ApplyOutcome::Applied);
     CHECK_EQ(DeviceStateText(Find(store, "living.curtain")), std::string("已关闭"));
-    CHECK_EQ(FormatActivity(store.activity(), kChina), std::string("客厅空调 已关闭 等 2 个设备 · 来自 场景"));
+    CHECK_EQ(FormatActivity(store.activity(), kChina).what, std::string("客厅空调 已关闭 等 2 个设备"));
+    CHECK_EQ(FormatActivity(store.activity(), kChina).detail, std::string("来自 场景"));
     // Once a stale seq is below the held one it is a repeat even after a gap.
     Delta old = delta.delta;
     CHECK(store.ApplyDelta(old, kUtc) == ApplyOutcome::Ignored);
@@ -256,7 +258,8 @@ void TestDeltaGoldenAndSequence() {
     CHECK(store.ApplyDelta(first_report, 0) == ApplyOutcome::Applied);
     CHECK(Find(store, "entry.camera").has_state);
     CHECK_EQ(DeviceStateText(Find(store, "entry.camera")), std::string("看护中"));
-    CHECK_EQ(FormatActivity(store.activity(), kChina), std::string("摄像头 已上线 · 来自 文字"));
+    CHECK_EQ(FormatActivity(store.activity(), kChina).what, std::string("摄像头 已上线"));
+    CHECK_EQ(FormatActivity(store.activity(), kChina).detail, std::string("来自 文字"));
 
     SmartHomeStore empty;
     CHECK(empty.ApplyDelta(delta.delta, kUtc) == ApplyOutcome::NeedSync);
@@ -466,28 +469,29 @@ void TestContractViolationsAreRejected() {
 void TestTileTextTable() {
     SmartHomeStore store = LoadedStore();
     CHECK(store.ApplyDelta(Receive("panel-delta.json").delta, kUtc) == ApplyOutcome::Applied);
-    const struct { const char* id; const char* glyph; const char* text; bool active; bool steps; } kRows[] = {
-        {"living.main_light", "灯", "开 · 60%", true, true},
-        {"master.light", "灯", "关", false, true},
-        {"living.ac", "冷", "制冷 26°C · 室温 28°", true, true},
-        {"master.ac", "冷", "关 · 室温 27°", false, true},
-        {"living.curtain", "帘", "开 70%", true, true},
-        {"balcony.rack", "晾", "已关闭", false, true},
-        {"living.purifier", "净", "运行 · 30%", true, true},
-        {"master.humidifier", "湿", "关", false, true},
-        {"living.tv", "视", "关", false, true},
-        {"living.speaker", "音", "开 · 音量 35", true, true},
-        {"whole.vacuum", "扫", "空闲", false, false},
-        {"balcony.washer", "洗", "空闲", false, false},
-        {"kitchen.rice_cooker", "饭", "空闲", false, false},
-        {"bath.water_heater", "热", "加热 · 42°C", true, true},
-        {"entry.lock", "锁", "已上锁", false, false},
-        {"entry.camera", "摄", "离线", false, false},  // offline, no state reported
-        {"living.thermo", "温", "24.5°C · 48%", false, false},
+    using I = DeviceIcon;
+    const struct { const char* id; DeviceIcon icon; const char* text; bool active; bool steps; } kRows[] = {
+        {"living.main_light", I::Light, "开 · 60%", true, true},
+        {"master.light", I::Light, "关", false, true},
+        {"living.ac", I::Cooling, "制冷 26°C · 室温 28°", true, true},
+        {"master.ac", I::Cooling, "关 · 室温 27°", false, true},
+        {"living.curtain", I::CurtainOpen, "开 70%", true, true},
+        {"balcony.rack", I::DryingRack, "已关闭", false, true},
+        {"living.purifier", I::Purifier, "运行 · 30%", true, true},
+        {"master.humidifier", I::Humidifier, "关", false, true},
+        {"living.tv", I::Tv, "关", false, true},
+        {"living.speaker", I::Speaker, "开 · 音量 35", true, true},
+        {"whole.vacuum", I::Vacuum, "空闲", false, false},
+        {"balcony.washer", I::Washer, "空闲", false, false},
+        {"kitchen.rice_cooker", I::RiceCooker, "空闲", false, false},
+        {"bath.water_heater", I::WaterHeater, "加热 · 42°C", true, true},
+        {"entry.lock", I::Locked, "已上锁", false, false},
+        {"entry.camera", I::Camera, "离线", false, false},  // offline, no state reported
+        {"living.thermo", I::Thermometer, "24.5°C · 48%", false, false},
     };
     for (const auto& row : kRows) {
         const Device& device = Find(store, row.id);
-        CHECK_EQ(std::string(DeviceGlyph(device)), std::string(row.glyph));
+        CHECK(IconFor(device) == row.icon);
         CHECK_EQ(DeviceStateText(device), std::string(row.text));
         CHECK_EQ(IsActive(device), row.active);
         CHECK_EQ(OffersSteps(device), row.steps);
@@ -496,6 +500,9 @@ void TestTileTextTable() {
     DeviceState s;
     s.position = {true, 100};
     CHECK_EQ(DeviceStateText(Synthetic(DeviceType::Cover, s)), std::string("全开"));
+    CHECK(IconFor(Synthetic(DeviceType::Cover, s)) == DeviceIcon::CurtainOpen);
+    s.position = {true, 0};
+    CHECK(IconFor(Synthetic(DeviceType::Cover, s)) == DeviceIcon::CurtainClosed);
     s = {};
     s.run_state = RunState::Running;
     CHECK_EQ(DeviceStateText(Synthetic(DeviceType::Appliance, s)), std::string("运行中"));
@@ -507,6 +514,7 @@ void TestTileTextTable() {
     s = {};
     s.locked = {true, false};
     CHECK_EQ(DeviceStateText(Synthetic(DeviceType::Lock, s)), std::string("未上锁"));
+    CHECK(IconFor(Synthetic(DeviceType::Lock, s)) == DeviceIcon::Unlocked);
     CHECK(IsActive(Synthetic(DeviceType::Lock, s)));
     s = {};
     s.on = {true, false};
@@ -517,7 +525,7 @@ void TestTileTextTable() {
     s.mode = ThermostatMode::Heat;
     s.target_c = {true, 24.5};
     CHECK_EQ(DeviceStateText(Synthetic(DeviceType::Climate, s)), std::string("制热 24.5°C"));
-    CHECK_EQ(std::string(DeviceGlyph(Synthetic(DeviceType::Climate, s))), std::string("暖"));
+    CHECK(IconFor(Synthetic(DeviceType::Climate, s)) == DeviceIcon::Heating);
     s = {};
     s.on = {true, true};
     s.volume = {true, 35};

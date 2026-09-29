@@ -22,21 +22,24 @@ namespace eidolon {
 //
 // Lifecycle scenes come from the shared EidolonUiModel and are drawn as a plain
 // system page; Ready (and a live or recovering conversation) is the dashboard:
-// area navigation, a page of device tiles, scenes, the latest activity and a
-// voice result card. The home itself comes from the host through PanelSurface
+// area navigation, a page of device tiles, and a status line that carries a
+// spoken command's progress and result (or else the latest activity), with a
+// tray of choices when a command names more than one device. The home itself comes from the host through PanelSurface
 // and is only ever a cache: tiles change when the host reports a change, never
 // when the panel sends a command, and a stale cache is dimmed and inert.
 //
 // Every LVGL object is created once in Build() and reused. Tiles are a fixed
 // pool of kTileSlots rebound to whichever devices the current area and page
 // show; navigation items grow to the largest registry seen and are then reused.
+// The look (Eidolon brand palette, Material icons, Chinese system copy) was
+// reviewed against host renders: tests/home_panel_ui draws every state.
 class HomePanelView : public EidolonView, public smarthome::PanelSurface {
 public:
     struct BuildContext {
         lv_obj_t* parent = nullptr;          // active screen
         Display* display = nullptr;          // owns the LVGL lock
         const lv_font_t* font = nullptr;     // CJK text font
-        const lv_font_t* icon_font = nullptr;  // FontAwesome subset (mic, pager)
+        const lv_font_t* icon_font = nullptr;  // FontAwesome subset (network icon)
     };
 
     HomePanelView();
@@ -64,11 +67,10 @@ public:
 
 private:
     static constexpr size_t kTileSlots = 12;  // 4 columns x 3 rows
-    static constexpr size_t kSceneSlots = 4;
     static constexpr size_t kCandidateSlots = smarthome::kMaxCandidates;
 
     enum class Role : uint8_t {
-        None, Tile, Minus, Plus, Nav, Scene, Candidate, Card, PagePrev, PageNext, Mic, Primary, Setup,
+        None, Tile, Minus, Plus, Nav, Candidate, Card, PagePrev, PageNext, Mic, Primary, Setup,
     };
     enum class CardMode : uint8_t { Hidden, Listening, Processing, Result };
 
@@ -80,6 +82,7 @@ private:
         lv_obj_t* minus = nullptr;
         lv_obj_t* plus = nullptr;
         int device = -1;  // index into the held snapshot's devices
+        bool steps = false;  // the device offers - / + (shown unless the cache is stale)
     };
     struct NavSlot {
         lv_obj_t* item = nullptr;
@@ -99,6 +102,7 @@ private:
     void BuildCard();
     void BuildSystemPage();
     void ApplyFontMetrics();
+    void RefreshPanelFont();
     NavSlot& NavSlotAt(size_t index);
 
     void RenderScene();
@@ -107,15 +111,14 @@ private:
     void RenderTopBar();
     void RenderNav();
     void RenderGrid();
-    void RenderBottomBar();
     void RenderMic();
     void RenderCard();
+    void RenderStatusLine();
     void ShowResult(smarthome::VoiceResult&& result);
     void HideCard();
     void RebuildNavigation();
     void RequestSync();
     void Send(const smarthome::Command& command);
-    void SendScene(const std::string& scene_id);
     std::string NextRequestId();
     std::string LocalClock() const;
     void LogMissingGlyphs() const;
@@ -130,8 +133,11 @@ private:
     void HandleMic(lv_event_code_t code);
 
     Display* display_ = nullptr;
-    const lv_font_t* font_ = nullptr;
-    const lv_font_t* icon_font_ = nullptr;
+    const lv_font_t* font_ = nullptr;       // the board's text font
+    const lv_font_t* icon_font_ = nullptr;  // FontAwesome (network icon)
+    // The text font with the panel's Material icons as fallback, so one label
+    // can carry an icon and its words; refreshed whenever the text font changes.
+    lv_font_t panel_font_{};
     bool built_ = false;
     lv_timer_t* timer_ = nullptr;
 
@@ -140,32 +146,32 @@ private:
     lv_obj_t* dash_ = nullptr;
     lv_obj_t* top_ = nullptr;
     lv_obj_t* home_label_ = nullptr;
-    lv_obj_t* area_label_ = nullptr;
     lv_obj_t* clock_label_ = nullptr;
     lv_obj_t* net_icon_ = nullptr;
     lv_obj_t* conn_dot_ = nullptr;
-    lv_obj_t* conn_label_ = nullptr;
+    lv_obj_t* conn_label_ = nullptr;  // a pill, shown only when not connected
     lv_obj_t* mic_ = nullptr;
     lv_obj_t* nav_ = nullptr;
     lv_obj_t* grid_ = nullptr;
+    lv_obj_t* empty_icon_ = nullptr;
     lv_obj_t* empty_label_ = nullptr;
     lv_obj_t* page_prev_ = nullptr;
     lv_obj_t* page_label_ = nullptr;
     lv_obj_t* page_next_ = nullptr;
     lv_obj_t* bottom_ = nullptr;
-    lv_obj_t* activity_label_ = nullptr;
-    lv_obj_t* card_ = nullptr;
-    lv_obj_t* card_heard_ = nullptr;
-    lv_obj_t* card_message_ = nullptr;
-    lv_obj_t* card_choices_ = nullptr;
+    lv_obj_t* status_icon_ = nullptr;    // what kind of news the status line carries
+    lv_obj_t* status_text_ = nullptr;    // a command's result, the voice state, or the latest change
+    lv_obj_t* status_detail_ = nullptr;  // what was heard, or when and by whom
+    lv_obj_t* card_ = nullptr;           // the tray of choices
     lv_obj_t* toast_ = nullptr;
     lv_obj_t* sys_ = nullptr;
+    lv_obj_t* sys_icon_ = nullptr;
     lv_obj_t* sys_title_ = nullptr;
+    lv_obj_t* sys_bar_ = nullptr;
     lv_obj_t* sys_detail_ = nullptr;
     lv_obj_t* sys_action_ = nullptr;
     lv_obj_t* sys_setup_ = nullptr;
     std::array<TileSlot, kTileSlots> tiles_{};
-    std::array<lv_obj_t*, kSceneSlots> scenes_{};
     std::array<lv_obj_t*, kCandidateSlots> candidates_{};
     std::vector<NavSlot> nav_slots_;
 

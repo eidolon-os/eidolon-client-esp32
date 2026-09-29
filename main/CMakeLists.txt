@@ -1215,7 +1215,16 @@ if(CONFIG_EIDOLON_HUB_MODE)
         )
     endif()
     if(CONFIG_BOARD_TYPE_KORVO_1)
-        list(APPEND SOURCES "eidolon/views/home_panel_view.cc")
+        # Fonts from scripts/eidolon/gen_home_panel_fonts.py.
+        list(APPEND SOURCES
+            "eidolon/views/home_panel_view.cc"
+            "eidolon/views/home_panel_copy.cc"
+            "eidolon/fonts/font_home_icons_20.c"
+            "eidolon/fonts/font_home_icons_24.c"
+            "eidolon/fonts/font_home_icons_48.c"
+            "eidolon/fonts/font_home_text_20.c"
+            "eidolon/fonts/font_home_clock_34.c"
+        )
     endif()
 
     if(CONFIG_EIDOLON_WAKE_WORD_ENABLE)

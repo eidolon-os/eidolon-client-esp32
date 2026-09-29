@@ -107,30 +107,31 @@ bool StepAbsolute(const Device& device, const Reading<int>& current, int delta, 
 
 }  // namespace
 
-const char* DeviceGlyph(const Device& device) {
-    // A few common appliances get their own character, as a person would
-    // label them; everything else takes its type's.
-    static constexpr struct { const char* word; const char* glyph; } kNamed[] = {
-        {"加湿", "湿"}, {"净化", "净"}, {"音箱", "音"}, {"电视", "视"}, {"扫地", "扫"},
-        {"洗衣", "洗"}, {"电饭", "饭"}, {"晾衣", "晾"},
+DeviceIcon IconFor(const Device& device) {
+    static constexpr struct { const char* word; DeviceIcon icon; } kNamed[] = {
+        {"加湿", DeviceIcon::Humidifier}, {"净化", DeviceIcon::Purifier}, {"音箱", DeviceIcon::Speaker},
+        {"电视", DeviceIcon::Tv}, {"扫地", DeviceIcon::Vacuum}, {"洗衣", DeviceIcon::Washer},
+        {"电饭", DeviceIcon::RiceCooker}, {"晾衣", DeviceIcon::DryingRack},
     };
     for (const auto& entry : kNamed) {
-        if (device.name.find(entry.word) != std::string::npos) return entry.glyph;
+        if (device.name.find(entry.word) != std::string::npos) return entry.icon;
     }
+    const DeviceState& s = device.state;
     switch (device.type) {
-    case DeviceType::Light: return "灯";
-    case DeviceType::Switch: return "开";
-    case DeviceType::Climate: return device.state.mode == ThermostatMode::Heat ? "暖" : "冷";
-    case DeviceType::WaterHeater: return "热";
-    case DeviceType::Cover: return "帘";
-    case DeviceType::Fan: return "风";
-    case DeviceType::Media: return "视";
-    case DeviceType::Appliance: return "机";
-    case DeviceType::Lock: return "锁";
-    case DeviceType::Camera: return "摄";
-    case DeviceType::Sensor: return "温";
+    case DeviceType::Light: return DeviceIcon::Light;
+    case DeviceType::Switch: return DeviceIcon::Power;
+    case DeviceType::Climate: return s.mode == ThermostatMode::Heat ? DeviceIcon::Heating : DeviceIcon::Cooling;
+    case DeviceType::WaterHeater: return DeviceIcon::WaterHeater;
+    case DeviceType::Cover:
+        return s.position.known && s.position.value > 0 ? DeviceIcon::CurtainOpen : DeviceIcon::CurtainClosed;
+    case DeviceType::Fan: return DeviceIcon::Fan;
+    case DeviceType::Media: return DeviceIcon::Tv;
+    case DeviceType::Appliance: return DeviceIcon::Appliance;
+    case DeviceType::Lock: return s.locked.known && !s.locked.value ? DeviceIcon::Unlocked : DeviceIcon::Locked;
+    case DeviceType::Camera: return DeviceIcon::Camera;
+    case DeviceType::Sensor: return DeviceIcon::Thermometer;
     }
-    return "?";
+    return DeviceIcon::Power;
 }
 
 std::string DeviceStateText(const Device& device, bool compact) {
@@ -318,14 +319,14 @@ std::string FormatClock(int64_t utc_ms, int32_t utc_offset_minutes) {
     return Format("%02d:%02d", static_cast<int>(day_s / 3600), static_cast<int>(day_s % 3600 / 60));
 }
 
-std::string FormatActivity(const Activity& activity, int32_t utc_offset_minutes) {
-    if (!activity.valid) return "";
-    std::string line;
-    if (activity.utc_ms > 0) line = FormatClock(activity.utc_ms, utc_offset_minutes) + " ";
-    line += activity.device_name + " " + activity.change;
-    if (activity.more > 0) line += Format(" 等 %u 个设备", static_cast<unsigned>(activity.more + 1));
-    if (!activity.source.empty()) line += " · 来自 " + activity.source;
-    return line;
+ActivityLines FormatActivity(const Activity& activity, int32_t utc_offset_minutes) {
+    ActivityLines lines;
+    if (!activity.valid) return lines;
+    lines.what = activity.device_name + " " + activity.change;
+    if (activity.more > 0) lines.what += Format(" 等 %u 个设备", static_cast<unsigned>(activity.more + 1));
+    if (activity.utc_ms > 0) lines.detail = FormatClock(activity.utc_ms, utc_offset_minutes);
+    if (!activity.source.empty()) lines.detail += (lines.detail.empty() ? "来自 " : " · 来自 ") + activity.source;
+    return lines;
 }
 
 bool InArea(const Device& device, const std::string& area_id) {

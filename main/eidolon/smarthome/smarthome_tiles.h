@@ -15,8 +15,15 @@ namespace eidolon::smarthome {
 
 enum class TileAction : uint8_t { Tap, Minus, Plus };
 
-// One CJK character naming the device on its tile (UTF-8).
-const char* DeviceGlyph(const Device& device);
+// The picture a tile shows for a device: a few appliances by name, as a
+// person would label them, then the type's (following state where the type
+// has a picture for it). A view maps each to a glyph of its own icon font.
+enum class DeviceIcon : uint8_t {
+    Light, Power, Cooling, Heating, WaterHeater, CurtainOpen, CurtainClosed, DryingRack,
+    Fan, Purifier, Humidifier, Tv, Speaker, Washer, Vacuum, RiceCooker, Appliance,
+    Locked, Unlocked, Camera, Thermometer,
+};
+DeviceIcon IconFor(const Device& device);
 // Chinese state line, e.g. "开 · 40%", "制冷 26°C · 室温 28°", "已关闭".
 // `compact` drops secondary detail (a climate's room temperature) for a tile
 // too narrow to show it whole.
@@ -41,8 +48,14 @@ ResultTone OutcomeTone(VoiceOutcome outcome);
 // "HH:MM" in the given offset (the snapshot's utc_offset_minutes), or "--:--"
 // before the panel has a wall clock.
 std::string FormatClock(int64_t utc_ms, int32_t utc_offset_minutes);
-// "HH:MM 客厅空调 已打开 · 来自 面板语音"; the time is left out without a clock.
-std::string FormatActivity(const Activity& activity, int32_t utc_offset_minutes);
+// The activity strip's two lines: what changed ("客厅空调 已打开", "客厅空调
+// 已关闭 等 2 个设备") and when and by whom ("20:30 · 来自 面板语音"; the time
+// is left out without a clock). Both empty before the first change.
+struct ActivityLines {
+    std::string what;
+    std::string detail;
+};
+ActivityLines FormatActivity(const Activity& activity, int32_t utc_offset_minutes);
 
 // Area navigation: "全部", then the snapshot's areas that hold devices, then
 // "其他" for devices placed in no area.
