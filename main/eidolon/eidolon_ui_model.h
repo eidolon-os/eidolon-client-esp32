@@ -60,6 +60,9 @@ struct EidolonUiModel {
     const char* emotion = "neutral";
 
     UiIntent primary_intent = UiIntent::None;
+    // What a session control (the session button, or a view's on-screen one)
+    // does now; see UiStateProjector::SessionControlIntent.
+    UiIntent session_intent = UiIntent::None;
     const char* primary_label = "";
     bool primary_enabled = false;
     // Semantic availability is distinct from a control being visible.

@@ -245,6 +245,50 @@ const std::string* DetailOverride(const EidolonRuntimeStatus& status,
     return nullptr;
 }
 
+// Whether `intent` may run now, read off the model projected for `status`.
+bool Allows(const EidolonRuntimeStatus& status, const EidolonUiModel& model, UiIntent intent)
+{
+    switch (intent) {
+    case UiIntent::OpenConversation:
+        return model.primary_enabled && model.primary_intent == intent;
+    case UiIntent::CloseConversation:
+        return model.end_allowed;
+    case UiIntent::BeginTalk:
+        return model.scene == UiScene::Conversation &&
+               IsPushToTalk(model.interaction_mode) &&
+               model.turn != TurnPhase::Recording;
+    case UiIntent::CommitTalk:
+        return model.scene == UiScene::Conversation &&
+               IsPushToTalk(model.interaction_mode) &&
+               model.turn == TurnPhase::Recording;
+    case UiIntent::ToggleMicrophone:
+        return model.scene == UiScene::Conversation &&
+               IsAutomaticEndpointing(model.interaction_mode);
+    case UiIntent::OpenSetup:
+        return status.runtime!=RuntimePhase::Updating;
+    case UiIntent::None:
+    default:
+        return false;
+    }
+}
+
+// The one walk every gesture takes: the first intent bound to (source,
+// gesture) that may run now. `physical` also asks that the input itself be
+// declared and registered; an on-screen session control is an input of its
+// own and does not borrow a physical button's availability.
+UiIntent FirstAllowedBinding(const EidolonRuntimeStatus& status, const EidolonUiModel& model,
+                             const UiInputProfile& inputs, UiInputSource source,
+                             UiInputGesture gesture, bool physical)
+{
+    for (size_t i=0; i<inputs.binding_count; ++i) {
+        const auto& binding=inputs.bindings[i];
+        if (binding.source!=source || binding.gesture!=gesture) continue;
+        if (physical && !inputs.Binding(binding.intent,source)) continue;
+        if (Allows(status,model,binding.intent)) return binding.intent;
+    }
+    return UiIntent::None;
+}
+
 }  // namespace
 
 EidolonUiModel UiStateProjector::Project(const EidolonRuntimeStatus& status,
@@ -332,34 +376,15 @@ EidolonUiModel UiStateProjector::Project(const EidolonRuntimeStatus& status,
         !inputs.Binding(UiIntent::BeginTalk,UiInputSource::TalkButton)) {
         model.detail_text = "Talk input unavailable";
     }
+    // A session control is the session button's click, wherever it is.
+    model.session_intent = FirstAllowedBinding(status, model, inputs, UiInputSource::SessionButton,
+                                               UiInputGesture::Click, false);
     return model;
 }
 
 bool UiStateProjector::AllowsIntent(const EidolonRuntimeStatus& status, UiIntent intent)
 {
-    const auto model = Project(status);
-    switch (intent) {
-    case UiIntent::OpenConversation:
-        return model.primary_enabled && model.primary_intent == intent;
-    case UiIntent::CloseConversation:
-        return model.end_allowed;
-    case UiIntent::BeginTalk:
-        return model.scene == UiScene::Conversation &&
-               IsPushToTalk(model.interaction_mode) &&
-               model.turn != TurnPhase::Recording;
-    case UiIntent::CommitTalk:
-        return model.scene == UiScene::Conversation &&
-               IsPushToTalk(model.interaction_mode) &&
-               model.turn == TurnPhase::Recording;
-    case UiIntent::ToggleMicrophone:
-        return model.scene == UiScene::Conversation &&
-               IsAutomaticEndpointing(model.interaction_mode);
-    case UiIntent::OpenSetup:
-        return status.runtime!=RuntimePhase::Updating;
-    case UiIntent::None:
-    default:
-        return false;
-    }
+    return Allows(status, Project(status), intent);
 }
 
 UiIntent UiStateProjector::ResolveInput(const EidolonRuntimeStatus& status,
@@ -367,12 +392,13 @@ UiIntent UiStateProjector::ResolveInput(const EidolonRuntimeStatus& status,
                                        UiInputGesture gesture)
 {
     if (!inputs.Has(source)) return UiIntent::None;
-    for (size_t i=0; i<inputs.binding_count; ++i) {
-        const auto& binding=inputs.bindings[i];
-        if (binding.source==source && binding.gesture==gesture &&
-            inputs.Binding(binding.intent,source) && AllowsIntent(status,binding.intent)) return binding.intent;
-    }
-    return UiIntent::None;
+    return FirstAllowedBinding(status, Project(status), inputs, source, gesture, true);
+}
+
+UiIntent UiStateProjector::SessionControlIntent(const EidolonRuntimeStatus& status,
+                                               const UiInputProfile& inputs)
+{
+    return Project(status, inputs).session_intent;
 }
 
 bool UiStateProjector::IsConversationState(DeviceState state)

@@ -1247,6 +1247,19 @@ menu "Eidolon Hub"
         default y if BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_2_06 && !EIDOLON_INTERACTION_MODE_PTT
         default n
 
+    config EIDOLON_UI_MICROPHONE_MUTE
+        bool "Offer a microphone mute"
+        depends on EIDOLON_HUB_MODE
+        default n if EIDOLON_SMARTHOME_PANEL
+        default y
+        help
+            A mute the user toggles during a conversation (a view's on-screen
+            control, or the auxiliary button's double-click), kept across
+            restarts. Without it the product has no mute state at all: no input
+            may ask for one, and every conversation opens with the microphone
+            on. The smart home panel has none: its microphone is the session
+            control, doing what SET and MODE do.
+
     config EIDOLON_COMPANION_BENCHMARK
         bool "Run bounded shared-face display benchmark at boot"
         default n

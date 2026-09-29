@@ -16,6 +16,13 @@ public:
                                  const UiInputProfile& inputs, UiInputSource source,
                                  UiInputGesture gesture);
     static bool AllowsIntent(const EidolonRuntimeStatus& status, UiIntent intent);
+    // What a session control does now: start a conversation when one can be
+    // opened, end the one that is open or opening, nothing otherwise. It is the
+    // session button's click resolved through the same bindings ResolveInput
+    // walks, so a physical session button and an on-screen one (a panel's
+    // microphone) cannot come to mean different things.
+    static UiIntent SessionControlIntent(const EidolonRuntimeStatus& status,
+                                         const UiInputProfile& inputs = {});
 
     // The legacy DeviceState carries two unrelated things. The Application owns
     // the device's lifecycle — starting, wifi_configuring, activating,

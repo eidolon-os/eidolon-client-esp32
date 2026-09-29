@@ -1,5 +1,7 @@
 #include "livekit_voice_transport.h"
 
+#include <sdkconfig.h>
+
 #include <esp_log.h>
 #include <livekit.h>
 
@@ -13,7 +15,13 @@ LiveKitVoiceTransport::LiveKitVoiceTransport(VoiceSessionCallbacks cb, GuardServ
         ESP_LOGE(TAG, "livekit_system_init failed");
     }
 
+#if CONFIG_EIDOLON_UI_MICROPHONE_MUTE
     mic_enabled_ = device_store_.LoadMicEnabled(true);
+#else
+    // A product without a mute has no mute state: a value stored by earlier
+    // firmware must not silence every conversation this one holds.
+    mic_enabled_ = true;
+#endif
     controller_ = std::make_unique<EidolonVoiceController>(guard_service);
     on_runtime_status_ = std::move(cb.on_runtime_status);
 

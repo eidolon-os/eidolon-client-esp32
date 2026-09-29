@@ -37,13 +37,17 @@ struct UiInputProfile {
     uint8_t available_inputs = 0;
     bool automatic_start = false;
     bool setup_available = false;
+    // Whether the product offers a microphone mute at all; without one no input
+    // may ask for ToggleMicrophone (CONFIG_EIDOLON_UI_MICROPHONE_MUTE).
+    bool microphone_mute = true;
     const UiInputBinding* bindings = kStandardUiBindings;
     size_t binding_count = sizeof(kStandardUiBindings) / sizeof(kStandardUiBindings[0]);
     bool Has(UiInputSource input) const {
         return (enabled_inputs & available_inputs & InputBit(input)) != 0;
     }
     const UiInputBinding* Binding(UiIntent intent, UiInputSource input) const {
-        if (!Has(input) || (intent==UiIntent::OpenSetup && !setup_available)) return nullptr;
+        if (!Has(input) || (intent==UiIntent::OpenSetup && !setup_available) ||
+            (intent==UiIntent::ToggleMicrophone && !microphone_mute)) return nullptr;
         for (size_t i=0; i<binding_count; ++i)
             if (bindings[i].intent==intent && bindings[i].source==input) return &bindings[i];
         return nullptr;
@@ -67,6 +71,9 @@ inline UiInputProfile CompiledUiInputProfile(uint8_t available) {
 #endif
 #if CONFIG_EIDOLON_AUTO_JOIN_ON_ACTIVATION
     profile.automatic_start = true;
+#endif
+#if CONFIG_EIDOLON_HUB_MODE && !CONFIG_EIDOLON_UI_MICROPHONE_MUTE
+    profile.microphone_mute = false;
 #endif
     profile.available_inputs = available;
     return profile;

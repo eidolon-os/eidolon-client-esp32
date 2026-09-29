@@ -8,7 +8,65 @@ static EidolonRuntimeStatus Ready(InteractionMode mode) {
     s.service=ServicePhase::Ready;s.interaction_mode=mode;
     return s;
 }
+// A session control means the session button's click, in every state: the
+// on-screen one a panel draws resolves through the same bindings.
+static void SessionControlIsTheSessionButton() {
+    UiInputProfile input;
+    input.enabled_inputs=input.available_inputs=InputBit(UiInputSource::Touch)|InputBit(UiInputSource::SessionButton);
+    for (auto mode:{InteractionMode::HalfDuplex,InteractionMode::FullDuplex,InteractionMode::PushToTalk})
+    for (int r=0;r<=static_cast<int>(RuntimePhase::Fault);++r)
+    for (int e=0;e<=static_cast<int>(EnrollmentPhase::Revoked);++e)
+    for (int v=0;v<=static_cast<int>(ServicePhase::Fault);++v)
+    for (int c=0;c<=static_cast<int>(ConversationPhase::Failed);++c)
+    for (auto turn:{TurnPhase::Idle,TurnPhase::UserSpeaking,TurnPhase::AgentThinking,TurnPhase::Recording}) {
+        EidolonRuntimeStatus s;
+        s.runtime=static_cast<RuntimePhase>(r);s.enrollment=static_cast<EnrollmentPhase>(e);
+        s.service=static_cast<ServicePhase>(v);s.conversation=static_cast<ConversationPhase>(c);
+        s.turn=turn;s.interaction_mode=mode;
+        const UiIntent button=UiStateProjector::ResolveInput(s,input,UiInputSource::SessionButton,UiInputGesture::Click);
+        assert(UiStateProjector::SessionControlIntent(s,input)==button);
+        assert(UiStateProjector::Project(s,input).session_intent==button);
+    }
+    auto s=Ready(InteractionMode::HalfDuplex);
+    assert(UiStateProjector::SessionControlIntent(s,input)==UiIntent::OpenConversation);
+    s.conversation=ConversationPhase::Opening;
+    assert(UiStateProjector::SessionControlIntent(s,input)==UiIntent::CloseConversation);
+    s.conversation=ConversationPhase::Active;
+    // Ends the conversation, where the primary touch action is the mute toggle.
+    assert(UiStateProjector::SessionControlIntent(s,input)==UiIntent::CloseConversation);
+    assert(UiStateProjector::Project(s,input).primary_intent==UiIntent::ToggleMicrophone);
+    s.conversation=ConversationPhase::Closed;s.service=ServicePhase::Reconnecting;
+    assert(UiStateProjector::SessionControlIntent(s,input)==UiIntent::None);
+    // An on-screen control does not depend on the physical button being there.
+    input.available_inputs=InputBit(UiInputSource::Touch);
+    s=Ready(InteractionMode::HalfDuplex);
+    assert(UiStateProjector::ResolveInput(s,input,UiInputSource::SessionButton,UiInputGesture::Click)==UiIntent::None);
+    assert(UiStateProjector::SessionControlIntent(s,input)==UiIntent::OpenConversation);
+}
+
+// A product that offers no mute: nothing may ask for one, however it is
+// touched or pressed, and the session control is unaffected.
+static void ProductWithoutMute() {
+    UiInputProfile input;
+    input.enabled_inputs=input.available_inputs=InputBit(UiInputSource::Touch)|
+        InputBit(UiInputSource::SessionButton)|InputBit(UiInputSource::AuxiliaryButton);
+    input.microphone_mute=false;
+    auto s=Ready(InteractionMode::HalfDuplex);
+    s.conversation=ConversationPhase::Active;
+    for (auto source:{UiInputSource::Touch,UiInputSource::AuxiliaryButton})
+        assert(!input.Binding(UiIntent::ToggleMicrophone,source));
+    assert(UiStateProjector::ResolveInput(s,input,UiInputSource::AuxiliaryButton,UiInputGesture::DoubleClick)==UiIntent::None);
+    assert(UiStateProjector::SessionControlIntent(s,input)==UiIntent::CloseConversation);
+    assert(UiStateProjector::Project(s,input).primary_presentation!=UiActionPresentation::TouchControl);
+    // The same profile with a mute keeps offering it.
+    input.microphone_mute=true;
+    assert(input.Binding(UiIntent::ToggleMicrophone,UiInputSource::Touch));
+    assert(UiStateProjector::ResolveInput(s,input,UiInputSource::AuxiliaryButton,UiInputGesture::DoubleClick)==UiIntent::ToggleMicrophone);
+}
+
 int main() {
+    SessionControlIsTheSessionButton();
+    ProductWithoutMute();
     UiInputProfile input;
     auto initial=Ready(InteractionMode::HalfDuplex);
     assert(!std::strcmp(UiStateProjector::Project(initial,input).detail_text,"No start input available"));
