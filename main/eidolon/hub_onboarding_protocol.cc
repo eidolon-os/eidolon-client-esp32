@@ -4,6 +4,7 @@
 #include "device_capabilities.h"
 
 #include "eidolon_device_profile.h"
+#include "eidolon_topics.h"
 #if CONFIG_BOARD_TYPE_KORVO_1
 #include "smarthome/smarthome_wire.h"
 #endif
@@ -425,7 +426,9 @@ std::string BuildDeviceManifestJson(const std::string& board_name, const DeviceC
 #if CONFIG_BOARD_TYPE_KORVO_1
     // Voice application is independent of the panel's display capability.
     // The Host validates this declared use case when it provisions a session.
-    properties += ",{\"name\":\"voice.application\",\"observable\":false,\"schema\":{\"const\":\"home.command.v1\",\"type\":\"string\"},\"writable\":false}";
+    properties += std::string(",{\"name\":\"") + kVoiceApplicationProperty +
+        "\",\"observable\":false,\"schema\":{\"const\":\"" +
+        kSessionApplicationHomeCommand + "\",\"type\":\"string\"},\"writable\":false}";
     properties += std::string(",{\"name\":\"") + smarthome::kPanelProfileProperty +
         "\",\"observable\":false,\"schema\":{\"const\":\"" +
         smarthome::kPanelProfile + "\",\"type\":\"string\"},\"writable\":false}";

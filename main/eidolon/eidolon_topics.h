@@ -103,6 +103,14 @@ inline constexpr const char* kSessionIntentPresence = "presence_initiated";
 inline constexpr const char* kSessionIntentProactive = "proactive_initiated";
 inline constexpr const char* kSessionFlowIdHeader = "X-Device-Session-Flow-Id";
 
+// Voice application — which application a voice session serves, distinct from
+// session_intent (why it was opened) and from what the device can display.
+// Declared once, as a const-schema manifest property; a board that declares
+// none is served the Companion, so only the application a board opts into is
+// spelled here. Source of record: eidolon_sdk.biz.contracts.
+inline constexpr const char* kVoiceApplicationProperty = "voice.application";
+inline constexpr const char* kSessionApplicationHomeCommand = "home.command.v1";
+
 }  // namespace eidolon
 
 #endif  // EIDOLON_TOPICS_H_
