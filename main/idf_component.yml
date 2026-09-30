@@ -148,12 +148,13 @@ dependencies:
   #     the subscriber can reach connected instead of retrying SCTP INIT forever.
   #   - close/leave terminate reconnect backoff, and transitions run the old
   #     state's exit hook before the new state's enter hook;
-  #   - receive-only and data-only rooms do not allocate/start a capture sink.
+  #   - receive-only and data-only rooms do not allocate/start a capture sink;
+  #   - disabled TCP ICE candidates cannot fail a UDP-only peer before UDP arrives.
   # https over ssh so a build needs no SSH access to the fork.
   livekit/livekit:
     git: https://github.com/eidolon-os/client-sdk-esp32.git
     path: components/livekit
-    version: "c32c26301a2e3626c5ddd6adc645803f13b5f603"
+    version: "bd56a60e6180ad5a1eccbf4df7ab41c7bc4500cc"
     rules:
     - if: target in [esp32s3, esp32p4, esp32s31]
 

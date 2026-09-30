@@ -1,0 +1,342 @@
+{
+  "wrong_address": {
+    "source": "/tmp/eidolon-handoff-address-box-1.log",
+    "lines": [
+      "CAPTURE {\"utc_epoch\": 1790771871.552139, \"port\": \"/dev/cu.usbmodem21201\", \"requested_reset\": true}",
+      "I (6339) NetTrace: dns end task=hub_activation host=eidolon-hub-f89c0ecca5d0070a7989.local rc=0 ms=277 first=192.168.3.17",
+      "I (6339) NetTrace: connect begin task=hub_activation fd=54 peer=192.168.3.17:9443",
+      "E (6399) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=337 status=0 socket_errno=104 tls_error=0x8004 tls_code=0 tls_flags=0x0",
+      "W (6419) HubHttp: Clearing DNS cache after connection failure for eidolon-hub-f89c0ecca5d0070a7989.local",
+      "I (14739) NetTrace: dns end task=hub_activation host=eidolon-hub-f89c0ecca5d0070a7989.local rc=0 ms=176 first=192.168.3.230",
+      "I (14739) NetTrace: connect begin task=hub_activation fd=54 peer=192.168.3.230:9443",
+      "I (16189) NetTrace: dns end task=hub_activation host=eidolon-hub-f89c0ecca5d0070a7989.local rc=0 ms=0 first=192.168.3.230",
+      "I (16199) NetTrace: connect begin task=hub_activation fd=54 peer=192.168.3.230:9443",
+      "I (17209) NetTrace: dns end task=hub_activation host=eidolon-hub-f89c0ecca5d0070a7989.local rc=0 ms=2 first=192.168.3.230",
+      "I (17219) NetTrace: connect begin task=hub_activation fd=54 peer=192.168.3.230:9443",
+      "I (18569) NetTrace: dns end task=websocket_task host=192.168.3.230 rc=0 ms=5 first=192.168.3.230",
+      "I (18579) NetTrace: connect begin task=websocket_task fd=54 peer=192.168.3.230:7880"
+    ]
+  },
+  "rtc_failure_order": {
+    "source": "/tmp/eidolon-rtc-order-box-4.log",
+    "lines": [
+      "CAPTURE {\"utc_epoch\": 1790773658.442795, \"round\": 4}",
+      "I (10929) NetTrace: rtc input peer=0x3fcf3a14 type=1 transport=- bytes=667",
+      "I (11029) NetTrace: rtc result peer=0x3fcf3a14 rc=0",
+      "I (11039) NetTrace: rtc input peer=0x3fcf3a14 type=2 transport=tcp bytes=103",
+      "I (11199) livekit_peer.pub: State changed: 0 -> 1",
+      "I (11199) NetTrace: rtc result peer=0x3fcf3a14 rc=0",
+      "I (11199) NetTrace: rtc input peer=0x3fcf3a14 type=2 transport=udp bytes=89",
+      "I (11209) livekit_peer.pub: State changed: 1 -> 4",
+      "I (11219) livekit_peer.pub: State changed: 4 -> 1",
+      "I (11219) NetTrace: rtc result peer=0x3fcf3a14 rc=0",
+      "I (11249) livekit_peer.pub: State changed: 1 -> 0",
+      "E (11309) LiveKitSession: Failure: RTC",
+      "I (12769) NetTrace: rtc input peer=0x3fcf42d4 type=1 transport=- bytes=667",
+      "I (12939) NetTrace: rtc result peer=0x3fcf42d4 rc=0",
+      "I (13299) NetTrace: rtc input peer=0x3fcf42d4 type=2 transport=udp bytes=89",
+      "I (13319) livekit_peer.pub: State changed: 0 -> 1",
+      "I (13319) NetTrace: rtc result peer=0x3fcf42d4 rc=0",
+      "I (13329) NetTrace: rtc input peer=0x3fcf42d4 type=2 transport=tcp bytes=103",
+      "I (13409) NetTrace: rtc result peer=0x3fcf42d4 rc=0",
+      "I (13859) livekit_peer.pub: State changed: 1 -> 2",
+      "I (13989) EidolonUiPresenter: visible state=READY scene=7",
+      "I (17759) NetTrace: rtc input peer=0x3fcf42d4 type=2 transport=udp bytes=122",
+      "I (17759) NetTrace: rtc result peer=0x3fcf42d4 rc=0"
+    ]
+  },
+  "stack_final_before_rtc_fix": {
+    "source": "/tmp/eidolon-mdns-final-stack-boot.log",
+    "lines": [
+      "W (390) Application: EIDOLON-BUILDSTAMP git=2a7a0911b sdk=c32c26301a2e3626c5ddd6adc645803f13b5f603 idf=5.5.4 branch=main built=Sep 30 2026 20:55:11",
+      "I (8050) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=1385",
+      "I (10110) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=553",
+      "I (12960) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=1320",
+      "I (13890) SystemInfo: free sram: 87863 minimal sram: 81875",
+      "W (14230) EidolonVoice: [dispatch] type=0 wait_ms=0 run_ms=164 pending=0",
+      "I (15640) EidolonUiPresenter: visible state=READY scene=7",
+      "I (24650) SystemInfo: free sram: 61995 minimal sram: 61235",
+      "I (34650) SystemInfo: free sram: 61995 minimal sram: 61055",
+      "I (44650) SystemInfo: free sram: 61995 minimal sram: 61055",
+      "I (54650) SystemInfo: free sram: 61995 minimal sram: 61055",
+      "I (64650) SystemInfo: free sram: 61995 minimal sram: 61055",
+      "I (74650) SystemInfo: free sram: 61995 minimal sram: 61055",
+      "I (84650) SystemInfo: free sram: 61995 minimal sram: 61055"
+    ]
+  },
+  "waveshare_final_before_rtc_fix": {
+    "source": "/tmp/eidolon-mdns-final-wave-boot.log",
+    "lines": [
+      "W (369) Application: EIDOLON-BUILDSTAMP git=2a7a0911b sdk=c32c26301a2e3626c5ddd6adc645803f13b5f603 idf=5.5.4 branch=main built=Sep 30 2026 20:58:41",
+      "I (6579) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=276",
+      "I (8109) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=106",
+      "I (9249) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=140",
+      "I (10259) SystemInfo: free sram: 85087 minimal sram: 79279",
+      "W (10599) EidolonVoice: [dispatch] type=0 wait_ms=0 run_ms=163 pending=0",
+      "I (11729) EidolonUiPresenter: visible state=READY scene=7",
+      "I (21219) SystemInfo: free sram: 50727 minimal sram: 49955",
+      "I (31219) SystemInfo: free sram: 50727 minimal sram: 49955",
+      "I (41219) SystemInfo: free sram: 50727 minimal sram: 49955",
+      "I (51219) SystemInfo: free sram: 50727 minimal sram: 49955",
+      "I (61219) SystemInfo: free sram: 50727 minimal sram: 49955",
+      "I (71219) SystemInfo: free sram: 50727 minimal sram: 49955",
+      "I (81219) SystemInfo: free sram: 50747 minimal sram: 49955"
+    ]
+  },
+  "unrelated_mdns_answer": [
+    {
+      "target": "224.0.0.251",
+      "peer": [
+        "192.168.3.230",
+        5353
+      ],
+      "header": [
+        31141,
+        33792,
+        1,
+        1,
+        0,
+        1
+      ],
+      "questions": [
+        [
+          "eidolon-hub-f89c0ecca5d0070a7989.local",
+          1,
+          1
+        ]
+      ],
+      "answers": [
+        [
+          "eidolon-hub-f89c0ecca5d0070a7989.local",
+          1,
+          1,
+          120,
+          "192.168.3.230"
+        ],
+        [
+          "owner-f774cf8e1b667eb0ca7b._eidolon-owner._tcp.local",
+          47,
+          1,
+          120,
+          "c048000400000008"
+        ]
+      ]
+    },
+    {
+      "target": "224.0.0.251",
+      "peer": [
+        "192.168.3.17",
+        5353
+      ],
+      "header": [
+        31141,
+        33792,
+        1,
+        1,
+        0,
+        0
+      ],
+      "questions": [
+        [
+          "eidolon-hub-f89c0ecca5d0070a7989.local",
+          1,
+          1
+        ]
+      ],
+      "answers": [
+        [
+          "192-168-3-17.local",
+          1,
+          1,
+          3600,
+          "192.168.3.17"
+        ]
+      ]
+    }
+  ],
+  "sdk_fix_hil": {
+    "sdk_commit": "bd56a60e6180ad5a1eccbf4df7ab41c7bc4500cc",
+    "extra_network_diagnostics": false,
+    "runs": [
+      {
+        "source": "/tmp/eidolon-rtc-fixed-box-1.log",
+        "ready_ms": [
+          "11380"
+        ],
+        "rtc_failures": 0,
+        "http_failures": 0,
+        "resolved_addresses": [
+          "192.168.3.230",
+          "192.168.3.230",
+          "192.168.3.230"
+        ],
+        "tcp_ignored_before_first_pairing": false
+      },
+      {
+        "source": "/tmp/eidolon-rtc-fixed-box-2.log",
+        "ready_ms": [
+          "11740"
+        ],
+        "rtc_failures": 0,
+        "http_failures": 0,
+        "resolved_addresses": [
+          "192.168.3.230",
+          "192.168.3.230",
+          "192.168.3.230"
+        ],
+        "tcp_ignored_before_first_pairing": true
+      },
+      {
+        "source": "/tmp/eidolon-rtc-fixed-box-3.log",
+        "ready_ms": [
+          "11780"
+        ],
+        "rtc_failures": 0,
+        "http_failures": 0,
+        "resolved_addresses": [
+          "192.168.3.230",
+          "192.168.3.230",
+          "192.168.3.230"
+        ],
+        "tcp_ignored_before_first_pairing": false
+      },
+      {
+        "source": "/tmp/eidolon-rtc-fixed-box-4.log",
+        "ready_ms": [
+          "11640"
+        ],
+        "rtc_failures": 0,
+        "http_failures": 0,
+        "resolved_addresses": [
+          "192.168.3.230",
+          "192.168.3.230",
+          "192.168.3.230"
+        ],
+        "tcp_ignored_before_first_pairing": false
+      },
+      {
+        "source": "/tmp/eidolon-rtc-fixed-box-5.log",
+        "ready_ms": [
+          "11860"
+        ],
+        "rtc_failures": 0,
+        "http_failures": 0,
+        "resolved_addresses": [
+          "192.168.3.230",
+          "192.168.3.230",
+          "192.168.3.230"
+        ],
+        "tcp_ignored_before_first_pairing": false
+      },
+      {
+        "source": "/tmp/eidolon-rtc-fixed-box-6.log",
+        "ready_ms": [
+          "11920"
+        ],
+        "rtc_failures": 0,
+        "http_failures": 0,
+        "resolved_addresses": [
+          "192.168.3.230",
+          "192.168.3.230",
+          "192.168.3.230"
+        ],
+        "tcp_ignored_before_first_pairing": false
+      },
+      {
+        "source": "/tmp/eidolon-rtc-fixed-box-7.log",
+        "ready_ms": [
+          "11400"
+        ],
+        "rtc_failures": 0,
+        "http_failures": 0,
+        "resolved_addresses": [
+          "192.168.3.230",
+          "192.168.3.230",
+          "192.168.3.230"
+        ],
+        "tcp_ignored_before_first_pairing": false
+      },
+      {
+        "source": "/tmp/eidolon-rtc-fixed-box-8.log",
+        "ready_ms": [
+          "11630"
+        ],
+        "rtc_failures": 0,
+        "http_failures": 0,
+        "resolved_addresses": [
+          "192.168.3.230",
+          "192.168.3.230",
+          "192.168.3.230"
+        ],
+        "tcp_ignored_before_first_pairing": false
+      },
+      {
+        "source": "/tmp/eidolon-rtc-fixed-box-9.log",
+        "ready_ms": [
+          "11800"
+        ],
+        "rtc_failures": 0,
+        "http_failures": 0,
+        "resolved_addresses": [
+          "192.168.3.230",
+          "192.168.3.230",
+          "192.168.3.230"
+        ],
+        "tcp_ignored_before_first_pairing": false
+      },
+      {
+        "source": "/tmp/eidolon-rtc-fixed-box-10.log",
+        "ready_ms": [
+          "12760"
+        ],
+        "rtc_failures": 0,
+        "http_failures": 0,
+        "resolved_addresses": [
+          "192.168.3.230",
+          "192.168.3.230",
+          "192.168.3.230"
+        ],
+        "tcp_ignored_before_first_pairing": false
+      },
+      {
+        "source": "/tmp/eidolon-rtc-fixed-box-11.log",
+        "ready_ms": [
+          "11720"
+        ],
+        "rtc_failures": 0,
+        "http_failures": 0,
+        "resolved_addresses": [
+          "192.168.3.230",
+          "192.168.3.230",
+          "192.168.3.230"
+        ],
+        "tcp_ignored_before_first_pairing": true
+      },
+      {
+        "source": "/tmp/eidolon-rtc-fixed-box-12.log",
+        "ready_ms": [
+          "11540"
+        ],
+        "rtc_failures": 0,
+        "http_failures": 0,
+        "resolved_addresses": [
+          "192.168.3.230",
+          "192.168.3.230",
+          "192.168.3.230"
+        ],
+        "tcp_ignored_before_first_pairing": false
+      }
+    ]
+  },
+  "rtc_fixed_order": {
+    "source": "/tmp/eidolon-rtc-fixed-box-11.log",
+    "lines": [
+      "I (11030) livekit_peer.pub: Ignoring TCP ICE candidate: TCP transport disabled",
+      "I (11050) AGENT: 0 Add remote type:1 192.168.3.230:58911",
+      "I (11050) livekit_peer.pub: State changed: 0 -> 1",
+      "I (11570) livekit_peer.pub: State changed: 1 -> 2",
+      "I (11720) EidolonUiPresenter: visible state=READY scene=7",
+      "I (15750) AGENT: 0 Add remote type:2 125.33.204.51:23075"
+    ]
+  }
+}
