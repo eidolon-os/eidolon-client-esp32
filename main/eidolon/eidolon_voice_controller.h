@@ -61,7 +61,7 @@ public:
     explicit EidolonVoiceController(GuardService* guard_service = nullptr);
     ~EidolonVoiceController();
 
-    void OnHubActivationSucceeded();
+    void OnHubActivationSucceeded(const Esp32HubConfig& config, uint32_t commissioning_generation);
     void OnNetworkLost();
     void OnNetworkRestored();
     void QuiesceForCommissioning(std::function<void(bool)> completion);
@@ -182,6 +182,7 @@ private:
         // Phase 1: dropped on mismatch).
         uint32_t generation = 0;
         std::string* payload = nullptr;  // owned; the loop deletes it after dispatch
+        Esp32HubConfig* activation_config = nullptr;  // same ownership as payload
         std::function<void(bool)>* completion = nullptr;  // owned by the loop
     };
     static_assert(std::is_trivially_copyable_v<Event>,
@@ -194,7 +195,7 @@ private:
     void DispatchAndRelease(const Event& ev);
 
     // ---- Handlers (run only on the controller task) ----
-    void DoActivation();
+    void DoActivation(const Esp32HubConfig& config);
     void DoNetworkLost();
     void DoNetworkRestored();
     bool DoCommissioningQuiesce();
@@ -251,7 +252,7 @@ private:
 
     // ---- Internal helpers (controller task only) ----
     esp_err_t LoadStoredConfig();
-    esp_err_t LoadAuthorityRoutes();
+    esp_err_t LoadAuthorityRoutes(bool restore_from_storage = true);
     // Fetch fresh Hub config (server_url/token/room_name/...). persist=true also
     // writes it to NVS; the per-JOIN refresh passes persist=false because each
     // JOIN now gets a unique nonce'd voice room+token (so NVS dedup would never

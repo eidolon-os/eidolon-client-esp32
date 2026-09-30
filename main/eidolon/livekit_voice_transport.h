@@ -18,7 +18,7 @@ public:
     explicit LiveKitVoiceTransport(VoiceSessionCallbacks cb, GuardService* guard_service = nullptr);
     ~LiveKitVoiceTransport() override;
 
-    void OnActivationComplete() override;
+    void OnActivationComplete(const Esp32HubConfig& config, uint32_t commissioning_generation) override;
     void OnNetworkLost() override;
     void OnNetworkRestored() override;
     void QuiesceForCommissioning(

@@ -2,10 +2,11 @@
 #define EIDOLON_HUB_ACTIVATOR_H_
 
 namespace eidolon {
+struct Esp32HubConfig;
 
 class HubActivator {
 public:
-    bool Run();
+    bool Run(Esp32HubConfig& activated);
 };
 
 }  // namespace eidolon

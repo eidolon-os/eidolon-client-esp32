@@ -67,7 +67,8 @@ ActivationAttemptOutcome ClassifyAttempt(esp_err_t err, const Esp32HubConfig& co
 
 }  // namespace
 
-bool HubActivator::Run() {
+bool HubActivator::Run(Esp32HubConfig& activated) {
+    activated = {};
     auto& app = Application::GetInstance();
     HubActivationRetryCore retry;
 
@@ -136,6 +137,7 @@ bool HubActivator::Run() {
                 ESP_LOGW(TAG, "Hub activation could not be cached; using it for this session");
             }
             ProjectHubConfig(app, config.status);
+            activated = std::move(config);
             return true;
 
         case ActivationStandDown::ClaimTerminal:

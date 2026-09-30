@@ -272,9 +272,9 @@ static esp_err_t build_renderer(esp_codec_dev_handle_t play_handle, uint32_t out
     return ESP_OK;
 }
 
-extern "C" esp_err_t eidolon_livekit_board_init(bool audio_output)
+extern "C" esp_err_t eidolon_livekit_board_init(bool audio_input, bool audio_output)
 {
-    if (s_capturer != nullptr) {
+    if (s_capturer != nullptr || s_av_renderer != nullptr || (!audio_input && !audio_output)) {
         return ESP_OK;
     }
 
@@ -303,7 +303,9 @@ extern "C" esp_err_t eidolon_livekit_board_init(bool audio_output)
 
     ESP_RETURN_ON_ERROR(register_media_codecs(), TAG, "media codecs");
 
-    ESP_RETURN_ON_ERROR(build_capturer(codec), TAG, "capturer");
+    if (audio_input) {
+        ESP_RETURN_ON_ERROR(build_capturer(codec), TAG, "capturer");
+    }
     uint32_t output_sample_rate = codec && codec->output_sample_rate() > 0
                                       ? static_cast<uint32_t>(codec->output_sample_rate())
                                       : 16000;
@@ -355,7 +357,7 @@ extern "C" uint32_t eidolon_livekit_board_recent_playback_rms_ppm(void)
 extern "C" esp_err_t eidolon_livekit_board_set_capture_enabled(bool enabled)
 {
     if (!s_capturer) {
-        return ESP_ERR_INVALID_STATE;
+        return enabled ? ESP_ERR_INVALID_STATE : ESP_OK;
     }
     bool previous = s_gated_audio_source.enabled;
     s_gated_audio_source.enabled = enabled;

@@ -1578,3 +1578,8 @@ if ("${size}" AND "${offset}")
 else()
     message(STATUS "Assets partition not found, using v1 partition table")
 endif()
+
+if(CONFIG_EIDOLON_NETWORK_DIAGNOSTICS)
+    target_sources(${COMPONENT_LIB} PRIVATE "eidolon/network_diagnostics.cc")
+    target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--wrap=lwip_getaddrinfo" "-Wl,--wrap=lwip_connect")
+endif()

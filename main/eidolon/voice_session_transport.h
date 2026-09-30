@@ -31,7 +31,7 @@ class IVoiceSessionTransport {
 public:
     virtual ~IVoiceSessionTransport() = default;
 
-    virtual void OnActivationComplete() = 0;
+    virtual void OnActivationComplete(const Esp32HubConfig& config, uint32_t commissioning_generation) = 0;
     virtual void OnNetworkLost() = 0;
     virtual void OnNetworkRestored() = 0;
     virtual void QuiesceForCommissioning(

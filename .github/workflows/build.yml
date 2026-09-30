@@ -33,7 +33,11 @@ jobs:
           bash tests/run_commissioning_nvs_replay_tests.sh
           bash tests/run_owner_trust_storage_policy_tests.sh
           bash tests/run_firmware_boot_tests.sh
+          bash tests/run_ota_transaction_tests.sh
           bash tests/run_settings_tests.sh
+          bash tests/run_i2c_bus_recovery_tests.sh
+          bash tests/run_waveshare_pmic_tests.sh
+          bash tests/run_device_local_erase_bsp_contract_tests.sh
           bash tests/run_device_provisioning_protocol_tests.sh
           python tests/partition_contract_test.py
 

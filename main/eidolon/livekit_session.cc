@@ -361,12 +361,12 @@ void LiveKitSession::UnregisterStreamHandlers()
     }
 }
 
-esp_err_t LiveKitSession::EnsureMediaBoard(bool audio_output)
+esp_err_t LiveKitSession::EnsureMediaBoard(bool audio_input, bool audio_output)
 {
     if (media_board_initialized_) {
         return ESP_OK;
     }
-    esp_err_t err = eidolon_livekit_board_init(audio_output);
+    esp_err_t err = eidolon_livekit_board_init(audio_input, audio_output);
     if (err == ESP_OK) {
         media_board_initialized_ = true;
     } else {
@@ -452,14 +452,15 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
     const bool audio_output = config.output_policy.known
         ? bool(config.output_policy.allowed & local_audio)
         : (!kOutputPolicyRequired && local_audio != 0);
-    esp_err_t media_err = EnsureMediaBoard(audio_output);
+    const bool audio_input = !config.output_policy.inputs_known || config.output_policy.microphone;
+    esp_err_t media_err = EnsureMediaBoard(audio_input, audio_output);
     if (media_err != ESP_OK) {
         return media_err;
     }
 
     esp_capture_handle_t capturer = eidolon_livekit_board_get_capturer();
     av_render_handle_t renderer = eidolon_livekit_board_get_renderer();
-    if (!capturer || (audio_output && !renderer)) {
+    if ((audio_input && !capturer) || (audio_output && !renderer)) {
         ESP_LOGE(TAG, "Media pipeline not ready");
         ReleaseMediaBoard();
         return ESP_ERR_INVALID_STATE;
@@ -470,7 +471,7 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
 
     livekit_room_options_t room_options = {};
     room_options.publish = {
-        .kind = LIVEKIT_MEDIA_TYPE_AUDIO,
+        .kind = audio_input ? LIVEKIT_MEDIA_TYPE_AUDIO : LIVEKIT_MEDIA_TYPE_NONE,
         .audio_encode =
             {
                 .codec = LIVEKIT_AUDIO_CODEC_OPUS,

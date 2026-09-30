@@ -1,3 +1,11 @@
+config EIDOLON_NETWORK_DIAGNOSTICS
+    bool "Trace actual DNS and socket connection attempts"
+    default n
+    help
+        Diagnostic firmware only. Log resolver timings and actual peer addresses.
+        Logging changes scheduling; compare with ordinary builds before drawing
+        conclusions about intermittent failures. No credentials are logged.
+
 menu "Xiaozhi Assistant"
 
 config EIDOLON_OTA_MIN_FREE_BYTES

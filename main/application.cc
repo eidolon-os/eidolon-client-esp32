@@ -970,7 +970,8 @@ void Application::HandleActivationDoneEvent() {
         // ordinary NetworkRestored edge will refresh the signed directory and
         // start the transport when a route exists again.
         if (network_connected_) {
-            voice_transport_->OnActivationComplete();
+            voice_transport_->OnActivationComplete(activation_config_, activation_generation_.load());
+            activation_config_ = {};
         } else {
             ESP_LOGW(TAG, "Activation completed while offline; deferring transport restore");
             SetEidolonRuntimeUi(eidolon::RuntimePhase::NetworkConnecting,
@@ -1049,7 +1050,7 @@ bool Application::ActivationTask() {
     SetEidolonRuntimeUi(eidolon::RuntimePhase::Normal);
     SetEidolonServiceUi(eidolon::ServicePhase::DiscoveringAuthority);
     eidolon::HubActivator activator;
-    if (!activator.Run()) {
+    if (!activator.Run(activation_config_)) {
         ESP_LOGE(TAG, "Hub activation failed, staying in activating state");
         return false;
     }

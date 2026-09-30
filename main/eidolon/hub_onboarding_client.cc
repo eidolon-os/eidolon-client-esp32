@@ -327,7 +327,7 @@ esp_err_t HubOnboardingClient::FetchDescriptor(
     const AuthorityCandidateRecord& candidate,
     device_foundation::v1::OwnerDomainDescriptor& out)
 {
-    diagnostic_.BeginStage("directory-fetch");
+    BeginStage("directory-fetch");
     HubHttpResponse response;
     const esp_err_t err = HubHttpRequest(
         "GET", candidate.owner_domain_descriptor_uri,
@@ -383,7 +383,7 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
     const ActiveClaimState& claim,
     Esp32HubConfig& out)
 {
-    diagnostic_.BeginStage("configuration-proof");
+    BeginStage("configuration-proof");
     if (!claim.valid()) return ESP_ERR_INVALID_STATE;
     auto& identity = DeviceIdentity::GetInstance();
     esp_err_t err = identity.EnsureKeypair();
@@ -420,7 +420,7 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
     if (err != ESP_OK) return err;
     if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
     HubHttpResponse response;
-    diagnostic_.BeginStage("configuration-fetch");
+    BeginStage("configuration-fetch");
     err = HubHttpRequest(
         "POST", control.uri + "/configuration:pull",
         trust_.owner_root_certificate_pem, body, response);
@@ -449,7 +449,7 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
     if (ClassifyAuthorityDeviceRef(claim.device_ref, authority_ref) ==
         DeviceRefCorrection::Adopt) {
         if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
-        diagnostic_.BeginStage("claim-generation-store");
+        BeginStage("claim-generation-store");
         current.device_ref = authority_ref;
         if (!HubConfigStore().StoreActiveClaim(current)) return ESP_FAIL;
         ESP_LOGI(TAG, "Adopted Authority claim generation %u/%u (held %u/%u)",
@@ -480,7 +480,7 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
         out.expires_at_ms = assignment.expires_at_ms;
     }
     if (status == HubConfigStatus::Revoked) {
-        diagnostic_.BeginStage("claim-revocation-store");
+        BeginStage("claim-revocation-store");
         ActiveClaimState revoked = current;
         revoked.state = ActiveClaimLocalState::Revoked;
         if (!HubConfigStore().StoreActiveClaim(revoked)) {
@@ -568,7 +568,7 @@ bool HubOnboardingClient::ContextCurrent() const {
 
 esp_err_t HubOnboardingClient::LoadCommissionedTrust()
 {
-    diagnostic_.BeginStage("trust-load");
+    BeginStage("trust-load");
     auto& runtime = CommissioningRuntime::GetInstance();
     if (runtime.IsInProgress()) return ESP_ERR_INVALID_STATE;
     setup_generation_ = runtime.Generation();
@@ -580,7 +580,7 @@ esp_err_t HubOnboardingClient::LoadCommissionedTrust()
                  esp_err_to_name(reload), static_cast<unsigned int>(reload));
         return ESP_ERR_NOT_ALLOWED;
     }
-    diagnostic_.BeginStage("trust-bundle");
+    BeginStage("trust-bundle");
     const esp_err_t bundle = locator.TrustBundle(trust_);
     if (bundle != ESP_OK) {
         ESP_LOGE(TAG, "Owner trust bundle unavailable error=%s code=0x%x",
@@ -605,7 +605,10 @@ esp_err_t HubOnboardingClient::Attempt(const std::string& device_id,
 {
     diagnostic_ = {};
     const int64_t started = esp_timer_get_time();
+    attempt_started_us_ = started;
     const auto generation = CommissioningRuntime::GetInstance().Generation();
+    ESP_LOGI(TAG, "Hub attempt begin mode=%s generation=%lu",
+             discover ? "activate" : "resume", static_cast<unsigned long>(generation));
     const esp_err_t err = discover ? RunAttempt(device_id, out) : ResumeAttempt(device_id, out);
     diagnostic_.error = err;
     if (err != ESP_OK) {
@@ -619,13 +622,20 @@ esp_err_t HubOnboardingClient::Attempt(const std::string& device_id,
     return err;
 }
 
+void HubOnboardingClient::BeginStage(const char* stage)
+{
+    diagnostic_.BeginStage(stage);
+    ESP_LOGI(TAG, "Hub step=%s elapsed_ms=%lu", stage,
+             static_cast<unsigned long>((esp_timer_get_time() - attempt_started_us_) / 1000));
+}
+
 esp_err_t HubOnboardingClient::RunAttempt(const std::string& device_id,
                                    Esp32HubConfig& out)
 {
     esp_err_t err = LoadCommissionedTrust();
     if (err != ESP_OK) return err;
     device_foundation::v1::OwnerDomainDescriptor descriptor;
-    diagnostic_.BeginStage("directory-restore");
+    BeginStage("directory-restore");
     err = DeviceAuthorityLocator::GetInstance().AcceptedDescriptor(descriptor);
     if (err != ESP_OK) return err;
     AuthorityCandidateRecord commissioned;
@@ -634,7 +644,7 @@ esp_err_t HubOnboardingClient::RunAttempt(const std::string& device_id,
     HubDiscovery discovery;
     err = discovery.RefreshOwnerDirectory(commissioned,
         [this, &descriptor](const AuthorityCandidateRecord& candidate) {
-            diagnostic_.BeginStage("generation-check");
+            BeginStage("generation-check");
             const auto& runtime = CommissioningRuntime::GetInstance();
             if (runtime.IsInProgress() || runtime.Generation() != setup_generation_) {
                 return ESP_ERR_INVALID_STATE;
@@ -664,7 +674,7 @@ esp_err_t HubOnboardingClient::ConsultOwnerInstruction(
 esp_err_t HubOnboardingClient::StandDownRevoked(const ActiveClaimState& claim,
                                                 Esp32HubConfig& out)
 {
-    diagnostic_.BeginStage("claim-terminal");
+    BeginStage("claim-terminal");
     // Say what this is through the lifecycle channel. esp_err_t cannot carry it:
     // ESP_ERR_NOT_ALLOWED is also what a plain 401/403 becomes, and a rejected
     // request is not a decision about this device.
@@ -733,7 +743,7 @@ esp_err_t HubOnboardingClient::RunAccepted(
     const std::string& device_id,
     Esp32HubConfig& out)
 {
-    diagnostic_.BeginStage("claim-restore");
+    BeginStage("claim-restore");
     context_ = {descriptor.owner_domain_id, descriptor.owner_domain_generation, device_id};
     if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
     HubConfigStore store;
@@ -787,7 +797,7 @@ esp_err_t HubOnboardingClient::RunAccepted(
 
     // Finish a durable activation's cleanup even when the active Claim already
     // exists. The normal active-configuration path used to bypass this resume.
-    diagnostic_.BeginStage("claim-cleanup");
+    BeginStage("claim-cleanup");
     EnrollmentJournalEntry pending;
     const auto pending_load = store.LoadEnrollment(pending);
     if (pending_load == ClaimStoreLoadResult::StorageFailure) return ESP_FAIL;
@@ -827,7 +837,7 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
     const std::string& device_id, ActiveClaimState& activated_claim,
     bool& activated)
 {
-    diagnostic_.BeginStage("claim-resume");
+    BeginStage("claim-resume");
     activated = false;
     if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
     HubConfigStore store;
@@ -973,7 +983,7 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
             command_id, correlation_id, canonical_create);
         if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
         HubHttpResponse response;
-        diagnostic_.BeginStage("claim-propose");
+        BeginStage("claim-propose");
         err = HubHttpRequest("POST", admission + "/enrollments",
                              trust_.owner_root_certificate_pem, wire, response);
         diagnostic_.http_status = response.status;
@@ -1005,7 +1015,7 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
             18);
         if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
         HubHttpResponse response;
-        diagnostic_.BeginStage("claim-collect");
+        BeginStage("claim-collect");
         err = HubHttpRequest(
             "POST",
             admission + "/enrollments/" + journal.enrollment_id +
@@ -1072,7 +1082,7 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
             "ack|" + journal.enrollment_id + "|" + journal.grant_id, 18);
         if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
         HubHttpResponse response;
-        diagnostic_.BeginStage("claim-ack");
+        BeginStage("claim-ack");
         err = HubHttpRequest(
             "POST",
             admission + "/enrollments/" + journal.enrollment_id +
@@ -1126,7 +1136,7 @@ esp_err_t HubOnboardingClient::ResumeAttempt(const std::string& device_id,
     esp_err_t err = LoadCommissionedTrust();
     if (err != ESP_OK) return err;
     device_foundation::v1::OwnerDomainDescriptor descriptor;
-    diagnostic_.BeginStage("directory-restore");
+    BeginStage("directory-restore");
     err = DeviceAuthorityLocator::GetInstance().AcceptedDescriptor(descriptor);
     if (err != ESP_OK) return err;
     return RunAccepted(descriptor, device_id, out);

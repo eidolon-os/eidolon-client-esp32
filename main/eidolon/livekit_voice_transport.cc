@@ -96,9 +96,9 @@ void LiveKitVoiceTransport::NotifyRuntimeStatus(VoiceSessionState state)
 
 LiveKitVoiceTransport::~LiveKitVoiceTransport() = default;
 
-void LiveKitVoiceTransport::OnActivationComplete()
+void LiveKitVoiceTransport::OnActivationComplete(const Esp32HubConfig& config, uint32_t commissioning_generation)
 {
-    controller_->OnHubActivationSucceeded();
+    controller_->OnHubActivationSucceeded(config, commissioning_generation);
 }
 
 void LiveKitVoiceTransport::OnNetworkLost()

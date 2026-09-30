@@ -20,6 +20,7 @@
 #include "device_state_machine.h"
 
 #if CONFIG_EIDOLON_HUB_MODE
+#include "eidolon/hub_types.h"
 namespace eidolon {
 enum class RuntimePhase;
 enum class EnrollmentPhase;
@@ -204,6 +205,9 @@ private:
     uint32_t network_generation_ = 0;
     std::atomic<uint32_t> activation_generation_{0};
     bool hub_activation_done_ = false;
+    // Published by the activation worker before activation_succeeded_. The
+    // completion event consumes it before another activation can start.
+    eidolon::Esp32HubConfig activation_config_;
 #if CONFIG_EIDOLON_GUARD_SERVICE
     std::unique_ptr<eidolon::GuardService> guard_service_;
 #endif

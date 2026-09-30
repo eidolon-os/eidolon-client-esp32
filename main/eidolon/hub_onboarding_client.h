@@ -30,6 +30,8 @@ private:
     esp_err_t RunAttempt(const std::string& device_id, Esp32HubConfig& out);
     esp_err_t ResumeAttempt(const std::string& device_id, Esp32HubConfig& out);
     HubOnboardingDiagnostic diagnostic_;
+    int64_t attempt_started_us_ = 0;
+    void BeginStage(const char* stage);
     // Loaded once per run from what commissioning left behind. Empty means this
     // device has no commissioned Owner Domain and must not accept discovery.
     esp_err_t LoadCommissionedTrust();

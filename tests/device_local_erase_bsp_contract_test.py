@@ -59,9 +59,12 @@ def main() -> None:
     assert '"eidolon/esp_idf_owner_data_erase_storage.cc"' in cmake_text
     assert '"eidolon/device_boot_recovery.cc"' in cmake_text
     resume = boot_text.index("DeviceBootRecovery::ResumePendingRemoval()")
-    discovery = boot_text.index("HubDiscovery discovery")
-    assert resume < discovery
-    assert "AllowsClaimOrRuntime" in boot_text
+    # Discovery now belongs to HubOnboardingClient. Check the actual admission
+    # boundary, not a local variable that used to live in this translation unit.
+    gate = boot_text.index("DeviceBootRecovery::AllowsClaimOrRuntime", resume)
+    activation = boot_text.index("client.Run(device_id, config)", gate)
+    assert resume < gate < activation
+    assert "return false;" in boot_text[gate:activation]
 
     # D8 / §1 item 10: the window-opening decision consults the RemovalJournal
     # BEFORE it asks for a window, not afterwards through the Claim that fails.

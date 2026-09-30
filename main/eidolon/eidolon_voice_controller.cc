@@ -35,6 +35,7 @@
 #include <esp_log.h>
 #include <esp_random.h>
 #include <esp_timer.h>
+#include "commissioning_runtime.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <chrono>
@@ -291,6 +292,7 @@ EidolonVoiceController::~EidolonVoiceController()
         Event ev;
         while (inbox_.Take(ev)) {
             delete ev.payload;
+            delete ev.activation_config;
             if (ev.completion != nullptr) {
                 (*ev.completion)(false);
                 delete ev.completion;
@@ -336,12 +338,13 @@ void EidolonVoiceController::DispatchAndRelease(const Event& ev)
     const int64_t wait_us = ev.enqueued_us ? started_us - ev.enqueued_us : -1000;
     if (elapsed_us >= 80000 || wait_us >= 80000) {
         // Notification bits do not retain individual enqueue timestamps.
-        ESP_LOGW(TAG, "[dispatch] type=%d wait_ms=%lld run_ms=%lld pending=%u",
+        ESP_LOGW(TAG, "[dispatch] type=%d wait_ms=%ld run_ms=%ld pending=%u",
                  static_cast<int>(ev.type),
-                 wait_us / 1000,
-                 elapsed_us / 1000, static_cast<unsigned>(inbox_.Pending()));
+                 static_cast<long>(wait_us / 1000),
+                 static_cast<long>(elapsed_us / 1000), static_cast<unsigned>(inbox_.Pending()));
     }
     delete ev.payload;
+    delete ev.activation_config;
     delete ev.completion;
 }
 
@@ -349,6 +352,7 @@ esp_err_t EidolonVoiceController::Enqueue(Event ev)
 {
     if (!inbox_.Valid() || task_ == nullptr) {
         delete ev.payload;
+        delete ev.activation_config;
         if (ev.completion != nullptr) {
             (*ev.completion)(false);
             delete ev.completion;
@@ -378,6 +382,7 @@ esp_err_t EidolonVoiceController::Enqueue(Event ev)
             cJSON_Delete(json);
         }
         delete ev.payload;
+        delete ev.activation_config;
         if (ev.completion != nullptr) {
             (*ev.completion)(false);
             delete ev.completion;
@@ -391,7 +396,11 @@ void EidolonVoiceController::Dispatch(const Event& ev)
 {
     switch (ev.type) {
     case EventType::Activation:
-        DoActivation();
+        if (ev.activation_config &&
+            !CommissioningRuntime::GetInstance().IsInProgress() &&
+            ev.generation == CommissioningRuntime::GetInstance().Generation()) {
+            DoActivation(*ev.activation_config);
+        }
         break;
     case EventType::NetworkLost:
         DoNetworkLost();
@@ -517,10 +526,16 @@ void EidolonVoiceController::Dispatch(const Event& ev)
 // ignored by callers (LiveKitVoiceTransport), so success/failure is reported via
 // state transitions, not the synchronous return.
 
-void EidolonVoiceController::OnHubActivationSucceeded()
+void EidolonVoiceController::OnHubActivationSucceeded(const Esp32HubConfig& config, uint32_t commissioning_generation)
 {
     Event ev;
     ev.type = EventType::Activation;
+    ev.generation = commissioning_generation;
+    ev.activation_config = new (std::nothrow) Esp32HubConfig(config);
+    if (!ev.activation_config) {
+        ESP_LOGE(TAG, "Unable to enqueue activated configuration");
+        return;
+    }
     Enqueue(ev);
 }
 
@@ -835,10 +850,10 @@ esp_err_t EidolonVoiceController::LoadStoredConfig()
     return ESP_OK;
 }
 
-esp_err_t EidolonVoiceController::LoadAuthorityRoutes()
+esp_err_t EidolonVoiceController::LoadAuthorityRoutes(bool restore_from_storage)
 {
     auto& locator = DeviceAuthorityLocator::GetInstance();
-    if (locator.ReloadCommissionedDirectory() != ESP_OK) {
+    if (restore_from_storage && locator.ReloadCommissionedDirectory() != ESP_OK) {
         device_control_uri_.clear();
         return ESP_ERR_NOT_ALLOWED;
     }
@@ -3156,7 +3171,7 @@ void EidolonVoiceController::HandleSessionEnd(EndReason reason)
 
 // ============================ Lifecycle handlers ============================
 
-void EidolonVoiceController::DoActivation()
+void EidolonVoiceController::DoActivation(const Esp32HubConfig& config)
 {
 #if CONFIG_EIDOLON_SMARTHOME_PANEL
     if (auto* view = GetEidolonView(); view && view->SmartHomePanel()) {
@@ -3222,23 +3237,26 @@ void EidolonVoiceController::DoActivation()
         });
     }
 #endif
-    if (LoadStoredConfig() != ESP_OK) {
+    // The activation actor already authenticated this configuration. Preserve
+    // its boot-local clock instead of discarding it through NVS and repeating
+    // the same network handoff on the controller's command queue. This also
+    // keeps a successful activation usable when only the NVS cache write failed.
+    config_ = config;
+    // Run already accepted the signed directory into the shared locator. The
+    // commissioning generation was checked at dispatch; Resolve still enforces
+    // directory validity. Do not re-verify the same signature through NVS here.
+    if (LoadAuthorityRoutes(false) != ESP_OK ||
+        !CurrentOutputGate().Bind(config_.output_policy)) {
+        SetState(VoiceSessionState::Error, "activation_config_invalid");
         return;
     }
+    SetState(StateForConfig(config_), "config_activated");
 
     if (config_.status == HubConfigStatus::PendingApproval ||
         config_.status == HubConfigStatus::WaitingBinding) {
         // HubActivator just performed the first handoff. Avoid immediately
         // repeating it; the normal bounded poll owns the next attempt.
         ScheduleOnboardingPoll();
-    } else {
-        // Stored credentials can reconnect transport, but their boot-local
-        // authenticated clock is deliberately not persisted. Refresh on every
-        // activation before treating the device as ready for timed commands.
-        const esp_err_t refresh_err = RefreshHubConfig();
-        if (refresh_err != ESP_OK) {
-            ESP_LOGW(TAG, "Initial Hub config refresh failed: %s", esp_err_to_name(refresh_err));
-        }
     }
 #if CONFIG_EIDOLON_GUARD_SERVICE
     if (guard_service_ != nullptr) {
