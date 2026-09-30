@@ -1,4 +1,6 @@
 #include "ota.h"
+#include "ota_transaction.h"
+#include <memory>
 #include "system_info.h"
 #include "settings.h"
 #include "assets/lang_config.h"
@@ -280,121 +282,64 @@ void Ota::MarkCurrentVersionValid() {
 
 bool Ota::Upgrade(const std::string& firmware_url, std::function<void(int progress, size_t speed)> callback) {
     ESP_LOGI(TAG, "Upgrading firmware from %s", firmware_url.c_str());
-    esp_ota_handle_t update_handle = 0;
-    auto update_partition = esp_ota_get_next_update_partition(NULL);
-    if (update_partition == NULL) {
+    auto update_partition = esp_ota_get_next_update_partition(nullptr);
+    if (!update_partition) {
         ESP_LOGE(TAG, "Failed to get update partition");
         return false;
     }
-
-    ESP_LOGI(TAG, "Writing to partition %s at offset 0x%lx", update_partition->label, update_partition->address);
-    bool image_header_checked = false;
-    std::string image_header;
-
     auto network = Board::GetInstance().GetNetwork();
     auto http = network->CreateHttp(0);
-    if (!http->Open("GET", firmware_url)) {
-        ESP_LOGE(TAG, "Failed to open HTTP connection");
+    if (!http || !http->Open("GET", firmware_url) || http->GetStatusCode() != 200) {
+        ESP_LOGE(TAG, "Failed to open firmware response");
         return false;
     }
-
-    if (http->GetStatusCode() != 200) {
-        ESP_LOGE(TAG, "Failed to get firmware, status code: %d", http->GetStatusCode());
+    const size_t content_length = http->GetBodyLength();
+    if (content_length == 0 || content_length > update_partition->size) {
+        ESP_LOGE(TAG, "Firmware length does not fit OTA slot");
         return false;
     }
-
-    size_t content_length = http->GetBodyLength();
-    if (content_length == 0) {
-        ESP_LOGE(TAG, "Failed to get content length");
-        return false;
-    }
-
     constexpr size_t PAGE_SIZE = 4096;
-    char* buffer = (char*)heap_caps_malloc(PAGE_SIZE, MALLOC_CAP_INTERNAL);
-    if (buffer == nullptr) {
+    std::unique_ptr<char, decltype(&heap_caps_free)> buffer(
+        static_cast<char*>(heap_caps_malloc(PAGE_SIZE, MALLOC_CAP_INTERNAL)), heap_caps_free);
+    if (!buffer) {
         ESP_LOGE(TAG, "Failed to allocate buffer");
         return false;
     }
-
-    size_t buffer_offset = 0;  // Current data size in buffer
+    OtaTransaction update(update_partition, content_length);
+    auto err = update.Begin();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to begin OTA: %s", esp_err_to_name(err));
+        return false;
+    }
     size_t total_read = 0, recent_read = 0;
     auto last_calc_time = esp_timer_get_time();
     while (true) {
-        int ret = http->Read(buffer + buffer_offset, PAGE_SIZE - buffer_offset);
+        const int ret = http->Read(buffer.get(), PAGE_SIZE);
         if (ret < 0) {
-            ESP_LOGE(TAG, "Failed to read HTTP data: %s", esp_err_to_name(ret));
-            heap_caps_free(buffer);
+            ESP_LOGE(TAG, "Failed to read firmware response");
             return false;
         }
-
-        // Calculate speed and progress every second
-        recent_read += ret;
+        if (ret == 0) break;
+        err = update.Write(buffer.get(), static_cast<size_t>(ret));
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to write OTA: %s", esp_err_to_name(err));
+            return false;
+        }
         total_read += ret;
-        buffer_offset += ret;
-        if (esp_timer_get_time() - last_calc_time >= 1000000 || ret == 0) {
-            size_t progress = total_read * 100 / content_length;
-            ESP_LOGI(TAG, "Progress: %u%% (%u/%u), Speed: %uB/s", progress, total_read, content_length, recent_read);
-            if (callback) {
-                callback(progress, recent_read);
-            }
+        recent_read += ret;
+        if (esp_timer_get_time() - last_calc_time >= 1000000) {
+            if (callback) callback(total_read * 100 / content_length, recent_read);
             last_calc_time = esp_timer_get_time();
             recent_read = 0;
         }
-
-        if (!image_header_checked) {
-            image_header.append(buffer, buffer_offset);
-            if (image_header.size() >= sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t) + sizeof(esp_app_desc_t)) {
-                esp_app_desc_t new_app_info;
-                memcpy(&new_app_info, image_header.data() + sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t), sizeof(esp_app_desc_t));
-
-                if (esp_ota_begin(update_partition, OTA_WITH_SEQUENTIAL_WRITES, &update_handle)) {
-                    esp_ota_abort(update_handle);
-                    ESP_LOGE(TAG, "Failed to begin OTA");
-                    heap_caps_free(buffer);
-                    return false;
-                }
-
-                image_header_checked = true;
-                std::string().swap(image_header);
-            }
-        }
-
-        // Write to flash when buffer is full (4KB) or it's the last chunk
-        bool is_last_chunk = (ret == 0);
-        if (buffer_offset == PAGE_SIZE || (is_last_chunk && buffer_offset > 0)) {
-            auto err = esp_ota_write(update_handle, buffer, buffer_offset);
-            if (err != ESP_OK) {
-                ESP_LOGE(TAG, "Failed to write OTA data: %s", esp_err_to_name(err));
-                esp_ota_abort(update_handle);
-                heap_caps_free(buffer);
-                return false;
-            }
-
-            buffer_offset = 0;
-        }
-
-        if (is_last_chunk) {
-            break;
-        }
     }
     http->Close();
-    heap_caps_free(buffer);
-
-    esp_err_t err = esp_ota_end(update_handle);
+    err = update.Finish();
     if (err != ESP_OK) {
-        if (err == ESP_ERR_OTA_VALIDATE_FAILED) {
-            ESP_LOGE(TAG, "Image validation failed, image is corrupted");
-        } else {
-            ESP_LOGE(TAG, "Failed to end OTA: %s", esp_err_to_name(err));
-        }
+        ESP_LOGE(TAG, "Failed to finalize OTA: %s", esp_err_to_name(err));
         return false;
     }
-
-    err = esp_ota_set_boot_partition(update_partition);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to set boot partition: %s", esp_err_to_name(err));
-        return false;
-    }
+    if (callback) callback(100, recent_read);
 
     ESP_LOGI(TAG, "Firmware upgrade successful");
     return true;
