@@ -14,6 +14,9 @@
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_st77916.h>
 #include <esp_log.h>
+#include <esp_codec_dev_defaults.h>
+
+#include <cassert>
 
 #if CONFIG_EIDOLON_HUB_MODE
 #include "eidolon/eidolon_view.h"
@@ -211,6 +214,50 @@ static const st77916_lcd_init_cmd_t vendor_specific_init[] = {
     {0x29, (uint8_t[]){0x00}, 1, 0},
 };
 
+// The raw I2S speaker (I2S_NUM_0 TX) has no codec chip, so NoAudioCodecSimplex
+// alone exposes no esp_codec_dev playback handle. LiveKit renders through a raw
+// esp_codec_dev output handle, so wrap the inherited TX channel in a playback-only
+// esp_codec_dev (null codec_if -> software volume) and forward output volume into it.
+class WwlBallS3Lcd185AudioCodec final : public NoAudioCodecSimplex {
+public:
+    WwlBallS3Lcd185AudioCodec(
+            int input_sample_rate, int output_sample_rate,
+            gpio_num_t spk_bclk, gpio_num_t spk_ws, gpio_num_t spk_dout,
+            i2s_std_slot_mask_t spk_slot_mask,
+            gpio_num_t mic_sck, gpio_num_t mic_ws, gpio_num_t mic_din,
+            i2s_std_slot_mask_t mic_slot_mask)
+        : NoAudioCodecSimplex(input_sample_rate, output_sample_rate,
+                              spk_bclk, spk_ws, spk_dout, spk_slot_mask,
+                              mic_sck, mic_ws, mic_din, mic_slot_mask) {
+        audio_codec_i2s_cfg_t i2s_cfg = {
+            .port = I2S_NUM_0,
+            .rx_handle = nullptr,
+            .tx_handle = tx_handle_,
+            .clk_src = 0,
+        };
+        data_if_ = audio_codec_new_i2s_data(&i2s_cfg);
+        assert(data_if_ != nullptr);
+
+        esp_codec_dev_cfg_t dev_cfg = {
+            .dev_type = ESP_CODEC_DEV_TYPE_OUT,
+            .codec_if = nullptr,
+            .data_if = data_if_,
+        };
+        output_dev_ = esp_codec_dev_new(&dev_cfg);
+        assert(output_dev_ != nullptr);
+    }
+
+    void SetOutputVolume(int volume) override {
+        if (output_dev_ != nullptr) {
+            esp_codec_dev_set_out_vol(output_dev_, volume);
+        }
+        AudioCodec::SetOutputVolume(volume);
+    }
+
+private:
+    const audio_codec_data_if_t* data_if_ = nullptr;
+};
+
 class WwlBallS3Lcd185Board final : public WifiBoard {
 private:
     i2c_master_bus_handle_t i2c_bus_ = nullptr;
@@ -350,7 +397,7 @@ public:
     }
 
     AudioCodec* GetAudioCodec() override {
-        static NoAudioCodecSimplex codec(
+        static WwlBallS3Lcd185AudioCodec codec(
             AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
             AUDIO_I2S_SPK_GPIO_BCLK, AUDIO_I2S_SPK_GPIO_LRCK,
             AUDIO_I2S_SPK_GPIO_DOUT, I2S_STD_SLOT_BOTH,
