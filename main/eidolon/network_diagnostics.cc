@@ -1,4 +1,7 @@
 #include <cerrno>
+#include <cstdio>
+#include <cstring>
+#include <esp_peer.h>
 #include <esp_log.h>
 #include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
@@ -11,6 +14,7 @@
 extern "C" int __real_lwip_getaddrinfo(const char*, const char*,
                                       const struct addrinfo*, struct addrinfo**);
 extern "C" int __real_lwip_connect(int, const struct sockaddr*, socklen_t);
+extern "C" int __real_esp_peer_send_msg(esp_peer_handle_t, esp_peer_msg_t*);
 
 namespace {
 void Address(const struct sockaddr* address, char* text, size_t size, unsigned& port) {
@@ -63,6 +67,28 @@ extern "C" int __wrap_lwip_connect(int socket, const struct sockaddr* target, so
     const int saved = errno;
     ESP_LOGI("NetTrace", "connect end fd=%d rc=%d errno=%d ms=%ld", socket, result,
              result < 0 ? saved : 0, static_cast<long>((esp_timer_get_time() - start) / 1000));
+    errno = saved;
+    return result;
+}
+
+extern "C" int __wrap_esp_peer_send_msg(esp_peer_handle_t peer, esp_peer_msg_t* message) {
+    const int before = errno;
+    char transport[8] = "-";
+    if (message && message->type == ESP_PEER_MSG_TYPE_CANDIDATE &&
+        message->data && message->size > 0) {
+        char prefix[96] = {};
+        const size_t count = static_cast<size_t>(message->size) < sizeof(prefix) - 1
+            ? static_cast<size_t>(message->size) : sizeof(prefix) - 1;
+        std::memcpy(prefix, message->data, count);
+        std::sscanf(prefix, "%*s %*u %7s", transport);
+    }
+    ESP_LOGI("NetTrace", "rtc input peer=%p type=%d transport=%s bytes=%d", peer,
+             message ? static_cast<int>(message->type) : -1, transport,
+             message ? message->size : 0);
+    errno = before;
+    const int result = __real_esp_peer_send_msg(peer, message);
+    const int saved = errno;
+    ESP_LOGI("NetTrace", "rtc result peer=%p rc=%d", peer, result);
     errno = saved;
     return result;
 }

@@ -1072,6 +1072,12 @@ if(CONFIG_IDF_TARGET_ESP32S3)
 endif()
 
 set(MAIN_PRIV_REQUIRES_EXTRA "")
+# Match the LiveKit manifest target rule during IDF's early dependency pass,
+# where CONFIG_EIDOLON_HUB_MODE is not available yet.
+idf_build_get_property(EIDOLON_BUILD_TARGET IDF_TARGET)
+if(EIDOLON_BUILD_TARGET MATCHES "^(esp32s3|esp32p4|esp32s31)$")
+    list(APPEND MAIN_PRIV_REQUIRES_EXTRA espressif__esp_peer)
+endif()
 if(BOARD_TYPE STREQUAL "m5stack-stick-s3")
     list(APPEND MAIN_PRIV_REQUIRES_EXTRA
         m5stack__m5pm1
@@ -1581,7 +1587,7 @@ endif()
 
 if(CONFIG_EIDOLON_NETWORK_DIAGNOSTICS)
     target_sources(${COMPONENT_LIB} PRIVATE "eidolon/network_diagnostics.cc")
-    target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--wrap=lwip_getaddrinfo" "-Wl,--wrap=lwip_connect")
+    target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--wrap=lwip_getaddrinfo" "-Wl,--wrap=lwip_connect" "-Wl,--wrap=esp_peer_send_msg")
 endif()
 
 # The synchronous netconn hook runs on the requesting task, never TCPIP.
