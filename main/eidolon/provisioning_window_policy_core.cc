@@ -50,6 +50,20 @@ bool HubSetupButtonClickOpensSetup(DeviceState state)
            state == kDeviceStateWifiConfiguring;
 }
 
+bool HubSetupButtonLongPressOpensSetup(DeviceState state)
+{
+    // Same set as HubDeviceStateAllowsSetupOpen, except the long press also opens
+    // from Connecting (a device still joining may need to be reclaimed) and never
+    // opens from Listening or Speaking, whose button must stay exclusively on PTT.
+    if (state == kDeviceStateConnecting) {
+        return true;
+    }
+    if (state == kDeviceStateListening || state == kDeviceStateSpeaking) {
+        return false;
+    }
+    return HubDeviceStateAllowsSetupOpen(state);
+}
+
 bool HubDeviceStateAllowsSetupOpen(DeviceState state)
 {
     switch (state) {

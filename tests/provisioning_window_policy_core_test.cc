@@ -96,6 +96,22 @@ void SetupOpensFromAWorkingDevice()
     assert(HubDeviceStateAllowsSetupOpen(kDeviceStateSpeaking));
 }
 
+void LongPressSetupIsLimitedToNonConversationStates()
+{
+    const DeviceState allowed_states[] = {
+        kDeviceStateIdle, kDeviceStateStarting, kDeviceStateActivating,
+        kDeviceStateWifiConfiguring, kDeviceStateConnecting};
+    for (const auto state : allowed_states) {
+        assert(HubSetupButtonLongPressOpensSetup(state));
+    }
+    const DeviceState rejected_states[] = {
+        kDeviceStateUnknown, kDeviceStateListening, kDeviceStateSpeaking,
+        kDeviceStateUpgrading, kDeviceStateAudioTesting, kDeviceStateFatalError};
+    for (const auto state : rejected_states) {
+        assert(!HubSetupButtonLongPressOpensSetup(state));
+    }
+}
+
 // An OTA that is half written is the one thing a setup window must not
 // interrupt, and a device that has not finished deciding what it is has nothing
 // to hand over yet.
@@ -120,6 +136,7 @@ int main()
     SetupOpensFromEveryStateAFailedActivationCanLeaveTheDeviceIn();
     ShortClickKeepsItsSetupMeaningAsBootAdvances();
     SetupOpensFromAWorkingDevice();
+    LongPressSetupIsLimitedToNonConversationStates();
     SetupStaysShutWhereOpeningItWouldBreakSomething();
     return 0;
 }

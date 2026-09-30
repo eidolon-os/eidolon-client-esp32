@@ -25,8 +25,6 @@
 
 #define TAG "WwlBallS3Lcd185"
 
-#define LCD_OPCODE_READ_CMD (0x0BULL)
-
 static const st77916_lcd_init_cmd_t vendor_specific_init[] = {
     {0xF0, (uint8_t[]){0x28}, 1, 0},
     {0xF2, (uint8_t[]){0x28}, 1, 0},
@@ -220,15 +218,12 @@ static const st77916_lcd_init_cmd_t vendor_specific_init[] = {
 // esp_codec_dev (null codec_if -> software volume) and forward output volume into it.
 class WwlBallS3Lcd185AudioCodec final : public NoAudioCodecSimplex {
 public:
-    WwlBallS3Lcd185AudioCodec(
-            int input_sample_rate, int output_sample_rate,
-            gpio_num_t spk_bclk, gpio_num_t spk_ws, gpio_num_t spk_dout,
-            i2s_std_slot_mask_t spk_slot_mask,
-            gpio_num_t mic_sck, gpio_num_t mic_ws, gpio_num_t mic_din,
-            i2s_std_slot_mask_t mic_slot_mask)
-        : NoAudioCodecSimplex(input_sample_rate, output_sample_rate,
-                              spk_bclk, spk_ws, spk_dout, spk_slot_mask,
-                              mic_sck, mic_ws, mic_din, mic_slot_mask) {
+    WwlBallS3Lcd185AudioCodec()
+        : NoAudioCodecSimplex(AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
+                              AUDIO_I2S_SPK_GPIO_BCLK, AUDIO_I2S_SPK_GPIO_LRCK,
+                              AUDIO_I2S_SPK_GPIO_DOUT, I2S_STD_SLOT_BOTH,
+                              AUDIO_I2S_MIC_GPIO_SCK, AUDIO_I2S_MIC_GPIO_WS,
+                              AUDIO_I2S_MIC_GPIO_DIN, I2S_STD_SLOT_RIGHT) {
         audio_codec_i2s_cfg_t i2s_cfg = {
             .port = I2S_NUM_0,
             .rx_handle = nullptr,
@@ -348,24 +343,18 @@ private:
     void InitializeButtons() {
 #if CONFIG_EIDOLON_HUB_MODE
         eidolon::SetEidolonSetupHandler([this]() { EnterWifiConfigMode(); });
-        eidolon::SetEidolonInputAvailable(eidolon::UiInputSource::SessionButton, true);
         eidolon::SetEidolonInputAvailable(eidolon::UiInputSource::TalkButton, true);
 #endif
+#if !CONFIG_EIDOLON_HUB_MODE
         boot_button_.OnClick([this]() {
             auto& app = Application::GetInstance();
-#if CONFIG_EIDOLON_HUB_MODE
-            if (eidolon::HubSetupButtonClickOpensSetup(app.GetDeviceState())) {
-                app.Schedule([this]() { EnterWifiConfigMode(); });
-                return;
-            }
-#else
             if (app.GetDeviceState() == kDeviceStateStarting) {
                 EnterWifiConfigMode();
                 return;
             }
             app.ToggleChatState();
-#endif
         });
+#endif
 #if CONFIG_EIDOLON_HUB_MODE
         boot_button_.OnPressDown([this]() {
             eidolon::DispatchEidolonUiInput(
@@ -379,7 +368,14 @@ private:
         });
 #endif
         boot_button_.OnLongPress([this]() {
+#if CONFIG_EIDOLON_HUB_MODE
+            auto& app = Application::GetInstance();
+            if (eidolon::HubSetupButtonLongPressOpensSetup(app.GetDeviceState())) {
+                app.Schedule([this]() { EnterWifiConfigMode(); });
+            }
+#else
             Application::GetInstance().Schedule([this]() { EnterWifiConfigMode(); });
+#endif
         });
     }
 
@@ -397,12 +393,7 @@ public:
     }
 
     AudioCodec* GetAudioCodec() override {
-        static WwlBallS3Lcd185AudioCodec codec(
-            AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
-            AUDIO_I2S_SPK_GPIO_BCLK, AUDIO_I2S_SPK_GPIO_LRCK,
-            AUDIO_I2S_SPK_GPIO_DOUT, I2S_STD_SLOT_BOTH,
-            AUDIO_I2S_MIC_GPIO_SCK, AUDIO_I2S_MIC_GPIO_WS,
-            AUDIO_I2S_MIC_GPIO_DIN, I2S_STD_SLOT_RIGHT);
+        static WwlBallS3Lcd185AudioCodec codec;
         return &codec;
     }
 

@@ -101,6 +101,10 @@ int main() {
     s.interaction_mode=InteractionMode::PushToTalk;
     m=UiStateProjector::Project(s,input);
     assert(!std::strcmp(m.input_hint,"Hold button to talk"));
+    s.conversation=ConversationPhase::Closed;
+    assert(UiStateProjector::ResolveInput(s,input,UiInputSource::TalkButton,UiInputGesture::Press)==UiIntent::OpenConversation);
+    assert(UiStateProjector::ResolveInput(s,input,UiInputSource::TalkButton,UiInputGesture::Release)==UiIntent::None);
+    s.conversation=ConversationPhase::Active;
     assert(UiStateProjector::ResolveInput(s,input,UiInputSource::TalkButton,UiInputGesture::Press)==UiIntent::BeginTalk);
     s.turn=TurnPhase::Recording;
     assert(!std::strcmp(UiStateProjector::Project(s,input).input_hint,"Release button to send"));

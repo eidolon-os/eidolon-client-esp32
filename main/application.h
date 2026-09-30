@@ -149,6 +149,13 @@ public:
     void PttPress();
     void PttRelease();
 
+    /**
+     * Returns true when a voice session is active or transitioning:
+     * Connecting, Opening, InRoom, Reconnecting.
+     * Idle, Error, and config/provisioning states return false.
+     */
+    bool IsVoiceSessionActive();
+
     void SetEidolonRuntimeUi(eidolon::RuntimePhase phase,
                              const std::string& detail = "");
     void SetEidolonEnrollmentUi(eidolon::EnrollmentPhase phase,

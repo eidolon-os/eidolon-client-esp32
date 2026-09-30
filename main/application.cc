@@ -269,6 +269,23 @@ void Application::PttRelease()
     });
 }
 
+bool Application::IsVoiceSessionActive()
+{
+    if (!voice_transport_) {
+        return false;
+    }
+    const auto state = voice_transport_->GetSessionState();
+    switch (state) {
+    case eidolon::VoiceSessionState::Connecting:
+    case eidolon::VoiceSessionState::Opening:
+    case eidolon::VoiceSessionState::InRoom:
+    case eidolon::VoiceSessionState::Reconnecting:
+        return true;
+    default:
+        return false;
+    }
+}
+
 #if CONFIG_EIDOLON_WAKE_WORD_ENABLE
 void Application::StartEidolonWakeWord()
 {

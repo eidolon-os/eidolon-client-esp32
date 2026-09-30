@@ -15,3 +15,7 @@ This is the first-generation WWL Ball S3 LCD 1.85 board.
 
 The first-generation board has no playback reference channel, so device-side AEC
 and full-duplex barge-in are not enabled. Eidolon builds use PTT by default.
+
+In Hub mode, press BOOT to start a conversation. While in a conversation, hold
+BOOT to talk and release it to send. A long press outside a conversation opens
+Wi-Fi setup.

@@ -27,6 +27,7 @@ inline constexpr UiInputBinding kStandardUiBindings[] = {
     {UiInputSource::SessionButton, UiInputGesture::Click, UiIntent::OpenConversation, "Press button to start"},
     {UiInputSource::SessionButton, UiInputGesture::Click, UiIntent::CloseConversation, "Press button to end"},
     {UiInputSource::TalkButton, UiInputGesture::Press, UiIntent::BeginTalk, "Hold button to talk"},
+    {UiInputSource::TalkButton, UiInputGesture::Press, UiIntent::OpenConversation, "Hold button to talk"},
     {UiInputSource::TalkButton, UiInputGesture::Release, UiIntent::CommitTalk, "Release button to send"},
     {UiInputSource::TalkButton, UiInputGesture::Cancel, UiIntent::CommitTalk, "Release button to send"},
     {UiInputSource::AuxiliaryButton, UiInputGesture::Click, UiIntent::OpenConversation, "Press button to start"},

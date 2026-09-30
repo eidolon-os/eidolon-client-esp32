@@ -97,6 +97,12 @@ bool HubDeviceStateAllowsSetupOpen(DeviceState state);
 // activation or recovery. Operational states retain their chat action.
 bool HubSetupButtonClickOpensSetup(DeviceState state);
 
+// A long press is the WWL Hub's explicit setup gesture. It is available while
+// the device is outside an active conversation, including lifecycle states in
+// which a short press has other setup semantics; active voice states must keep
+// the button exclusively on PTT.
+bool HubSetupButtonLongPressOpensSetup(DeviceState state);
+
 }  // namespace eidolon
 
 #endif  // EIDOLON_PROVISIONING_WINDOW_POLICY_CORE_H_
