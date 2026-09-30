@@ -385,6 +385,9 @@ choice BOARD_TYPE
     config BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_LCD_1_85
         bool "Waveshare ESP32-S3-Touch-LCD-1.85"
         depends on IDF_TARGET_ESP32S3
+    config BOARD_TYPE_WWL_BALL_S3_LCD_1_85
+        bool "WWL Ball S3 LCD 1.85"
+        depends on IDF_TARGET_ESP32S3
     config BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_LCD_1_46
         bool "Waveshare ESP32-S3-Touch-LCD-1.46"
         depends on IDF_TARGET_ESP32S3
@@ -1155,7 +1158,7 @@ menu "TAIJIPAI_S3_CONFIG"
 endmenu
 
 menu "Eidolon Hub"
-    depends on BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_2_06 || BOARD_TYPE_ESP_BOX_3 || BOARD_TYPE_ATK_DNESP32S3 || BOARD_TYPE_M5STACK_CORE_S3 || BOARD_TYPE_M5STACK_STACKCHAN || BOARD_TYPE_KORVO_1
+    depends on BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_2_06 || BOARD_TYPE_ESP_BOX_3 || BOARD_TYPE_ATK_DNESP32S3 || BOARD_TYPE_M5STACK_CORE_S3 || BOARD_TYPE_M5STACK_STACKCHAN || BOARD_TYPE_KORVO_1 || BOARD_TYPE_WWL_BALL_S3_LCD_1_85
 
     config EIDOLON_HUB_MODE
         bool "Enable Eidolon Hub mDNS discovery and config"
@@ -1195,7 +1198,7 @@ menu "Eidolon Hub"
 
     config EIDOLON_CAP_DIALOGUE_TEXT
         bool "Device can render dialogue text"
-        default y if BOARD_TYPE_ESP_BOX_3 || BOARD_TYPE_M5STACK_STACKCHAN || BOARD_TYPE_M5STACK_CORE_S3 || BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_2_06
+        default y if BOARD_TYPE_ESP_BOX_3 || BOARD_TYPE_M5STACK_STACKCHAN || BOARD_TYPE_M5STACK_CORE_S3 || BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_2_06 || BOARD_TYPE_WWL_BALL_S3_LCD_1_85
         default n
 
     config EIDOLON_CAP_MOTION
@@ -1240,12 +1243,13 @@ menu "Eidolon Hub"
     config EIDOLON_UI_SESSION_BUTTON
         bool "Physical click toggles a conversation"
         depends on EIDOLON_HUB_MODE
-        default y if BOARD_TYPE_ESP_BOX_3
+        default y if BOARD_TYPE_ESP_BOX_3 || BOARD_TYPE_WWL_BALL_S3_LCD_1_85
         default n
 
     config EIDOLON_UI_TALK_BUTTON
         bool "Physical button supplies press/release talk events"
         depends on EIDOLON_HUB_MODE
+        default y if BOARD_TYPE_WWL_BALL_S3_LCD_1_85
         default n
         help
             The board adapter must register the input and dispatch press,
