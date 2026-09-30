@@ -140,8 +140,9 @@ Usage: $0 <command>
 
 Commands:
   build            Build ESP32-S31-Korvo-1 Eidolon firmware (ESP-IDF v${BOARD_IDF_VERSION})
-  flash            Build, verify the chip is an ESP32-S31, flash, then check the
-                   boot build stamp
+  flash [--app-only]
+                   Build, verify the chip is an ESP32-S31, flash, then check the
+                   boot build stamp. --app-only preserves bootloader and assets
   monitor          Open idf.py monitor
   verify           Read the boot build stamp over serial and diff vs the last build
   logs [SECONDS] [noreset]
@@ -178,12 +179,17 @@ case "${cmd}" in
     run_idf build
     ;;
   flash)
+    [[ $# -le 2 && ( $# -eq 1 || "${2}" == "--app-only" ) ]] || die "Usage: $0 flash [--app-only]"
     require_idf
     PORT="$(detect_port)"
     info "Using serial port: ${PORT}"
     verify_target_chip "${PORT}"
     eidolon_prepare_build "${PROJECT_ROOT}" "${BOARD_IDF_VERSION}"
-    eidolon_flash "${PROJECT_ROOT}" "${BUILD_DIR}" "${PORT}" flash run_idf -p "${PORT}"
+    if [[ "${2:-}" == "--app-only" ]]; then
+      eidolon_flash "${PROJECT_ROOT}" "${BUILD_DIR}" "${PORT}" app-flash run_idf -p "${PORT}"
+    else
+      eidolon_flash "${PROJECT_ROOT}" "${BUILD_DIR}" "${PORT}" flash run_idf -p "${PORT}"
+    fi
     ;;
   monitor)
     require_idf
