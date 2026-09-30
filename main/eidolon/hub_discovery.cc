@@ -1,6 +1,7 @@
 #include "hub_discovery.h"
 
 #include "hub_txt_parser.h"
+#include "local_mdns_resolver.h"
 
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
@@ -27,20 +28,6 @@ std::string HubDiscovery::NormalizeServiceType(const char* configured) {
         return type;
     }
     return "_eidolon-owner";
-}
-
-esp_err_t HubDiscovery::EnsureMdnsInit() {
-    static bool initialized = false;
-    if (initialized) {
-        return ESP_OK;
-    }
-    esp_err_t err = mdns_init();
-    if (err == ESP_OK || err == ESP_ERR_INVALID_STATE) {
-        initialized = true;
-        return ESP_OK;
-    }
-    ESP_LOGE(TAG, "mdns_init failed: %s", esp_err_to_name(err));
-    return err;
 }
 
 esp_err_t HubDiscovery::QueryOnce(AuthorityCandidateRecord& best,
@@ -110,7 +97,7 @@ esp_err_t HubDiscovery::Discover(AuthorityCandidateRecord& out,
                                  const std::string& owner_domain_id) {
     out = AuthorityCandidateRecord{};
     if (owner_domain_id.empty()) return ESP_ERR_INVALID_ARG;
-    esp_err_t err = EnsureMdnsInit();
+    esp_err_t err = EnsureLocalMdnsInitialized();
     if (err != ESP_OK) {
         return err;
     }

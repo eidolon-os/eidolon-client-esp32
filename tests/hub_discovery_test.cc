@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+namespace eidolon { esp_err_t EnsureLocalMdnsInitialized() { return ESP_OK; } }
+
 mdns_result_t* supplied = nullptr;
 int queries = 0;
 

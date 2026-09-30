@@ -22,7 +22,6 @@ public:
                        const std::string& owner_domain_id);
 
 private:
-    esp_err_t EnsureMdnsInit();
     esp_err_t QueryOnce(AuthorityCandidateRecord& best,
                         const std::string& owner_domain_id, bool* found);
     static std::string NormalizeServiceType(const char* configured);

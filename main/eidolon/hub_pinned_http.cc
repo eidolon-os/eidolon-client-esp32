@@ -1,6 +1,5 @@
 #include "hub_pinned_http.h"
 
-#include "host_resolution_core.h"
 #include "http_date_utc.h"
 
 #include "system_info.h"
@@ -10,8 +9,6 @@
 #include <esp_http_client.h>
 #include <esp_log.h>
 #include <esp_timer.h>
-#include <lwip/dns.h>
-#include <lwip/tcpip.h>
 
 #include <strings.h>
 
@@ -86,31 +83,6 @@ void LogRequestFailure(esp_http_client_handle_t client,
              static_cast<unsigned int>(tls_flags));
 }
 
-// dns_table is TCPIP-thread state and this build has no core locking
-// (CONFIG_LWIP_TCPIP_CORE_LOCKING is off, so LOCK_TCPIP_CORE is a no-op), so
-// the clear is marshalled onto that thread rather than raced from this one.
-// Waiting for it matters: the next attempt has to resolve again, not race the
-// clear that was supposed to precede it.
-//
-// dns_clear_cache() drops every entry, not one name. On a device that talks to
-// one Host that is a handful of names, and it fails any lookup already in
-// flight, whose caller retries.
-void ClearDnsCacheOnTcpipThread(void*)
-{
-    dns_clear_cache();
-}
-
-void DropCachedResolutionIfStale(const std::string& host, HubRequestFailure failure)
-{
-    if (!ShouldDropCachedResolution(host, failure)) {
-        return;
-    }
-    ESP_LOGW(TAG, "Clearing DNS cache after connection failure for %s",
-             host.c_str());
-    // Never called from the TCPIP thread itself, which would deadlock here.
-    tcpip_callback_wait(ClearDnsCacheOnTcpipThread, nullptr);
-}
-
 }  // namespace
 
 esp_err_t HubHttpRequest(const std::string& method,
@@ -169,8 +141,6 @@ esp_err_t HubHttpRequest(const std::string& method,
     if (err != ESP_OK) {
         LogRequestFailure(client, method, url, "open", err, err, diagnostic_start_ms);
         esp_http_client_cleanup(client);
-        DropCachedResolutionIfStale(HostOfUrl(url),
-                                    HubRequestFailure::ConnectionNotOpened);
         return err;
     }
 

@@ -1,5 +1,6 @@
 # Define source files
-set(SOURCES "audio/audio_codec.cc"
+set(SOURCES "eidolon/local_mdns_resolver.cc"
+            "audio/audio_codec.cc"
             "audio/audio_service.cc"
             "audio/demuxer/ogg_demuxer.cc"
             "audio/codecs/no_audio_codec.cc"
@@ -1113,7 +1114,6 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/output_policy.cc"
         "eidolon/policy_audio_renderer.cc"
         "eidolon/claim_recovery_core.cc"
-        "eidolon/host_resolution_core.cc"
         "eidolon/hub_activation_retry_core.cc"
         "eidolon/hub_activator.cc"
         "eidolon/hub_config_client.cc"
@@ -1582,4 +1582,10 @@ endif()
 if(CONFIG_EIDOLON_NETWORK_DIAGNOSTICS)
     target_sources(${COMPONENT_LIB} PRIVATE "eidolon/network_diagnostics.cc")
     target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--wrap=lwip_getaddrinfo" "-Wl,--wrap=lwip_connect")
+endif()
+
+# The synchronous netconn hook runs on the requesting task, never TCPIP.
+# Fail explicitly rather than silently reverting .local to lwIP's DNS parser.
+if(CONFIG_EIDOLON_HUB_MODE AND NOT CONFIG_LWIP_HOOK_NETCONN_EXT_RESOLVE_CUSTOM)
+    message(FATAL_ERROR "Eidolon requires CONFIG_LWIP_HOOK_NETCONN_EXT_RESOLVE_CUSTOM=y; update the existing sdkconfig (new builds use sdkconfig.defaults)")
 endif()
