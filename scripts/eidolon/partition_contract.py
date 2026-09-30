@@ -66,6 +66,8 @@ def validate_build(build):
     cfg = build_config(build)
     if cfg.get('CONFIG_EIDOLON_HUB_MODE') != 'y':
         return None
+    if cfg.get('CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE') != 'y':
+        raise ValueError('Hub releases require IDF application rollback support')
     from esptool.util import flash_size_bytes
     args = json.loads((build / 'flasher_args.json').read_text())
     offset = int(args['partition-table']['offset'], 0)
@@ -75,6 +77,11 @@ def validate_build(build):
     csv_path = ROOT / cfg['CONFIG_PARTITION_TABLE_CUSTOM_FILENAME'].strip('"')
     if table.to_binary() != load_table(csv_path, offset).to_binary():
         raise ValueError('Built partition table differs from configured CSV; rebuild before flashing')
+    # A fitting image is not necessarily a maintainable release. Keep a common
+    # minimum growth budget without moving installed partition boundaries.
+    app_reserve = int(cfg.get('CONFIG_EIDOLON_OTA_MIN_FREE_BYTES', '262144'), 0)
+    if app_reserve < 262144:
+        raise ValueError('OTA growth reserve must be at least 256 KiB')
     for address, filename in args['flash_files'].items():
         start = int(address, 0)
         size = (build / filename).stat().st_size
@@ -89,6 +96,11 @@ def validate_build(build):
             limit = part.size
         if size > limit:
             raise ValueError(f'{filename}: {size} bytes exceeds capacity {limit}')
+        if filename not in (args['partition-table']['file'], args['bootloader']['file']):
+            free = limit - size
+            print(f'EIDOLON storage: {part.name}: {size}/{limit} bytes, {free} free ({100 * free / limit:.1f}%)')
+            if part.type == parser().TYPES['app'] and free < app_reserve:
+                raise ValueError(f'{part.name}: only {free} bytes free; requires {app_reserve} bytes OTA growth reserve; reduce image contents before considering a layout migration')
     return args, table, table_path
 
 

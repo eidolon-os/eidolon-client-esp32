@@ -1,5 +1,15 @@
 menu "Xiaozhi Assistant"
 
+config EIDOLON_OTA_MIN_FREE_BYTES
+    int "Minimum OTA slot growth reserve (bytes)"
+    depends on EIDOLON_HUB_MODE
+    range 262144 1048576
+    default 262144
+    help
+        Build-time release budget, checked against the actual application image.
+        Keep at least 256 KiB available in both equal-sized OTA slots. This does
+        not change the installed partition layout or the runtime OTA format.
+
 config OTA_URL
     string "Default OTA URL"
     default "https://api.tenclass.net/xiaozhi/ota/"

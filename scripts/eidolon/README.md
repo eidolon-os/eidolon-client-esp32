@@ -85,3 +85,10 @@ python tests/serial_buildstamp_reconnect_test.py
 
 The Python test imports IDF's real partition parser. No duplicate CSV parser,
 flash writer or private provisioning protocol is introduced.
+
+## OTA capacity
+
+Hub builds reserve at least 256 KiB in each application slot, checked against
+actual binaries by the shared contract (`CONFIG_EIDOLON_OTA_MIN_FREE_BYTES`).
+Every flashed partition reports used/free bytes. This budget does not resize
+partitions. Reduce linked features before proposing a device-layout migration.

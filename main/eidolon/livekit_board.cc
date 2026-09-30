@@ -8,8 +8,12 @@
 #include "audio/pcm_push_capture_source.h"
 #include "eidolon_audio_input.h"
 
-#include <esp_audio_dec_default.h>
-#include <esp_audio_enc_default.h>
+#include <esp_audio_dec.h>
+#include <esp_audio_enc.h>
+#include <esp_opus_dec.h>
+#include <esp_opus_enc.h>
+#include <esp_pcm_dec.h>
+#include <esp_pcm_enc.h>
 #include <esp_capture_defaults.h>
 #include <esp_capture_sink.h>
 #include <esp_check.h>
@@ -36,6 +40,32 @@ static volatile uint32_t s_recent_capture_rms_ppm;
 static volatile uint32_t s_recent_playback_rms_ppm;
 
 namespace {
+// LiveKitSession publishes/subscribes Opus; the capture/render boundary is PCM.
+// Register via the SDK rather than pulling every default codec into every board.
+esp_err_t register_media_codecs()
+{
+    struct Registration {
+        esp_audio_type_t type;
+        esp_audio_err_t (*check)(esp_audio_type_t);
+        esp_audio_err_t (*install)();
+    };
+    const Registration codecs[] = {
+        {ESP_AUDIO_TYPE_OPUS, esp_audio_enc_check_audio_type, esp_opus_enc_register},
+        {ESP_AUDIO_TYPE_PCM, esp_audio_enc_check_audio_type, esp_pcm_enc_register},
+        {ESP_AUDIO_TYPE_OPUS, esp_audio_dec_check_audio_type, esp_opus_dec_register},
+        {ESP_AUDIO_TYPE_PCM, esp_audio_dec_check_audio_type, esp_pcm_dec_register},
+    };
+    for (const auto& codec : codecs) {
+        if (codec.check(codec.type) == ESP_AUDIO_ERR_OK) continue;
+        const auto err = codec.install();
+        if (err != ESP_AUDIO_ERR_OK) {
+            ESP_LOGE(TAG, "Codec registration failed: type=%d error=%d", codec.type, err);
+            return ESP_FAIL;
+        }
+    }
+    return ESP_OK;
+}
+
 constexpr int kPlaybackPcmMinAvgAbs = 120;
 constexpr uint32_t kRmsScalePpm = 1000000;
 
@@ -271,8 +301,7 @@ extern "C" esp_err_t eidolon_livekit_board_init(bool audio_output)
         codec->SetOutputVolume(LIVEKIT_SPEAKER_VOLUME);
     }
 
-    esp_audio_enc_register_default();
-    esp_audio_dec_register_default();
+    ESP_RETURN_ON_ERROR(register_media_codecs(), TAG, "media codecs");
 
     ESP_RETURN_ON_ERROR(build_capturer(codec), TAG, "capturer");
     uint32_t output_sample_rate = codec && codec->output_sample_rate() > 0

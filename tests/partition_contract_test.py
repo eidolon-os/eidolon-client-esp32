@@ -60,7 +60,7 @@ class StorageContractTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             build = Path(temp)
             cfg = build / 'sdkconfig'
-            cfg.write_text('CONFIG_EIDOLON_HUB_MODE=y\nCONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/v2/16m_eidolon.csv"\n')
+            cfg.write_text('CONFIG_EIDOLON_HUB_MODE=y\nCONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y\nCONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/v2/16m_eidolon.csv"\n')
             (build / 'project_description.json').write_text(json.dumps({'config_file': str(cfg)}))
             args = {'flash_settings': {'flash_size': '16MB'},
                     'partition-table': {'offset': '0x8000', 'file': 'table.bin'},
@@ -70,6 +70,17 @@ class StorageContractTest(unittest.TestCase):
             (build / 'table.bin').write_bytes(self.table.to_binary())
             (build / 'boot.bin').write_bytes(b'boot')
             (build / 'app.bin').write_bytes(b'app')
+            contract.validate_build(build)
+            original_config = cfg.read_text()
+            cfg.write_text(original_config.replace('CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y', 'CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=n'))
+            with self.assertRaisesRegex(ValueError, 'rollback support'):
+                contract.validate_build(build)
+            cfg.write_text(original_config)
+            for reserve in (262143, 60224, 0):
+                (build / 'app.bin').write_bytes(b'x' * (0x450000 - reserve))
+                with self.assertRaisesRegex(ValueError, 'growth reserve'):
+                    contract.validate_build(build)
+            (build / 'app.bin').write_bytes(b'x' * (0x450000 - 262144))
             contract.validate_build(build)
             (build / 'app.bin').write_bytes(b'x' * (0x450000 + 1))
             with self.assertRaises(ValueError): contract.validate_build(build)
