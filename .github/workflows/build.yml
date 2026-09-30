@@ -31,6 +31,10 @@ jobs:
           bash tests/run_device_local_erase_adapter_tests.sh
           bash tests/run_device_physical_recovery_core_tests.sh
           bash tests/run_commissioning_nvs_replay_tests.sh
+          bash tests/run_owner_trust_storage_policy_tests.sh
+          bash tests/run_firmware_boot_tests.sh
+          bash tests/run_device_provisioning_protocol_tests.sh
+          python tests/partition_contract_test.py
 
   prepare:
     name: Determine variants to build

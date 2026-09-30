@@ -11,6 +11,7 @@
 #include "eidolon/device_physical_recovery.h"
 #include "eidolon/eidolon_runtime_status.h"
 #include "eidolon/hub_trust_store.h"
+#include "eidolon/firmware_boot.h"
 #include "eidolon/provisioning_window_policy_core.h"
 #endif
 
@@ -18,6 +19,7 @@
 #include <freertos/task.h>
 #include <esp_network.h>
 #include <esp_log.h>
+#include <esp_system.h>
 #include <utility>
 
 #include <font_awesome.h>
@@ -55,6 +57,9 @@ std::string WifiBoard::GetBoardType() {
 }
 
 void WifiBoard::StartNetwork() {
+#if CONFIG_EIDOLON_HUB_MODE
+    if (eidolon::boot_storage_error != ESP_OK) return;
+#endif
     auto& wifi_manager = WifiManager::GetInstance();
 
     // Initialize WiFi manager
@@ -332,6 +337,13 @@ void WifiBoard::StartWifiConfigMode() {
 
 void WifiBoard::EnterWifiConfigMode() {
     ESP_LOGI(TAG, "EnterWifiConfigMode called");
+#if CONFIG_EIDOLON_HUB_MODE
+    if (eidolon::boot_storage_error != ESP_OK) {
+        // A physical retry re-runs initialization without erasing stored data.
+        esp_restart();
+        return;
+    }
+#endif
 
     auto& app = Application::GetInstance();
     auto state = app.GetDeviceState();

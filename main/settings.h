@@ -24,6 +24,7 @@ private:
     nvs_handle_t nvs_handle_ = 0;
     bool read_write_ = false;
     bool dirty_ = false;
+    esp_err_t write_error_ = ESP_OK;
 };
 
 #endif

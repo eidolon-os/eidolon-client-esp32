@@ -1,4 +1,7 @@
 #include "application.h"
+#if CONFIG_EIDOLON_HUB_MODE
+#include "eidolon/firmware_boot.h"
+#endif
 #include "board.h"
 #include "display.h"
 #include "system_info.h"
@@ -375,6 +378,11 @@ void Application::Initialize() {
     // The UI presenter is created before assets/network so it is the sole owner
     // of every visible Eidolon lifecycle and voice state from this point on.
     ui_presenter_ = std::make_unique<eidolon::EidolonUiPresenter>(*this);
+    if (eidolon::boot_storage_error != ESP_OK) {
+        SetEidolonRuntimeUi(eidolon::RuntimePhase::RecoveryRequired,
+            "Settings preserved. Restart to retry; if this persists, install compatible firmware without erasing data.");
+        return; // Keep the UI/event loop alive; no Wi-Fi driver or identity writes.
+    }
     SetEidolonRuntimeUi(eidolon::RuntimePhase::LoadingAssets);
     ApplyLocalAssets();
     SetEidolonRuntimeUi(eidolon::RuntimePhase::Booting);
@@ -609,6 +617,14 @@ void Application::Initialize() {
 #endif
     });
 
+#if CONFIG_EIDOLON_HUB_MODE
+    // Confirm offline, after local hardware/UI startup and transaction recovery.
+    // An invalid candidate returns to the previous firmware when one is usable.
+    if (eidolon::ConfirmFirmwareBoot() != ESP_OK) {
+        SetEidolonRuntimeUi(eidolon::RuntimePhase::RecoveryRequired,
+            "Settings preserved. Hold BOOT to retry setup; install compatible firmware if recovery remains blocked.");
+    }
+#endif
     // Start network asynchronously
     board.StartNetwork();
 
@@ -1023,22 +1039,6 @@ bool Application::ActivationTask() {
 #if CONFIG_EIDOLON_HUB_MODE
     std::lock_guard<std::mutex> activation_lock(activation_execution_mutex_);
     if (eidolon::CommissioningRuntime::GetInstance().IsInProgress()) return false;
-    // HUB_MODE never runs the Xiaozhi version-check, so it never reaches the
-    // mark-valid path inside CheckNewVersion(). Commit the running firmware here so an
-    // anti-rollback reset (e.g. a user power-cycle) before hub activation completes
-    // cannot abort the app and leave the device unbootable. We are already past board
-    // bring-up and WiFi connect by the time activation runs.
-    {
-        const esp_partition_t* running = esp_ota_get_running_partition();
-        esp_ota_img_states_t ota_state;
-        if (running != nullptr &&
-            esp_ota_get_state_partition(running, &ota_state) == ESP_OK &&
-            ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
-            esp_ota_mark_app_valid_cancel_rollback();
-            ESP_LOGI(TAG, "Marked firmware valid (HUB_MODE boot commit)");
-        }
-    }
-
     CheckAssetsVersion();
     if (eidolon::CommissioningRuntime::GetInstance().IsInProgress()) return false;
 

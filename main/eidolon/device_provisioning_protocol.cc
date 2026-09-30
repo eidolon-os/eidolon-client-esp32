@@ -1,3 +1,4 @@
+#include "owner_trust_storage_policy.h"
 #include "device_provisioning_protocol.h"
 
 #include <cJSON.h>
@@ -14,7 +15,7 @@ constexpr const char* kFoundationContractVersion = "1.0";
 constexpr const char* kTrustProfile = "eidolon-trust-p256-hpke-v1";
 
 // A self-signed P-256 leaf is well under this.
-constexpr size_t kMaxCertificateBytes = 4 * 1024;
+constexpr size_t kMaxCertificateBytes = kMaxOwnerTrustStringBytes + 1;
 
 constexpr size_t kMaxOwnerDomainIdBytes = 128;
 

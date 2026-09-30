@@ -80,6 +80,12 @@ void TestDescriptorCanonicalisationMatchesTheGoldenVector()
     std::string canonical;
     assert(eidolon::ParseOwnerDomainDescriptor(descriptor, parsed, canonical));
     assert(canonical == expected_canonical);
+    std::string boundary = descriptor;
+    boundary.resize(3999, ' ');
+    assert(eidolon::ParseOwnerDomainDescriptor(boundary, parsed, canonical));
+    boundary.push_back(' ');
+    assert(!eidolon::ParseOwnerDomainDescriptor(boundary, parsed, canonical));
+    assert(eidolon::ParseOwnerDomainDescriptor(descriptor, parsed, canonical));
     assert(parsed.owner_domain_id == "owner-domain_01");
     assert(parsed.owner_domain_generation == 3);
     assert(parsed.endpoints.size() == 2);

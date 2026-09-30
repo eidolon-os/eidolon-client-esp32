@@ -355,6 +355,11 @@ int main()
     AcceptsTheOwnerDomainAControllerHandsOver();
     RefusesAHandoverThatNamesNoOwnerDomain();
     RefusesAnythingThatIsNotACertificate();
+    std::string certificate = "-----BEGIN CERTIFICATE-----";
+    certificate.resize(3999, 'A');
+    assert(eidolon::IsCommissionableCertificate(certificate));
+    certificate.push_back('A');
+    assert(!eidolon::IsCommissionableCertificate(certificate));
     RefusesAnOversizedOwnerDomainId();
     RefusesAForeignOrMalformedEnvelope();
     LeavesTheHandoverUntouchedWhenItRefuses();

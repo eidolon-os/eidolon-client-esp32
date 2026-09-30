@@ -1,3 +1,4 @@
+#include "owner_trust_storage_policy.h"
 #include "eidolon/expression/generated/presentation_catalog.h"
 #include "room_config_json.h"
 #include "hub_onboarding_protocol.h"
@@ -267,7 +268,7 @@ bool ParseOwnerDomainDescriptor(
     using device_foundation::v1::OwnerDomainDescriptor;
     out = OwnerDomainDescriptor{};
     canonical_signing_bytes.clear();
-    if (body.empty() || body.size() > 32 * 1024) {
+    if (body.empty() || body.size() > kMaxOwnerTrustStringBytes) {
         return false;
     }
     cJSON* root = cJSON_ParseWithLength(body.data(), body.size());

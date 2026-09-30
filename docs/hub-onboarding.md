@@ -199,3 +199,23 @@ M5Stack StackChan 与 ESP-BOX-3 / ESP32-S3 配置均生成完整固件并通过�
 此次身份更换由服务端此前已撤销并排队的 erase 引起，事务恢复本身没有强制轮换。
 完整调查、原版 NVS 回放与实机证据边界见
 [BOX-3 recovery 报告](../reports/box3-recovery-20260918/analysis.md)。
+
+## 普通升级、NVS 故障与本地恢复
+
+普通 app OTA 不更新分区表，不清空配置。Hub 固件启动时 NVS 返回“无空闲页”或“新版本格式”
+不再擦除默认 NVS：设备身份私钥（`eidolon_id`）、Wi-Fi 与 Claim 都在其中，擦除等于销毁设备归属。
+初始化失败时记录 `boot_storage_error`，不启动 Wi-Fi，显示恢复界面，长按 BOOT 重启重试；
+持续的存储损坏或较新格式需要安装兼容固件维护，不能靠重新配网重建已丢失的私钥。
+owner_trust 分区小于 64 KiB 不再被拒绝初始化：64 KiB 是新布局预算，不是旧分区的运行时门槛。
+
+Settings 不再先删除旧值为新值腾空间；空间不足时写入失败并经 Commit 返回错误，
+删除失败同样返回错误，不再 `ESP_ERROR_CHECK` 重启。证书与目录字符串最多 3999 bytes（另加 NUL），
+在协议入口检查，避免写到一半才发现超出 `nvs_set_str` 的上限。
+
+OTA 确认不再等 Wi-Fi：板级/UI 初始化完成后，以本地事务恢复、身份与 Owner trust 可读、
+已保存目录验签通过作为确认条件（`main/eidolon/firmware_boot.h`），离线首次启动的新固件
+不会因复位被 bootloader 放弃。条件不满足且存在可用旧 app 时走 IDF rollback；没有可用旧 app
+时把当前唯一镜像标为有效并显示恢复状态，不让它停在 PENDING_VERIFY。
+
+Owner trust 的存储选择与迁移保持原样（见上文）；trust key、selector、digest 与身份/事务的
+version 1 编码均未改变，相同布局下的升级与回退可以互读。

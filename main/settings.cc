@@ -19,6 +19,7 @@ Settings::~Settings() {
 }
 
 esp_err_t Settings::Commit() {
+    if (write_error_ != ESP_OK) return write_error_;
     if (nvs_handle_ == 0 || !read_write_) {
         return ESP_ERR_INVALID_STATE;
     }
@@ -80,19 +81,9 @@ esp_err_t Settings::SetString(const std::string& key, const std::string& value) 
     // loop -> wipe NVS -> lose P-256 identity" chain. The in-RAM value still works
     // this session; the next boot falls back to the last good stored value.
     esp_err_t err = nvs_set_str(nvs_handle_, key.c_str(), value.c_str());
-    if (err == ESP_ERR_NVS_NOT_ENOUGH_SPACE) {
-        // Replacing a string writes the new value before the old one is dropped,
-        // so on a nearly full partition an entry cannot be replaced even when the
-        // space it needs is held by the very entry it would replace. Dropping
-        // ours first is safe in a way that wiping the partition is not: what is
-        // discarded is this key's previous value, which costs a re-fetch, rather
-        // than the identity that lives beside it and cannot be re-fetched at all.
-        ESP_LOGW(TAG, "%s/%s does not fit; replacing it in place", ns_.c_str(), key.c_str());
-        if (nvs_erase_key(nvs_handle_, key.c_str()) == ESP_OK) {
-            nvs_commit(nvs_handle_);
-            err = nvs_set_str(nvs_handle_, key.c_str(), value.c_str());
-        }
-    }
+    // NVS writes a replacement before retiring the old value. Never erase it
+    // to make room: this generic store also holds claims and identity-related
+    // state, which cannot safely be reconstructed after a torn write.
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "nvs_set_str(%s/%s) failed: %s", ns_.c_str(), key.c_str(),
                  esp_err_to_name(err));
@@ -165,9 +156,11 @@ void Settings::SetBool(const std::string& key, bool value) {
 void Settings::EraseKey(const std::string& key) {
     if (read_write_) {
         auto ret = nvs_erase_key(nvs_handle_, key.c_str());
-        if (ret != ESP_ERR_NVS_NOT_FOUND) {
-            ESP_ERROR_CHECK(ret);
+        if (ret == ESP_OK) {
             dirty_ = true;
+        } else if (ret != ESP_ERR_NVS_NOT_FOUND) {
+            write_error_ = ret;
+            ESP_LOGE(TAG, "nvs_erase_key(%s/%s) failed: %s", ns_.c_str(), key.c_str(), esp_err_to_name(ret));
         }
     } else {
         ESP_LOGW(TAG, "Namespace %s is not open for writing", ns_.c_str());
@@ -176,7 +169,12 @@ void Settings::EraseKey(const std::string& key) {
 
 void Settings::EraseAll() {
     if (read_write_) {
-        ESP_ERROR_CHECK(nvs_erase_all(nvs_handle_));
+        const auto err = nvs_erase_all(nvs_handle_);
+        if (err == ESP_OK) dirty_ = true;
+        else {
+            write_error_ = err;
+            ESP_LOGE(TAG, "nvs_erase_all(%s) failed: %s", ns_.c_str(), esp_err_to_name(err));
+        }
     } else {
         ESP_LOGW(TAG, "Namespace %s is not open for writing", ns_.c_str());
     }
