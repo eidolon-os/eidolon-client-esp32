@@ -4,6 +4,7 @@ using esp_err_t = int;
 using esp_ota_handle_t = unsigned;
 struct esp_partition_t { size_t size; };
 constexpr int ESP_OK=0, ESP_FAIL=-1, ESP_ERR_INVALID_STATE=1, ESP_ERR_INVALID_SIZE=2;
+constexpr int ESP_ERR_NOT_SUPPORTED=0x106, ESP_ERR_NOT_FOUND=0x105;
 constexpr size_t OTA_WITH_SEQUENTIAL_WRITES = static_cast<size_t>(-2);
 esp_err_t esp_ota_begin(const esp_partition_t*, size_t, esp_ota_handle_t*);
 esp_err_t esp_ota_write(esp_ota_handle_t, const void*, size_t);

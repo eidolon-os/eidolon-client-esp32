@@ -6,7 +6,7 @@
 
 现在的 StackChan 是「一台会转头的对话终端」，不是宠物：头部只有 6 个离散手势、脸只有 8 个手势 + 4 个基态、没有任何空闲自主行为、没有嘴型同步、机身上的三区触摸板 / IMU / 接近光传感器 / 12 颗 RGB 全部闲置或只在「唤醒」时亮一下。要变成宠物，缺的不是「再加几个手势」，而是三层东西：**一个常驻的活性层（idle liveness）、一个本地反射层（touch / IMU 反射）、一套多轨动画数据格式（头 + 脸 + 灯 + 声 同步）**，再加一条把这些接进 agent 语义层的契约通路。
 
-同时有一个硬约束必须先解决：**半双工模式下 mic 一开舵机电源就被切断**，而 mic 在 agent 不说话时一直是开的。不解这个，任何空闲动作、任何「摸头点头」都动不了。
+同时有一个硬约束：**半双工模式下 mic 一开舵机电源就被切断**。现有受控头部动作已有例外：运动 deadline 有效时控制器暂时关闭采集，为动作让出电源窗口。本方案的连续空闲动作和触摸反射尚未接入这个协调机制，实施前需要验证如何复用它以及对收音的影响。
 
 ---
 
@@ -17,7 +17,7 @@
 - 硬件：Feetech SCS0009 串行舵机 ×2（yaw id1 / pitch id2），UART1 1Mbaud；软件限位 yaw ±128°、pitch 3°…87°（`main/boards/m5stack-stackchan/config.h:93-96`）。弹簧阻尼插值，50 Hz tick（`servo.cc:133-150`、`stackchan_body.cc:117-150`）。
 - 手势表只有 6 个，全部硬编码在 `RunGesture()`（`stackchan_body.cc:335-372`）：`nod / shake / perk_up / droop / glance / wake_wobble`。每个都是「几个固定角度 + 固定 hold」，无缓动曲线、无随机、无幅度参数。
 - **没有任何空闲行为**：无呼吸、无随机看、无眨眼配合的转头。唯一的「空闲」是舵机自动卸力（`servo.cc:65-72`）。
-- 舵机电源门控：`SetCaptureQuiet(true)` 直接切断 VM EN 并冻结 motion（`stackchan_body.cc:152-175`）；由 `eidolon_voice_controller.cc:3586` 推导：半双工 = `mic_enabled_ && !playback_active`。**结论：只要在会话里且 agent 没在说话，头就是断电的。**
+- 舵机电源门控：`SetCaptureQuiet(true)` 直接切断 VM EN 并冻结 motion；`PublishClientAudioState` 在半双工空闲时通常打开 mic，但 `head_deadline_us_` 有效时会令 `capture_on=false`，现有受控动作可以运行。新增活性层必须复用采集/运动协调，不能另开一路舵机电源控制。
 - 安全护栏已完备：`safety.stop`、5 s 运动 deadline、TTL、pitch 堵转保护、`BUSY` 互斥。这一层不需要动，新方案全部在它下面跑。
 
 ### 1.2 表情 / 脸
@@ -112,6 +112,8 @@
 ### 4.1 先解决舵机断电（P0 前置，最高优先）
 
 现状 `SetCaptureQuiet(capture_on)` 把「mic 开」和「舵机电源关」硬绑在一起（`eidolon_voice_controller.cc:3604`），根因是舵机电源轨的开关啸叫（~3 kHz）会把 ADC 打满（见 memory：StackChan uplink audio）。选项：
+
+2026-09-30 代码复核：现有带 deadline 的受控动作已协调采集暂停。新增本地行为首先评估复用这个动作窗口；以下是尚未验证的声学实验选项，不能直接放宽当前门控。
 
 1. **按阶段而不是按 mic 门控**（推荐先试）：只在 `UserSpeaking / Recording`（STT 真正在吃音频）时断电；`Silent` 阶段 mic 虽开但只做 VAD/EOT，测一下啸叫是否触发服务端 VAD 误判。若不触发，空闲活性和触摸反应就都能动。
 2. **卸力而不断电**：验证「卸力 + 电轨常开」的啸叫是否真的比断电差（memory 说只有切电轨才能静音，但当时是全双工 AEC 场景；半双工 + 服务端 VAD 的容忍度不同）。

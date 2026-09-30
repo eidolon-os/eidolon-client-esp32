@@ -618,11 +618,15 @@ void Application::Initialize() {
     });
 
 #if CONFIG_EIDOLON_HUB_MODE
-    // Confirm offline, after local hardware/UI startup and transaction recovery.
-    // An invalid candidate returns to the previous firmware when one is usable.
-    if (eidolon::ConfirmFirmwareBoot() != ESP_OK) {
+    // Confirm local executable startup offline. StartNetwork owns transaction
+    // recovery; Owner admission owns identity/directory validation. Neither
+    // configuration faults nor expired routes authorize a firmware downgrade.
+    const auto confirmation = eidolon::ConfirmFirmwareBoot();
+    if (confirmation != ESP_OK) {
+        ESP_LOGE(TAG, "Firmware boot confirmation failed: %s",
+                 esp_err_to_name(confirmation));
         SetEidolonRuntimeUi(eidolon::RuntimePhase::RecoveryRequired,
-            "Settings preserved. Hold BOOT to retry setup; install compatible firmware if recovery remains blocked.");
+            "Firmware confirmation failed. Service the device before restarting.");
     }
 #endif
     // Start network asynchronously

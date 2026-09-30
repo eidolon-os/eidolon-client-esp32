@@ -1,53 +1,30 @@
 #pragma once
 
 #include <esp_ota_ops.h>
-#include "commissioning_transaction.h"
-#include "authority_locator.h"
-#include "esp_idf_commissioning_credential_store.h"
-#include "hub_trust_store.h"
 
 namespace eidolon {
 // Boot-only state. A failed init must not enter drivers that assume NVS works.
 inline esp_err_t boot_storage_error = ESP_OK;
 
-inline bool FirmwareNeedsVerification() {
-    const auto* running = esp_ota_get_running_partition();
-    esp_ota_img_states_t state;
-    return running && esp_ota_get_state_partition(running, &state) == ESP_OK &&
-           state == ESP_OTA_IMG_PENDING_VERIFY;
-}
-
-inline esp_err_t RecoverFirmwareBoot() {
-    if (!FirmwareNeedsVerification()) return ESP_OK;
-    if (esp_ota_check_rollback_is_possible()) {
-        // On success IDF reboots into the previous app; it never rewinds NVS.
-        const auto err = esp_ota_mark_app_invalid_rollback_and_reboot();
-        if (err == ESP_OK) return ESP_OK;
-    }
-    // No usable fallback (e.g. initial installation): keep this recovery-capable
-    // image bootable. Leaving PENDING_VERIFY here can abort the only app on reset.
-    return esp_ota_mark_app_valid_cancel_rollback();
-}
-
+// Confirm the executable after local startup, before attempting the network.
+// Persistent Owner/configuration state belongs to the existing recovery and
+// admission paths, not to OTA image health. In particular, an expired directory
+// is not a broken executable, and an older bootable image may erase NVS on the
+// very storage fault that brought this image into recovery.
+//
+// Also used before board startup when NVS cannot initialize: retain this
+// data-preserving recovery image across an explicit retry. Do not request an
+// application rollback here. IDF still handles crashes before confirmation.
 inline esp_err_t ConfirmFirmwareBoot() {
-    if (!FirmwareNeedsVerification()) return ESP_OK;
-    OwnerTrustBundle trust;
-    std::string key;
-    const bool recovered = RecoverPendingCommissioningTransaction();
-    const auto trust_state = OwnerTrustStore().ReadActive(trust);
-    const auto identity = EspIdfCommissioningCredentialStore::LoadPrivateKey(key);
-    const bool readable = boot_storage_error == ESP_OK && recovered &&
-        trust_state != OwnerTrustLoadResult::Unavailable &&
-        identity != CommissioningIdentityLoad::Unavailable &&
-        (trust_state != OwnerTrustLoadResult::Loaded || identity == CommissioningIdentityLoad::Loaded);
-    const bool directory_valid = trust_state != OwnerTrustLoadResult::Loaded ||
-        DeviceAuthorityLocator::GetInstance().ReloadCommissionedDirectory() == ESP_OK;
-    if (!readable || !directory_valid) {
-        RecoverFirmwareBoot();
-        return ESP_ERR_INVALID_STATE;
-    }
-    // Board/UI startup and local recovery are enough; Wi-Fi and the Hub may be
-    // offline. They must not keep a working firmware in PENDING_VERIFY.
+    const auto* running = esp_ota_get_running_partition();
+    if (!running) return ESP_ERR_INVALID_STATE;
+    esp_ota_img_states_t state;
+    const auto err = esp_ota_get_state_partition(running, &state);
+    // Factory images and a first serial installation without an otadata record
+    // have no pending verification to commit. Do not invent an OTA selection.
+    if (err == ESP_ERR_NOT_SUPPORTED || err == ESP_ERR_NOT_FOUND) return ESP_OK;
+    if (err != ESP_OK) return err;
+    if (state != ESP_OTA_IMG_PENDING_VERIFY) return ESP_OK;
     return esp_ota_mark_app_valid_cancel_rollback();
 }
 }  // namespace eidolon

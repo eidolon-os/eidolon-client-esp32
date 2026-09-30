@@ -485,4 +485,26 @@ int main(int argc, char** argv) {
                current.operational_key_id == before.operational_key_id);
     }
     std::cout << "100 complete network maintenance transactions across boots passed\n";
+    // Exercise legacy key validation over the real NVS allocator with a real
+    // PEM parser, not the small key-name adapter used by the transaction test.
+    std::string valid_pem;
+    assert(EspIdfCommissioningCredentialStore::LoadPrivateKey(valid_pem) ==
+           CommissioningIdentityLoad::Loaded);
+    flash.data.assign(flash.data.size(), 255);
+    trust_flash.data.assign(trust_flash.data.size(), 255);
+    Boot();
+    std::string loaded_pem;
+    assert(EspIdfCommissioningCredentialStore::LoadPrivateKey(loaded_pem) ==
+           CommissioningIdentityLoad::NotFound);
+    for (const auto& pem : {valid_pem, std::string(""), std::string("not-a-private-key")}) {
+        assert(Write("eidolon_id", "p256_priv", pem));
+        const auto before_read = flash.data;
+        Boot();
+        const auto result = EspIdfCommissioningCredentialStore::LoadPrivateKey(loaded_pem);
+        assert(result == (pem == valid_pem ? CommissioningIdentityLoad::Loaded
+                                         : CommissioningIdentityLoad::Unavailable));
+        assert(pem == valid_pem ? loaded_pem == pem : loaded_pem.empty());
+        assert(flash.data == before_read); // no replacement, erase or migration
+    }
+    std::cout << "legacy PEM validation preserves NVS bytes on valid/empty/corrupt keys passed\n";
 }

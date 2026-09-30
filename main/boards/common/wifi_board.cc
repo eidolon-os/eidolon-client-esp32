@@ -339,6 +339,17 @@ void WifiBoard::EnterWifiConfigMode() {
     ESP_LOGI(TAG, "EnterWifiConfigMode called");
 #if CONFIG_EIDOLON_HUB_MODE
     if (eidolon::boot_storage_error != ESP_OK) {
+        // Retry otadata confirmation too. If the startup attempt failed, a
+        // blind restart could still hand NVS to an older, destructive image.
+        const auto confirmation = eidolon::ConfirmFirmwareBoot();
+        if (confirmation != ESP_OK) {
+            ESP_LOGE(TAG, "Cannot safely restart storage recovery: %s",
+                     esp_err_to_name(confirmation));
+            Application::GetInstance().SetEidolonRuntimeUi(
+                eidolon::RuntimePhase::RecoveryRequired,
+                "Could not save recovery state. Service the device before restarting.");
+            return;
+        }
         // A physical retry re-runs initialization without erasing stored data.
         esp_restart();
         return;

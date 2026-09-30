@@ -285,6 +285,24 @@ void CorruptionAndUnavailableStorageFailClosed() {
     std::string pem;
     assert(EspIdfCommissioningCredentialStore::LoadPrivateKey(pem) == CommissioningIdentityLoad::Unavailable);
 }
+void LegacyIdentityValidationNeverCreatesOrReplacesAKey() {
+    for (const auto& value : {std::string("key-1"), std::string(""), std::string("broken-pem")}) {
+        Reset();
+        disk["eidolon_id"]["p256_priv"] = value;
+        const auto before = disk;
+        std::string pem;
+        const auto result = EspIdfCommissioningCredentialStore::LoadPrivateKey(pem);
+        assert(result == (value == "key-1" ? CommissioningIdentityLoad::Loaded
+                                           : CommissioningIdentityLoad::Unavailable));
+        assert(value == "key-1" ? pem == value : pem.empty());
+        assert(disk == before && write_number == 0 && keys_created == 1);
+    }
+    Reset(); disk["eidolon_id"].erase("p256_priv");
+    std::string pem;
+    assert(EspIdfCommissioningCredentialStore::LoadPrivateKey(pem) == CommissioningIdentityLoad::NotFound);
+    disk["eidolon_id"]["base_id"] = std::string("existing-base");
+    assert(EspIdfCommissioningCredentialStore::LoadPrivateKey(pem) == CommissioningIdentityLoad::Unavailable);
+}
 }
 
 esp_err_t nvs_open(const char* ns, int, nvs_handle_t* handle) {
@@ -339,6 +357,8 @@ esp_err_t DeviceIdentity::EnsureKeypair() {
     return DescribeKey(private_key_pem_,fingerprint_,device_instance_id_) ? ESP_OK : ESP_FAIL;
 }
 bool DeviceIdentity::DescribeKey(const std::string& pem, std::string& key, std::string& instance) {
+    if (pem.size() <= 4 || pem.substr(0, 4) != "key-" ||
+        pem.find_first_not_of("0123456789", 4) != std::string::npos) return false;
     key=KeyId(pem); instance="device-instance-"+key.substr(7); return true;
 }
 bool DeviceIdentity::PrepareKey(bool fresh,std::string& pem,std::string& key,std::string& instance) {
@@ -398,4 +418,5 @@ int main() {
     PowerLossAtEveryWriteResumesWithoutOldOwnerRevival();
     CommitFailureCannotBeCancelledOrOverwritten();
     CorruptionAndUnavailableStorageFailClosed();
+    LegacyIdentityValidationNeverCreatesOrReplacesAKey();
 }

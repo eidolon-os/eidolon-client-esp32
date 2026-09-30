@@ -270,6 +270,14 @@ CommissioningIdentityLoad EspIdfCommissioningCredentialStore::LoadPrivateKey(std
         return loaded;
     }
     const auto legacy = ReadString("p256_priv", pem);
+    if (legacy == Load::Loaded) {
+        std::string key_id, instance;
+        if (!DeviceIdentity::DescribeKey(pem, key_id, instance)) {
+            ESP_LOGE(TAG, "legacy operational private key could not be parsed; preserving identity");
+            pem.clear();
+            return Load::Unavailable;
+        }
+    }
     if (legacy == Load::NotFound) {
         std::string base;
         if (ReadString("base_id", base) != Load::NotFound) {

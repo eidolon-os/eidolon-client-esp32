@@ -59,7 +59,8 @@ std::string Settings::GetString(const std::string& key, const std::string& defau
 esp_err_t Settings::SetString(const std::string& key, const std::string& value) {
     if (!read_write_ || nvs_handle_ == 0) {
         ESP_LOGW(TAG, "Namespace %s is not open for writing", ns_.c_str());
-        return ESP_ERR_INVALID_STATE;
+        write_error_ = ESP_ERR_INVALID_STATE;
+        return write_error_;
     }
     // Dedup: a config refresh usually re-saves an identical blob. Skipping the
     // unchanged write spares NVS space and flash wear (and avoids needlessly
@@ -85,6 +86,7 @@ esp_err_t Settings::SetString(const std::string& key, const std::string& value) 
     // to make room: this generic store also holds claims and identity-related
     // state, which cannot safely be reconstructed after a torn write.
     if (err != ESP_OK) {
+        write_error_ = err;
         ESP_LOGE(TAG, "nvs_set_str(%s/%s) failed: %s", ns_.c_str(), key.c_str(),
                  esp_err_to_name(err));
         return err;
@@ -107,6 +109,7 @@ int32_t Settings::GetInt(const std::string& key, int32_t default_value) {
 
 void Settings::SetInt(const std::string& key, int32_t value) {
     if (!read_write_) {
+        write_error_ = ESP_ERR_INVALID_STATE;
         ESP_LOGW(TAG, "Namespace %s is not open for writing", ns_.c_str());
         return;
     }
@@ -116,6 +119,7 @@ void Settings::SetInt(const std::string& key, int32_t value) {
     }
     esp_err_t err = nvs_set_i32(nvs_handle_, key.c_str(), value);
     if (err != ESP_OK) {
+        write_error_ = err;
         ESP_LOGE(TAG, "nvs_set_i32(%s/%s) failed: %s", ns_.c_str(), key.c_str(),
                  esp_err_to_name(err));
         return;
@@ -137,6 +141,7 @@ bool Settings::GetBool(const std::string& key, bool default_value) {
 
 void Settings::SetBool(const std::string& key, bool value) {
     if (!read_write_) {
+        write_error_ = ESP_ERR_INVALID_STATE;
         ESP_LOGW(TAG, "Namespace %s is not open for writing", ns_.c_str());
         return;
     }
@@ -146,6 +151,7 @@ void Settings::SetBool(const std::string& key, bool value) {
     }
     esp_err_t err = nvs_set_u8(nvs_handle_, key.c_str(), value ? 1 : 0);
     if (err != ESP_OK) {
+        write_error_ = err;
         ESP_LOGE(TAG, "nvs_set_u8(%s/%s) failed: %s", ns_.c_str(), key.c_str(),
                  esp_err_to_name(err));
         return;

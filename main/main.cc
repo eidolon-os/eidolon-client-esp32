@@ -40,7 +40,6 @@ extern "C" void app_main(void)
     if (ret != ESP_OK) {
         eidolon::boot_storage_error = ret;
         ESP_LOGE(TAG, "Storage initialization failed: %s; preserving data", esp_err_to_name(ret));
-        eidolon::RecoverFirmwareBoot();
     }
 #else
     ESP_ERROR_CHECK(ret);
@@ -59,7 +58,6 @@ extern "C" void app_main(void)
         const esp_err_t trust_result = nvs_flash_init_partition(eidolon::kOwnerTrustPartitionName);
         if (trust_result != ESP_OK) {
             eidolon::boot_storage_error = trust_result;
-            eidolon::RecoverFirmwareBoot();
             ESP_LOGE(TAG, "Owner trust partition unavailable: %s",
                      esp_err_to_name(trust_result));
         } else {
@@ -68,6 +66,15 @@ extern "C" void app_main(void)
         }
     } else {
         ESP_LOGW(TAG, "EIDOLON-STORAGE owner_trust=legacy-layout");
+    }
+    if (eidolon::boot_storage_error != ESP_OK) {
+        // Preserve the recovery image too: the previous executable may erase
+        // NVS on this fault. Normal startup confirms after board/UI bring-up.
+        const auto confirmation = eidolon::ConfirmFirmwareBoot();
+        if (confirmation != ESP_OK) {
+            ESP_LOGE(TAG, "Could not verify recovery firmware retention: %s",
+                     esp_err_to_name(confirmation));
+        }
     }
 #endif
 
