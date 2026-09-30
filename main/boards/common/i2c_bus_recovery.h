@@ -20,7 +20,7 @@
 // condition. On an idle bus it changes nothing, so it is always safe to run
 // before taking the pins for the I2C peripheral.
 //
-// Returns true if SDA was released (or was never held).
+// Returns true only when both SDA and SCL are released after recovery.
 bool RecoverI2cBus(gpio_num_t sda, gpio_num_t scl);
 
 #endif  // EIDOLON_I2C_BUS_RECOVERY_H_

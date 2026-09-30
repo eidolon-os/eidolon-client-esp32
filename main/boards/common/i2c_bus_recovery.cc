@@ -10,6 +10,17 @@ namespace {
 // 100kHz, the slowest standard rate, so a slave that is slow to release still
 // sees the clocks it is waiting for.
 constexpr int kHalfPeriodUs = 5;
+constexpr int kClockReleaseTimeoutUs = 1000;
+
+bool ReleaseClock(gpio_num_t scl)
+{
+    gpio_set_level(scl, 1);
+    for (int elapsed = 0; elapsed < kClockReleaseTimeoutUs; elapsed += kHalfPeriodUs) {
+        ets_delay_us(kHalfPeriodUs);
+        if (gpio_get_level(scl) == 1) return true;
+    }
+    return false;
+}
 
 void Release(gpio_num_t pin)
 {
@@ -40,26 +51,35 @@ bool RecoverI2cBus(gpio_num_t sda, gpio_num_t scl)
         return false;
     }
     Release(sda);
-    Release(scl);
-    if (gpio_get_level(sda) == 1) {
-        return true;  // Nobody is holding it.
+    if (!ReleaseClock(scl)) {
+        ESP_LOGE(TAG, "SCL is held low; bus recovery deferred");
+        return false;
     }
+    if (gpio_get_level(sda) == 1) return true;
 
     ESP_LOGW(TAG, "SDA is held low; clocking the bus free");
+    // Sample SDA while SCL is low, as IDF's software bus-clear does. A slave
+    // transmitting zero bytes only releases SDA for the master's ACK/NACK.
+    Drive(scl);
     for (int pulse = 0; pulse < 9 && gpio_get_level(sda) == 0; ++pulse) {
+        if (!ReleaseClock(scl)) {
+            Release(sda);
+            ESP_LOGE(TAG, "SCL remained low during bus recovery");
+            return false;
+        }
         Drive(scl);
-        Release(scl);
     }
-    const bool released = gpio_get_level(sda) == 1;
 
-    // STOP: SDA rises while SCL is high, which is what tells every slave the
-    // transfer is over and leaves the bus idle for the peripheral that follows.
+    // Set SDA low while SCL is LOW, then release SCL and finally SDA. Pulling
+    // SDA down with SCL already high generates START, not the setup for STOP.
     Drive(sda);
-    Release(scl);
-    Release(sda);
-
-    if (!released) {
-        ESP_LOGE(TAG, "SDA is still held low after nine clocks");
+    if (!ReleaseClock(scl)) {
+        Release(sda);
+        return false;
     }
+    Release(sda);
+    const bool released = gpio_get_level(sda) == 1 && gpio_get_level(scl) == 1;
+    if (!released) ESP_LOGE(TAG, "I2C bus still held after STOP: SDA=%d SCL=%d",
+                           gpio_get_level(sda), gpio_get_level(scl));
     return released;
 }

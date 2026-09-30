@@ -10,7 +10,7 @@
 #include "mcp_server.h"
 #include "config.h"
 #include "power_save_timer.h"
-#include "axp2101.h"
+#include "pmic.h"
 #include "i2c_device.h"
 #include "../common/i2c_bus_recovery.h"
 
@@ -29,35 +29,6 @@
 
 #define TAG "WaveshareEsp32s3TouchAMOLED2inch06"
 
-class Pmic : public Axp2101 {
-public:
-    Pmic(i2c_master_bus_handle_t i2c_bus, uint8_t addr) : Axp2101(i2c_bus, addr) {
-        WriteReg(0x22, 0b110); // PWRON > OFFLEVEL as POWEROFF Source enable
-        WriteReg(0x27, 0x10);  // hold 4s to power off
-
-        // Disable All DCs but DC1
-        WriteReg(0x80, 0x01);
-        // Disable All LDOs
-        WriteReg(0x90, 0x00);
-        WriteReg(0x91, 0x00);
-
-        // Set DC1 to 3.3V
-        WriteReg(0x82, (3300 - 1500) / 100);
-
-        // Set ALDO1 to 3.3V
-        WriteReg(0x92, (3300 - 500) / 100);
-        WriteReg(0x93, (3300 - 500) / 100);
-
-        // Enable ALDO1(MIC)
-        WriteReg(0x90, 0x03);
-
-        WriteReg(0x64, 0x02); // CV charger voltage setting to 4.1V
-
-        WriteReg(0x61, 0x02); // set Main battery precharge current to 50mA
-        WriteReg(0x62, 0x0A); // set Main battery charger current to 400mA ( 0x08-200mA, 0x09-300mA, 0x0A-400mA )
-        WriteReg(0x63, 0x01); // set Main battery term charge current to 25mA
-    }
-};
 
 #define LCD_OPCODE_WRITE_CMD (0x02ULL)
 #define LCD_OPCODE_READ_CMD (0x03ULL)
@@ -233,10 +204,17 @@ private:
         // with the case open is not a state this firmware may enter.
         for (int attempt = 1; attempt <= 5; ++attempt) {
             if (i2c_master_probe(i2c_bus_, 0x34, 100) == ESP_OK) {
-                pmic_ = new Pmic(i2c_bus_, 0x34);
-                return;
+                auto* candidate = new Pmic(i2c_bus_, 0x34);
+                const auto initialized = candidate->InitializationError();
+                if (initialized == ESP_OK) {
+                    pmic_ = candidate;
+                    return;
+                }
+                ESP_LOGW(TAG, "AXP2101 register initialization failed: %s",
+                         esp_err_to_name(initialized));
+                delete candidate;
             }
-            ESP_LOGW(TAG, "AXP2101 did not answer (attempt %d/5); recovering the bus",
+            ESP_LOGW(TAG, "AXP2101 initialization incomplete (attempt %d/5); recovering the bus",
                      attempt);
             // Not ESP_ERROR_CHECK: aborting inside the recovery for an abort
             // is the same dead end one level down.
