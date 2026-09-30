@@ -338,5 +338,187 @@
       "I (11720) EidolonUiPresenter: visible state=READY scene=7",
       "I (15750) AGENT: 0 Add remote type:2 125.33.204.51:23075"
     ]
-  }
+  },
+  "historical_retry_counterevidence": {
+    "source": "/tmp/eidolon-stack-historic-retry-hub.log",
+    "server_events": [
+      {
+        "time": "2026-09-30T18:13:18+08:00",
+        "msg": "starting RTC session",
+        "participant": "device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0",
+        "participantID": "PA_VwpVje4nc4Aq"
+      },
+      {
+        "time": "2026-09-30T18:13:19+08:00",
+        "msg": "participant active",
+        "participant": "device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0",
+        "participantID": "PA_VwpVje4nc4Aq",
+        "connectionType": "udp"
+      },
+      {
+        "time": "2026-09-30T18:13:19+08:00",
+        "msg": "mediaTrack published",
+        "participant": "device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0",
+        "participantID": "PA_VwpVje4nc4Aq"
+      }
+    ],
+    "serial_gap_ms": [
+      35641,
+      83641
+    ],
+    "retry_due_ms": 38861,
+    "heap_before_bytes": 88279,
+    "heap_after_bytes": 62079,
+    "conclusion": "The reported StackChan hang is contradicted by a successful RTC session and published track during the missing serial-log interval; this does not rule out unrelated future hangs."
+  },
+  "final_firmware": {
+    "git": "893bf7ca1",
+    "sdk": "bd56a60e6180ad5a1eccbf4df7ab41c7bc4500cc",
+    "boards": [
+      {
+        "board": "box",
+        "boot_log": "/tmp/eidolon-893bf7ca-box-boot.log",
+        "build_stamp": [
+          "BUILDSTAMP git=893bf7ca1 sdk=bd56a60e6180ad5a1eccbf4df7ab41c7bc4500cc idf=5.5.4 branch=main built=Sep 30 2026 21:25:03"
+        ],
+        "flash_verified": true,
+        "visible_state": "READY",
+        "ready_ms": [
+          "11860"
+        ],
+        "activation_dispatch_ms": [
+          "217"
+        ],
+        "local_addresses": [
+          "192.168.3.230",
+          "192.168.3.230",
+          "192.168.3.230"
+        ],
+        "free_sram_bytes": [
+          "120471",
+          "31331",
+          "31331",
+          "31331",
+          "31331"
+        ],
+        "observed_errors": []
+      },
+      {
+        "board": "stack",
+        "boot_log": "/tmp/eidolon-893bf7ca-stack-boot.log",
+        "build_stamp": [
+          "BUILDSTAMP git=893bf7ca1 sdk=bd56a60e6180ad5a1eccbf4df7ab41c7bc4500cc idf=5.5.4 branch=main built=Sep 30 2026 21:29:43"
+        ],
+        "flash_verified": true,
+        "visible_state": "READY",
+        "ready_ms": [
+          "12920"
+        ],
+        "activation_dispatch_ms": [
+          "164"
+        ],
+        "local_addresses": [
+          "192.168.3.230",
+          "192.168.3.230",
+          "192.168.3.230"
+        ],
+        "free_sram_bytes": [
+          "87899",
+          "62075",
+          "62075",
+          "62075",
+          "62075"
+        ],
+        "observed_errors": []
+      },
+      {
+        "board": "wave",
+        "boot_log": "/tmp/eidolon-893bf7ca-wave-boot.log",
+        "build_stamp": [
+          "BUILDSTAMP git=893bf7ca1 sdk=bd56a60e6180ad5a1eccbf4df7ab41c7bc4500cc idf=5.5.4 branch=main built=Sep 30 2026 21:33:46"
+        ],
+        "flash_verified": true,
+        "visible_state": "READY",
+        "ready_ms": [
+          "12519"
+        ],
+        "activation_dispatch_ms": [
+          "163"
+        ],
+        "local_addresses": [
+          "192.168.3.230",
+          "192.168.3.230",
+          "192.168.3.230"
+        ],
+        "free_sram_bytes": [
+          "85127",
+          "50783",
+          "50783",
+          "50783",
+          "50783"
+        ],
+        "observed_errors": []
+      },
+      {
+        "board": "korvo",
+        "boot_log": "/tmp/eidolon-893bf7ca-korvo-boot.log",
+        "build_stamp": [
+          "BUILDSTAMP git=893bf7ca1 sdk=bd56a60e6180ad5a1eccbf4df7ab41c7bc4500cc idf=6.1 branch=main built=Sep 30 2026 21:38:06"
+        ],
+        "flash_verified": true,
+        "visible_state": "SETUP",
+        "ready_ms": [],
+        "activation_dispatch_ms": [],
+        "local_addresses": [],
+        "free_sram_bytes": [
+          "185923",
+          "185923",
+          "185923",
+          "185923",
+          "185923"
+        ],
+        "observed_errors": []
+      }
+    ],
+    "korvo_network_and_conversation_validated": false
+  },
+  "separate_connection_timeout": {
+    "source": "/tmp/eidolon-mdns-fixed-box-1.log",
+    "lines": [
+      "I (6549) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK ms=542",
+      "I (6549) NetTrace: dns end task=hub_activation host=eidolon-hub-f89c0ecca5d0070a7989.local rc=0 ms=550 first=192.168.3.230",
+      "E (21589) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15589 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0"
+    ],
+    "root_cause_established": false,
+    "note": "Correct address, connection timeout; capture ended before the follow-up completed. Not attributed to the wrong-address or RTC-candidate defects."
+  },
+  "tests": {
+    "device_foundation_contracts": {
+      "passed": 48,
+      "log": "/tmp/eidolon-sdk-device-foundation-tests.log"
+    },
+    "mobile_targeted": 43,
+    "mobile_host_integration": 28,
+    "sdk_lifecycle": 2,
+    "host_regressions_passed": [
+      "local_mdns_resolver (IPv4 and dual stack, initialization concurrency, failure handling)",
+      "hub_discovery",
+      "i2c_bus_recovery",
+      "waveshare_pmic",
+      "ota_transaction",
+      "device_local_erase_bsp_contract",
+      "output_policy",
+      "hub_activation_retry_core",
+      "activation_worker_resources",
+      "authority_locator_core",
+      "firmware_boot",
+      "partition_contract (9 cases)"
+    ]
+  },
+  "not_hardware_validated": [
+    "first real spoken conversation on the final firmware",
+    "live server-side microphone publication revocation",
+    "NVS failure recovery screen under a real hardware fault",
+    "physical power loss during HTTP OTA"
+  ]
 }
