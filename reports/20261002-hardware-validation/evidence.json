@@ -1,0 +1,2343 @@
+{
+  "date": "2026-10-02",
+  "timezone": "Asia/Shanghai",
+  "baseline_runs": [
+    {
+      "result": "FAIL",
+      "reasons": [
+        "failure/recovery evidence in serial log"
+      ],
+      "stamps": [
+        [
+          "893bf7ca1",
+          "bd56a60e6180ad5a1eccbf4df7ab41c7bc4500cc"
+        ]
+      ],
+      "states": [
+        "ASSETS",
+        "BOOT",
+        "NETWORK",
+        "SERVICE"
+      ],
+      "ready_ms": [],
+      "resolved_addresses": [
+        "192.168.3.230",
+        "-",
+        "-",
+        "-"
+      ],
+      "activation_dispatch_ms": [],
+      "heap_samples": [
+        [
+          14970,
+          114571
+        ],
+        [
+          24970,
+          118643
+        ],
+        [
+          34970,
+          114567
+        ],
+        [
+          44970,
+          120579
+        ],
+        [
+          54970,
+          114923
+        ],
+        [
+          64970,
+          114435
+        ],
+        [
+          75000,
+          120583
+        ]
+      ],
+      "settled_heap_delta": null,
+      "faults": [
+        "E (21300) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15279 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+        "E (37530) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0x0",
+        "E (37550) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8109 status=0 socket_errno=119 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+        "E (56130) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0x0",
+        "E (56150) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8033 status=0 socket_errno=119 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+        "E (72330) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0x0",
+        "E (72350) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8110 status=0 socket_errno=119 tls_error=0x8001 tls_code=0 tls_flags=0x0"
+      ],
+      "error_lines": [
+        "E (21300) esp-tls: [sock=54] select() timeout",
+        "E (21300) esp-tls: Failed to open new connection",
+        "E (21300) transport_base: Failed to open a new connection",
+        "E (21300) HTTP_CLIENT: Connection failed, sock < 0",
+        "E (21300) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15279 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+        "E (37530) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0x0",
+        "E (37540) esp-tls: Failed to open new connection",
+        "E (37540) transport_base: Failed to open a new connection",
+        "E (37550) HTTP_CLIENT: Connection failed, sock < 0",
+        "E (37550) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8109 status=0 socket_errno=119 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+        "E (56130) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0x0",
+        "E (56140) esp-tls: Failed to open new connection",
+        "E (56140) transport_base: Failed to open a new connection",
+        "E (56150) HTTP_CLIENT: Connection failed, sock < 0",
+        "E (56150) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8033 status=0 socket_errno=119 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+        "E (72330) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0x0",
+        "E (72340) esp-tls: Failed to open new connection",
+        "E (72340) transport_base: Failed to open a new connection",
+        "E (72350) HTTP_CLIENT: Connection failed, sock < 0",
+        "E (72350) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8110 status=0 socket_errno=119 tls_error=0x8001 tls_code=0 tls_flags=0x0"
+      ],
+      "board": "box",
+      "log": "baseline-01-box.log",
+      "expected_hub_ip": "192.168.3.230"
+    },
+    {
+      "result": "PASS",
+      "reasons": [],
+      "stamps": [
+        [
+          "893bf7ca1",
+          "bd56a60e6180ad5a1eccbf4df7ab41c7bc4500cc"
+        ]
+      ],
+      "states": [
+        "ASSETS",
+        "BOOT",
+        "NETWORK",
+        "SERVICE",
+        "READY"
+      ],
+      "ready_ms": [
+        14400
+      ],
+      "resolved_addresses": [
+        "192.168.3.230",
+        "192.168.3.230",
+        "192.168.3.230"
+      ],
+      "activation_dispatch_ms": [
+        164
+      ],
+      "heap_samples": [
+        [
+          12670,
+          87891
+        ],
+        [
+          23650,
+          62015
+        ],
+        [
+          33650,
+          62015
+        ],
+        [
+          43650,
+          62015
+        ],
+        [
+          53650,
+          62015
+        ],
+        [
+          63650,
+          62015
+        ],
+        [
+          73650,
+          62015
+        ]
+      ],
+      "settled_heap_delta": 0,
+      "faults": [],
+      "error_lines": [
+        "E (13690) AGENT: 0 Not found for bind remote 192.168.3.230:56682",
+        "E (13690) AGENT: 0 Not found for bind remote 192.168.3.230:56682",
+        "E (13690) AGENT: 0 Not found for bind remote 192.168.3.230:56682",
+        "E (13690) AGENT: 0 Not found for bind remote 192.168.3.230:56682",
+        "E (13700) AGENT: 0 Not found for bind remote 192.168.3.230:56682",
+        "E (13710) AGENT: 0 Not found for bind remote 192.168.3.230:56682",
+        "E (13860) AGENT: 0 Not found for bind remote 192.168.3.230:54630",
+        "E (13860) AGENT: 0 Not found for bind remote 192.168.3.230:54630"
+      ],
+      "board": "stack",
+      "log": "baseline-02-stack.log",
+      "expected_hub_ip": "192.168.3.230"
+    },
+    {
+      "result": "PASS",
+      "reasons": [],
+      "stamps": [
+        [
+          "893bf7ca1",
+          "bd56a60e6180ad5a1eccbf4df7ab41c7bc4500cc"
+        ]
+      ],
+      "states": [
+        "ASSETS",
+        "BOOT",
+        "NETWORK",
+        "SERVICE",
+        "READY"
+      ],
+      "ready_ms": [
+        12190
+      ],
+      "resolved_addresses": [
+        "192.168.3.230",
+        "192.168.3.230",
+        "192.168.3.230"
+      ],
+      "activation_dispatch_ms": [
+        164
+      ],
+      "heap_samples": [
+        [
+          10600,
+          87871
+        ],
+        [
+          21650,
+          62007
+        ],
+        [
+          31650,
+          62007
+        ],
+        [
+          41650,
+          62003
+        ],
+        [
+          51650,
+          62007
+        ],
+        [
+          61650,
+          62003
+        ],
+        [
+          71650,
+          62007
+        ]
+      ],
+      "settled_heap_delta": 4,
+      "faults": [],
+      "error_lines": [
+        "E (11450) AGENT: 0 Not found for bind remote 192.168.3.230:58170",
+        "E (11450) AGENT: 0 Not found for bind remote 192.168.3.230:58170",
+        "E (11450) AGENT: 0 Not found for bind remote 192.168.3.230:58170",
+        "E (11460) AGENT: 0 Not found for bind remote 192.168.3.230:58170",
+        "E (11580) AGENT: 0 Not found for bind remote 192.168.3.230:58170",
+        "E (11580) AGENT: 0 Not found for bind remote 192.168.3.230:58170",
+        "E (11580) AGENT: 0 Not found for bind remote 192.168.3.230:50450",
+        "E (11590) AGENT: 0 Not found for bind remote 192.168.3.230:50450"
+      ],
+      "board": "stack",
+      "log": "baseline-03-stack.log",
+      "expected_hub_ip": "192.168.3.230"
+    },
+    {
+      "result": "PASS",
+      "reasons": [],
+      "stamps": [
+        [
+          "893bf7ca1",
+          "bd56a60e6180ad5a1eccbf4df7ab41c7bc4500cc"
+        ]
+      ],
+      "states": [
+        "ASSETS",
+        "BOOT",
+        "NETWORK",
+        "SERVICE",
+        "READY"
+      ],
+      "ready_ms": [
+        13470
+      ],
+      "resolved_addresses": [
+        "192.168.3.230",
+        "192.168.3.230",
+        "192.168.3.230"
+      ],
+      "activation_dispatch_ms": [
+        164
+      ],
+      "heap_samples": [
+        [
+          11800,
+          87851
+        ],
+        [
+          22650,
+          62003
+        ],
+        [
+          32650,
+          62003
+        ],
+        [
+          42650,
+          62187
+        ],
+        [
+          52650,
+          62003
+        ],
+        [
+          62650,
+          62003
+        ],
+        [
+          72650,
+          62187
+        ],
+        [
+          82650,
+          62003
+        ],
+        [
+          92650,
+          62003
+        ],
+        [
+          102650,
+          62187
+        ],
+        [
+          112650,
+          62187
+        ],
+        [
+          122650,
+          62175
+        ],
+        [
+          132650,
+          62187
+        ],
+        [
+          142650,
+          62003
+        ],
+        [
+          152650,
+          62003
+        ],
+        [
+          162650,
+          62175
+        ],
+        [
+          172650,
+          62187
+        ],
+        [
+          182650,
+          62175
+        ],
+        [
+          192650,
+          62187
+        ],
+        [
+          202650,
+          62175
+        ],
+        [
+          212650,
+          62003
+        ],
+        [
+          222650,
+          62003
+        ],
+        [
+          232650,
+          62003
+        ],
+        [
+          242650,
+          62187
+        ],
+        [
+          252650,
+          62175
+        ]
+      ],
+      "settled_heap_delta": -12,
+      "faults": [],
+      "error_lines": [
+        "E (12710) AGENT: 0 Not found for bind remote 192.168.3.230:53530",
+        "E (12710) AGENT: 0 Not found for bind remote 192.168.3.230:53530",
+        "E (12710) AGENT: 0 Not found for bind remote 192.168.3.230:53530",
+        "E (12710) AGENT: 0 Not found for bind remote 192.168.3.230:53530",
+        "E (12830) AGENT: 0 Not found for bind remote 192.168.3.230:53530",
+        "E (12830) AGENT: 0 Not found for bind remote 192.168.3.230:53530",
+        "E (12830) AGENT: 0 Not found for bind remote 192.168.3.230:51996",
+        "E (12840) AGENT: 0 Not found for bind remote 192.168.3.230:51996"
+      ],
+      "board": "stack",
+      "log": "baseline-04-stack.log",
+      "expected_hub_ip": "192.168.3.230"
+    },
+    {
+      "result": "PASS",
+      "reasons": [],
+      "stamps": [
+        [
+          "893bf7ca1",
+          "bd56a60e6180ad5a1eccbf4df7ab41c7bc4500cc"
+        ]
+      ],
+      "states": [
+        "ASSETS",
+        "BOOT",
+        "NETWORK",
+        "SERVICE",
+        "READY"
+      ],
+      "ready_ms": [
+        12449
+      ],
+      "resolved_addresses": [
+        "192.168.3.230",
+        "192.168.3.230",
+        "192.168.3.230"
+      ],
+      "activation_dispatch_ms": [
+        163
+      ],
+      "heap_samples": [
+        [
+          10739,
+          85127
+        ],
+        [
+          22219,
+          50703
+        ],
+        [
+          32219,
+          50703
+        ],
+        [
+          42219,
+          50703
+        ],
+        [
+          52219,
+          50703
+        ],
+        [
+          62219,
+          50703
+        ],
+        [
+          72219,
+          50703
+        ]
+      ],
+      "settled_heap_delta": 0,
+      "faults": [],
+      "error_lines": [
+        "E (829) sh8601: swap_xy is not supported by this panel",
+        "E (11609) AGENT: 0 Not found for bind remote 192.168.3.230:52708",
+        "E (11609) AGENT: 0 Not found for bind remote 192.168.3.230:52708",
+        "E (11609) AGENT: 0 Not found for bind remote 192.168.3.230:52708",
+        "E (11619) AGENT: 0 Not found for bind remote 192.168.3.230:52708",
+        "E (11619) AGENT: 0 Not found for bind remote 192.168.3.230:52708"
+      ],
+      "board": "wave",
+      "log": "baseline-05-wave.log",
+      "expected_hub_ip": "192.168.3.230"
+    },
+    {
+      "result": "PASS",
+      "reasons": [],
+      "stamps": [
+        [
+          "893bf7ca1",
+          "bd56a60e6180ad5a1eccbf4df7ab41c7bc4500cc"
+        ]
+      ],
+      "states": [
+        "ASSETS",
+        "BOOT",
+        "NETWORK",
+        "SERVICE",
+        "READY"
+      ],
+      "ready_ms": [
+        11959
+      ],
+      "resolved_addresses": [
+        "192.168.3.230",
+        "192.168.3.230",
+        "192.168.3.230"
+      ],
+      "activation_dispatch_ms": [
+        163
+      ],
+      "heap_samples": [
+        [
+          10479,
+          85099
+        ],
+        [
+          21219,
+          50659
+        ],
+        [
+          31219,
+          50659
+        ],
+        [
+          41219,
+          50659
+        ],
+        [
+          51219,
+          50659
+        ],
+        [
+          61219,
+          50659
+        ],
+        [
+          71219,
+          50659
+        ]
+      ],
+      "settled_heap_delta": 0,
+      "faults": [],
+      "error_lines": [
+        "E (829) sh8601: swap_xy is not supported by this panel",
+        "E (11329) AGENT: 0 Not found for bind remote 192.168.3.230:56420",
+        "E (11329) AGENT: 0 Not found for bind remote 192.168.3.230:56420",
+        "E (11339) AGENT: 0 Not found for bind remote 192.168.3.230:56420",
+        "E (11359) AGENT: 0 Not found for bind remote 192.168.3.230:56420"
+      ],
+      "board": "wave",
+      "log": "baseline-06-wave.log",
+      "expected_hub_ip": "192.168.3.230"
+    },
+    {
+      "result": "PASS",
+      "reasons": [],
+      "stamps": [
+        [
+          "893bf7ca1",
+          "bd56a60e6180ad5a1eccbf4df7ab41c7bc4500cc"
+        ]
+      ],
+      "states": [
+        "ASSETS",
+        "BOOT",
+        "NETWORK",
+        "SERVICE",
+        "READY"
+      ],
+      "ready_ms": [
+        13009
+      ],
+      "resolved_addresses": [
+        "192.168.3.230",
+        "192.168.3.230",
+        "192.168.3.230"
+      ],
+      "activation_dispatch_ms": [
+        163
+      ],
+      "heap_samples": [
+        [
+          11229,
+          85131
+        ],
+        [
+          22219,
+          50727
+        ],
+        [
+          32219,
+          50727
+        ],
+        [
+          42219,
+          50727
+        ],
+        [
+          52219,
+          50727
+        ],
+        [
+          62219,
+          50727
+        ],
+        [
+          72219,
+          50727
+        ],
+        [
+          82219,
+          50923
+        ],
+        [
+          92219,
+          50747
+        ],
+        [
+          102219,
+          50919
+        ],
+        [
+          112219,
+          50747
+        ],
+        [
+          122219,
+          50747
+        ],
+        [
+          132219,
+          50747
+        ],
+        [
+          142219,
+          50747
+        ],
+        [
+          152219,
+          50747
+        ],
+        [
+          162219,
+          50747
+        ],
+        [
+          172219,
+          50747
+        ],
+        [
+          182219,
+          50747
+        ],
+        [
+          192219,
+          50747
+        ],
+        [
+          202219,
+          50747
+        ],
+        [
+          212219,
+          50747
+        ],
+        [
+          222219,
+          50747
+        ],
+        [
+          232219,
+          50747
+        ],
+        [
+          242219,
+          50747
+        ],
+        [
+          252219,
+          50747
+        ]
+      ],
+      "settled_heap_delta": 20,
+      "faults": [],
+      "error_lines": [
+        "E (829) sh8601: swap_xy is not supported by this panel",
+        "E (12169) AGENT: 0 Not found for bind remote 192.168.3.230:58221",
+        "E (12169) AGENT: 0 Not found for bind remote 192.168.3.230:58221",
+        "E (12169) AGENT: 0 Not found for bind remote 192.168.3.230:58221",
+        "E (12169) AGENT: 0 Not found for bind remote 192.168.3.230:58221",
+        "E (12179) AGENT: 0 Not found for bind remote 192.168.3.230:58221",
+        "E (12469) AGENT: 0 Not found for bind remote 192.168.3.230:53568",
+        "E (12469) AGENT: 0 Not found for bind remote 192.168.3.230:53568"
+      ],
+      "board": "wave",
+      "log": "baseline-07-wave.log",
+      "expected_hub_ip": "192.168.3.230"
+    },
+    {
+      "result": "PASS",
+      "reasons": [],
+      "stamps": [
+        [
+          "893bf7ca1",
+          "bd56a60e6180ad5a1eccbf4df7ab41c7bc4500cc"
+        ]
+      ],
+      "states": [
+        "ASSETS",
+        "BOOT",
+        "NETWORK",
+        "SERVICE",
+        "READY"
+      ],
+      "ready_ms": [
+        9722
+      ],
+      "resolved_addresses": [
+        "192.168.3.182",
+        "192.168.3.182",
+        "192.168.3.182"
+      ],
+      "activation_dispatch_ms": [
+        195
+      ],
+      "heap_samples": [
+        [
+          8452,
+          214047
+        ],
+        [
+          19352,
+          146571
+        ],
+        [
+          29352,
+          147411
+        ],
+        [
+          39352,
+          147411
+        ],
+        [
+          49352,
+          147411
+        ],
+        [
+          59352,
+          143007
+        ],
+        [
+          69352,
+          147411
+        ]
+      ],
+      "settled_heap_delta": 0,
+      "faults": [],
+      "error_lines": [
+        "E (9082) AGENT: 0 Not found for bind remote 192.168.3.182:59387",
+        "E (9082) AGENT: 0 Not found for bind remote 192.168.3.182:59387",
+        "E (9082) AGENT: 0 Not found for bind remote 192.168.3.182:59387",
+        "E (9092) AGENT: 0 Not found for bind remote 192.168.3.182:59387",
+        "E (9102) AGENT: 0 Not found for bind remote 192.168.3.182:59387",
+        "E (9112) AGENT: 0 Not found for bind remote 192.168.3.182:59387",
+        "E (9132) AGENT: 0 Not found for bind remote 192.168.3.182:59387",
+        "E (9132) AGENT: 0 Not found for bind remote 192.168.3.182:59387",
+        "E (9142) AGENT: 0 Not found for bind remote 192.168.3.182:59387",
+        "E (9252) AGENT: 0 Not found for bind remote 192.168.3.182:55007",
+        "E (9262) AGENT: 0 Not found for bind remote 192.168.3.182:55007"
+      ],
+      "board": "korvo",
+      "log": "baseline-08-korvo.log",
+      "expected_hub_ip": "192.168.3.182"
+    },
+    {
+      "result": "PASS",
+      "reasons": [],
+      "stamps": [
+        [
+          "893bf7ca1",
+          "bd56a60e6180ad5a1eccbf4df7ab41c7bc4500cc"
+        ]
+      ],
+      "states": [
+        "ASSETS",
+        "BOOT",
+        "NETWORK",
+        "SERVICE",
+        "READY"
+      ],
+      "ready_ms": [
+        11562
+      ],
+      "resolved_addresses": [
+        "192.168.3.182",
+        "192.168.3.182",
+        "192.168.3.182"
+      ],
+      "activation_dispatch_ms": [
+        197
+      ],
+      "heap_samples": [
+        [
+          10202,
+          214035
+        ],
+        [
+          21352,
+          147467
+        ],
+        [
+          31352,
+          147467
+        ],
+        [
+          41352,
+          147467
+        ],
+        [
+          51352,
+          147467
+        ],
+        [
+          61352,
+          147467
+        ],
+        [
+          71352,
+          147439
+        ]
+      ],
+      "settled_heap_delta": -28,
+      "faults": [],
+      "error_lines": [
+        "E (10872) AGENT: 0 Not found for bind remote 192.168.3.182:51876",
+        "E (10872) AGENT: 0 Not found for bind remote 192.168.3.182:51876",
+        "E (10872) AGENT: 0 Not found for bind remote 192.168.3.182:51876",
+        "E (10872) AGENT: 0 Not found for bind remote 192.168.3.182:51876",
+        "E (10882) AGENT: 0 Not found for bind remote 192.168.3.182:51876",
+        "E (10892) AGENT: 0 Not found for bind remote 192.168.3.182:51876",
+        "E (10912) AGENT: 0 Not found for bind remote 192.168.3.182:51876",
+        "E (10922) AGENT: 0 Not found for bind remote 192.168.3.182:51876",
+        "E (10922) AGENT: 0 Not found for bind remote 192.168.3.182:51876",
+        "E (11072) AGENT: 0 Not found for bind remote 192.168.3.182:55796",
+        "E (11082) AGENT: 0 Not found for bind remote 192.168.3.182:55796"
+      ],
+      "board": "korvo",
+      "log": "baseline-09-korvo.log",
+      "expected_hub_ip": "192.168.3.182"
+    },
+    {
+      "result": "PASS",
+      "reasons": [],
+      "stamps": [
+        [
+          "893bf7ca1",
+          "bd56a60e6180ad5a1eccbf4df7ab41c7bc4500cc"
+        ]
+      ],
+      "states": [
+        "ASSETS",
+        "BOOT",
+        "NETWORK",
+        "SERVICE",
+        "READY"
+      ],
+      "ready_ms": [
+        9452
+      ],
+      "resolved_addresses": [
+        "192.168.3.182",
+        "192.168.3.182",
+        "192.168.3.182"
+      ],
+      "activation_dispatch_ms": [
+        195
+      ],
+      "heap_samples": [
+        [
+          7902,
+          214079
+        ],
+        [
+          19372,
+          147499
+        ],
+        [
+          29372,
+          147499
+        ],
+        [
+          39372,
+          147499
+        ],
+        [
+          49372,
+          147467
+        ],
+        [
+          59372,
+          147467
+        ],
+        [
+          69372,
+          147467
+        ],
+        [
+          79372,
+          147467
+        ],
+        [
+          89372,
+          147467
+        ],
+        [
+          99372,
+          147467
+        ],
+        [
+          109372,
+          147467
+        ],
+        [
+          119372,
+          147467
+        ],
+        [
+          129372,
+          148135
+        ],
+        [
+          139372,
+          148135
+        ],
+        [
+          149372,
+          148135
+        ],
+        [
+          159372,
+          148135
+        ],
+        [
+          169372,
+          148135
+        ],
+        [
+          179372,
+          148135
+        ],
+        [
+          189372,
+          148135
+        ],
+        [
+          199372,
+          148135
+        ],
+        [
+          209372,
+          148135
+        ],
+        [
+          219372,
+          148135
+        ],
+        [
+          229372,
+          148135
+        ],
+        [
+          239372,
+          148135
+        ],
+        [
+          249372,
+          148135
+        ]
+      ],
+      "settled_heap_delta": 636,
+      "faults": [],
+      "error_lines": [
+        "E (8522) AGENT: 0 Not found for bind remote 192.168.3.182:58737",
+        "E (8522) AGENT: 0 Not found for bind remote 192.168.3.182:58737",
+        "E (8522) AGENT: 0 Not found for bind remote 192.168.3.182:58737",
+        "E (8542) AGENT: 0 Not found for bind remote 192.168.3.182:58737",
+        "E (8552) AGENT: 0 Not found for bind remote 192.168.3.182:58737",
+        "E (8562) AGENT: 0 Not found for bind remote 192.168.3.182:58737",
+        "E (8562) AGENT: 0 Not found for bind remote 192.168.3.182:58737",
+        "E (8572) AGENT: 0 Not found for bind remote 192.168.3.182:58737",
+        "E (8652) AGENT: 0 Not found for bind remote 192.168.3.182:58737",
+        "E (8652) AGENT: 0 Not found for bind remote 192.168.3.182:58737",
+        "E (8932) AGENT: 0 Not found for bind remote 192.168.3.182:59910",
+        "E (8932) AGENT: 0 Not found for bind remote 192.168.3.182:59910",
+        "E (8932) AGENT: 0 Not found for bind remote 192.168.3.182:59910",
+        "E (8932) AGENT: 0 Not found for bind remote 192.168.3.182:59910"
+      ],
+      "board": "korvo",
+      "log": "baseline-10-korvo.log",
+      "expected_hub_ip": "192.168.3.182"
+    }
+  ],
+  "receive_only": {
+    "result": "PASS",
+    "sdk": "3f98d8deed47d7e9b8ea9cb65b13d87c61174033",
+    "diagnostic_build": true,
+    "before": "receive-only-before.log",
+    "after": "receive-only-after.log",
+    "server_snapshot": "participants-receive-fixed-disabled.jsonl",
+    "microphone_capture_started": false,
+    "subscribed_tracks": [
+      "TR_AaiYSKRU2ATS7",
+      "TR_AR5mBJunLdwjU"
+    ],
+    "released_tracks": [
+      "TR_AaiYSKRU2ATS7",
+      "TR_AR5mBJunLdwjU"
+    ],
+    "error_lines": [],
+    "receive_format_reference": "https://github.com/espressif/esp-webrtc-solution/blob/main/components/esp_peer/README.md"
+  },
+  "unresolved": [
+    {
+      "issue": "BOX-3 first-round correct-address TCP timeout followed by native mDNS query timeouts",
+      "result": "FAIL",
+      "root_cause": "not established; failed interval was not packet-captured",
+      "log": "baseline-01-box.log"
+    },
+    {
+      "issue": "Enabling microphone on a running receive-only ESP32 room updates server permission but does not recreate local capture/publication",
+      "result": "FAIL",
+      "evidence": [
+        "participants-receive-fixed-enabled.jsonl",
+        "receive-only-after.log"
+      ],
+      "qualification": "policy is reloaded at configuration refresh/join/reboot; immediate runtime restoration did not occur; immediate-apply product contract and common refresh path require review before choosing a fix"
+    },
+    {
+      "issue": "StackChan formal boot: mDNS query failures and correct-address TCP connect timeouts; no READY within 195 seconds",
+      "result": "FAIL",
+      "root_cause": "TCP handshake fails before TLS; Hub answers were emitted but no device TCP ACK observed. Lower-level root cause remains open.",
+      "log": "formal-stack-boot-stack-1.log",
+      "retry": "Activation progressed through attempts 1 to 4, with 10/20/40 second backoff; no retry-task stall was observed. Later requested reboot recovered."
+    },
+    {
+      "issue": "BOX-3 formal round 1: connected room Ping Timeout",
+      "result": "FAIL",
+      "log": "formal-box-boot-box-1.log",
+      "ready_ms": [
+        11939,
+        65699
+      ],
+      "failure_ms": 56499,
+      "root_cause": "not established; TCP 9443 header capture does not cover RTC signaling connection on port 7880",
+      "hub_log": "box-hub-journal.jsonl",
+      "qualification": "Duplicate identity removal after the reconnect is a consequence of a replacement connection; subsequent planned reboot replacements must not be classified as spontaneous faults."
+    }
+  ],
+  "capture_caveats": [
+    "Korvo is now claimed to Mac Hub .182. Initial common .230 expectation was a test configuration error and is not a product failure; corrected Korvo runs are used.",
+    "Reopening BOX serial produced USB_UART_CHIP_RESET; the continuation READY is not evidence of unassisted retry recovery.",
+    "PASS covers declared boot/idle criteria. Nonfatal error log lines remain visible in each result.",
+    "Silent remote audio validates RTP/decoder/render entry and subscription lifecycle, not acoustic microphone/speaker quality or an Agent conversation.",
+    "Two preliminary formal-retest starts lacked serial sandbox access and captured no device output. They are excluded; escalated runs in remaining-retest supply the actual Korvo/StackChan evidence."
+  ],
+  "not_executed": [
+    "Spoken first conversation and AEC quality",
+    "Real power loss during OTA",
+    "Physical NVS fault recovery",
+    "PCM B shutdown failure injection"
+  ],
+  "tests": {
+    "hil_evidence_classifier": "5 passed",
+    "sdk_receive_only": "1 passed with ASan/UBSan",
+    "sdk_engine_lifecycle": "2 passed",
+    "sdk_ice_transport": "passed",
+    "firmware_output_policy": "passed",
+    "firmware_pcm_capture": "passed with ASan/UBSan"
+  },
+  "final_firmware": "e75d1807",
+  "sdk": "3f98d8deed47d7e9b8ea9cb65b13d87c61174033",
+  "formal_runs": [
+    {
+      "result": "FAIL",
+      "reasons": [
+        "failure/recovery evidence in serial log"
+      ],
+      "stamps": [
+        [
+          "e75d1807c",
+          "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+        ]
+      ],
+      "states": [
+        "ASSETS",
+        "BOOT",
+        "NETWORK",
+        "SERVICE",
+        "READY",
+        "RETRY",
+        "READY"
+      ],
+      "ready_ms": [
+        11939,
+        65699
+      ],
+      "resolved_addresses": [
+        "192.168.3.230",
+        "192.168.3.230",
+        "192.168.3.230"
+      ],
+      "activation_dispatch_ms": [
+        215
+      ],
+      "heap_samples": [
+        [
+          10169,
+          120535
+        ],
+        [
+          20959,
+          32831
+        ],
+        [
+          30959,
+          32439
+        ],
+        [
+          40959,
+          32811
+        ],
+        [
+          50959,
+          32791
+        ],
+        [
+          74959,
+          32559
+        ]
+      ],
+      "settled_heap_delta": -252,
+      "faults": [
+        "I (56479) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1",
+        "E (56499) LiveKitSession: Failure: Ping Timeout"
+      ],
+      "error_lines": [
+        "E (10459) MODEL_LOADER: Can not find model in partition table",
+        "E (11099) AGENT: 0 Not found for bind remote 192.168.3.230:53182",
+        "E (11099) AGENT: 0 Not found for bind remote 192.168.3.230:53182",
+        "E (11109) AGENT: 0 Not found for bind remote 192.168.3.230:53182",
+        "E (11109) AGENT: 0 Not found for bind remote 192.168.3.230:53182",
+        "E (11109) AGENT: 0 Not found for bind remote 192.168.3.230:53182",
+        "E (56499) LiveKitSession: Failure: Ping Timeout",
+        "E (63489) AGENT: 0 Failed to receive request",
+        "E (63709) AGENT: 0 Failed to receive request",
+        "E (63709) AGENT: Failed to recv retry ret -1",
+        "E (64289) AGENT: 0 Not found for bind remote 192.168.3.230:51994",
+        "E (64289) AGENT: 0 Not found for bind remote 192.168.3.230:51994",
+        "E (64289) AGENT: 0 Not found for bind remote 192.168.3.230:51994",
+        "E (64299) AGENT: 0 Not found for bind remote 192.168.3.230:51994",
+        "E (64309) AGENT: 0 Not found for bind remote 192.168.3.230:51994",
+        "E (64309) AGENT: 0 Not found for bind remote 192.168.3.230:51994",
+        "E (64589) AGENT: 0 Not found for bind remote 192.168.3.230:51994",
+        "E (64589) AGENT: 0 Not found for bind remote 192.168.3.230:51994",
+        "E (64939) AGENT: 0 Not found for bind remote 192.168.3.230:51994",
+        "E (64939) AGENT: 0 Not found for bind remote 192.168.3.230:51994",
+        "E (64939) AGENT: 0 Not found for bind remote 192.168.3.230:51415",
+        "E (64949) AGENT: 0 Not found for bind remote 192.168.3.230:51415",
+        "E (64949) AGENT: 0 Not found for bind remote 192.168.3.230:51994",
+        "E (64959) AGENT: 0 Not found for bind remote 192.168.3.230:51994",
+        "E (64989) AGENT: 0 Not found for bind remote 192.168.3.230:51415",
+        "E (65129) AGENT: 0 Not found for bind remote 192.168.3.230:51415",
+        "E (65129) AGENT: 0 Not found for bind remote 192.168.3.230:51415"
+      ],
+      "name": "box",
+      "port": "/dev/cu.usbmodem21201",
+      "round": 1,
+      "duration_seconds": 75,
+      "log": "formal-box-boot-box-1.log",
+      "serial_disconnects": 0,
+      "serial_errors": []
+    },
+    {
+      "result": "PASS",
+      "reasons": [],
+      "stamps": [
+        [
+          "e75d1807c",
+          "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+        ]
+      ],
+      "states": [
+        "ASSETS",
+        "BOOT",
+        "NETWORK",
+        "SERVICE",
+        "READY"
+      ],
+      "ready_ms": [
+        12149
+      ],
+      "resolved_addresses": [
+        "192.168.3.230",
+        "192.168.3.230",
+        "192.168.3.230"
+      ],
+      "activation_dispatch_ms": [
+        216
+      ],
+      "heap_samples": [
+        [
+          10009,
+          120515
+        ],
+        [
+          21969,
+          32043
+        ],
+        [
+          31969,
+          32787
+        ],
+        [
+          41959,
+          32787
+        ],
+        [
+          51969,
+          32787
+        ],
+        [
+          61959,
+          32787
+        ],
+        [
+          71979,
+          32959
+        ]
+      ],
+      "settled_heap_delta": 172,
+      "faults": [],
+      "error_lines": [
+        "E (10299) MODEL_LOADER: Can not find model in partition table",
+        "E (10969) AGENT: 0 Not found for bind remote 192.168.3.230:56088",
+        "E (10969) AGENT: 0 Not found for bind remote 192.168.3.230:56088",
+        "E (10969) AGENT: 0 Not found for bind remote 192.168.3.230:56088",
+        "E (10979) AGENT: 0 Not found for bind remote 192.168.3.230:56088",
+        "E (10989) AGENT: 0 Not found for bind remote 192.168.3.230:56088",
+        "E (10989) AGENT: 0 Not found for bind remote 192.168.3.230:56088",
+        "E (11089) AGENT: 0 Not found for bind remote 192.168.3.230:56088",
+        "E (11089) AGENT: 0 Not found for bind remote 192.168.3.230:56088",
+        "E (11099) AGENT: 0 Not found for bind remote 192.168.3.230:58035",
+        "E (11099) AGENT: 0 Not found for bind remote 192.168.3.230:58035",
+        "E (11289) AGENT: 0 Not found for bind remote 192.168.3.230:56088",
+        "E (11289) AGENT: 0 Not found for bind remote 192.168.3.230:56088",
+        "E (11299) AGENT: 0 Not found for bind remote 192.168.3.230:58035",
+        "E (11299) AGENT: 0 Not found for bind remote 192.168.3.230:58035",
+        "E (11529) AGENT: 0 Not found for bind remote 192.168.3.230:58035",
+        "E (11539) AGENT: 0 Not found for bind remote 192.168.3.230:58035"
+      ],
+      "name": "box",
+      "port": "/dev/cu.usbmodem21201",
+      "round": 2,
+      "duration_seconds": 75,
+      "log": "formal-box-boot-box-2.log",
+      "serial_disconnects": 0,
+      "serial_errors": []
+    },
+    {
+      "result": "PASS",
+      "reasons": [],
+      "stamps": [
+        [
+          "e75d1807c",
+          "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+        ]
+      ],
+      "states": [
+        "ASSETS",
+        "BOOT",
+        "NETWORK",
+        "SERVICE",
+        "READY"
+      ],
+      "ready_ms": [
+        11429
+      ],
+      "resolved_addresses": [
+        "192.168.3.230",
+        "192.168.3.230",
+        "192.168.3.230"
+      ],
+      "activation_dispatch_ms": [
+        214
+      ],
+      "heap_samples": [
+        [
+          9729,
+          120503
+        ],
+        [
+          20959,
+          32491
+        ],
+        [
+          30959,
+          32491
+        ],
+        [
+          40959,
+          32491
+        ],
+        [
+          50959,
+          31747
+        ],
+        [
+          60959,
+          32491
+        ],
+        [
+          70959,
+          32491
+        ],
+        [
+          80959,
+          32491
+        ],
+        [
+          90969,
+          32491
+        ],
+        [
+          100979,
+          32491
+        ],
+        [
+          110959,
+          32491
+        ],
+        [
+          120959,
+          32491
+        ],
+        [
+          130959,
+          33043
+        ],
+        [
+          140959,
+          33159
+        ],
+        [
+          150969,
+          33159
+        ],
+        [
+          160959,
+          33159
+        ],
+        [
+          170969,
+          33159
+        ],
+        [
+          180959,
+          33159
+        ],
+        [
+          190959,
+          33159
+        ],
+        [
+          200959,
+          33159
+        ],
+        [
+          210959,
+          33339
+        ],
+        [
+          220979,
+          33159
+        ],
+        [
+          230959,
+          33159
+        ],
+        [
+          240959,
+          33159
+        ],
+        [
+          250959,
+          33159
+        ]
+      ],
+      "settled_heap_delta": 668,
+      "faults": [],
+      "error_lines": [
+        "E (10019) MODEL_LOADER: Can not find model in partition table",
+        "E (10689) AGENT: 0 Not found for bind remote 192.168.3.230:51507",
+        "E (10689) AGENT: 0 Not found for bind remote 192.168.3.230:51507",
+        "E (10689) AGENT: 0 Not found for bind remote 192.168.3.230:51507",
+        "E (10689) AGENT: 0 Not found for bind remote 192.168.3.230:51507",
+        "E (10699) AGENT: 0 Not found for bind remote 192.168.3.230:51507",
+        "E (10789) AGENT: 0 Not found for bind remote 192.168.3.230:51507",
+        "E (10799) AGENT: 0 Not found for bind remote 192.168.3.230:51507",
+        "E (10799) AGENT: 0 Not found for bind remote 192.168.3.230:56139",
+        "E (10799) AGENT: 0 Not found for bind remote 192.168.3.230:56139"
+      ],
+      "name": "box",
+      "port": "/dev/cu.usbmodem21201",
+      "round": 3,
+      "duration_seconds": 255,
+      "log": "formal-box-boot-box-3.log",
+      "serial_disconnects": 0,
+      "serial_errors": []
+    },
+    {
+      "result": "FAIL",
+      "reasons": [
+        "failure/recovery evidence in serial log"
+      ],
+      "stamps": [
+        [
+          "e75d1807c",
+          "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+        ]
+      ],
+      "states": [
+        "ASSETS",
+        "BOOT",
+        "NETWORK",
+        "SERVICE"
+      ],
+      "ready_ms": [],
+      "resolved_addresses": [
+        "-",
+        "-",
+        "192.168.3.230",
+        "192.168.3.230",
+        "192.168.3.230",
+        "-",
+        "192.168.3.230"
+      ],
+      "activation_dispatch_ms": [],
+      "heap_samples": [
+        [
+          15651,
+          86107
+        ],
+        [
+          25651,
+          84939
+        ],
+        [
+          35651,
+          87947
+        ],
+        [
+          45651,
+          85307
+        ],
+        [
+          55651,
+          85247
+        ],
+        [
+          65651,
+          85863
+        ],
+        [
+          75651,
+          84731
+        ],
+        [
+          85651,
+          84731
+        ],
+        [
+          95651,
+          87931
+        ],
+        [
+          105651,
+          87931
+        ],
+        [
+          115651,
+          85227
+        ],
+        [
+          125651,
+          85899
+        ],
+        [
+          135651,
+          84803
+        ],
+        [
+          145651,
+          87931
+        ],
+        [
+          155651,
+          87931
+        ],
+        [
+          165651,
+          87931
+        ],
+        [
+          175651,
+          87931
+        ],
+        [
+          185651,
+          85183
+        ]
+      ],
+      "settled_heap_delta": null,
+      "faults": [
+        "E (14881) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+        "E (14901) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8127 status=0 socket_errno=0 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+        "E (31081) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+        "E (31101) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8109 status=0 socket_errno=0 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+        "E (62311) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=20648 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+        "E (86271) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15877 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+        "E (122011) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15178 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+        "E (138181) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+        "E (138201) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8109 status=0 socket_errno=119 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+        "E (194001) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15238 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0"
+      ],
+      "error_lines": [
+        "E (14881) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+        "E (14891) esp-tls: Failed to open new connection",
+        "E (14891) transport_base: Failed to open a new connection",
+        "E (14901) HTTP_CLIENT: Connection failed, sock < 0",
+        "E (14901) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8127 status=0 socket_errno=0 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+        "E (31081) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+        "E (31091) esp-tls: Failed to open new connection",
+        "E (31091) transport_base: Failed to open a new connection",
+        "E (31101) HTTP_CLIENT: Connection failed, sock < 0",
+        "E (31101) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8109 status=0 socket_errno=0 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+        "E (62311) esp-tls: [sock=54] select() timeout",
+        "E (62311) esp-tls: Failed to open new connection",
+        "E (62311) transport_base: Failed to open a new connection",
+        "E (62311) HTTP_CLIENT: Connection failed, sock < 0",
+        "E (62311) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=20648 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+        "E (86271) esp-tls: [sock=54] select() timeout",
+        "E (86271) esp-tls: Failed to open new connection",
+        "E (86271) transport_base: Failed to open a new connection",
+        "E (86271) HTTP_CLIENT: Connection failed, sock < 0",
+        "E (86271) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15877 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+        "E (122011) esp-tls: [sock=54] select() timeout",
+        "E (122011) esp-tls: Failed to open new connection",
+        "E (122011) transport_base: Failed to open a new connection",
+        "E (122011) HTTP_CLIENT: Connection failed, sock < 0",
+        "E (122011) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15178 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+        "E (138181) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+        "E (138191) esp-tls: Failed to open new connection",
+        "E (138191) transport_base: Failed to open a new connection",
+        "E (138201) HTTP_CLIENT: Connection failed, sock < 0",
+        "E (138201) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8109 status=0 socket_errno=119 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+        "E (194001) esp-tls: [sock=54] select() timeout",
+        "E (194001) esp-tls: Failed to open new connection",
+        "E (194001) transport_base: Failed to open a new connection",
+        "E (194001) HTTP_CLIENT: Connection failed, sock < 0",
+        "E (194001) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15238 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0"
+      ],
+      "name": "stack",
+      "port": "/dev/cu.usbmodem21101",
+      "round": 1,
+      "duration_seconds": 195.0,
+      "log": "formal-stack-boot-stack-1.log",
+      "serial_disconnects": 0,
+      "serial_errors": []
+    },
+    {
+      "result": "PASS",
+      "reasons": [],
+      "stamps": [
+        [
+          "e75d1807c",
+          "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+        ]
+      ],
+      "states": [
+        "ASSETS",
+        "BOOT",
+        "NETWORK",
+        "SERVICE",
+        "READY"
+      ],
+      "ready_ms": [
+        13309
+      ],
+      "resolved_addresses": [
+        "192.168.3.230",
+        "192.168.3.230",
+        "192.168.3.230"
+      ],
+      "activation_dispatch_ms": [
+        237
+      ],
+      "heap_samples": [
+        [
+          10919,
+          85055
+        ],
+        [
+          23219,
+          50727
+        ],
+        [
+          33219,
+          50727
+        ],
+        [
+          43219,
+          50727
+        ],
+        [
+          53219,
+          50727
+        ],
+        [
+          63219,
+          50727
+        ],
+        [
+          73219,
+          50739
+        ],
+        [
+          83219,
+          50739
+        ],
+        [
+          93219,
+          50739
+        ],
+        [
+          103219,
+          50739
+        ],
+        [
+          113219,
+          50739
+        ],
+        [
+          123219,
+          50739
+        ],
+        [
+          133219,
+          50739
+        ],
+        [
+          143219,
+          50739
+        ],
+        [
+          153219,
+          50739
+        ],
+        [
+          163219,
+          50739
+        ],
+        [
+          173219,
+          50739
+        ],
+        [
+          183219,
+          50739
+        ],
+        [
+          193219,
+          50739
+        ]
+      ],
+      "settled_heap_delta": 12,
+      "faults": [],
+      "error_lines": [
+        "E (829) sh8601: swap_xy is not supported by this panel",
+        "E (11849) AGENT: 0 Not found for bind remote 192.168.3.230:58789",
+        "E (11849) AGENT: 0 Not found for bind remote 192.168.3.230:58789",
+        "E (11849) AGENT: 0 Not found for bind remote 192.168.3.230:58789",
+        "E (11849) AGENT: 0 Not found for bind remote 192.168.3.230:58789",
+        "E (11859) AGENT: 0 Not found for bind remote 192.168.3.230:58789"
+      ],
+      "name": "wave",
+      "port": "/dev/cu.usbmodem21401",
+      "round": 1,
+      "duration_seconds": 195.0,
+      "log": "formal-wave-boot-wave-1.log",
+      "serial_disconnects": 0,
+      "serial_errors": []
+    },
+    {
+      "result": "PASS",
+      "reasons": [],
+      "stamps": [
+        [
+          "e75d1807c",
+          "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+        ]
+      ],
+      "states": [
+        "ASSETS",
+        "BOOT",
+        "NETWORK",
+        "SERVICE",
+        "READY"
+      ],
+      "ready_ms": [
+        9720
+      ],
+      "resolved_addresses": [
+        "192.168.3.182",
+        "192.168.3.182",
+        "192.168.3.182"
+      ],
+      "activation_dispatch_ms": [
+        195
+      ],
+      "heap_samples": [
+        [
+          8460,
+          213999
+        ],
+        [
+          19360,
+          147471
+        ],
+        [
+          29360,
+          147439
+        ],
+        [
+          39360,
+          147439
+        ],
+        [
+          49360,
+          147439
+        ],
+        [
+          59360,
+          147439
+        ],
+        [
+          69360,
+          147439
+        ]
+      ],
+      "settled_heap_delta": 0,
+      "faults": [],
+      "error_lines": [
+        "E (9090) AGENT: 0 Not found for bind remote 192.168.3.182:54891",
+        "E (9100) AGENT: 0 Not found for bind remote 192.168.3.182:54891",
+        "E (9110) AGENT: 0 Not found for bind remote 192.168.3.182:54891",
+        "E (9120) AGENT: 0 Not found for bind remote 192.168.3.182:54891",
+        "E (9120) AGENT: 0 Not found for bind remote 192.168.3.182:54891",
+        "E (9130) AGENT: 0 Not found for bind remote 192.168.3.182:54891",
+        "E (9130) AGENT: 0 Not found for bind remote 192.168.3.182:54891",
+        "E (9140) AGENT: 0 Not found for bind remote 192.168.3.182:54891",
+        "E (9260) AGENT: 0 Not found for bind remote 192.168.3.182:55177",
+        "E (9270) AGENT: 0 Not found for bind remote 192.168.3.182:55177"
+      ],
+      "name": "korvo",
+      "port": "/dev/cu.usbserial-2130",
+      "round": 1,
+      "duration_seconds": 75.0,
+      "log": "formal-remaining-retest-korvo-1.log",
+      "serial_disconnects": 0,
+      "serial_errors": []
+    },
+    {
+      "result": "PASS",
+      "reasons": [],
+      "stamps": [
+        [
+          "e75d1807c",
+          "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+        ]
+      ],
+      "states": [
+        "ASSETS",
+        "BOOT",
+        "NETWORK",
+        "SERVICE",
+        "READY"
+      ],
+      "ready_ms": [
+        9440
+      ],
+      "resolved_addresses": [
+        "192.168.3.182",
+        "192.168.3.182",
+        "192.168.3.182"
+      ],
+      "activation_dispatch_ms": [
+        195
+      ],
+      "heap_samples": [
+        [
+          7900,
+          214123
+        ],
+        [
+          19380,
+          147507
+        ],
+        [
+          29380,
+          147507
+        ],
+        [
+          39380,
+          147507
+        ],
+        [
+          49380,
+          147507
+        ],
+        [
+          59380,
+          147507
+        ],
+        [
+          69380,
+          147507
+        ],
+        [
+          79380,
+          147539
+        ],
+        [
+          89380,
+          147539
+        ],
+        [
+          99380,
+          147539
+        ],
+        [
+          109380,
+          147539
+        ],
+        [
+          119380,
+          147539
+        ],
+        [
+          129380,
+          148195
+        ],
+        [
+          139380,
+          148163
+        ],
+        [
+          149380,
+          148163
+        ],
+        [
+          159380,
+          148163
+        ],
+        [
+          169380,
+          148331
+        ],
+        [
+          179380,
+          148163
+        ],
+        [
+          189380,
+          148163
+        ]
+      ],
+      "settled_heap_delta": 656,
+      "faults": [],
+      "error_lines": [
+        "E (8530) AGENT: 0 Not found for bind remote 192.168.3.182:52330",
+        "E (8890) AGENT: 0 Not found for bind remote 192.168.3.182:59445",
+        "E (8900) AGENT: 0 Not found for bind remote 192.168.3.182:59445",
+        "E (8900) AGENT: 0 Not found for bind remote 192.168.3.182:59445",
+        "E (8910) AGENT: 0 Not found for bind remote 192.168.3.182:59445"
+      ],
+      "name": "korvo",
+      "port": "/dev/cu.usbserial-2130",
+      "round": 2,
+      "duration_seconds": 195.0,
+      "log": "formal-remaining-retest-korvo-2.log",
+      "serial_disconnects": 0,
+      "serial_errors": []
+    },
+    {
+      "result": "PASS",
+      "reasons": [],
+      "stamps": [
+        [
+          "e75d1807c",
+          "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+        ]
+      ],
+      "states": [
+        "ASSETS",
+        "BOOT",
+        "NETWORK",
+        "SERVICE",
+        "READY"
+      ],
+      "ready_ms": [
+        12381
+      ],
+      "resolved_addresses": [
+        "192.168.3.230",
+        "192.168.3.230",
+        "192.168.3.230"
+      ],
+      "activation_dispatch_ms": [
+        164
+      ],
+      "heap_samples": [
+        [
+          10691,
+          87851
+        ],
+        [
+          21651,
+          61975
+        ],
+        [
+          31651,
+          61971
+        ],
+        [
+          41651,
+          61975
+        ],
+        [
+          51651,
+          61975
+        ],
+        [
+          61651,
+          61975
+        ],
+        [
+          71651,
+          61975
+        ]
+      ],
+      "settled_heap_delta": 0,
+      "faults": [],
+      "error_lines": [
+        "E (11551) AGENT: 0 Not found for bind remote 192.168.3.230:56290",
+        "E (11551) AGENT: 0 Not found for bind remote 192.168.3.230:56290",
+        "E (11551) AGENT: 0 Not found for bind remote 192.168.3.230:56290",
+        "E (11571) AGENT: 0 Not found for bind remote 192.168.3.230:56290",
+        "E (11581) AGENT: 0 Not found for bind remote 192.168.3.230:56290",
+        "E (11581) AGENT: 0 Not found for bind remote 192.168.3.230:56290",
+        "E (11591) AGENT: 0 Not found for bind remote 192.168.3.230:56290",
+        "E (11601) AGENT: 0 Not found for bind remote 192.168.3.230:56290",
+        "E (11771) AGENT: 0 Not found for bind remote 192.168.3.230:56290",
+        "E (11771) AGENT: 0 Not found for bind remote 192.168.3.230:56290"
+      ],
+      "name": "stack",
+      "port": "/dev/cu.usbmodem21101",
+      "round": 1,
+      "duration_seconds": 75.0,
+      "log": "formal-remaining-retest-stack-1.log",
+      "serial_disconnects": 0,
+      "serial_errors": []
+    },
+    {
+      "result": "PASS",
+      "reasons": [],
+      "stamps": [
+        [
+          "e75d1807c",
+          "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+        ]
+      ],
+      "states": [
+        "ASSETS",
+        "BOOT",
+        "NETWORK",
+        "SERVICE",
+        "READY"
+      ],
+      "ready_ms": [
+        12311
+      ],
+      "resolved_addresses": [
+        "192.168.3.230",
+        "192.168.3.230",
+        "192.168.3.230"
+      ],
+      "activation_dispatch_ms": [
+        164
+      ],
+      "heap_samples": [
+        [
+          10711,
+          87887
+        ],
+        [
+          21651,
+          62019
+        ],
+        [
+          31651,
+          62019
+        ],
+        [
+          41651,
+          62019
+        ],
+        [
+          51651,
+          62011
+        ],
+        [
+          61651,
+          62191
+        ],
+        [
+          71651,
+          62019
+        ],
+        [
+          81651,
+          62019
+        ],
+        [
+          91651,
+          62019
+        ],
+        [
+          101651,
+          62019
+        ],
+        [
+          111651,
+          62019
+        ],
+        [
+          121651,
+          62019
+        ],
+        [
+          131651,
+          62195
+        ],
+        [
+          141651,
+          62019
+        ],
+        [
+          151651,
+          62019
+        ],
+        [
+          161651,
+          62019
+        ],
+        [
+          171651,
+          62011
+        ],
+        [
+          181651,
+          62019
+        ],
+        [
+          191651,
+          62019
+        ]
+      ],
+      "settled_heap_delta": 0,
+      "faults": [],
+      "error_lines": [
+        "E (11591) AGENT: 0 Not found for bind remote 192.168.3.230:52926",
+        "E (11591) AGENT: 0 Not found for bind remote 192.168.3.230:52926",
+        "E (11591) AGENT: 0 Not found for bind remote 192.168.3.230:52926",
+        "E (11591) AGENT: 0 Not found for bind remote 192.168.3.230:52926",
+        "E (11601) AGENT: 0 Not found for bind remote 192.168.3.230:52926",
+        "E (11611) AGENT: 0 Not found for bind remote 192.168.3.230:52926",
+        "E (11761) AGENT: 0 Not found for bind remote 192.168.3.230:51356",
+        "E (11771) AGENT: 0 Not found for bind remote 192.168.3.230:51356"
+      ],
+      "name": "stack",
+      "port": "/dev/cu.usbmodem21101",
+      "round": 2,
+      "duration_seconds": 195.0,
+      "log": "formal-remaining-retest-stack-2.log",
+      "serial_disconnects": 0,
+      "serial_errors": []
+    }
+  ],
+  "flashing": [
+    {
+      "board": "box",
+      "returncode": 0,
+      "verified": true,
+      "seconds": 228.5,
+      "verification_lines": [
+        "Hash of data verified.",
+        "Hash of data verified.",
+        "EIDOLON-BUILDSTAMP git=e75d1807c sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=5.5.4 branch=main built=Oct  2 2026 01:55:30",
+        ">> [common] VERIFIED: device runs the just-built firmware (git=e75d1807c sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=5.5.4)."
+      ]
+    },
+    {
+      "board": "stack",
+      "returncode": 0,
+      "verified": true,
+      "seconds": 188.6,
+      "verification_lines": [
+        "Hash of data verified.",
+        "Hash of data verified.",
+        "EIDOLON-BUILDSTAMP git=e75d1807c sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=5.5.4 branch=main built=Oct  2 2026 02:00:19",
+        ">> [common] VERIFIED: device runs the just-built firmware (git=e75d1807c sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=5.5.4)."
+      ]
+    },
+    {
+      "board": "wave",
+      "returncode": 0,
+      "verified": true,
+      "seconds": 201.0,
+      "verification_lines": [
+        "Hash of data verified.",
+        "Hash of data verified.",
+        "EIDOLON-BUILDSTAMP git=e75d1807c sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=5.5.4 branch=main built=Oct  2 2026 02:03:29",
+        ">> [common] VERIFIED: device runs the just-built firmware (git=e75d1807c sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=5.5.4)."
+      ]
+    },
+    {
+      "board": "korvo",
+      "returncode": 0,
+      "verified": true,
+      "seconds": 330.2,
+      "verification_lines": [
+        "Hash of data verified.",
+        "Hash of data verified.",
+        "EIDOLON-BUILDSTAMP git=e75d1807c sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=6.1 branch=main built=Oct  2 2026 02:07:09",
+        ">> [common] VERIFIED: device runs the just-built firmware (git=e75d1807c sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=6.1)."
+      ]
+    }
+  ],
+  "wire_findings": {
+    "log": "stack-hub-packet-headers.jsonl",
+    "vantage": "Hub AF_PACKET wlan0; TCP 9443 and UDP 5353 headers; no device/AP receive-side capture",
+    "tcp_counts": {
+      "device_syn": 55,
+      "hub_syn_ack": 80,
+      "other_tcp_packets": 0
+    },
+    "tcp_attempt_source_ports": [
+      53157,
+      53158,
+      53159,
+      53160,
+      53161
+    ],
+    "observed": "Hub received SYN and emitted SYN-ACK to the correct device MAC, repeatedly. No final ACK was observed. TLS handshake did not begin for those flows.",
+    "dns_observed": "During the first failed native lookup, Hub emitted unicast A answers for the queried owner name with address 192.168.3.230; the device nevertheless reported ESP_ERR_NOT_FOUND.",
+    "ping_after_failure": {
+      "hub_to_stack": {
+        "sent": 10,
+        "received": 0
+      },
+      "mac_to_stack": {
+        "sent": 10,
+        "received": 0
+      },
+      "hub_to_wave_control": {
+        "sent": 3,
+        "received": 3
+      },
+      "hub_neighbor_mac": "68:ee:8f:d8:4a:04"
+    },
+    "limits": "An outgoing capture does not prove packets reached the AP or device. AP/radio loss versus device receive/processing failure is not established. Correct MAC does not by itself exclude every possible address conflict.",
+    "ping_after_requested_reboot": {
+      "hub_to_stack": {
+        "sent": 3,
+        "received": 3
+      },
+      "mac_to_stack": {
+        "sent": 3,
+        "received": 3
+      }
+    }
+  },
+  "archives": {
+    "/tmp/eidolon-hil-20261002/box-round-1.log": {
+      "excerpt": "baseline-01-box.log",
+      "original_sha256": "f8d442aa9723ed879a6a9366cd6bb57da1933ff0c3aff7e5b53b42db492cf8a2",
+      "original_lines": 209,
+      "excerpt_lines": 50
+    },
+    "/tmp/eidolon-hil-20261002/stack-round-1.log": {
+      "excerpt": "baseline-02-stack.log",
+      "original_sha256": "8a63813de8a4bc9d65d101d9a0edb3c250fcffa512928466ba7c2032925ef6a0",
+      "original_lines": 342,
+      "excerpt_lines": 38
+    },
+    "/tmp/eidolon-hil-20261002/stack-round-2.log": {
+      "excerpt": "baseline-03-stack.log",
+      "original_sha256": "5508ea4256bbe1790423bf184b693a6722c898c205ae07ecada3a77c0ae95ea1",
+      "original_lines": 342,
+      "excerpt_lines": 38
+    },
+    "/tmp/eidolon-hil-20261002/stack-round-3.log": {
+      "excerpt": "baseline-04-stack.log",
+      "original_sha256": "ff8b65ffa3b2a320bba1a71cfdd56fe1fecb04420569500dfdc72128df2fd12c",
+      "original_lines": 360,
+      "excerpt_lines": 56
+    },
+    "/tmp/eidolon-hil-20261002/wave-round-1.log": {
+      "excerpt": "baseline-05-wave.log",
+      "original_sha256": "b244c44db7db481a728aed59b2344a03df592bf0464529b338176404ee8e86c0",
+      "original_lines": 347,
+      "excerpt_lines": 38
+    },
+    "/tmp/eidolon-hil-20261002/wave-round-2.log": {
+      "excerpt": "baseline-06-wave.log",
+      "original_sha256": "4ca94dfc8c661e5b3e91043585f42b2cfa4848f9c2fc4bd2d58a45827203fa94",
+      "original_lines": 339,
+      "excerpt_lines": 38
+    },
+    "/tmp/eidolon-hil-20261002/wave-round-3.log": {
+      "excerpt": "baseline-07-wave.log",
+      "original_sha256": "4c02607a85081e814be6f6f183f82e464c1c884a25a5b01fff4a0cdedb8ff358",
+      "original_lines": 367,
+      "excerpt_lines": 56
+    },
+    "/tmp/eidolon-hil-20261002-korvo/korvo-round-1.log": {
+      "excerpt": "baseline-08-korvo.log",
+      "original_sha256": "0ef5771ceaf3cdb188e2f502c99505fd13397e81505a9cdc47892c3a7d6f1b02",
+      "original_lines": 376,
+      "excerpt_lines": 37
+    },
+    "/tmp/eidolon-hil-20261002-korvo/korvo-round-2.log": {
+      "excerpt": "baseline-09-korvo.log",
+      "original_sha256": "2f3537dafc021b20abba669b06a0e258d4c5443cece68e934626181d79beb612",
+      "original_lines": 378,
+      "excerpt_lines": 37
+    },
+    "/tmp/eidolon-hil-20261002-korvo/korvo-round-3.log": {
+      "excerpt": "baseline-10-korvo.log",
+      "original_sha256": "28b5af37feaf61a0c886592c1bc7894a63f0a390f2e5a5fcd758f81877b458b9",
+      "original_lines": 395,
+      "excerpt_lines": 55
+    },
+    "/private/tmp/eidolon-hil-20261002-final/box-boot/box-round-1.log": {
+      "excerpt": "formal-box-boot-box-1.log",
+      "original_sha256": "ed1d44dad0ab701eed96f7f14ad49b2c81569b5fc4c9b0ead1faba6d5e6c737d",
+      "original_lines": 490,
+      "excerpt_lines": 41
+    },
+    "/private/tmp/eidolon-hil-20261002-final/box-boot/box-round-2.log": {
+      "excerpt": "formal-box-boot-box-2.log",
+      "original_sha256": "52ac15d3c41d75dd2ac7409ef4814c2185ce21989b8995a600469f8d0d70230f",
+      "original_lines": 359,
+      "excerpt_lines": 37
+    },
+    "/private/tmp/eidolon-hil-20261002-final/box-boot/box-round-3.log": {
+      "excerpt": "formal-box-boot-box-3.log",
+      "original_sha256": "f8f31bc0fa319cde07af329da4b91d640585ad4202d76c33ba4e2549bce546d6",
+      "original_lines": 365,
+      "excerpt_lines": 55
+    },
+    "/private/tmp/eidolon-hil-20261002-final/stack-boot/stack-round-1.log": {
+      "excerpt": "formal-stack-boot-stack-1.log",
+      "original_sha256": "8533a5102697c2c9f5059d3fbc435b79988def46aed25f9d215fedbf630d96d8",
+      "original_lines": 262,
+      "excerpt_lines": 88
+    },
+    "/private/tmp/eidolon-hil-20261002-final/wave-boot/wave-round-1.log": {
+      "excerpt": "formal-wave-boot-wave-1.log",
+      "original_sha256": "4b20cbb1852de1197834d8a950d05d0bb37d89d170068c4616b22fe718f073af",
+      "original_lines": 357,
+      "excerpt_lines": 50
+    },
+    "/private/tmp/eidolon-hil-20261002-final/remaining-retest/korvo-round-1.log": {
+      "excerpt": "formal-remaining-retest-korvo-1.log",
+      "original_sha256": "c178116b10e70fc18bb12fc33bc1e1b6a63a2f2533ee98834933d25d0bb25b4c",
+      "original_lines": 379,
+      "excerpt_lines": 37
+    },
+    "/private/tmp/eidolon-hil-20261002-final/remaining-retest/korvo-round-2.log": {
+      "excerpt": "formal-remaining-retest-korvo-2.log",
+      "original_sha256": "0f862fb09502a9381df48fedd1f727cfb7b80be5bb1fd1ac1e968c8a3a3f1162",
+      "original_lines": 396,
+      "excerpt_lines": 49
+    },
+    "/private/tmp/eidolon-hil-20261002-final/remaining-retest/stack-round-1.log": {
+      "excerpt": "formal-remaining-retest-stack-1.log",
+      "original_sha256": "ed6b5841dbe29bd3d31c368107584a48e703b7c50840dc6b6d9efee8f4871b5d",
+      "original_lines": 344,
+      "excerpt_lines": 38
+    },
+    "/private/tmp/eidolon-hil-20261002-final/remaining-retest/stack-round-2.log": {
+      "excerpt": "formal-remaining-retest-stack-2.log",
+      "original_sha256": "417605bf959fd5f4bd59f7a0a0aa75e27222e35b87125f35348dd33cca3b1f6c",
+      "original_lines": 358,
+      "excerpt_lines": 50
+    },
+    "/tmp/eidolon-hil-20261002/box-microphone-policy.log": {
+      "excerpt": "receive-only-before.log",
+      "original_sha256": "46ad568eef9b8b305309fc40557cf03ae0595b0520abcc793a474258a89426ae",
+      "original_lines": 1317,
+      "excerpt_lines": 294
+    },
+    "/tmp/eidolon-hil-20261002/box-receive-fixed-disabled.log": {
+      "excerpt": "receive-only-after.log",
+      "original_sha256": "c6c9e58e00ea711c781fcf30334bcaf23f67270d6d690c6e6da2f3969407c64c",
+      "original_lines": 521,
+      "excerpt_lines": 72
+    }
+  },
+  "verdict": "FAIL: later successful boots do not erase earlier connection failures. All four installed firmware images verified; receive-only fix passed its declared diagnostic scope.",
+  "formal_totals": {
+    "FAIL": 2,
+    "PASS": 7
+  },
+  "baseline_totals": {
+    "FAIL": 1,
+    "PASS": 9
+  },
+  "current_settings": "BOX-3 microphone policy restored to enabled after diagnostic tests; formal reboots reload it. Other devices were not reconfigured.",
+  "runtime_mode_test_limits": "Receive-only audio test used the recorded eb510c447+dirty diagnostic build with SDK 3f98d8d; clean e75d1807 main firmware was then flashed and boot/idle tested on all four boards. Receive-only mode was not rerun under the clean final build.",
+  "remaining_work": [
+    {
+      "priority": "P1",
+      "task": "Identify the StackChan downlink receive failure using AP/device receive-side evidence; compare failed and recovered state. Preserve current common resolver and Owner identity checks until evidence establishes a change.",
+      "status": "open"
+    },
+    {
+      "priority": "P1",
+      "task": "Capture BOX-3 signaling ping/pong timing and port 7880 traffic across a Ping Timeout; distinguish packet loss from scheduling/timer behavior.",
+      "status": "open"
+    },
+    {
+      "priority": "P2",
+      "task": "Verify immediate microphone policy application contract and the common configuration-refresh path; test live disable and re-enable without reboot.",
+      "status": "open"
+    },
+    {
+      "priority": "P2",
+      "task": "Run a spoken first conversation and acoustic microphone/speaker/AEC acceptance.",
+      "status": "not covered by silent track test"
+    },
+    {
+      "priority": "P2",
+      "task": "Run controlled real power-loss OTA and persistent NVS failure/recovery validation with dedicated fault fixtures.",
+      "status": "not executed"
+    }
+  ]
+}
