@@ -1,0 +1,55 @@
+CAPTURE {"utc": "2026-10-01T17:26:11.889022+00:00", "name": "korvo", "port": "/dev/cu.usbserial-2130", "round": 3, "duration": 255}
+rst:0x1 (POWERON),boot:0x79 (SPI_FAST_FLASH_BOOT)
+W (912) Application: EIDOLON-BUILDSTAMP git=893bf7ca1 sdk=bd56a60e6180ad5a1eccbf4df7ab41c7bc4500cc idf=6.1 branch=main built=Sep 30 2026 21:38:06
+W (922) Application: EIDOLON-PROFILE mode=half_duplex device_aec=0 capture=raw
+I (1152) EidolonUiPresenter: visible state=ASSETS scene=1
+I (1322) EidolonUiPresenter: visible state=BOOT scene=0
+I (1742) EidolonUiPresenter: visible state=NETWORK scene=2
+I (6092) WifiStation: Got IP: 192.168.3.231
+I (6092) EidolonUiPresenter: visible state=SERVICE scene=6
+I (6112) HubOnboarding: Hub attempt begin mode=activate generation=0
+I (6112) HubOnboarding: Hub step=trust-load elapsed_ms=0
+I (6192) HubOnboarding: Hub step=trust-bundle elapsed_ms=77
+I (6192) HubOnboarding: Hub step=directory-restore elapsed_ms=77
+I (6192) HubOnboarding: Hub step=generation-check elapsed_ms=77
+I (6192) HubOnboarding: Hub step=directory-fetch elapsed_ms=83
+I (6502) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.3.182 ms=303
+I (6892) HubOnboarding: Accepted Owner directory owner=owner-0342958c2e259f177f43 revision=1
+I (6892) HubOnboarding: Hub step=claim-restore elapsed_ms=781
+I (7022) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.3.182 ms=83
+I (7372) HubOnboarding: Hub step=claim-cleanup elapsed_ms=1260
+I (7372) HubOnboarding: Hub step=configuration-proof elapsed_ms=1260
+I (7402) HubOnboarding: Hub step=configuration-fetch elapsed_ms=1293
+I (7542) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.3.182 ms=132
+I (7902) SystemInfo: free sram: 214079 minimal sram: 105004
+I (8222) EidolonMicCap: Mic capture started topology=raw (codec=16000 Hz, out=16000 Hz, channels=2)
+I (8242) LiveKitSession: [mem] room_create verdict=sufficient internal free=191527 largest_block=94208 free_blocks=28 need_contiguous=9472 need_total=19712
+I (8252) LiveKitSession: Connecting room=eidolon-device-2f20df7d0c6ebd741d5b96c1 identity=device-instance-69ab20f5bdd16b5fd5f2cff9451bfe60d8f7a0b5c26dba88e6fcdafe4be5fc5b server=ws://192.168.3.182:7880
+W (8272) EidolonVoice: [dispatch] type=0 wait_ms=0 run_ms=195 pending=0
+I (8302) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-69ab20f5bdd16b5fd5f2cff9451bfe60d8f7a0b5c26dba88e6fcdafe4be5fc5b gen=1
+I (9362) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-69ab20f5bdd16b5fd5f2cff9451bfe60d8f7a0b5c26dba88e6fcdafe4be5fc5b gen=1
+I (9452) EidolonUiPresenter: visible state=READY scene=7
+I (19372) SystemInfo: free sram: 147499 minimal sram: 39088
+I (29372) SystemInfo: free sram: 147499 minimal sram: 39088
+I (39372) SystemInfo: free sram: 147499 minimal sram: 39088
+I (49372) SystemInfo: free sram: 147467 minimal sram: 39088
+I (59372) SystemInfo: free sram: 147467 minimal sram: 39088
+I (69372) SystemInfo: free sram: 147467 minimal sram: 39088
+I (79372) SystemInfo: free sram: 147467 minimal sram: 39088
+I (89372) SystemInfo: free sram: 147467 minimal sram: 39088
+I (99372) SystemInfo: free sram: 147467 minimal sram: 39088
+I (109372) SystemInfo: free sram: 147467 minimal sram: 39088
+I (119372) SystemInfo: free sram: 147467 minimal sram: 39088
+I (129372) SystemInfo: free sram: 148135 minimal sram: 39088
+I (139372) SystemInfo: free sram: 148135 minimal sram: 39088
+I (149372) SystemInfo: free sram: 148135 minimal sram: 39088
+I (159372) SystemInfo: free sram: 148135 minimal sram: 39088
+I (169372) SystemInfo: free sram: 148135 minimal sram: 39088
+I (179372) SystemInfo: free sram: 148135 minimal sram: 39088
+I (189372) SystemInfo: free sram: 148135 minimal sram: 39088
+I (199372) SystemInfo: free sram: 148135 minimal sram: 39088
+I (209372) SystemInfo: free sram: 148135 minimal sram: 39088
+I (219372) SystemInfo: free sram: 148135 minimal sram: 39088
+I (229372) SystemInfo: free sram: 148135 minimal sram: 39088
+I (239372) SystemInfo: free sram: 148135 minimal sram: 39088
+I (249372) SystemInfo: free sram: 148135 minimal sram: 39088

@@ -1,0 +1,294 @@
+CAPTURE continuing WITHOUT requested reset epoch=1790875712.802152
+rst:0x15 (USB_UART_CHIP_RESET),boot:0xa (SPI_FAST_FLASH_BOOT)
+W (210) Application: EIDOLON-BUILDSTAMP git=893bf7ca1 sdk=bd56a60e6180ad5a1eccbf4df7ab41c7bc4500cc idf=5.5.4 branch=main built=Sep 30 2026 21:25:03
+W (220) Application: EIDOLON-PROFILE mode=full_duplex device_aec=1 capture=afe
+I (510) EidolonUiPresenter: visible state=ASSETS scene=1
+I (950) EidolonUiPresenter: visible state=BOOT scene=0
+I (1200) EidolonUiPresenter: visible state=NETWORK scene=2
+I (5430) WifiStation: Got IP: 192.168.3.194
+I (5430) EidolonUiPresenter: visible state=SERVICE scene=6
+I (5470) HubOnboarding: Hub attempt begin mode=activate generation=0
+I (5470) HubOnboarding: Hub step=trust-load elapsed_ms=0
+I (5980) HubOnboarding: Hub step=trust-bundle elapsed_ms=510
+I (5980) HubOnboarding: Hub step=directory-restore elapsed_ms=510
+I (5980) HubOnboarding: Hub step=generation-check elapsed_ms=511
+I (5990) HubOnboarding: Hub step=directory-fetch elapsed_ms=516
+I (6260) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=263
+I (7510) HubOnboarding: Accepted Owner directory owner=owner-f774cf8e1b667eb0ca7b revision=1
+I (7510) HubOnboarding: Hub step=claim-restore elapsed_ms=2037
+I (7900) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=215
+I (8740) HubOnboarding: Hub step=claim-cleanup elapsed_ms=3268
+I (8740) HubOnboarding: Hub step=configuration-proof elapsed_ms=3268
+I (8890) HubOnboarding: Hub step=configuration-fetch elapsed_ms=3423
+I (9030) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=129
+I (10030) SystemInfo: free sram: 120535 minimal sram: 102211
+I (10320) LiveKitSession: [mem] room_create verdict=sufficient internal free=116507 largest_block=86016 free_blocks=21 need_contiguous=9472 need_total=19712
+I (10330) LiveKitSession: Connecting room=eidolon-device-a581e67a035ca24efd1198be identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a server=ws://192.168.3.230:7880
+W (10350) EidolonVoice: [dispatch] type=0 wait_ms=0 run_ms=155 pending=0
+I (10380) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1
+E (16820) livekit_peer.sub: Failed to open peer
+I (16940) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1
+E (17340) livekit_peer.sub: Failed to open peer
+I (17360) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1
+E (18790) livekit_peer.sub: Failed to open peer
+I (18820) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1
+I (19970) SystemInfo: free sram: 97787 minimal sram: 79063
+E (20500) livekit_peer.sub: Failed to open peer
+I (20520) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1
+E (23040) livekit_peer.sub: Failed to open peer
+I (23060) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1
+E (26990) livekit_peer.sub: Failed to open peer
+I (27010) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1
+I (29970) SystemInfo: free sram: 97787 minimal sram: 78987
+E (33780) livekit_peer.sub: Failed to open peer
+I (33800) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1
+I (35350) LiveKitSession: Disconnecting room
+I (35360) LiveKitSession: [lifecycle] room state=Disconnected room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1
+I (35560) AV_RENDER: Close done
+I (35560) LiveKitSession: LiveKit media board released
+W (35580) EidolonVoice: [dispatch] type=24 wait_ms=0 run_ms=222 pending=1
+W (35610) EidolonVoice: [dispatch] type=10 wait_ms=210 run_ms=25 pending=0
+I (36590) LiveKitSession: [mem] room_create verdict=sufficient internal free=117639 largest_block=86016 free_blocks=26 need_contiguous=9472 need_total=19712
+I (36600) LiveKitSession: Connecting room=eidolon-device-a581e67a035ca24efd1198be identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a server=ws://192.168.3.230:7880
+I (36640) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=3
+E (36680) livekit_peer.sub: Failed to open peer
+I (36710) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=3
+E (37830) livekit_peer.sub: Failed to open peer
+I (37860) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=3
+E (39180) livekit_peer.sub: Failed to open peer
+I (39290) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=3
+I (39970) SystemInfo: free sram: 97755 minimal sram: 78923
+E (40900) livekit_peer.sub: Failed to open peer
+I (41010) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=3
+E (43560) livekit_peer.sub: Failed to open peer
+I (43590) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=3
+E (47410) livekit_peer.sub: Failed to open peer
+I (47440) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=3
+I (49970) SystemInfo: free sram: 97755 minimal sram: 78923
+E (54430) livekit_peer.sub: Failed to open peer
+I (54460) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=3
+I (59970) SystemInfo: free sram: 97755 minimal sram: 78923
+E (61490) livekit_peer.sub: Failed to open peer
+I (61600) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=3
+I (61610) LiveKitSession: [lifecycle] room state=Failed room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=3
+E (61620) LiveKitSession: Failure: Max Retries
+I (61650) LiveKitSession: Disconnecting room
+W (63160) LiveKitSession: Timed out waiting for LiveKit room to disconnect
+I (63310) AV_RENDER: Close done
+I (63310) LiveKitSession: LiveKit media board released
+W (63330) EidolonVoice: [dispatch] type=24 wait_ms=20 run_ms=1683 pending=1
+W (63360) EidolonVoice: [dispatch] type=10 wait_ms=1706 run_ms=24 pending=0
+I (65330) HubOnboarding: Hub attempt begin mode=activate generation=0
+I (65330) HubOnboarding: Hub step=trust-load elapsed_ms=1
+I (65840) HubOnboarding: Hub step=trust-bundle elapsed_ms=511
+I (65840) HubOnboarding: Hub step=directory-restore elapsed_ms=511
+I (65840) HubOnboarding: Hub step=generation-check elapsed_ms=511
+I (65840) HubOnboarding: Hub step=directory-fetch elapsed_ms=517
+I (66060) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=208
+I (67340) HubOnboarding: Accepted Owner directory owner=owner-f774cf8e1b667eb0ca7b revision=1
+I (67340) HubOnboarding: Hub step=claim-restore elapsed_ms=2012
+I (67710) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=194
+I (68560) HubOnboarding: Hub step=claim-cleanup elapsed_ms=3238
+I (68560) HubOnboarding: Hub step=configuration-proof elapsed_ms=3238
+I (68720) HubOnboarding: Hub step=configuration-fetch elapsed_ms=3396
+I (68830) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=101
+I (69970) SystemInfo: free sram: 109063 minimal sram: 78907
+I (70250) LiveKitSession: [mem] room_create verdict=sufficient internal free=116615 largest_block=86016 free_blocks=34 need_contiguous=9472 need_total=19712
+I (70260) LiveKitSession: Connecting room=eidolon-device-a581e67a035ca24efd1198be identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a server=ws://192.168.3.230:7880
+W (70280) EidolonVoice: [dispatch] type=23 wait_ms=0 run_ms=4952 pending=0
+I (70310) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=5
+E (70360) livekit_peer.sub: Failed to open peer
+I (70380) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=5
+E (70680) livekit_peer.sub: Failed to open peer
+I (70700) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=5
+E (71140) livekit_peer.sub: Failed to open peer
+I (71160) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=5
+E (72250) livekit_peer.sub: Failed to open peer
+I (72270) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=5
+E (74400) livekit_peer.sub: Failed to open peer
+I (74430) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=5
+E (77810) livekit_peer.sub: Failed to open peer
+I (77930) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=5
+I (79970) SystemInfo: free sram: 96743 minimal sram: 78867
+E (84970) livekit_peer.sub: Failed to open peer
+I (85080) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=5
+I (89970) SystemInfo: free sram: 96743 minimal sram: 77655
+E (92110) livekit_peer.sub: Failed to open peer
+I (92140) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=5
+I (92140) LiveKitSession: [lifecycle] room state=Failed room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=5
+E (92160) LiveKitSession: Failure: Max Retries
+I (96210) HubOnboarding: Hub attempt begin mode=activate generation=0
+I (96210) HubOnboarding: Hub step=trust-load elapsed_ms=1
+I (96720) HubOnboarding: Hub step=trust-bundle elapsed_ms=517
+I (96730) HubOnboarding: Hub step=directory-restore elapsed_ms=517
+I (96730) HubOnboarding: Hub step=generation-check elapsed_ms=517
+I (96730) HubOnboarding: Hub step=directory-fetch elapsed_ms=523
+I (96980) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=245
+I (98250) HubOnboarding: Accepted Owner directory owner=owner-f774cf8e1b667eb0ca7b revision=1
+I (98250) HubOnboarding: Hub step=claim-restore elapsed_ms=2043
+I (98520) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=91
+I (99410) HubOnboarding: Hub step=claim-cleanup elapsed_ms=3198
+I (99410) HubOnboarding: Hub step=configuration-proof elapsed_ms=3199
+I (99570) HubOnboarding: Hub step=configuration-fetch elapsed_ms=3358
+I (99650) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=81
+I (99970) SystemInfo: free sram: 81051 minimal sram: 73263
+I (101080) EidolonUiPresenter: visible state=RETRY scene=10
+I (101090) LiveKitSession: Disconnecting room
+W (102600) LiveKitSession: Timed out waiting for LiveKit room to disconnect
+I (102750) AV_RENDER: Close done
+I (102750) LiveKitSession: LiveKit media board released
+I (102770) LiveKitSession: [mem] room_create verdict=sufficient internal free=115947 largest_block=86016 free_blocks=41 need_contiguous=9472 need_total=19712
+I (102780) LiveKitSession: Connecting room=eidolon-device-a581e67a035ca24efd1198be identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a server=ws://192.168.3.230:7880
+W (102800) EidolonVoice: [dispatch] type=23 wait_ms=0 run_ms=6591 pending=0
+I (102830) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=7
+E (102870) livekit_peer.sub: Failed to open peer
+I (102890) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=7
+E (103130) livekit_peer.sub: Failed to open peer
+I (103150) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=7
+E (103960) livekit_peer.sub: Failed to open peer
+I (103980) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=7
+E (105700) livekit_peer.sub: Failed to open peer
+I (105720) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=7
+E (108100) livekit_peer.sub: Failed to open peer
+I (108120) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=7
+I (110970) SystemInfo: free sram: 96127 minimal sram: 71147
+E (111930) livekit_peer.sub: Failed to open peer
+I (112060) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=7
+E (118630) livekit_peer.sub: Failed to open peer
+I (118660) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=7
+I (120970) SystemInfo: free sram: 96099 minimal sram: 71147
+E (125700) livekit_peer.sub: Failed to open peer
+I (125720) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=7
+I (125730) LiveKitSession: [lifecycle] room state=Failed room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=7
+E (125750) LiveKitSession: Failure: Max Retries
+I (130970) SystemInfo: free sram: 96755 minimal sram: 71147
+I (133800) HubOnboarding: Hub attempt begin mode=activate generation=0
+I (133800) HubOnboarding: Hub step=trust-load elapsed_ms=1
+I (134310) HubOnboarding: Hub step=trust-bundle elapsed_ms=516
+I (134320) HubOnboarding: Hub step=directory-restore elapsed_ms=516
+I (134320) HubOnboarding: Hub step=generation-check elapsed_ms=517
+I (134320) HubOnboarding: Hub step=directory-fetch elapsed_ms=522
+I (134560) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=235
+I (135830) HubOnboarding: Accepted Owner directory owner=owner-f774cf8e1b667eb0ca7b revision=1
+I (135830) HubOnboarding: Hub step=claim-restore elapsed_ms=2033
+I (136200) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=194
+I (137060) HubOnboarding: Hub step=claim-cleanup elapsed_ms=3261
+I (137060) HubOnboarding: Hub step=configuration-proof elapsed_ms=3262
+I (137220) HubOnboarding: Hub step=configuration-fetch elapsed_ms=3419
+I (137330) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=110
+I (138800) EidolonUiPresenter: visible state=SERVICE scene=6
+I (138830) EidolonUiPresenter: visible state=RETRY scene=10
+I (138840) LiveKitSession: Disconnecting room
+W (140350) LiveKitSession: Timed out waiting for LiveKit room to disconnect
+I (140500) AV_RENDER: Close done
+I (140500) LiveKitSession: LiveKit media board released
+I (140520) LiveKitSession: [mem] room_create verdict=sufficient internal free=115983 largest_block=86016 free_blocks=42 need_contiguous=9472 need_total=19712
+I (140530) LiveKitSession: Connecting room=eidolon-device-a581e67a035ca24efd1198be identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a server=ws://192.168.3.230:7880
+W (140550) EidolonVoice: [dispatch] type=23 wait_ms=0 run_ms=6750 pending=0
+I (140580) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=9
+E (140620) livekit_peer.sub: Failed to open peer
+I (140640) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=9
+E (141130) livekit_peer.sub: Failed to open peer
+I (141150) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=9
+E (142210) livekit_peer.sub: Failed to open peer
+I (142340) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=9
+E (146580) livekit_peer.sub: Failed to open peer
+I (146600) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=9
+I (147970) SystemInfo: free sram: 96059 minimal sram: 69351
+E (148630) livekit_peer.sub: Failed to open peer
+I (148650) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=9
+E (151960) livekit_peer.sub: Failed to open peer
+I (151990) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=9
+I (157970) SystemInfo: free sram: 96059 minimal sram: 69351
+E (158680) livekit_peer.sub: Failed to open peer
+I (158700) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=9
+I (165550) LiveKitSession: Disconnecting room
+I (165550) LiveKitSession: [lifecycle] room state=Disconnected room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=9
+I (165750) AV_RENDER: Close done
+I (165750) LiveKitSession: LiveKit media board released
+I (165780) EidolonUiPresenter: visible state=SERVICE scene=6
+W (165790) EidolonVoice: [dispatch] type=24 wait_ms=0 run_ms=245 pending=1
+W (165830) EidolonVoice: [dispatch] type=10 wait_ms=232 run_ms=25 pending=0
+I (174970) SystemInfo: free sram: 117439 minimal sram: 69351
+I (181790) HubOnboarding: Hub attempt begin mode=activate generation=0
+I (181800) HubOnboarding: Hub step=trust-load elapsed_ms=1
+I (182310) HubOnboarding: Hub step=trust-bundle elapsed_ms=512
+I (182310) HubOnboarding: Hub step=directory-restore elapsed_ms=513
+I (182310) HubOnboarding: Hub step=generation-check elapsed_ms=513
+I (182310) HubOnboarding: Hub step=directory-fetch elapsed_ms=519
+I (182590) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=269
+I (183850) HubOnboarding: Accepted Owner directory owner=owner-f774cf8e1b667eb0ca7b revision=1
+I (183850) HubOnboarding: Hub step=claim-restore elapsed_ms=2058
+I (184130) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=99
+I (184970) SystemInfo: free sram: 111323 minimal sram: 69351
+I (184980) HubOnboarding: Hub step=claim-cleanup elapsed_ms=3180
+I (184980) HubOnboarding: Hub step=configuration-proof elapsed_ms=3181
+I (185130) HubOnboarding: Hub step=configuration-fetch elapsed_ms=3338
+I (185260) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=121
+I (186680) EidolonUiPresenter: visible state=RETRY scene=10
+I (186700) LiveKitSession: [mem] room_create verdict=sufficient internal free=115147 largest_block=86016 free_blocks=33 need_contiguous=9472 need_total=19712
+I (186720) LiveKitSession: Connecting room=eidolon-device-a581e67a035ca24efd1198be identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a server=ws://192.168.3.230:7880
+W (186740) EidolonVoice: [dispatch] type=23 wait_ms=0 run_ms=4941 pending=0
+I (186760) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=11
+E (186800) livekit_peer.sub: Failed to open peer
+I (186830) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=11
+E (187590) livekit_peer.sub: Failed to open peer
+I (187620) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=11
+E (188130) livekit_peer.sub: Failed to open peer
+I (188150) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=11
+E (189880) livekit_peer.sub: Failed to open peer
+I (190000) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=11
+E (191910) livekit_peer.sub: Failed to open peer
+I (191940) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=11
+E (195240) livekit_peer.sub: Failed to open peer
+I (195260) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=11
+I (195970) SystemInfo: free sram: 96003 minimal sram: 69307
+E (202290) livekit_peer.sub: Failed to open peer
+I (202310) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=11
+I (205970) SystemInfo: free sram: 96003 minimal sram: 69307
+E (209360) livekit_peer.sub: Failed to open peer
+I (209470) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=11
+I (209480) LiveKitSession: [lifecycle] room state=Failed room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=11
+E (209490) LiveKitSession: Failure: Max Retries
+I (215970) SystemInfo: free sram: 96003 minimal sram: 69307
+I (225970) SystemInfo: free sram: 96639 minimal sram: 69307
+I (235970) SystemInfo: free sram: 96639 minimal sram: 69307
+I (239550) HubOnboarding: Hub attempt begin mode=activate generation=0
+I (239550) HubOnboarding: Hub step=trust-load elapsed_ms=1
+I (240060) HubOnboarding: Hub step=trust-bundle elapsed_ms=514
+I (240060) HubOnboarding: Hub step=directory-restore elapsed_ms=515
+I (240060) HubOnboarding: Hub step=generation-check elapsed_ms=515
+I (240070) HubOnboarding: Hub step=directory-fetch elapsed_ms=521
+I (240240) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=167
+I (241570) HubOnboarding: Accepted Owner directory owner=owner-f774cf8e1b667eb0ca7b revision=1
+I (241580) HubOnboarding: Hub step=claim-restore elapsed_ms=2029
+I (241890) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=142
+I (242770) HubOnboarding: Hub step=claim-cleanup elapsed_ms=3225
+I (242770) HubOnboarding: Hub step=configuration-proof elapsed_ms=3226
+I (242930) HubOnboarding: Hub step=configuration-fetch elapsed_ms=3384
+I (243010) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=75
+I (244500) EidolonUiPresenter: visible state=SERVICE scene=6
+I (244540) EidolonUiPresenter: visible state=RETRY scene=10
+I (244550) LiveKitSession: Disconnecting room
+W (246050) LiveKitSession: Timed out waiting for LiveKit room to disconnect
+I (246200) AV_RENDER: Close done
+I (246200) LiveKitSession: LiveKit media board released
+I (246260) EidolonMicCap: Mic capture started topology=afe (codec=24000 Hz, out=16000 Hz, channels=2)
+I (246280) LiveKitSession: [mem] room_create verdict=sufficient internal free=58571 largest_block=57344 free_blocks=3 need_contiguous=9472 need_total=19712
+I (246290) LiveKitSession: Connecting room=eidolon-device-a581e67a035ca24efd1198be identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a server=ws://192.168.3.230:7880
+W (246310) EidolonVoice: [dispatch] type=23 wait_ms=0 run_ms=6763 pending=0
+I (246340) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=13
+I (247700) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=13
+I (247780) EidolonUiPresenter: visible state=READY scene=7
+W (247830) EidolonVoice: [dispatch] type=10 wait_ms=0 run_ms=95 pending=0
+I (253970) SystemInfo: free sram: 32799 minimal sram: 31507
+I (263970) SystemInfo: free sram: 33435 minimal sram: 31507
+I (273970) SystemInfo: free sram: 33435 minimal sram: 31507
+I (283970) SystemInfo: free sram: 33435 minimal sram: 31507
+I (293970) SystemInfo: free sram: 33435 minimal sram: 31507
+I (303970) SystemInfo: free sram: 33651 minimal sram: 31507
+I (313970) SystemInfo: free sram: 34075 minimal sram: 31507
+I (323970) SystemInfo: free sram: 34075 minimal sram: 31507
+I (333970) SystemInfo: free sram: 34251 minimal sram: 31435
+I (343970) SystemInfo: free sram: 34075 minimal sram: 31435
+I (353970) SystemInfo: free sram: 34075 minimal sram: 31435

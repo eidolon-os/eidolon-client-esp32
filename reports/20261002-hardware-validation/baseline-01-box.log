@@ -1,0 +1,50 @@
+CAPTURE {"utc": "2026-10-01T17:21:32.716844+00:00", "name": "box", "port": "/dev/cu.usbmodem21201", "round": 1, "duration": 75}
+rst:0x15 (USB_UART_CHIP_RESET),boot:0xa (SPI_FAST_FLASH_BOOT)
+W (210) Application: EIDOLON-BUILDSTAMP git=893bf7ca1 sdk=bd56a60e6180ad5a1eccbf4df7ab41c7bc4500cc idf=5.5.4 branch=main built=Sep 30 2026 21:25:03
+W (220) Application: EIDOLON-PROFILE mode=full_duplex device_aec=1 capture=afe
+I (510) EidolonUiPresenter: visible state=ASSETS scene=1
+I (950) EidolonUiPresenter: visible state=BOOT scene=0
+I (1250) EidolonUiPresenter: visible state=NETWORK scene=2
+I (5460) WifiStation: Got IP: 192.168.3.194
+I (5460) EidolonUiPresenter: visible state=SERVICE scene=6
+I (5500) HubOnboarding: Hub attempt begin mode=activate generation=0
+I (5500) HubOnboarding: Hub step=trust-load elapsed_ms=0
+I (6010) HubOnboarding: Hub step=trust-bundle elapsed_ms=510
+I (6010) HubOnboarding: Hub step=directory-restore elapsed_ms=510
+I (6010) HubOnboarding: Hub step=generation-check elapsed_ms=511
+I (6020) HubOnboarding: Hub step=directory-fetch elapsed_ms=516
+I (6290) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=267
+I (14970) SystemInfo: free sram: 114571 minimal sram: 108795
+E (21300) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15279 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0
+W (21320) HubDiscovery: Commissioned Owner route failed (ESP_ERR_HTTP_CONNECT); discovering only owner=owner-f774cf8e1b667eb0ca7b
+I (24970) SystemInfo: free sram: 118643 minimal sram: 108063
+I (29430) HubDiscovery: Found Owner candidate: owner-f774cf8e1b667eb0ca7b port=9443
+I (29430) HubDiscovery: Found Owner candidate: owner-0342958c2e259f177f43 port=8443
+I (29430) HubOnboarding: Hub step=generation-check elapsed_ms=23928
+I (29440) HubOnboarding: Hub step=directory-fetch elapsed_ms=23934
+I (34970) SystemInfo: free sram: 114567 minimal sram: 107991
+I (37530) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_ERR_NOT_FOUND address=- ms=8083
+E (37550) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8109 status=0 socket_errno=119 tls_error=0x8001 tls_code=0 tls_flags=0x0
+W (37570) HubOnboarding: Hub attempt failed mode=activate stage=directory-fetch error=ESP_ERR_HTTP_CONNECT code=0x7002 http=0 elapsed_ms=32071 generation=0
+W (37590) HubActivator: Hub activation failed stage=directory-fetch error=ESP_ERR_HTTP_CONNECT code=0x7002 http=0 attempt=1 retry_s=10
+I (44970) SystemInfo: free sram: 120579 minimal sram: 107991
+I (47600) HubOnboarding: Hub attempt begin mode=activate generation=0
+I (47600) HubOnboarding: Hub step=trust-load elapsed_ms=0
+I (48110) HubOnboarding: Hub step=trust-bundle elapsed_ms=510
+I (48110) HubOnboarding: Hub step=directory-restore elapsed_ms=510
+I (48110) HubOnboarding: Hub step=generation-check elapsed_ms=511
+I (48110) HubOnboarding: Hub step=directory-fetch elapsed_ms=516
+I (54970) SystemInfo: free sram: 114923 minimal sram: 107991
+I (56130) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_ERR_NOT_FOUND address=- ms=8007
+E (56150) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8033 status=0 socket_errno=119 tls_error=0x8001 tls_code=0 tls_flags=0x0
+W (56170) HubDiscovery: Commissioned Owner route failed (ESP_ERR_HTTP_CONNECT); discovering only owner=owner-f774cf8e1b667eb0ca7b
+I (64230) HubDiscovery: Found Owner candidate: owner-f774cf8e1b667eb0ca7b port=9443
+I (64230) HubDiscovery: Found Owner candidate: owner-0342958c2e259f177f43 port=8443
+I (64230) HubOnboarding: Hub step=generation-check elapsed_ms=16635
+I (64240) HubOnboarding: Hub step=directory-fetch elapsed_ms=16640
+I (64970) SystemInfo: free sram: 114435 minimal sram: 107991
+I (72330) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_ERR_NOT_FOUND address=- ms=8083
+E (72350) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8110 status=0 socket_errno=119 tls_error=0x8001 tls_code=0 tls_flags=0x0
+W (72370) HubOnboarding: Hub attempt failed mode=activate stage=directory-fetch error=ESP_ERR_HTTP_CONNECT code=0x7002 http=0 elapsed_ms=24777 generation=0
+W (72390) HubActivator: Hub activation failed stage=directory-fetch error=ESP_ERR_HTTP_CONNECT code=0x7002 http=0 attempt=2 retry_s=20
+I (75000) SystemInfo: free sram: 120583 minimal sram: 107991

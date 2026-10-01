@@ -1,0 +1,56 @@
+CAPTURE {"utc": "2026-10-01T17:24:03.016301+00:00", "name": "stack", "port": "/dev/cu.usbmodem21101", "round": 3, "duration": 255}
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x2b (SPI_FAST_FLASH_BOOT)
+W (390) Application: EIDOLON-BUILDSTAMP git=893bf7ca1 sdk=bd56a60e6180ad5a1eccbf4df7ab41c7bc4500cc idf=5.5.4 branch=main built=Sep 30 2026 21:29:43
+W (400) Application: EIDOLON-PROFILE mode=half_duplex device_aec=0 capture=raw
+I (410) M5StackChanBoard: Init AXP2101
+I (1480) EidolonUiPresenter: visible state=ASSETS scene=1
+I (1630) EidolonUiPresenter: visible state=BOOT scene=0
+I (1910) EidolonUiPresenter: visible state=NETWORK scene=2
+I (6200) WifiStation: Got IP: 192.168.3.211
+I (6200) EidolonUiPresenter: visible state=SERVICE scene=6
+I (6240) HubOnboarding: Hub attempt begin mode=activate generation=0
+I (6240) HubOnboarding: Hub step=trust-load elapsed_ms=0
+I (6750) HubOnboarding: Hub step=trust-bundle elapsed_ms=509
+I (6750) HubOnboarding: Hub step=directory-restore elapsed_ms=510
+I (6750) HubOnboarding: Hub step=generation-check elapsed_ms=510
+I (6760) HubOnboarding: Hub step=directory-fetch elapsed_ms=515
+I (8170) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=1401
+I (9390) HubOnboarding: Accepted Owner directory owner=owner-f774cf8e1b667eb0ca7b revision=1
+I (9390) HubOnboarding: Hub step=claim-restore elapsed_ms=3152
+I (9600) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=34
+I (10430) HubOnboarding: Hub step=claim-cleanup elapsed_ms=4187
+I (10430) HubOnboarding: Hub step=configuration-proof elapsed_ms=4188
+I (10580) HubOnboarding: Hub step=configuration-fetch elapsed_ms=4341
+I (10720) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=133
+I (11800) SystemInfo: free sram: 87851 minimal sram: 81915
+I (12090) EidolonMicCap: Mic capture started topology=raw (codec=24000 Hz, out=16000 Hz, channels=1)
+I (12110) LiveKitSession: [mem] room_create verdict=sufficient internal free=92611 largest_block=65536 free_blocks=5 need_contiguous=9472 need_total=19712
+I (12120) LiveKitSession: Connecting room=eidolon-device-02554c8b8ffbe75bfbe32274 identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 server=ws://192.168.3.230:7880
+W (12140) EidolonVoice: [dispatch] type=0 wait_ms=0 run_ms=164 pending=0
+I (12170) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1
+I (13380) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1
+I (13470) EidolonUiPresenter: visible state=READY scene=7
+I (22650) SystemInfo: free sram: 62003 minimal sram: 61231
+I (32650) SystemInfo: free sram: 62003 minimal sram: 61231
+I (42650) SystemInfo: free sram: 62187 minimal sram: 61107
+I (52650) SystemInfo: free sram: 62003 minimal sram: 61107
+I (62650) SystemInfo: free sram: 62003 minimal sram: 61107
+I (72650) SystemInfo: free sram: 62187 minimal sram: 61107
+I (82650) SystemInfo: free sram: 62003 minimal sram: 61107
+I (92650) SystemInfo: free sram: 62003 minimal sram: 61107
+I (102650) SystemInfo: free sram: 62187 minimal sram: 61107
+I (112650) SystemInfo: free sram: 62187 minimal sram: 61107
+I (122650) SystemInfo: free sram: 62175 minimal sram: 61107
+I (132650) SystemInfo: free sram: 62187 minimal sram: 61107
+I (142650) SystemInfo: free sram: 62003 minimal sram: 61107
+I (152650) SystemInfo: free sram: 62003 minimal sram: 61107
+I (162650) SystemInfo: free sram: 62175 minimal sram: 61107
+I (172650) SystemInfo: free sram: 62187 minimal sram: 61107
+I (182650) SystemInfo: free sram: 62175 minimal sram: 61107
+I (192650) SystemInfo: free sram: 62187 minimal sram: 61107
+I (202650) SystemInfo: free sram: 62175 minimal sram: 61107
+I (212650) SystemInfo: free sram: 62003 minimal sram: 61107
+I (222650) SystemInfo: free sram: 62003 minimal sram: 61063
+I (232650) SystemInfo: free sram: 62003 minimal sram: 61063
+I (242650) SystemInfo: free sram: 62187 minimal sram: 61063
+I (252650) SystemInfo: free sram: 62175 minimal sram: 61063

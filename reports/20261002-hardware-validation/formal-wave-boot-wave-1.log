@@ -1,0 +1,50 @@
+CAPTURE {"utc": "2026-10-01T18:05:59.084888+00:00", "name": "wave", "port": "/dev/cu.usbmodem21401", "round": 1, "duration": 195.0}
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x2b (SPI_FAST_FLASH_BOOT)
+W (369) Application: EIDOLON-BUILDSTAMP git=e75d1807c sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=5.5.4 branch=main built=Oct  2 2026 02:03:29
+W (379) Application: EIDOLON-PROFILE mode=ptt device_aec=0 capture=raw
+I (399) WaveshareEsp32s3TouchAMOLED2inch06: Init AXP2101
+I (889) EidolonUiPresenter: visible state=ASSETS scene=1
+I (1209) EidolonUiPresenter: visible state=BOOT scene=0
+I (1529) EidolonUiPresenter: visible state=NETWORK scene=2
+I (5889) WifiStation: Got IP: 192.168.3.132
+I (5889) EidolonUiPresenter: visible state=SERVICE scene=6
+I (5909) HubOnboarding: Hub attempt begin mode=activate generation=0
+I (5909) HubOnboarding: Hub step=trust-load elapsed_ms=0
+I (6429) HubOnboarding: Hub step=trust-bundle elapsed_ms=521
+I (6429) HubOnboarding: Hub step=directory-restore elapsed_ms=521
+I (6429) HubOnboarding: Hub step=generation-check elapsed_ms=522
+I (6439) HubOnboarding: Hub step=directory-fetch elapsed_ms=527
+I (6729) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=290
+I (7989) HubOnboarding: Accepted Owner directory owner=owner-f774cf8e1b667eb0ca7b revision=1
+I (7989) HubOnboarding: Hub step=claim-restore elapsed_ms=2077
+I (8269) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=117
+I (9139) HubOnboarding: Hub step=claim-cleanup elapsed_ms=3231
+I (9139) HubOnboarding: Hub step=configuration-proof elapsed_ms=3232
+I (9289) HubOnboarding: Hub step=configuration-fetch elapsed_ms=3382
+I (9399) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=109
+I (10919) SystemInfo: free sram: 85055 minimal sram: 79227
+I (11199) EidolonMicCap: Mic capture started topology=raw (codec=16000 Hz, out=16000 Hz, channels=1)
+I (11209) LiveKitSession: [mem] room_create verdict=sufficient internal free=80663 largest_block=63488 free_blocks=4 need_contiguous=9472 need_total=19712
+I (11309) LiveKitSession: Connecting room=eidolon-device-4191ea4e073a21cae98940a0 identity=device-instance-eed82aee54cac09ae11bc67c34612447e8c59a1c661cd2109384ee89a4e4f775 server=ws://192.168.3.230:7880
+W (11319) EidolonVoice: [dispatch] type=0 wait_ms=0 run_ms=237 pending=0
+I (11349) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-eed82aee54cac09ae11bc67c34612447e8c59a1c661cd2109384ee89a4e4f775 gen=1
+I (13219) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-eed82aee54cac09ae11bc67c34612447e8c59a1c661cd2109384ee89a4e4f775 gen=1
+I (13309) EidolonUiPresenter: visible state=READY scene=7
+I (23219) SystemInfo: free sram: 50727 minimal sram: 49971
+I (33219) SystemInfo: free sram: 50727 minimal sram: 49971
+I (43219) SystemInfo: free sram: 50727 minimal sram: 49971
+I (53219) SystemInfo: free sram: 50727 minimal sram: 49971
+I (63219) SystemInfo: free sram: 50727 minimal sram: 49971
+I (73219) SystemInfo: free sram: 50739 minimal sram: 49971
+I (83219) SystemInfo: free sram: 50739 minimal sram: 49971
+I (93219) SystemInfo: free sram: 50739 minimal sram: 49971
+I (103219) SystemInfo: free sram: 50739 minimal sram: 49971
+I (113219) SystemInfo: free sram: 50739 minimal sram: 49971
+I (123219) SystemInfo: free sram: 50739 minimal sram: 49971
+I (133219) SystemInfo: free sram: 50739 minimal sram: 49971
+I (143219) SystemInfo: free sram: 50739 minimal sram: 49971
+I (153219) SystemInfo: free sram: 50739 minimal sram: 49971
+I (163219) SystemInfo: free sram: 50739 minimal sram: 49971
+I (173219) SystemInfo: free sram: 50739 minimal sram: 49971
+I (183219) SystemInfo: free sram: 50739 minimal sram: 49971
+I (193219) SystemInfo: free sram: 50739 minimal sram: 49971
