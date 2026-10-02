@@ -11,7 +11,7 @@ SOURCE = (Path(__file__).resolve().parents[1] / 'scripts/eidolon/eidolon-common.
 CODE = SOURCE.split("<<'PY' 2>/dev/null || true\n", 1)[1].split('\nPY\n)', 1)[0]
 
 class ReconnectTest(unittest.TestCase):
-    def run_probe(self, *, never_returns=False, storage_ready=True):
+    def run_probe(self, *, never_returns=False, storage_ready=True, expected_sku='', actual_sku=''):
         clock = [0.0]
         instances = []
         class SerialException(OSError):
@@ -33,13 +33,15 @@ class ReconnectTest(unittest.TestCase):
                 self.read_count += 1
                 if self.read_count == 1 and storage_ready:
                     return b'I (100) EIDOLON-STORAGE owner_trust=ready bytes=65536\n'
+                if self.read_count == 3 and actual_sku:
+                    return f'I (600) Board: UUID=test SKU={actual_sku}\n'.encode()
                 return b'I (500) EIDOLON-BUILDSTAMP git=test sdk=test idf=5.5.4\n'
             def close(self):
                 self.closed = True
         serial = types.SimpleNamespace(Serial=Serial, SerialException=SerialException)
         time = types.SimpleNamespace(monotonic=lambda: clock[0], sleep=lambda n: clock.__setitem__(0, clock[0]+n))
         out = io.StringIO()
-        with patch.dict(sys.modules, serial=serial, time=time), patch.object(sys, 'argv', ['-', '/dev/test', '1']), contextlib.redirect_stdout(out):
+        with patch.dict(sys.modules, serial=serial, time=time), patch.object(sys, 'argv', ['-', '/dev/test', '1', expected_sku]), contextlib.redirect_stdout(out):
             exec(CODE, {})
         return out.getvalue(), instances, clock[0]
 
@@ -51,6 +53,12 @@ class ReconnectTest(unittest.TestCase):
 
     def test_missing_storage_is_not_success(self):
         out, _, _ = self.run_probe(storage_ready=False)
+        self.assertEqual(out, '')
+
+    def test_declared_board_requires_board_line_after_stamp(self):
+        out, _, _ = self.run_probe(expected_sku='wave', actual_sku='wave')
+        self.assertIn('EIDOLON-BOARD sku=wave', out)
+        out, _, _ = self.run_probe(expected_sku='wave')
         self.assertEqual(out, '')
 
     def test_missing_port_remains_a_bounded_failure(self):

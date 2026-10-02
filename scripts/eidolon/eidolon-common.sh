@@ -319,6 +319,12 @@ eidolon_flash() {
   case "$action" in flash|app-flash) ;; *) return 2 ;; esac
   local python
   python="$(eidolon_idf_python)" || return 1
+  # Shared build directories retain CMake's BOARD_NAME even when sdkconfig
+  # selects another board. Apply the caller's identity to both IDF invocations,
+  # including the implicit rebuild performed by the flash action.
+  if [[ -n "${BOARD_NAME:-}" && -n "${BOARD_PATH:-}" ]]; then
+    set -- "$@" -DBOARD_NAME="${BOARD_NAME}" -DBOARD_TYPE="${BOARD_PATH}"
+  fi
   "$@" build || return 1
   "$python" "$root/scripts/eidolon/partition_contract.py" preflight "$build" --port "$port" --action "$action" || return 1
   "$@" "$action" || return 1
@@ -339,17 +345,19 @@ eidolon_verify_flashed() {
 
   eidolon__info "Verifying flashed firmware on ${port} (expected: ${expected:-<unknown>})"
   verifier_python="$(eidolon_idf_python)" || return 1
-  actual="$("${verifier_python}" - "${port}" "${timeout}" <<'PY' 2>/dev/null || true
+  actual="$("${verifier_python}" - "${port}" "${timeout}" "${BOARD_NAME:-}" <<'PY' 2>/dev/null || true
 import sys, time
 try:
     import serial
 except Exception:
     sys.exit(3)
 port, tmo = sys.argv[1], float(sys.argv[2])
+expected_sku = sys.argv[3] if len(sys.argv) > 3 else ""
 deadline = time.monotonic() + tmo
 reset_sent = False
 storage = ""
 stamp = ""
+sku = ""
 p = None
 try:
     while time.monotonic() < deadline:
@@ -374,9 +382,13 @@ try:
             i = line.find("EIDOLON-BUILDSTAMP")
             if i != -1:
                 stamp = line[i:].strip()
-            if storage and stamp:
+            if "Board:" in line and " SKU=" in line:
+                sku = line.split(" SKU=", 1)[1].strip()
+            if storage and stamp and (sku or not expected_sku):
                 print(storage)
                 print(stamp)
+                if sku:
+                    print("EIDOLON-BOARD sku=" + sku)
                 break
         except (serial.SerialException, OSError):
             if p is not None:
@@ -401,19 +413,21 @@ PY
 
   eidolon__info "Device reports: ${actual}"
   # Compare the git= and sdk= tokens against expected.
-  local exp_git exp_sdk exp_idf act_git act_sdk act_idf
+  local exp_git exp_sdk exp_idf act_git act_sdk act_idf act_board
   exp_git="$(sed -n 's/.*git=\([^ ]*\).*/\1/p' <<<"${expected}")"
   exp_sdk="$(sed -n 's/.*sdk=\([^ ]*\).*/\1/p' <<<"${expected}")"
   exp_idf="$(sed -n 's/.*idf=\([^ ]*\).*/\1/p' <<<"${expected}")"
   act_git="$(sed -n 's/.*git=\([^ ]*\).*/\1/p' <<<"${actual}")"
   act_sdk="$(sed -n 's/.*sdk=\([^ ]*\).*/\1/p' <<<"${actual}")"
   act_idf="$(sed -n 's/.*idf=\([^ ]*\).*/\1/p' <<<"${actual}")"
+  act_board="$(sed -n 's/^EIDOLON-BOARD sku=//p' <<<"${actual}")"
   if [[ "${exp_git}" == "${act_git}" && "${exp_sdk}" == "${act_sdk}" &&
-        "${exp_idf}" == "${act_idf}" ]]; then
+        "${exp_idf}" == "${act_idf}" ]] &&
+     [[ -z "${BOARD_NAME:-}" || "${BOARD_NAME}" == "${act_board}" ]]; then
     eidolon__info "VERIFIED: device runs the just-built firmware (git=${act_git} sdk=${act_sdk} idf=${act_idf})."
     return 0
   else
-    eidolon__warn "MISMATCH: built git=${exp_git} sdk=${exp_sdk} idf=${exp_idf} but device git=${act_git} sdk=${act_sdk} idf=${act_idf}."
+    eidolon__warn "MISMATCH: built git=${exp_git} sdk=${exp_sdk} idf=${exp_idf} board=${BOARD_NAME:-unknown} but device git=${act_git} sdk=${act_sdk} idf=${act_idf} board=${act_board:-unknown}."
     eidolon__warn "The device is NOT running what you just built (stale flash / wrong path / cached SDK / wrong toolchain)."
     return 1
   fi

@@ -86,4 +86,17 @@ if EIDOLON_TEST_ACTUAL='EIDOLON-BUILDSTAMP git=abcdef123 branch=test sdk=1234567
   exit 1
 fi
 
+for actual_board in waveshare stackchan missing; do
+  status=0
+  BOARD_NAME=waveshare \
+    EIDOLON_TEST_ACTUAL=$'EIDOLON-STORAGE owner_trust=ready bytes=65536\nEIDOLON-BUILDSTAMP git=abcdef123 branch=test sdk=1234567890abcdef idf=6.1\nEIDOLON-BOARD sku='"${actual_board}" \
+    IDF_PYTHON_ENV_PATH="${fake_idf_python}" \
+    eidolon_verify_flashed "${verify_root}" /dev/test 0 >/dev/null 2>&1 || status=$?
+  if [[ "${actual_board}" == waveshare ]]; then
+    [[ "${status}" == 0 ]] || { echo "matching board was rejected" >&2; exit 1; }
+  else
+    [[ "${status}" != 0 ]] || { echo "wrong board was accepted" >&2; exit 1; }
+  fi
+done
+
 echo "eidolon_common_test: PASS"
