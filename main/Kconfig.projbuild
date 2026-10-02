@@ -1,13 +1,3 @@
-config EIDOLON_NETWORK_DIAGNOSTICS
-    bool "Trace actual DNS, socket and RTC connection attempts"
-    depends on EIDOLON_HUB_MODE
-    default n
-    help
-        Diagnostic firmware only. Log resolver timings, actual peer addresses,
-        and RTC candidate transport arrival order without SDP credentials.
-        Logging changes scheduling; compare with ordinary builds before drawing
-        conclusions about intermittent failures. No credentials are logged.
-
 menu "Xiaozhi Assistant"
 
 config EIDOLON_OTA_MIN_FREE_BYTES

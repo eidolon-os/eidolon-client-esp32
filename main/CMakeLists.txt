@@ -1585,11 +1585,6 @@ else()
     message(STATUS "Assets partition not found, using v1 partition table")
 endif()
 
-if(CONFIG_EIDOLON_NETWORK_DIAGNOSTICS)
-    target_sources(${COMPONENT_LIB} PRIVATE "eidolon/network_diagnostics.cc")
-    target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--wrap=lwip_getaddrinfo" "-Wl,--wrap=lwip_connect" "-Wl,--wrap=esp_peer_send_msg" "-Wl,--wrap=ip4_input" "-Wl,--wrap=inet_chksum_pseudo")
-endif()
-
 # The synchronous netconn hook runs on the requesting task, never TCPIP.
 # Fail explicitly rather than silently reverting .local to lwIP's DNS parser.
 if(CONFIG_EIDOLON_HUB_MODE AND NOT CONFIG_LWIP_HOOK_NETCONN_EXT_RESOLVE_CUSTOM)

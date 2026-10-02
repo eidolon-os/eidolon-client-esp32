@@ -925,6 +925,13 @@ esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist, bool* channel_c
     if (channel_changed) {
         *channel_changed = ChannelConfigurationChanged(config_, fresh);
         if (!*channel_changed) {
+            // Explicit config.refresh keeps its existing durable-store contract,
+            // including after a transport hint updated only the in-memory config.
+            if (persist) {
+                HubConfigStore store;
+                err = store.SaveHubConfig(fresh);
+                if (err != ESP_OK) return err;
+            }
             // Initial ACTIVE and local track updates also reach the official
             // participant callback. Refresh only the clock; retain the current
             // conversation, output gate and connection when config is equal.
@@ -2481,13 +2488,8 @@ void EidolonVoiceController::HandleConfigRefreshCommand(const std::string& comma
                                                         const std::string& /*payload*/)
 {
     ESP_LOGI(TAG, "Control command -> refresh Hub config");
-    ControlCommand command;
-    command.id = command_id;
-    command.op = kControlOpConfigRefresh;
-
     if (DoConfigurationInvalidated(session_generation_, &command_id) != ESP_OK) {
         ESP_LOGW(TAG, "Control-triggered config refresh failed");
-        AckCommand(command, "failed", "CONFIG_REFRESH_FAILED");
         return;
     }
 }
@@ -3864,28 +3866,33 @@ esp_err_t EidolonVoiceController::DoConfigurationInvalidated(uint32_t generation
 {
     if (generation != session_generation_) return ESP_ERR_INVALID_STATE;
     bool changed = false;
-    const esp_err_t refreshed = RefreshHubConfig(/*persist=*/false, &changed);
-    const auto acknowledge = [this, command_id]() {
+    const esp_err_t refreshed = RefreshHubConfig(/*persist=*/command_id != nullptr, &changed);
+    const auto acknowledge = [this, command_id](esp_err_t result) {
         if (!command_id) return;
         ControlCommand command;
         command.id = *command_id;
         command.op = kControlOpConfigRefresh;
-        AckCommand(command, "succeeded", "OK");
+        if (result != ESP_OK) {
+            AckCommand(command, "failed", "CONFIG_REFRESH_FAILED");
+        } else {
+            AckCommand(command, "succeeded", "OK", "",
+                       config_.status == HubConfigStatus::Active ? "{\"status\":\"active\"}" : nullptr);
+        }
     };
     if (refreshed == ESP_OK && !changed) {
         ESP_LOGI(TAG, "[lifecycle] Owner configuration current gen=%lu revision=%lu",
                  static_cast<unsigned long>(generation),
                  static_cast<unsigned long>(config_.output_policy.revision));
-        acknowledge();
+        acknowledge(ESP_OK);
         return ESP_OK;
     }
     ESP_LOGI(TAG, "[lifecycle] Owner configuration invalidated gen=%lu",
              static_cast<unsigned long>(generation));
     CloseConversationAudio();
-    if (refreshed == ESP_OK && command_id) {
+    if (command_id) {
         // Receipt belongs to the old room. Flush it before retiring that room;
-        // neither a duplicate hint nor a reconnect failure needs a new fetch.
-        acknowledge();
+        // report fetch failures here too, while that room can still send.
+        acknowledge(refreshed);
         vTaskDelay(kActiveAckSettleDelay);
     }
     if (shared_visit_) {

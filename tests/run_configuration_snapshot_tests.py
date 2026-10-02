@@ -40,13 +40,13 @@ GATE
 static DeviceOutputGate gate(false);
 DeviceOutputGate& CurrentOutputGate() { return gate; }
 static Esp32HubConfig response;
-static int http_error=0, requests=0, writes=0;
+static int http_error=0, store_error=0, requests=0, writes=0;
 struct HubOnboardingClient {
     int Resume(const std::string&, Esp32HubConfig& fresh) {
         ++requests; fresh=response; return http_error;
     }
 };
-struct HubConfigStore { int SaveHubConfig(const Esp32HubConfig&) { ++writes;return ESP_OK; } };
+struct HubConfigStore { int SaveHubConfig(const Esp32HubConfig&) { ++writes;return store_error; } };
 enum class VoiceSessionState { ConfigReady, Unauthorized };
 static void esp_timer_stop(void*) {}
 class EidolonVoiceController {
@@ -90,11 +90,19 @@ int main() {
     assert(CurrentOutputGate().AllowsMicrophone());
     assert(controller.state_changes==0 && controller.closes==0 && controller.session_.disconnects==0);
     assert(writes==0 && requests==1 && !controller.config_refresh_required_);
+    // Explicit refresh persists even when a prior hint made RAM current.
+    assert(controller.RefreshHubConfig(true,&changed)==ESP_OK && !changed);
+    assert(writes==1 && CurrentOutputGate().AllowsMicrophone());
+    assert(controller.state_changes==0 && controller.session_.disconnects==0);
+    store_error=ESP_ERR_INVALID_STATE;
+    assert(controller.RefreshHubConfig(true,&changed)==ESP_ERR_INVALID_STATE);
+    assert(writes==2 && CurrentOutputGate().AllowsMicrophone());
+    store_error=ESP_OK;
     response.output_policy.revision=8; response.output_policy.microphone=false;
     assert(controller.RefreshHubConfig(false,&changed)==ESP_OK && changed);
     assert(!CurrentOutputGate().AllowsMicrophone());
     assert(controller.session_.disconnects==0); // caller owns receipt + retirement
-    assert(controller.config_.output_policy.revision==8 && writes==0);
+    assert(controller.config_.output_policy.revision==8 && writes==2);
     response.output_policy.revision=7;
     assert(controller.RefreshHubConfig(false,&changed)==ESP_ERR_INVALID_STATE);
     assert(controller.config_.output_policy.revision==8 && !CurrentOutputGate().AllowsMicrophone());
@@ -105,6 +113,7 @@ int main() {
     response.recovery_hint="reapprove";
     assert(controller.RefreshHubConfig(false,&changed)==ESP_ERR_NOT_ALLOWED);
     assert(controller.config_.status==HubConfigStatus::RecoveryRequired && controller.network_lost==1);
+    assert(writes==2); // transport hints and recovery never persist
 }
 '''.replace('GATE', gate).replace('REFRESH', refresh)
 with tempfile.TemporaryDirectory() as directory:

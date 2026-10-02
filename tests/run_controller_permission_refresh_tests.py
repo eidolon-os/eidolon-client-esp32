@@ -95,6 +95,7 @@ struct ControlCommand { std::string id,op; };
 void vTaskDelay(int) {}
 [[maybe_unused]] constexpr auto kSessionCloseType="close";
 enum class VoiceSessionState { Reconnecting };
+enum class HubConfigStatus { Active, WaitingBinding };
 enum class EndReason { Superseded };
 int64_t esp_timer_get_time() { return 100000000; }
 class EidolonVoiceController {
@@ -103,8 +104,10 @@ public:
   bool shared_visit_=false, standby_=false, config_refresh_required_=false;
   bool conversation_confirmed_=true, audio_open=true;
   bool changed=true, channel_available=true;
-  int refresh_error=0, refreshes=0, receipts=0;
-  struct { struct { uint32_t revision=7; } output_policy; } config_;
+  int refresh_error=0, refreshes=0, persists=0, receipts=0;
+  std::string receipt_status,receipt_code,receipt_result;
+  struct { struct { uint32_t revision=7; } output_policy;
+    HubConfigStatus status=HubConfigStatus::Active; } config_;
   std::string current_conversation_id_="confirmed-id", pending_join="request-id";
   std::vector<std::string> calls;
   int connect_error=ESP_OK, terminal_ends=0, closes_sent=0, shared_ends=0;
@@ -115,13 +118,15 @@ public:
     void OnDisconnected(int64_t) { calls->push_back("recovery"); }
   } channel_recovery_{&calls};
   int RefreshHubConfig(bool persist, bool *different) {
-    assert(!persist); ++refreshes; *different=changed;
+    ++refreshes; if (persist) ++persists; *different=changed;
     if (!refresh_error) config_refresh_required_=false;
     return refresh_error;
   }
   bool HasChannelConfig() const { return channel_available; }
-  void AckCommand(const ControlCommand& c,const char*,const char*) {
+  void AckCommand(const ControlCommand& c,const char* status,const char* code,
+                  const char* =nullptr,const char* result=nullptr) {
     assert(c.op=="config.refresh"); ++receipts; calls.push_back("receipt");
+    receipt_status=status; receipt_code=code; receipt_result=result ? result : "";
   }
   void CloseConversationAudio() { audio_open=false; calls.push_back("audio-close"); }
   void FinishSharedVisit(const char*) { ++shared_ends; }
@@ -151,6 +156,7 @@ int main() {
   assert(active.conversation_confirmed_ && active.pending_join=="request-id");
   assert(active.terminal_ends==0 && active.closes_sent==0);
   assert(active.calls.back()=="fresh-owner-connect" && active.standby_);
+  assert(active.persists==0 && active.receipts==0);
   EidolonVoiceController failed;
   failed.refresh_error=-3; failed.DoConfigurationInvalidated(7);
   assert(!failed.audio_open && failed.config_refresh_required_);
@@ -164,6 +170,7 @@ int main() {
   for (int i=0;i<40;++i) assert(same.DoConfigurationInvalidated(7)==ESP_OK);
   assert(same.calls.empty() && same.audio_open && same.session_generation_==7);
   assert(same.current_conversation_id_=="confirmed-id" && same.pending_join=="request-id");
+  assert(same.persists==0);
   EidolonVoiceController unchanged_visit;
   unchanged_visit.shared_visit_=true; unchanged_visit.changed=false;
   unchanged_visit.DoConfigurationInvalidated(7);
@@ -179,14 +186,28 @@ int main() {
   EidolonVoiceController command;
   const std::string id="refresh-id";
   assert(command.DoConfigurationInvalidated(7,&id)==ESP_OK);
-  assert(command.receipts==1 && command.refreshes==1);
+  assert(command.receipts==1 && command.refreshes==1 && command.persists==1);
+  assert(command.receipt_status=="succeeded" && command.receipt_code=="OK");
+  assert(command.receipt_result=="{\"status\":\"active\"}");
   assert(command.calls[0]=="audio-close" && command.calls[1]=="receipt");
   assert(std::find(command.calls.begin(),command.calls.end(),"receipt") <
          std::find(command.calls.begin(),command.calls.end(),"disconnect"));
   EidolonVoiceController unchanged_command;
   unchanged_command.changed=false;
   unchanged_command.DoConfigurationInvalidated(7,&id);
-  assert(unchanged_command.audio_open && unchanged_command.receipts==1);
+  assert(unchanged_command.audio_open && unchanged_command.receipts==1 && unchanged_command.persists==1);
+  assert(unchanged_command.receipt_result=="{\"status\":\"active\"}");
+  EidolonVoiceController waiting_command;
+  waiting_command.changed=false; waiting_command.config_.status=HubConfigStatus::WaitingBinding;
+  waiting_command.DoConfigurationInvalidated(7,&id);
+  assert(waiting_command.receipts==1 && waiting_command.receipt_result.empty());
+  EidolonVoiceController failed_command;
+  failed_command.refresh_error=-3;
+  assert(failed_command.DoConfigurationInvalidated(7,&id)==-3);
+  assert(failed_command.receipts==1 && failed_command.receipt_status=="failed");
+  assert(failed_command.receipt_code=="CONFIG_REFRESH_FAILED");
+  assert(std::find(failed_command.calls.begin(),failed_command.calls.end(),"receipt") <
+         std::find(failed_command.calls.begin(),failed_command.calls.end(),"disconnect"));
   EidolonVoiceController visit;
   visit.shared_visit_=true; visit.DoConfigurationInvalidated(7);
   assert(!visit.audio_open && visit.shared_ends==1);
