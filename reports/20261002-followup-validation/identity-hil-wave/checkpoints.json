@@ -1,0 +1,259 @@
+[
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "294f47f71",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      14679
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      237
+    ],
+    "heap_samples": [
+      [
+        12919,
+        85127
+      ],
+      [
+        24219,
+        50643
+      ],
+      [
+        34219,
+        50643
+      ],
+      [
+        44219,
+        50643
+      ],
+      [
+        54219,
+        50643
+      ]
+    ],
+    "settled_heap_delta": 0,
+    "faults": [],
+    "error_lines": [
+      "E (829) sh8601: swap_xy is not supported by this panel",
+      "E (13829) AGENT: 0 Not found for bind remote 192.168.3.230:52579",
+      "E (13829) AGENT: 0 Not found for bind remote 192.168.3.230:52579",
+      "E (13829) AGENT: 0 Not found for bind remote 192.168.3.230:52579",
+      "E (13839) AGENT: 0 Not found for bind remote 192.168.3.230:52579",
+      "E (14139) AGENT: 0 Not found for bind remote 192.168.3.230:57101",
+      "E (14139) AGENT: 0 Not found for bind remote 192.168.3.230:57101"
+    ],
+    "name": "wave",
+    "port": "/dev/cu.usbmodem21401",
+    "round": 1,
+    "duration_seconds": 60.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/identity-hil-wave/wave-round-1.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "FAIL",
+    "reasons": [
+      "failure/recovery evidence in serial log"
+    ],
+    "stamps": [
+      [
+        "294f47f71",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE"
+    ],
+    "ready_ms": [],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "-",
+      "192.168.3.230",
+      "-",
+      "192.168.3.230",
+      "-",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [],
+    "heap_samples": [
+      [
+        15219,
+        82735
+      ],
+      [
+        25219,
+        83395
+      ],
+      [
+        35219,
+        82283
+      ],
+      [
+        45219,
+        85215
+      ],
+      [
+        55219,
+        82595
+      ],
+      [
+        65219,
+        82595
+      ],
+      [
+        75219,
+        83247
+      ],
+      [
+        85219,
+        85199
+      ],
+      [
+        95219,
+        85199
+      ],
+      [
+        105219,
+        82607
+      ],
+      [
+        115219,
+        82551
+      ],
+      [
+        125219,
+        83239
+      ],
+      [
+        135219,
+        82131
+      ],
+      [
+        145219,
+        85179
+      ],
+      [
+        155219,
+        85215
+      ],
+      [
+        165219,
+        85215
+      ],
+      [
+        175219,
+        85215
+      ],
+      [
+        185219,
+        82551
+      ],
+      [
+        195219,
+        83271
+      ],
+      [
+        205219,
+        82087
+      ],
+      [
+        215219,
+        82087
+      ],
+      [
+        225219,
+        85187
+      ],
+      [
+        235219,
+        85187
+      ]
+    ],
+    "settled_heap_delta": null,
+    "faults": [
+      "E (21689) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15299 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+      "E (37889) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (37919) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8109 status=0 socket_errno=119 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (68079) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=19609 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+      "E (84289) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (84319) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8109 status=0 socket_errno=119 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (122249) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=17379 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+      "E (138489) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (138519) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8109 status=0 socket_errno=119 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (194229) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15146 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+      "E (218199) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15891 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0"
+    ],
+    "error_lines": [
+      "E (829) sh8601: swap_xy is not supported by this panel",
+      "E (21689) esp-tls: [sock=54] select() timeout",
+      "E (21689) esp-tls: Failed to open new connection",
+      "E (21689) transport_base: Failed to open a new connection",
+      "E (21689) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (21689) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15299 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+      "E (37889) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (37909) esp-tls: Failed to open new connection",
+      "E (37909) transport_base: Failed to open a new connection",
+      "E (37909) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (37919) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8109 status=0 socket_errno=119 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (68079) esp-tls: [sock=54] select() timeout",
+      "E (68079) esp-tls: Failed to open new connection",
+      "E (68079) transport_base: Failed to open a new connection",
+      "E (68079) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (68079) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=19609 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+      "E (84289) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (84309) esp-tls: Failed to open new connection",
+      "E (84309) transport_base: Failed to open a new connection",
+      "E (84309) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (84319) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8109 status=0 socket_errno=119 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (122249) esp-tls: [sock=54] select() timeout",
+      "E (122249) esp-tls: Failed to open new connection",
+      "E (122249) transport_base: Failed to open a new connection",
+      "E (122249) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (122249) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=17379 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+      "E (138489) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (138509) esp-tls: Failed to open new connection",
+      "E (138509) transport_base: Failed to open a new connection",
+      "E (138519) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (138519) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8109 status=0 socket_errno=119 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (194229) esp-tls: [sock=54] select() timeout",
+      "E (194229) esp-tls: Failed to open new connection",
+      "E (194229) transport_base: Failed to open a new connection",
+      "E (194229) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (194229) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15146 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+      "E (218199) esp-tls: [sock=54] select() timeout",
+      "E (218199) esp-tls: Failed to open new connection",
+      "E (218199) transport_base: Failed to open a new connection",
+      "E (218199) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (218199) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15891 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0"
+    ],
+    "name": "wave",
+    "port": "/dev/cu.usbmodem21401",
+    "round": 2,
+    "duration_seconds": 240.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/identity-hil-wave/wave-round-2.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  }
+]

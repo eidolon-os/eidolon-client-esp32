@@ -1,0 +1,221 @@
+[
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "294f47f71",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      12389
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      163
+    ],
+    "heap_samples": [
+      [
+        10619,
+        85063
+      ],
+      [
+        22219,
+        50619
+      ],
+      [
+        32219,
+        50619
+      ],
+      [
+        42219,
+        50619
+      ],
+      [
+        52219,
+        50619
+      ],
+      [
+        62219,
+        50619
+      ],
+      [
+        72219,
+        50643
+      ],
+      [
+        82219,
+        50643
+      ],
+      [
+        92219,
+        50643
+      ],
+      [
+        102219,
+        50643
+      ],
+      [
+        112219,
+        50643
+      ],
+      [
+        122219,
+        50643
+      ],
+      [
+        132219,
+        50643
+      ],
+      [
+        142219,
+        50643
+      ],
+      [
+        152219,
+        50643
+      ],
+      [
+        162219,
+        50643
+      ],
+      [
+        172219,
+        50643
+      ],
+      [
+        182219,
+        50643
+      ],
+      [
+        192219,
+        50819
+      ],
+      [
+        202219,
+        50819
+      ],
+      [
+        212219,
+        50643
+      ],
+      [
+        222219,
+        50819
+      ],
+      [
+        232219,
+        50643
+      ],
+      [
+        242219,
+        50643
+      ],
+      [
+        252219,
+        50643
+      ],
+      [
+        262219,
+        50643
+      ],
+      [
+        272219,
+        50643
+      ],
+      [
+        282219,
+        50643
+      ],
+      [
+        292219,
+        50643
+      ],
+      [
+        302219,
+        50643
+      ],
+      [
+        312219,
+        50643
+      ],
+      [
+        322219,
+        50643
+      ],
+      [
+        332219,
+        50643
+      ],
+      [
+        342219,
+        50643
+      ],
+      [
+        352219,
+        50643
+      ],
+      [
+        362219,
+        50643
+      ],
+      [
+        372219,
+        50643
+      ],
+      [
+        382219,
+        50643
+      ],
+      [
+        392219,
+        50643
+      ],
+      [
+        402219,
+        50643
+      ],
+      [
+        412219,
+        50643
+      ]
+    ],
+    "settled_heap_delta": 24,
+    "faults": [],
+    "error_lines": [
+      "E (829) sh8601: swap_xy is not supported by this panel",
+      "E (11489) AGENT: 0 Not found for bind remote 192.168.3.230:55600",
+      "E (11509) AGENT: 0 Not found for bind remote 192.168.3.230:55600",
+      "E (11509) AGENT: 0 Not found for bind remote 192.168.3.230:55600",
+      "E (11519) AGENT: 0 Not found for bind remote 192.168.3.230:55600",
+      "E (11519) AGENT: 0 Not found for bind remote 192.168.3.230:55600",
+      "E (11529) AGENT: 0 Not found for bind remote 192.168.3.230:55600",
+      "E (11539) AGENT: 0 Not found for bind remote 192.168.3.230:55600",
+      "E (11679) AGENT: 0 Not found for bind remote 192.168.3.230:55600",
+      "E (11679) AGENT: 0 Not found for bind remote 192.168.3.230:55600",
+      "E (11789) AGENT: 0 Not found for bind remote 192.168.3.230:55600",
+      "E (11789) AGENT: 0 Not found for bind remote 192.168.3.230:55600",
+      "E (11789) AGENT: 0 Not found for bind remote 192.168.3.230:53646",
+      "E (11789) AGENT: 0 Not found for bind remote 192.168.3.230:53646"
+    ],
+    "name": "wave",
+    "port": "/dev/cu.usbmodem21401",
+    "round": 1,
+    "duration_seconds": 420.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/wave-repro/wave-round-1.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  }
+]

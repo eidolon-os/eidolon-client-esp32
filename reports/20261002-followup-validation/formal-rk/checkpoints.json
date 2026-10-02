@@ -1,0 +1,1323 @@
+[
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "df9b84611",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      12180
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      215
+    ],
+    "heap_samples": [
+      [
+        10340,
+        120539
+      ],
+      [
+        21960,
+        32543
+      ],
+      [
+        31960,
+        32543
+      ],
+      [
+        41960,
+        32543
+      ],
+      [
+        51960,
+        32543
+      ],
+      [
+        61960,
+        32543
+      ],
+      [
+        71960,
+        32543
+      ],
+      [
+        81960,
+        32543
+      ]
+    ],
+    "settled_heap_delta": 0,
+    "faults": [],
+    "error_lines": [
+      "E (10630) MODEL_LOADER: Can not find model in partition table",
+      "E (11320) AGENT: 0 Not found for bind remote 192.168.3.230:52283",
+      "E (11320) AGENT: 0 Not found for bind remote 192.168.3.230:52283",
+      "E (11320) AGENT: 0 Not found for bind remote 192.168.3.230:52283",
+      "E (11330) AGENT: 0 Not found for bind remote 192.168.3.230:52283",
+      "E (11620) AGENT: 0 Not found for bind remote 192.168.3.230:52085"
+    ],
+    "name": "box",
+    "port": "/dev/cu.usbmodem21201",
+    "round": 1,
+    "duration_seconds": 90.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/formal-rk/box-round-1.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "df9b84611",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      15160
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      215
+    ],
+    "heap_samples": [
+      [
+        13420,
+        120555
+      ],
+      [
+        24970,
+        32515
+      ],
+      [
+        34970,
+        32687
+      ],
+      [
+        44970,
+        32687
+      ],
+      [
+        54960,
+        32515
+      ],
+      [
+        64970,
+        32687
+      ],
+      [
+        74970,
+        32323
+      ],
+      [
+        84960,
+        32515
+      ]
+    ],
+    "settled_heap_delta": -172,
+    "faults": [],
+    "error_lines": [
+      "E (13710) MODEL_LOADER: Can not find model in partition table",
+      "E (14390) AGENT: 0 Not found for bind remote 192.168.3.230:54620",
+      "E (14390) AGENT: 0 Not found for bind remote 192.168.3.230:54620",
+      "E (14400) AGENT: 0 Not found for bind remote 192.168.3.230:54620",
+      "E (14400) AGENT: 0 Not found for bind remote 192.168.3.230:54620",
+      "E (14410) AGENT: 0 Not found for bind remote 192.168.3.230:54620",
+      "E (14500) AGENT: 0 Not found for bind remote 192.168.3.230:54620",
+      "E (14500) AGENT: 0 Not found for bind remote 192.168.3.230:54620",
+      "E (14500) AGENT: 0 Not found for bind remote 192.168.3.230:59864",
+      "E (14510) AGENT: 0 Not found for bind remote 192.168.3.230:59864"
+    ],
+    "name": "box",
+    "port": "/dev/cu.usbmodem21201",
+    "round": 2,
+    "duration_seconds": 90.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/formal-rk/box-round-2.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "df9b84611",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      11840
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      216
+    ],
+    "heap_samples": [
+      [
+        10040,
+        120487
+      ],
+      [
+        20960,
+        32595
+      ],
+      [
+        30980,
+        32595
+      ],
+      [
+        40960,
+        32595
+      ],
+      [
+        50960,
+        32595
+      ],
+      [
+        60970,
+        32595
+      ],
+      [
+        70970,
+        32595
+      ],
+      [
+        80960,
+        32595
+      ]
+    ],
+    "settled_heap_delta": 0,
+    "faults": [],
+    "error_lines": [
+      "E (10330) MODEL_LOADER: Can not find model in partition table",
+      "E (10970) AGENT: 0 Not found for bind remote 192.168.3.230:55851",
+      "E (10970) AGENT: 0 Not found for bind remote 192.168.3.230:55851",
+      "E (10970) AGENT: 0 Not found for bind remote 192.168.3.230:55851",
+      "E (10980) AGENT: 0 Not found for bind remote 192.168.3.230:55851",
+      "E (10980) AGENT: 0 Not found for bind remote 192.168.3.230:55851",
+      "E (11270) AGENT: 0 Not found for bind remote 192.168.3.230:51313",
+      "E (11270) AGENT: 0 Not found for bind remote 192.168.3.230:51313"
+    ],
+    "name": "box",
+    "port": "/dev/cu.usbmodem21201",
+    "round": 3,
+    "duration_seconds": 90.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/formal-rk/box-round-3.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "df9b84611",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      11560
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      215
+    ],
+    "heap_samples": [
+      [
+        9760,
+        120191
+      ],
+      [
+        20960,
+        32551
+      ],
+      [
+        30960,
+        32551
+      ],
+      [
+        40960,
+        32551
+      ],
+      [
+        50960,
+        32551
+      ],
+      [
+        60960,
+        32551
+      ],
+      [
+        70960,
+        32551
+      ],
+      [
+        80960,
+        32551
+      ]
+    ],
+    "settled_heap_delta": 0,
+    "faults": [],
+    "error_lines": [
+      "E (10050) MODEL_LOADER: Can not find model in partition table",
+      "E (10740) AGENT: 0 Not found for bind remote 192.168.3.230:50809",
+      "E (10740) AGENT: 0 Not found for bind remote 192.168.3.230:50809",
+      "E (10740) AGENT: 0 Not found for bind remote 192.168.3.230:50809",
+      "E (10740) AGENT: 0 Not found for bind remote 192.168.3.230:50809",
+      "E (10750) AGENT: 0 Not found for bind remote 192.168.3.230:50809",
+      "E (10920) AGENT: 0 Not found for bind remote 192.168.3.230:50809",
+      "E (10920) AGENT: 0 Not found for bind remote 192.168.3.230:50809",
+      "E (10920) AGENT: 0 Not found for bind remote 192.168.3.230:53987",
+      "E (10920) AGENT: 0 Not found for bind remote 192.168.3.230:53987"
+    ],
+    "name": "box",
+    "port": "/dev/cu.usbmodem21201",
+    "round": 4,
+    "duration_seconds": 90.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/formal-rk/box-round-4.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "df9b84611",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      12440
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      216
+    ],
+    "heap_samples": [
+      [
+        10100,
+        120319
+      ],
+      [
+        21970,
+        32499
+      ],
+      [
+        31960,
+        32499
+      ],
+      [
+        41970,
+        32499
+      ],
+      [
+        51960,
+        32499
+      ],
+      [
+        61960,
+        32499
+      ],
+      [
+        71960,
+        32499
+      ],
+      [
+        81970,
+        32499
+      ]
+    ],
+    "settled_heap_delta": 0,
+    "faults": [],
+    "error_lines": [
+      "E (10390) MODEL_LOADER: Can not find model in partition table",
+      "E (11070) AGENT: 0 Not found for bind remote 192.168.3.230:52853",
+      "E (11070) AGENT: 0 Not found for bind remote 192.168.3.230:52853",
+      "E (11070) AGENT: 0 Not found for bind remote 192.168.3.230:52853",
+      "E (11080) AGENT: 0 Not found for bind remote 192.168.3.230:52853",
+      "E (11080) AGENT: 0 Not found for bind remote 192.168.3.230:52853",
+      "E (11310) AGENT: 0 Not found for bind remote 192.168.3.230:52853",
+      "E (11310) AGENT: 0 Not found for bind remote 192.168.3.230:52853",
+      "E (11310) AGENT: 0 Not found for bind remote 192.168.3.230:52853",
+      "E (11310) AGENT: 0 Not found for bind remote 192.168.3.230:52853",
+      "E (11320) AGENT: 0 Not found for bind remote 192.168.3.230:51837",
+      "E (11330) AGENT: 0 Not found for bind remote 192.168.3.230:51837",
+      "E (11510) AGENT: 0 Not found for bind remote 192.168.3.230:52853",
+      "E (11510) AGENT: 0 Not found for bind remote 192.168.3.230:52853",
+      "E (11510) AGENT: 0 Not found for bind remote 192.168.3.230:51837",
+      "E (11510) AGENT: 0 Not found for bind remote 192.168.3.230:51837",
+      "E (11780) AGENT: 0 Not found for bind remote 192.168.3.230:51837",
+      "E (11780) AGENT: 0 Not found for bind remote 192.168.3.230:51837"
+    ],
+    "name": "box",
+    "port": "/dev/cu.usbmodem21201",
+    "round": 5,
+    "duration_seconds": 90.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/formal-rk/box-round-5.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "df9b84611",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      11980
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      216
+    ],
+    "heap_samples": [
+      [
+        10080,
+        120491
+      ],
+      [
+        21960,
+        32515
+      ],
+      [
+        31960,
+        32515
+      ],
+      [
+        41960,
+        32515
+      ],
+      [
+        51970,
+        32515
+      ],
+      [
+        61960,
+        32515
+      ],
+      [
+        71970,
+        31943
+      ],
+      [
+        81960,
+        32515
+      ],
+      [
+        91960,
+        32515
+      ],
+      [
+        101960,
+        32515
+      ],
+      [
+        111970,
+        32515
+      ],
+      [
+        121960,
+        32515
+      ],
+      [
+        131970,
+        33343
+      ],
+      [
+        141960,
+        33171
+      ],
+      [
+        151970,
+        32799
+      ],
+      [
+        161960,
+        33171
+      ],
+      [
+        171960,
+        33171
+      ],
+      [
+        181960,
+        33171
+      ],
+      [
+        191960,
+        33171
+      ],
+      [
+        201960,
+        33171
+      ],
+      [
+        211970,
+        33343
+      ],
+      [
+        221960,
+        33171
+      ],
+      [
+        231970,
+        33171
+      ],
+      [
+        241960,
+        33171
+      ],
+      [
+        251970,
+        33343
+      ],
+      [
+        261960,
+        33171
+      ]
+    ],
+    "settled_heap_delta": 656,
+    "faults": [],
+    "error_lines": [
+      "E (10370) MODEL_LOADER: Can not find model in partition table",
+      "E (11030) AGENT: 0 Not found for bind remote 192.168.3.230:53878",
+      "E (11030) AGENT: 0 Not found for bind remote 192.168.3.230:53878",
+      "E (11030) AGENT: 0 Not found for bind remote 192.168.3.230:53878",
+      "E (11040) AGENT: 0 Not found for bind remote 192.168.3.230:53878",
+      "E (11040) AGENT: 0 Not found for bind remote 192.168.3.230:53878",
+      "E (11050) AGENT: 0 Not found for bind remote 192.168.3.230:53878",
+      "E (11310) AGENT: 0 Not found for bind remote 192.168.3.230:53878",
+      "E (11310) AGENT: 0 Not found for bind remote 192.168.3.230:53878",
+      "E (11340) AGENT: 0 Not found for bind remote 192.168.3.230:53878",
+      "E (11340) AGENT: 0 Not found for bind remote 192.168.3.230:53878",
+      "E (11340) AGENT: 0 Not found for bind remote 192.168.3.230:59117",
+      "E (11350) AGENT: 0 Not found for bind remote 192.168.3.230:59117"
+    ],
+    "name": "box",
+    "port": "/dev/cu.usbmodem21201",
+    "round": 6,
+    "duration_seconds": 270.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/formal-rk/box-round-6.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "df9b84611",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      12471
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      164
+    ],
+    "heap_samples": [
+      [
+        10781,
+        87879
+      ],
+      [
+        21651,
+        62023
+      ],
+      [
+        31651,
+        62023
+      ],
+      [
+        41651,
+        62023
+      ],
+      [
+        51651,
+        62199
+      ],
+      [
+        61651,
+        62199
+      ],
+      [
+        71651,
+        62199
+      ],
+      [
+        81651,
+        62199
+      ]
+    ],
+    "settled_heap_delta": 176,
+    "faults": [],
+    "error_lines": [
+      "E (11721) AGENT: 0 Not found for bind remote 192.168.3.230:52678",
+      "E (11731) AGENT: 0 Not found for bind remote 192.168.3.230:52678",
+      "E (11731) AGENT: 0 Not found for bind remote 192.168.3.230:52678",
+      "E (11731) AGENT: 0 Not found for bind remote 192.168.3.230:52678",
+      "E (11821) AGENT: 0 Not found for bind remote 192.168.3.230:52678",
+      "E (11821) AGENT: 0 Not found for bind remote 192.168.3.230:52678",
+      "E (11821) AGENT: 0 Not found for bind remote 192.168.3.230:57964",
+      "E (11831) AGENT: 0 Not found for bind remote 192.168.3.230:57964"
+    ],
+    "name": "stack",
+    "port": "/dev/cu.usbmodem21101",
+    "round": 1,
+    "duration_seconds": 90.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/formal-rk/stack-round-1.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "df9b84611",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      14991
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      164
+    ],
+    "heap_samples": [
+      [
+        13401,
+        87819
+      ],
+      [
+        24651,
+        62027
+      ],
+      [
+        34651,
+        62027
+      ],
+      [
+        44651,
+        62027
+      ],
+      [
+        54651,
+        62027
+      ],
+      [
+        64651,
+        62027
+      ],
+      [
+        74651,
+        62027
+      ],
+      [
+        84651,
+        62027
+      ]
+    ],
+    "settled_heap_delta": 0,
+    "faults": [],
+    "error_lines": [
+      "E (14261) AGENT: 0 Not found for bind remote 192.168.3.230:50261",
+      "E (14261) AGENT: 0 Not found for bind remote 192.168.3.230:50261",
+      "E (14271) AGENT: 0 Not found for bind remote 192.168.3.230:50261",
+      "E (14281) AGENT: 0 Not found for bind remote 192.168.3.230:50261",
+      "E (14301) AGENT: 0 Not found for bind remote 192.168.3.230:50261",
+      "E (14301) AGENT: 0 Not found for bind remote 192.168.3.230:50261",
+      "E (14311) AGENT: 0 Not found for bind remote 192.168.3.230:50261",
+      "E (14431) AGENT: 0 Not found for bind remote 192.168.3.230:51443",
+      "E (14441) AGENT: 0 Not found for bind remote 192.168.3.230:51443"
+    ],
+    "name": "stack",
+    "port": "/dev/cu.usbmodem21101",
+    "round": 2,
+    "duration_seconds": 90.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/formal-rk/stack-round-2.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "df9b84611",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      12871
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      164
+    ],
+    "heap_samples": [
+      [
+        10881,
+        87827
+      ],
+      [
+        22641,
+        61967
+      ],
+      [
+        32641,
+        61967
+      ],
+      [
+        42641,
+        61967
+      ],
+      [
+        52641,
+        62139
+      ],
+      [
+        62641,
+        61967
+      ],
+      [
+        72641,
+        62139
+      ],
+      [
+        82641,
+        61967
+      ]
+    ],
+    "settled_heap_delta": 0,
+    "faults": [],
+    "error_lines": [
+      "E (11741) AGENT: 0 Not found for bind remote 192.168.3.230:58980",
+      "E (11751) AGENT: 0 Not found for bind remote 192.168.3.230:58980",
+      "E (11751) AGENT: 0 Not found for bind remote 192.168.3.230:58980",
+      "E (11751) AGENT: 0 Not found for bind remote 192.168.3.230:58980",
+      "E (11761) AGENT: 0 Not found for bind remote 192.168.3.230:58980",
+      "E (11771) AGENT: 0 Not found for bind remote 192.168.3.230:58980",
+      "E (11851) AGENT: 0 Not found for bind remote 192.168.3.230:58980",
+      "E (11851) AGENT: 0 Not found for bind remote 192.168.3.230:58980",
+      "E (11851) AGENT: 0 Not found for bind remote 192.168.3.230:54019",
+      "E (11851) AGENT: 0 Not found for bind remote 192.168.3.230:54019",
+      "E (12051) AGENT: 0 Not found for bind remote 192.168.3.230:58980",
+      "E (12051) AGENT: 0 Not found for bind remote 192.168.3.230:58980",
+      "E (12051) AGENT: 0 Not found for bind remote 192.168.3.230:54019",
+      "E (12051) AGENT: 0 Not found for bind remote 192.168.3.230:54019",
+      "E (12281) AGENT: 0 Not found for bind remote 192.168.3.230:54019",
+      "E (12291) AGENT: 0 Not found for bind remote 192.168.3.230:54019"
+    ],
+    "name": "stack",
+    "port": "/dev/cu.usbmodem21101",
+    "round": 3,
+    "duration_seconds": 90.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/formal-rk/stack-round-3.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "df9b84611",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      12291
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      164
+    ],
+    "heap_samples": [
+      [
+        10521,
+        87831
+      ],
+      [
+        21651,
+        61955
+      ],
+      [
+        31651,
+        61955
+      ],
+      [
+        41651,
+        61955
+      ],
+      [
+        51651,
+        62131
+      ],
+      [
+        61651,
+        62131
+      ],
+      [
+        71651,
+        62131
+      ],
+      [
+        81651,
+        62131
+      ]
+    ],
+    "settled_heap_delta": 176,
+    "faults": [],
+    "error_lines": [
+      "E (11371) AGENT: 0 Not found for bind remote 192.168.3.230:51611",
+      "E (11381) AGENT: 0 Not found for bind remote 192.168.3.230:51611",
+      "E (11381) AGENT: 0 Not found for bind remote 192.168.3.230:51611",
+      "E (11401) AGENT: 0 Not found for bind remote 192.168.3.230:51611",
+      "E (11521) AGENT: 0 Not found for bind remote 192.168.3.230:50153",
+      "E (11521) AGENT: 0 Not found for bind remote 192.168.3.230:50153"
+    ],
+    "name": "stack",
+    "port": "/dev/cu.usbmodem21101",
+    "round": 4,
+    "duration_seconds": 90.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/formal-rk/stack-round-4.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "df9b84611",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      12281
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      163
+    ],
+    "heap_samples": [
+      [
+        10691,
+        87855
+      ],
+      [
+        21651,
+        61959
+      ],
+      [
+        31651,
+        61959
+      ],
+      [
+        41651,
+        61959
+      ],
+      [
+        51651,
+        61959
+      ],
+      [
+        61651,
+        61959
+      ],
+      [
+        71651,
+        61959
+      ],
+      [
+        81651,
+        61959
+      ]
+    ],
+    "settled_heap_delta": 0,
+    "faults": [],
+    "error_lines": [
+      "E (11561) AGENT: 0 Not found for bind remote 192.168.3.230:53212",
+      "E (11571) AGENT: 0 Not found for bind remote 192.168.3.230:53212",
+      "E (11581) AGENT: 0 Not found for bind remote 192.168.3.230:53212",
+      "E (11591) AGENT: 0 Not found for bind remote 192.168.3.230:53212",
+      "E (11601) AGENT: 0 Not found for bind remote 192.168.3.230:53212",
+      "E (11601) AGENT: 0 Not found for bind remote 192.168.3.230:53212",
+      "E (11731) AGENT: 0 Not found for bind remote 192.168.3.230:59778",
+      "E (11741) AGENT: 0 Not found for bind remote 192.168.3.230:59778"
+    ],
+    "name": "stack",
+    "port": "/dev/cu.usbmodem21101",
+    "round": 5,
+    "duration_seconds": 90.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/formal-rk/stack-round-5.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "df9b84611",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      15641
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      164
+    ],
+    "heap_samples": [
+      [
+        14151,
+        87883
+      ],
+      [
+        24651,
+        61999
+      ],
+      [
+        34651,
+        62171
+      ],
+      [
+        44651,
+        62019
+      ],
+      [
+        54651,
+        62019
+      ],
+      [
+        64651,
+        62019
+      ],
+      [
+        74651,
+        62019
+      ],
+      [
+        84651,
+        62019
+      ],
+      [
+        94651,
+        61995
+      ],
+      [
+        104651,
+        61995
+      ],
+      [
+        114651,
+        62023
+      ],
+      [
+        124651,
+        62023
+      ],
+      [
+        134651,
+        62023
+      ],
+      [
+        144651,
+        62023
+      ],
+      [
+        154651,
+        62171
+      ],
+      [
+        164651,
+        62171
+      ],
+      [
+        174651,
+        62171
+      ],
+      [
+        184651,
+        61995
+      ],
+      [
+        194651,
+        62171
+      ],
+      [
+        204651,
+        62019
+      ],
+      [
+        214651,
+        61995
+      ],
+      [
+        224651,
+        62023
+      ],
+      [
+        234651,
+        62171
+      ],
+      [
+        244651,
+        62171
+      ],
+      [
+        254651,
+        62171
+      ],
+      [
+        264651,
+        62023
+      ]
+    ],
+    "settled_heap_delta": 4,
+    "faults": [],
+    "error_lines": [
+      "E (15001) AGENT: 0 Not found for bind remote 192.168.3.230:57753",
+      "E (15011) AGENT: 0 Not found for bind remote 192.168.3.230:57753",
+      "E (15011) AGENT: 0 Not found for bind remote 192.168.3.230:57753",
+      "E (15021) AGENT: 0 Not found for bind remote 192.168.3.230:57753"
+    ],
+    "name": "stack",
+    "port": "/dev/cu.usbmodem21101",
+    "round": 6,
+    "duration_seconds": 270.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/formal-rk/stack-round-6.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "df9b84611",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      13019
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      163
+    ],
+    "heap_samples": [
+      [
+        11459,
+        85099
+      ],
+      [
+        22219,
+        50687
+      ],
+      [
+        32219,
+        50687
+      ],
+      [
+        42219,
+        50687
+      ],
+      [
+        52219,
+        50687
+      ],
+      [
+        62219,
+        50687
+      ],
+      [
+        72219,
+        50687
+      ],
+      [
+        82219,
+        50707
+      ]
+    ],
+    "settled_heap_delta": 20,
+    "faults": [],
+    "error_lines": [
+      "E (829) sh8601: swap_xy is not supported by this panel",
+      "E (12319) AGENT: 0 Not found for bind remote 192.168.3.230:55604",
+      "E (12319) AGENT: 0 Not found for bind remote 192.168.3.230:55604",
+      "E (12319) AGENT: 0 Not found for bind remote 192.168.3.230:55604",
+      "E (12329) AGENT: 0 Not found for bind remote 192.168.3.230:55604",
+      "E (12329) AGENT: 0 Not found for bind remote 192.168.3.230:55604",
+      "E (12409) AGENT: 0 Not found for bind remote 192.168.3.230:55604",
+      "E (12409) AGENT: 0 Not found for bind remote 192.168.3.230:55604",
+      "E (12419) AGENT: 0 Not found for bind remote 192.168.3.230:58133",
+      "E (12419) AGENT: 0 Not found for bind remote 192.168.3.230:58133"
+    ],
+    "name": "wave",
+    "port": "/dev/cu.usbmodem21401",
+    "round": 1,
+    "duration_seconds": 90.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/formal-rk/wave-round-1.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "FAIL",
+    "reasons": [
+      "failure/recovery evidence in serial log"
+    ],
+    "stamps": [
+      [
+        "df9b84611",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE"
+    ],
+    "ready_ms": [],
+    "resolved_addresses": [
+      "-",
+      "-",
+      "-",
+      "-",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [],
+    "heap_samples": [
+      [
+        15219,
+        83419
+      ],
+      [
+        25219,
+        82311
+      ],
+      [
+        35219,
+        85187
+      ],
+      [
+        45219,
+        82683
+      ],
+      [
+        55219,
+        83251
+      ],
+      [
+        65219,
+        82147
+      ],
+      [
+        75219,
+        85171
+      ],
+      [
+        85229,
+        85171
+      ]
+    ],
+    "settled_heap_delta": null,
+    "faults": [
+      "E (14469) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (14499) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8126 status=0 socket_errno=0 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (30669) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (30699) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8109 status=0 socket_errno=0 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (49269) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (49299) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8053 status=0 socket_errno=0 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (65469) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (65499) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8109 status=0 socket_errno=0 tls_error=0x8001 tls_code=0 tls_flags=0x0"
+    ],
+    "error_lines": [
+      "E (829) sh8601: swap_xy is not supported by this panel",
+      "E (14469) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (14479) esp-tls: Failed to open new connection",
+      "E (14489) transport_base: Failed to open a new connection",
+      "E (14489) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (14499) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8126 status=0 socket_errno=0 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (30669) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (30679) esp-tls: Failed to open new connection",
+      "E (30689) transport_base: Failed to open a new connection",
+      "E (30689) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (30699) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8109 status=0 socket_errno=0 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (49269) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (49279) esp-tls: Failed to open new connection",
+      "E (49289) transport_base: Failed to open a new connection",
+      "E (49289) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (49299) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8053 status=0 socket_errno=0 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (65469) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (65479) esp-tls: Failed to open new connection",
+      "E (65489) transport_base: Failed to open a new connection",
+      "E (65489) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (65499) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8109 status=0 socket_errno=0 tls_error=0x8001 tls_code=0 tls_flags=0x0"
+    ],
+    "name": "wave",
+    "port": "/dev/cu.usbmodem21401",
+    "round": 2,
+    "duration_seconds": 90.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/formal-rk/wave-round-2.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  }
+]

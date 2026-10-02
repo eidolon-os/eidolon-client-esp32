@@ -1,0 +1,14 @@
+{
+  "window_local": [
+    "2026-10-02 12:10:30",
+    "2026-10-02 12:16:00"
+  ],
+  "checked_units": [
+    "eidolon-livekit",
+    "eidolon-channel-provider",
+    "eidolon-hub"
+  ],
+  "service_lifecycle_events": [],
+  "filtered_raw_sha256": "f09c18787abcb92d1981de7000881ff6326d98fac0523f9f3857c01640e4a5ce",
+  "note": "Initial diagnostic filter also matches normal starting RTC session and OOM inside Room; these API/session messages are excluded from lifecycle classification."
+}

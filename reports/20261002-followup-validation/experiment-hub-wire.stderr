@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "<stdin>", line 86, in <module>
+  File "<stdin>", line 58, in frames
+  File "<stdin>", line 14, in wsmeta
+KeyError: 'dp'

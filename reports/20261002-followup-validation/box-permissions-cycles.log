@@ -1,0 +1,154 @@
+CAPTURE continuing WITHOUT requested reset epoch=1790909317.900589
+I (210) main: EIDOLON-STORAGE owner_trust=ready bytes=65536
+W (210) Application: EIDOLON-BUILDSTAMP git=df9b84611 sdk=f7b4279643451c43d0bc0017ac1f564971de6714 idf=5.5.4 branch=main built=Oct  2 2026 10:46:34
+I (230) Board: UUID=92d803f6-6b00-4052-a396-b734cac83e80 SKU=esp-box-3
+I (510) EidolonUiPresenter: visible state=ASSETS scene=1
+I (950) EidolonUiPresenter: visible state=BOOT scene=0
+I (1200) EidolonUiPresenter: visible state=NETWORK scene=2
+I (5400) EidolonUiPresenter: visible state=SERVICE scene=6
+I (5440) HubOnboarding: Hub attempt begin mode=activate generation=0
+I (5440) HubOnboarding: Hub step=trust-load elapsed_ms=0
+I (5950) HubOnboarding: Hub step=trust-bundle elapsed_ms=507
+I (5950) HubOnboarding: Hub step=directory-restore elapsed_ms=507
+I (5950) HubOnboarding: Hub step=generation-check elapsed_ms=507
+I (5950) HubOnboarding: Hub step=directory-fetch elapsed_ms=513
+I (6090) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=125
+I (7330) HubOnboarding: Hub step=claim-restore elapsed_ms=1885
+I (7720) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=221
+I (8580) HubOnboarding: Hub step=claim-cleanup elapsed_ms=3136
+I (8580) HubOnboarding: Hub step=configuration-proof elapsed_ms=3136
+I (8730) HubOnboarding: Hub step=configuration-fetch elapsed_ms=3291
+I (8950) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=215
+I (9990) SystemInfo: free sram: 120467 minimal sram: 106159
+I (10320) EidolonMicCap: Mic capture started topology=afe (codec=24000 Hz, out=16000 Hz, channels=2)
+I (10400) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1
+I (11800) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1
+I (11900) EidolonUiPresenter: visible state=READY scene=7
+I (20960) SystemInfo: free sram: 31819 minimal sram: 30687
+I (23350) EidolonVoice: [lifecycle] local permissions invalidated configuration gen=1
+I (23580) LiveKitSession: [lifecycle] room state=Disconnected room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1
+I (23860) EidolonMicCap: Mic capture stopped
+I (23880) HubOnboarding: Hub attempt begin mode=resume generation=0
+I (23890) EidolonUiPresenter: visible state=RETRY scene=10
+I (23890) HubOnboarding: Hub step=trust-load elapsed_ms=10
+I (24400) HubOnboarding: Hub step=trust-bundle elapsed_ms=517
+I (24400) HubOnboarding: Hub step=directory-restore elapsed_ms=517
+I (24400) HubOnboarding: Hub step=claim-restore elapsed_ms=518
+I (24820) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=244
+I (25660) HubOnboarding: Hub step=claim-cleanup elapsed_ms=1775
+I (25660) HubOnboarding: Hub step=configuration-proof elapsed_ms=1775
+I (25810) HubOnboarding: Hub step=configuration-fetch elapsed_ms=1929
+I (25950) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=136
+I (26940) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=3
+I (27740) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=3
+I (27790) EidolonUiPresenter: visible state=READY scene=7
+I (36960) SystemInfo: free sram: 60983 minimal sram: 29907
+I (46960) SystemInfo: free sram: 61203 minimal sram: 29907
+I (47580) EidolonVoice: [lifecycle] local permissions invalidated configuration gen=3
+I (47720) LiveKitSession: [lifecycle] room state=Disconnected room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=3
+I (47920) HubOnboarding: Hub attempt begin mode=resume generation=0
+I (47920) EidolonUiPresenter: visible state=RETRY scene=10
+I (47930) HubOnboarding: Hub step=trust-load elapsed_ms=10
+I (48430) HubOnboarding: Hub step=trust-bundle elapsed_ms=517
+I (48430) HubOnboarding: Hub step=directory-restore elapsed_ms=518
+I (48430) HubOnboarding: Hub step=claim-restore elapsed_ms=518
+I (48680) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=70
+I (49530) HubOnboarding: Hub step=claim-cleanup elapsed_ms=1616
+I (49530) HubOnboarding: Hub step=configuration-proof elapsed_ms=1617
+I (49690) HubOnboarding: Hub step=configuration-fetch elapsed_ms=1771
+I (49810) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=117
+I (50730) EidolonMicCap: Mic capture started topology=afe (codec=24000 Hz, out=16000 Hz, channels=2)
+I (50840) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=5
+I (51830) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=5
+I (51880) EidolonUiPresenter: visible state=READY scene=7
+I (60970) SystemInfo: free sram: 30703 minimal sram: 29587
+I (70970) SystemInfo: free sram: 30703 minimal sram: 29587
+I (73660) EidolonVoice: [lifecycle] local permissions invalidated configuration gen=5
+I (73930) LiveKitSession: [lifecycle] room state=Disconnected room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=5
+I (74240) EidolonMicCap: Mic capture stopped
+I (74260) HubOnboarding: Hub attempt begin mode=resume generation=0
+I (74270) EidolonUiPresenter: visible state=RETRY scene=10
+I (74270) HubOnboarding: Hub step=trust-load elapsed_ms=10
+I (74780) HubOnboarding: Hub step=trust-bundle elapsed_ms=517
+I (74780) HubOnboarding: Hub step=directory-restore elapsed_ms=518
+I (74780) HubOnboarding: Hub step=claim-restore elapsed_ms=518
+I (75100) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=143
+I (75950) HubOnboarding: Hub step=claim-cleanup elapsed_ms=1684
+I (75950) HubOnboarding: Hub step=configuration-proof elapsed_ms=1685
+I (76100) HubOnboarding: Hub step=configuration-fetch elapsed_ms=1839
+I (76240) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=136
+I (77190) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=7
+I (78180) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=7
+I (78230) EidolonUiPresenter: visible state=READY scene=7
+I (87960) SystemInfo: free sram: 61627 minimal sram: 29095
+I (97960) SystemInfo: free sram: 61627 minimal sram: 29095
+I (99130) EidolonVoice: [lifecycle] local permissions invalidated configuration gen=7
+I (99260) LiveKitSession: [lifecycle] room state=Disconnected room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=7
+I (99470) HubOnboarding: Hub attempt begin mode=resume generation=0
+I (99470) EidolonUiPresenter: visible state=RETRY scene=10
+I (99480) HubOnboarding: Hub step=trust-load elapsed_ms=10
+I (99980) HubOnboarding: Hub step=trust-bundle elapsed_ms=518
+I (99980) HubOnboarding: Hub step=directory-restore elapsed_ms=518
+I (99990) HubOnboarding: Hub step=claim-restore elapsed_ms=518
+I (100190) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=27
+I (101050) HubOnboarding: Hub step=claim-cleanup elapsed_ms=1585
+I (101050) HubOnboarding: Hub step=configuration-proof elapsed_ms=1586
+I (101210) HubOnboarding: Hub step=configuration-fetch elapsed_ms=1740
+I (101310) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=107
+I (102240) EidolonMicCap: Mic capture started topology=afe (codec=24000 Hz, out=16000 Hz, channels=2)
+I (102330) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=9
+I (103390) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=9
+I (103450) EidolonUiPresenter: visible state=READY scene=7
+I (112960) SystemInfo: free sram: 30775 minimal sram: 29095
+I (122510) EidolonVoice: [lifecycle] local permissions invalidated configuration gen=9
+I (122630) LiveKitSession: [lifecycle] room state=Disconnected room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=9
+I (122930) EidolonMicCap: Mic capture stopped
+I (122950) HubOnboarding: Hub attempt begin mode=resume generation=0
+I (122960) EidolonUiPresenter: visible state=RETRY scene=10
+I (122960) HubOnboarding: Hub step=trust-load elapsed_ms=10
+I (123470) HubOnboarding: Hub step=trust-bundle elapsed_ms=518
+I (123470) HubOnboarding: Hub step=directory-restore elapsed_ms=518
+I (123470) HubOnboarding: Hub step=claim-restore elapsed_ms=519
+I (123840) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=192
+I (124700) HubOnboarding: Hub step=claim-cleanup elapsed_ms=1747
+I (124700) HubOnboarding: Hub step=configuration-proof elapsed_ms=1748
+I (124850) HubOnboarding: Hub step=configuration-fetch elapsed_ms=1902
+I (124970) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=119
+I (125930) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=11
+I (130670) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=11
+I (130720) EidolonUiPresenter: visible state=READY scene=7
+I (139960) SystemInfo: free sram: 61255 minimal sram: 28707
+I (147850) EidolonVoice: [lifecycle] local permissions invalidated configuration gen=11
+I (148070) LiveKitSession: [lifecycle] room state=Disconnected room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=11
+I (148290) HubOnboarding: Hub attempt begin mode=resume generation=0
+I (148290) EidolonUiPresenter: visible state=RETRY scene=10
+I (148300) HubOnboarding: Hub step=trust-load elapsed_ms=10
+I (148810) HubOnboarding: Hub step=trust-bundle elapsed_ms=518
+I (148810) HubOnboarding: Hub step=directory-restore elapsed_ms=518
+I (148810) HubOnboarding: Hub step=claim-restore elapsed_ms=519
+I (149140) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=158
+I (150000) HubOnboarding: Hub step=claim-cleanup elapsed_ms=1708
+I (150000) HubOnboarding: Hub step=configuration-proof elapsed_ms=1709
+I (150150) HubOnboarding: Hub step=configuration-fetch elapsed_ms=1863
+I (150270) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=113
+I (151190) EidolonMicCap: Mic capture started topology=afe (codec=24000 Hz, out=16000 Hz, channels=2)
+I (151290) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=13
+I (152260) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=13
+I (152350) EidolonUiPresenter: visible state=READY scene=7
+I (161960) SystemInfo: free sram: 30627 minimal sram: 28707
+I (171960) SystemInfo: free sram: 31051 minimal sram: 28707
+I (181960) SystemInfo: free sram: 31051 minimal sram: 28707
+I (191960) SystemInfo: free sram: 31051 minimal sram: 28707
+I (201960) SystemInfo: free sram: 31475 minimal sram: 28707
+I (211960) SystemInfo: free sram: 31475 minimal sram: 28707
+I (221960) SystemInfo: free sram: 31687 minimal sram: 28707
+I (231960) SystemInfo: free sram: 31899 minimal sram: 28707
+I (241960) SystemInfo: free sram: 31899 minimal sram: 28707
+I (251960) SystemInfo: free sram: 32323 minimal sram: 28707
+I (261960) SystemInfo: free sram: 32323 minimal sram: 28707
+I (271960) SystemInfo: free sram: 32747 minimal sram: 28707
+I (281960) SystemInfo: free sram: 32919 minimal sram: 28707
+I (291960) SystemInfo: free sram: 32747 minimal sram: 28707
+I (301960) SystemInfo: free sram: 32747 minimal sram: 28707
+I (311960) SystemInfo: free sram: 32747 minimal sram: 28707
+I (321960) SystemInfo: free sram: 32747 minimal sram: 28707

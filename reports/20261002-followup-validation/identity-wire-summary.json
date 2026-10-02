@@ -1,0 +1,28 @@
+{
+  "formal_failure_240s": {
+    "ports": [
+      63648,
+      63649,
+      63650,
+      63651,
+      63652
+    ],
+    "tcp_flags": {
+      "device": {
+        "2": 55
+      },
+      "hub": {
+        "18": 79
+      }
+    }
+  },
+  "heartbeat_metadata": {
+    "ping_request_device_field16": 513,
+    "pong_response_hub_field20": 513
+  },
+  "capture_start_epoch": 1790913907.046231,
+  "last_packet_epoch": 1790915031.9361236,
+  "stop_requested_epoch": 1790915031.843513,
+  "stderr_bytes": 0,
+  "raw_sha256": "f99a4eedadadeb26ad326a49ec3216c91821d051b55f17c98406c48858419d70"
+}

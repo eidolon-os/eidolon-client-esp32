@@ -1,0 +1,51 @@
+{
+  "firmware_source_commit": "294f47f71",
+  "sdk_commit": "f7b4279643451c43d0bc0017ac1f564971de6714",
+  "checks": [
+    {
+      "command": "python tests/run_controller_permission_refresh_tests.py (2 tests; production handler + authorization stage; ASan/UBSan; terminal-end mutation rejected)",
+      "result": "PASS"
+    },
+    {
+      "command": "bash tests/run_local_permission_observer_tests.sh",
+      "result": "PASS"
+    },
+    {
+      "command": "bash tests/run_channel_recovery_tests.sh",
+      "result": "PASS"
+    },
+    {
+      "command": "bash tests/run_output_policy_tests.sh",
+      "result": "PASS"
+    },
+    {
+      "command": "python tests/flash_lifecycle_test.py (2 tests)",
+      "result": "PASS"
+    },
+    {
+      "command": "python tests/board_flash_entry_test.py (3 tests)",
+      "result": "PASS"
+    },
+    {
+      "command": "python tests/serial_buildstamp_reconnect_test.py (4 tests)",
+      "result": "PASS"
+    },
+    {
+      "command": "bash tests/run_eidolon_common_tests.sh",
+      "result": "PASS"
+    },
+    {
+      "command": "bash -n scripts/eidolon/eidolon-common.sh",
+      "result": "PASS"
+    },
+    {
+      "command": "git diff --check",
+      "result": "PASS"
+    }
+  ],
+  "limitations": [
+    "controller handler test isolates transport; it is not an acoustic hardware test",
+    "SDK commit is local-only pending explicit push authorization",
+    "initial parser failed; corrected parser direction classification smoke-tested before use"
+  ]
+}

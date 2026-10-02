@@ -1,0 +1,98 @@
+{
+  "firmware": "294f47f71",
+  "sdk": "f7b4279643451c43d0bc0017ac1f564971de6714",
+  "planned_cases": 8,
+  "executed_cases": 8,
+  "pass": 7,
+  "fail": 1,
+  "cases": [
+    {
+      "name": "box",
+      "round": 1,
+      "result": "PASS",
+      "duration_seconds": 60.0,
+      "ready_ms": [
+        13309
+      ],
+      "settled_heap_delta": 4,
+      "reasons": []
+    },
+    {
+      "name": "box",
+      "round": 2,
+      "result": "PASS",
+      "duration_seconds": 240.0,
+      "ready_ms": [
+        11519
+      ],
+      "settled_heap_delta": 664,
+      "reasons": []
+    },
+    {
+      "name": "stack",
+      "round": 1,
+      "result": "PASS",
+      "duration_seconds": 60.0,
+      "ready_ms": [
+        13651
+      ],
+      "settled_heap_delta": 12,
+      "reasons": []
+    },
+    {
+      "name": "stack",
+      "round": 2,
+      "result": "PASS",
+      "duration_seconds": 240.0,
+      "ready_ms": [
+        12261
+      ],
+      "settled_heap_delta": -4,
+      "reasons": []
+    },
+    {
+      "name": "wave",
+      "round": 1,
+      "result": "PASS",
+      "duration_seconds": 60.0,
+      "ready_ms": [
+        14679
+      ],
+      "settled_heap_delta": 0,
+      "reasons": []
+    },
+    {
+      "name": "wave",
+      "round": 2,
+      "result": "FAIL",
+      "duration_seconds": 240.0,
+      "ready_ms": [],
+      "settled_heap_delta": null,
+      "reasons": [
+        "failure/recovery evidence in serial log"
+      ]
+    },
+    {
+      "name": "korvo",
+      "round": 1,
+      "result": "PASS",
+      "duration_seconds": 60.0,
+      "ready_ms": [
+        9442
+      ],
+      "settled_heap_delta": 0,
+      "reasons": []
+    },
+    {
+      "name": "korvo",
+      "round": 2,
+      "result": "PASS",
+      "duration_seconds": 240.0,
+      "ready_ms": [
+        9732
+      ],
+      "settled_heap_delta": 628,
+      "reasons": []
+    }
+  ]
+}

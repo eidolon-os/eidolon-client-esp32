@@ -1,0 +1,76 @@
+Open On-Chip Debugger v0.12.0-esp32-20251215 (2025-12-15-18:17)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : esp_usb_jtag: VID set to 0x303a and PID to 0x1001
+Info : esp_usb_jtag: capabilities descriptor set to 0x2000
+Info : Listening on port 6666 for tcl connections
+Info : Listening on port 4444 for telnet connections
+Info : esp_usb_jtag: serial (1C:DB:D4:7A:EF:0C)
+Info : esp_usb_jtag: Device found. Base speed 40000KHz, div range 1 to 255
+Info : clock speed 40000 kHz
+Info : JTAG tap: esp32s3.tap0 tap/device found: 0x120034e5 (mfg: 0x272 (Tensilica), part: 0x2003, ver: 0x1)
+Info : JTAG tap: esp32s3.tap1 tap/device found: 0x120034e5 (mfg: 0x272 (Tensilica), part: 0x2003, ver: 0x1)
+Info : [esp32s3.cpu0] Examination succeed
+Info : [esp32s3.cpu1] Examination succeed
+Info : [esp32s3.cpu0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+Info : [esp32s3.cpu0] Debug controller was reset.
+Info : [esp32s3.cpu0] Core was reset.
+Info : [esp32s3.cpu1] Debug controller was reset.
+Info : [esp32s3.cpu1] Core was reset.
+Info : [esp32s3.cpu0] Target halted, PC=0x4037FBBA, debug_reason=00000000
+Info : [esp32s3.cpu0] Reset cause (21) - (USB UART reset)
+Info : [esp32s3.cpu1] Target halted, PC=0x4037FBBA, debug_reason=00000000
+Info : [esp32s3.cpu1] Reset cause (21) - (USB UART reset)
+Info : accepting 'gdb' connection on tcp/3333
+Info : [esp32s3.cpu0] Target halted, PC=0x4037FBBA, debug_reason=00000000
+Info : Set GDB target to 'esp32s3.cpu0'
+Info : [esp32s3.cpu1] Target halted, PC=0x4037FBBA, debug_reason=00000000
+Memory protection is enabled. Reset target to disable it...
+Info : JTAG tap: esp32s3.tap0 tap/device found: 0x120034e5 (mfg: 0x272 (Tensilica), part: 0x2003, ver: 0x1)
+Info : JTAG tap: esp32s3.tap1 tap/device found: 0x120034e5 (mfg: 0x272 (Tensilica), part: 0x2003, ver: 0x1)
+Info : [esp32s3.cpu0] requesting target halt and executing a soft reset
+Info : [esp32s3.cpu0] Debug controller was reset.
+Info : [esp32s3.cpu0] Core was reset.
+Info : [esp32s3.cpu0] Target halted, PC=0x500000EF, debug_reason=00000000
+Info : [esp32s3.cpu0] Reset cause (3) - (Software core reset)
+Info : [esp32s3.cpu0] Core was reset.
+Info : [esp32s3.cpu0] Target halted, PC=0x40000400, debug_reason=00000000
+Info : [esp32s3.cpu1] Debug controller was reset.
+Info : [esp32s3.cpu1] Core was reset.
+Info : [esp32s3.cpu1] Target halted, PC=0x40000400, debug_reason=00000000
+Info : [esp32s3.cpu1] Reset cause (3) - (Software core reset)
+Info : [esp32s3.cpu0] Reset cause (3) - (Software core reset)
+Warn : No symbols for FreeRTOS!
+Info : [esp32s3.cpu0] Target halted, PC=0x4038CCA2, debug_reason=00000001
+Info : Flash mapping 0: 0x20020 -> 0x3c200020, 944 KB
+Info : Flash mapping 1: 0x110020 -> 0x42000020, 2010 KB
+Info : Auto-detected flash bank 'esp32s3.cpu0.flash' size 32768 KB
+Info : Using flash bank 'esp32s3.cpu0.flash' size 32768 KB
+Info : [esp32s3.cpu0] Target halted, PC=0x4038CCA2, debug_reason=00000001
+Info : Flash mapping 0: 0x20020 -> 0x3c200020, 944 KB
+Info : Flash mapping 1: 0x110020 -> 0x42000020, 2010 KB
+Info : Using flash bank 'esp32s3.cpu0.irom' size 2012 KB
+Info : [esp32s3.cpu0] Target halted, PC=0x4038CCA2, debug_reason=00000001
+Info : Flash mapping 0: 0x20020 -> 0x3c200020, 944 KB
+Info : Flash mapping 1: 0x110020 -> 0x42000020, 2010 KB
+Info : Using flash bank 'esp32s3.cpu0.drom' size 948 KB
+Info : New GDB Connection: 1, Target esp32s3.cpu0, state: halted
+Memory Map (8 regions):
+----------------------------------------
+Type    Start Addr    Length    BlockSize
+----------------------------------------
+FLASH   0x00000000  0x02000000  0x00001000
+R/W     0x02000000  0x3a200000  0x00000000
+FLASH   0x3c200000  0x000ed000  0x00001000
+R/W     0x3c2ed000  0x03d13000  0x00000000
+ROM     0x40000000  0x00060000  0x00000000
+R/W     0x40060000  0x01fa0000  0x00000000
+FLASH   0x42000000  0x001f7000  0x00001000
+R/W     0x421f7000  0xbde09000  0x00000000
+----------------------------------------
+Info : Detected FreeRTOS version: (10.5.1)
+Info : dropped 'gdb' connection
+Info : accepting 'tcl' connection on tcp/6666
+shutdown command invoked

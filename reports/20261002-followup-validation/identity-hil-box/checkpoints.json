@@ -1,0 +1,213 @@
+[
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "294f47f71",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      13309
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      216
+    ],
+    "heap_samples": [
+      [
+        11489,
+        120483
+      ],
+      [
+        22969,
+        32767
+      ],
+      [
+        32969,
+        32767
+      ],
+      [
+        42969,
+        32763
+      ],
+      [
+        52969,
+        32767
+      ]
+    ],
+    "settled_heap_delta": 4,
+    "faults": [],
+    "error_lines": [
+      "E (11779) MODEL_LOADER: Can not find model in partition table",
+      "E (12499) AGENT: 0 Not found for bind remote 192.168.3.230:57788",
+      "E (12499) AGENT: 0 Not found for bind remote 192.168.3.230:57788",
+      "E (12499) AGENT: 0 Not found for bind remote 192.168.3.230:57788",
+      "E (12499) AGENT: 0 Not found for bind remote 192.168.3.230:57788",
+      "E (12509) AGENT: 0 Not found for bind remote 192.168.3.230:57788",
+      "E (12659) AGENT: 0 Not found for bind remote 192.168.3.230:57788",
+      "E (12659) AGENT: 0 Not found for bind remote 192.168.3.230:57788",
+      "E (12659) AGENT: 0 Not found for bind remote 192.168.3.230:59101",
+      "E (12669) AGENT: 0 Not found for bind remote 192.168.3.230:59101"
+    ],
+    "name": "box",
+    "port": "/dev/cu.usbmodem21201",
+    "round": 1,
+    "duration_seconds": 60.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/identity-hil-box/box-round-1.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "294f47f71",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      11519
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      215
+    ],
+    "heap_samples": [
+      [
+        9749,
+        120387
+      ],
+      [
+        20969,
+        32931
+      ],
+      [
+        30969,
+        32939
+      ],
+      [
+        40969,
+        32931
+      ],
+      [
+        50969,
+        32931
+      ],
+      [
+        60969,
+        32931
+      ],
+      [
+        70969,
+        32931
+      ],
+      [
+        80969,
+        32931
+      ],
+      [
+        90969,
+        32939
+      ],
+      [
+        100969,
+        32939
+      ],
+      [
+        110969,
+        32939
+      ],
+      [
+        120969,
+        32939
+      ],
+      [
+        130969,
+        33767
+      ],
+      [
+        140969,
+        33595
+      ],
+      [
+        150969,
+        33595
+      ],
+      [
+        160969,
+        33595
+      ],
+      [
+        170969,
+        33595
+      ],
+      [
+        180969,
+        33595
+      ],
+      [
+        190969,
+        33595
+      ],
+      [
+        200969,
+        33595
+      ],
+      [
+        210969,
+        33595
+      ],
+      [
+        220969,
+        33595
+      ],
+      [
+        230969,
+        33595
+      ]
+    ],
+    "settled_heap_delta": 664,
+    "faults": [],
+    "error_lines": [
+      "E (10039) MODEL_LOADER: Can not find model in partition table",
+      "E (10669) AGENT: 0 Not found for bind remote 192.168.3.230:50096",
+      "E (10679) AGENT: 0 Not found for bind remote 192.168.3.230:50096",
+      "E (10679) AGENT: 0 Not found for bind remote 192.168.3.230:50096",
+      "E (10679) AGENT: 0 Not found for bind remote 192.168.3.230:50096",
+      "E (10689) AGENT: 0 Not found for bind remote 192.168.3.230:50096",
+      "E (10689) AGENT: 0 Not found for bind remote 192.168.3.230:50096"
+    ],
+    "name": "box",
+    "port": "/dev/cu.usbmodem21201",
+    "round": 2,
+    "duration_seconds": 240.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/identity-hil-box/box-round-2.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  }
+]

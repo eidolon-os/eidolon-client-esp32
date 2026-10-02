@@ -1,0 +1,24 @@
+{"epoch": 1790909331.427118, "action": ["esp-box-3"], "rc": 0, "output": "{\"tap\": \"esp-box-3\\n连接状态未知\\ndevice-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a\\n已添加\", \"bounds\": \"[55,846][2081,1119]\"}\n", "error": ""}
+{"epoch": 1790909334.308332, "action": ["更改"], "rc": 0, "output": "{\"tap\": \"更改\", \"bounds\": \"[1828,1366][2004,1498]\"}\n", "error": ""}
+{"epoch": 1790909337.1211672, "action": ["听说话", "true"], "rc": 0, "output": "{\"tap\": \"听说话\\n关闭后不采集麦克风声音，仍可接收已允许的回复\", \"bounds\": \"[243,1979][1893,2177]\"}\n", "error": ""}
+{"epoch": 1790909340.627274, "action": ["保存"], "rc": 0, "output": "{\"tap\": \"保存\", \"bounds\": \"[243,2958][1893,3101]\"}\n", "error": ""}
+{"epoch": 1790909356.1405509, "action": ["esp-box-3"], "rc": 0, "output": "{\"tap\": \"esp-box-3\\n连接状态未知\\ndevice-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a\\n已添加\", \"bounds\": \"[55,846][2081,1119]\"}\n", "error": ""}
+{"epoch": 1790909359.0391161, "action": ["更改"], "rc": 0, "output": "{\"tap\": \"更改\", \"bounds\": \"[1828,1366][2004,1498]\"}\n", "error": ""}
+{"epoch": 1790909361.8959732, "action": ["听说话", "false"], "rc": 0, "output": "{\"tap\": \"听说话\\n关闭后不采集麦克风声音，仍可接收已允许的回复\", \"bounds\": \"[243,1979][1893,2177]\"}\n", "error": ""}
+{"epoch": 1790909364.741466, "action": ["保存"], "rc": 0, "output": "{\"tap\": \"保存\", \"bounds\": \"[243,2958][1893,3101]\"}\n", "error": ""}
+{"epoch": 1790909380.128406, "action": ["esp-box-3"], "rc": 0, "output": "{\"tap\": \"esp-box-3\\n连接状态未知\\ndevice-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a\\n已添加\", \"bounds\": \"[55,846][2081,1119]\"}\n", "error": ""}
+{"epoch": 1790909383.629436, "action": ["更改"], "rc": 0, "output": "{\"tap\": \"更改\", \"bounds\": \"[1828,1366][2004,1498]\"}\n", "error": ""}
+{"epoch": 1790909386.523635, "action": ["听说话", "true"], "rc": 0, "output": "{\"tap\": \"听说话\\n关闭后不采集麦克风声音，仍可接收已允许的回复\", \"bounds\": \"[243,1979][1893,2177]\"}\n", "error": ""}
+{"epoch": 1790909390.960463, "action": ["保存"], "rc": 0, "output": "{\"tap\": \"保存\", \"bounds\": \"[243,2958][1893,3101]\"}\n", "error": ""}
+{"epoch": 1790909406.39394, "action": ["esp-box-3"], "rc": 0, "output": "{\"tap\": \"esp-box-3\\n连接状态未知\\ndevice-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a\\n已添加\", \"bounds\": \"[55,846][2081,1119]\"}\n", "error": ""}
+{"epoch": 1790909410.018254, "action": ["更改"], "rc": 0, "output": "{\"tap\": \"更改\", \"bounds\": \"[1828,1366][2004,1498]\"}\n", "error": ""}
+{"epoch": 1790909413.550859, "action": ["听说话", "false"], "rc": 0, "output": "{\"tap\": \"听说话\\n关闭后不采集麦克风声音，仍可接收已允许的回复\", \"bounds\": \"[243,1979][1893,2177]\"}\n", "error": ""}
+{"epoch": 1790909416.364264, "action": ["保存"], "rc": 0, "output": "{\"tap\": \"保存\", \"bounds\": \"[243,2958][1893,3101]\"}\n", "error": ""}
+{"epoch": 1790909431.6488252, "action": ["esp-box-3"], "rc": 0, "output": "{\"tap\": \"esp-box-3\\n连接状态未知\\ndevice-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a\\n已添加\", \"bounds\": \"[55,846][2081,1119]\"}\n", "error": ""}
+{"epoch": 1790909434.431659, "action": ["更改"], "rc": 0, "output": "{\"tap\": \"更改\", \"bounds\": \"[1828,1366][2004,1498]\"}\n", "error": ""}
+{"epoch": 1790909437.241707, "action": ["听说话", "true"], "rc": 0, "output": "{\"tap\": \"听说话\\n关闭后不采集麦克风声音，仍可接收已允许的回复\", \"bounds\": \"[243,1979][1893,2177]\"}\n", "error": ""}
+{"epoch": 1790909439.996329, "action": ["保存"], "rc": 0, "output": "{\"tap\": \"保存\", \"bounds\": \"[243,2958][1893,3101]\"}\n", "error": ""}
+{"epoch": 1790909455.3506691, "action": ["esp-box-3"], "rc": 0, "output": "{\"tap\": \"esp-box-3\\n连接状态未知\\ndevice-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a\\n已添加\", \"bounds\": \"[55,846][2081,1119]\"}\n", "error": ""}
+{"epoch": 1790909458.142549, "action": ["更改"], "rc": 0, "output": "{\"tap\": \"更改\", \"bounds\": \"[1828,1366][2004,1498]\"}\n", "error": ""}
+{"epoch": 1790909462.132132, "action": ["听说话", "false"], "rc": 0, "output": "{\"tap\": \"听说话\\n关闭后不采集麦克风声音，仍可接收已允许的回复\", \"bounds\": \"[243,1979][1893,2177]\"}\n", "error": ""}
+{"epoch": 1790909465.0779421, "action": ["保存"], "rc": 0, "output": "{\"tap\": \"保存\", \"bounds\": \"[243,2958][1893,3101]\"}\n", "error": ""}

@@ -1,0 +1,6 @@
+PING 192.168.3.132 (192.168.3.132) 56(84) bytes of data.
+
+--- 192.168.3.132 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss, time 2040ms
+
+192.168.3.132 dev wlan0 lladdr 1c:db:d4:7a:ef:0c DELAY

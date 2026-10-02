@@ -1,0 +1,205 @@
+[
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "294f47f71",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      13651
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      164
+    ],
+    "heap_samples": [
+      [
+        11991,
+        87923
+      ],
+      [
+        22651,
+        62035
+      ],
+      [
+        32661,
+        62071
+      ],
+      [
+        42661,
+        62059
+      ],
+      [
+        52661,
+        62071
+      ]
+    ],
+    "settled_heap_delta": 12,
+    "faults": [],
+    "error_lines": [
+      "E (12841) AGENT: 0 Not found for bind remote 192.168.3.230:56122",
+      "E (12851) AGENT: 0 Not found for bind remote 192.168.3.230:56122",
+      "E (12851) AGENT: 0 Not found for bind remote 192.168.3.230:56122",
+      "E (12851) AGENT: 0 Not found for bind remote 192.168.3.230:56122"
+    ],
+    "name": "stack",
+    "port": "/dev/cu.usbmodem21101",
+    "round": 1,
+    "duration_seconds": 60.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/identity-hil-stack/stack-round-1.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "294f47f71",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      12261
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      164
+    ],
+    "heap_samples": [
+      [
+        10541,
+        87723
+      ],
+      [
+        21661,
+        61975
+      ],
+      [
+        31661,
+        61975
+      ],
+      [
+        41651,
+        61979
+      ],
+      [
+        51651,
+        61975
+      ],
+      [
+        61651,
+        61975
+      ],
+      [
+        71651,
+        61975
+      ],
+      [
+        81651,
+        61975
+      ],
+      [
+        91651,
+        61975
+      ],
+      [
+        101661,
+        61975
+      ],
+      [
+        111661,
+        61975
+      ],
+      [
+        121661,
+        61975
+      ],
+      [
+        131651,
+        61975
+      ],
+      [
+        141651,
+        61975
+      ],
+      [
+        151651,
+        61975
+      ],
+      [
+        161651,
+        61975
+      ],
+      [
+        171651,
+        61975
+      ],
+      [
+        181661,
+        61975
+      ],
+      [
+        191651,
+        61975
+      ],
+      [
+        201651,
+        61975
+      ],
+      [
+        211651,
+        61975
+      ],
+      [
+        221651,
+        61975
+      ],
+      [
+        231651,
+        61975
+      ]
+    ],
+    "settled_heap_delta": -4,
+    "faults": [],
+    "error_lines": [
+      "E (11391) AGENT: 0 Not found for bind remote 192.168.3.230:58367",
+      "E (11391) AGENT: 0 Not found for bind remote 192.168.3.230:58367",
+      "E (11401) AGENT: 0 Not found for bind remote 192.168.3.230:58367",
+      "E (11401) AGENT: 0 Not found for bind remote 192.168.3.230:58367",
+      "E (11711) AGENT: 0 Not found for bind remote 192.168.3.230:58182"
+    ],
+    "name": "stack",
+    "port": "/dev/cu.usbmodem21101",
+    "round": 2,
+    "duration_seconds": 240.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/identity-hil-stack/stack-round-2.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  }
+]

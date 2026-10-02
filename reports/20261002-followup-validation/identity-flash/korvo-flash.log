@@ -1,0 +1,6 @@
+>> [common] Build stamp: git=294f47f71 branch=main sdk=f7b4279643451c43d0bc0017ac1f564971de6714 idf=6.1
+EIDOLON partition contract: preflight passed
+>> [common] Device reports: EIDOLON-STORAGE owner_trust=ready bytes=65536
+EIDOLON-BUILDSTAMP git=294f47f71 sdk=f7b4279643451c43d0bc0017ac1f564971de6714 idf=6.1 branch=main built=Oct  2 2026 12:12:01
+EIDOLON-BOARD sku=korvo-1
+>> [common] VERIFIED: device runs the just-built firmware (git=294f47f71 sdk=f7b4279643451c43d0bc0017ac1f564971de6714 idf=6.1).

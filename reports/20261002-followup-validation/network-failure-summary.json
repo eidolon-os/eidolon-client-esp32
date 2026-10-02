@@ -1,0 +1,42 @@
+{
+  "formal-rk": {
+    "start_utc": "2026-10-02T02:57:55.317499+00:00",
+    "window_seconds": 600,
+    "ports": [
+      56860,
+      56861,
+      56862,
+      56863,
+      56864,
+      56865
+    ],
+    "tcp_flag_counts": {
+      "device": {
+        "2": 66
+      },
+      "hub": {
+        "18": 93
+      }
+    },
+    "note": "Hub packet emission is not proof of over-air delivery. Formal 600s includes preserved failure after 90s serial capture ended. Experiment capture aborts at next-round first WS frame."
+  },
+  "wave-ps-experiment": {
+    "start_utc": "2026-10-02T03:24:13.604076+00:00",
+    "window_seconds": 180,
+    "ports": [
+      61283,
+      61284,
+      61285,
+      61286
+    ],
+    "tcp_flag_counts": {
+      "device": {
+        "2": 44
+      },
+      "hub": {
+        "18": 64
+      }
+    },
+    "note": "Hub packet emission is not proof of over-air delivery. Formal 600s includes preserved failure after 90s serial capture ended. Experiment capture aborts at next-round first WS frame."
+  }
+}

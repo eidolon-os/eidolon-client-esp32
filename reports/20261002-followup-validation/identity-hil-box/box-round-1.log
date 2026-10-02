@@ -1,0 +1,30 @@
+CAPTURE {"utc": "2026-10-02T04:05:11.502153+00:00", "name": "box", "port": "/dev/cu.usbmodem21201", "round": 1, "duration": 60.0}
+I (209) main: EIDOLON-STORAGE owner_trust=ready bytes=65536
+W (219) Application: EIDOLON-BUILDSTAMP git=294f47f71 sdk=f7b4279643451c43d0bc0017ac1f564971de6714 idf=5.5.4 branch=main built=Oct  2 2026 12:02:25
+I (229) Board: UUID=92d803f6-6b00-4052-a396-b734cac83e80 SKU=esp-box-3
+I (509) EidolonUiPresenter: visible state=ASSETS scene=1
+I (949) EidolonUiPresenter: visible state=BOOT scene=0
+I (1199) EidolonUiPresenter: visible state=NETWORK scene=2
+I (5529) EidolonUiPresenter: visible state=SERVICE scene=6
+I (5569) HubOnboarding: Hub attempt begin mode=activate generation=0
+I (5569) HubOnboarding: Hub step=trust-load elapsed_ms=0
+I (6069) HubOnboarding: Hub step=trust-bundle elapsed_ms=498
+I (6069) HubOnboarding: Hub step=directory-restore elapsed_ms=499
+I (6069) HubOnboarding: Hub step=generation-check elapsed_ms=499
+I (6079) HubOnboarding: Hub step=directory-fetch elapsed_ms=504
+I (7499) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=1413
+I (8809) HubOnboarding: Hub step=claim-restore elapsed_ms=3239
+I (9239) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=256
+I (10079) HubOnboarding: Hub step=claim-cleanup elapsed_ms=4511
+I (10079) HubOnboarding: Hub step=configuration-proof elapsed_ms=4511
+I (10239) HubOnboarding: Hub step=configuration-fetch elapsed_ms=4666
+I (10469) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=228
+I (11489) SystemInfo: free sram: 120483 minimal sram: 106231
+I (11829) EidolonMicCap: Mic capture started topology=afe (codec=24000 Hz, out=16000 Hz, channels=2)
+I (11909) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1
+I (13219) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1
+I (13309) EidolonUiPresenter: visible state=READY scene=7
+I (22969) SystemInfo: free sram: 32767 minimal sram: 31731
+I (32969) SystemInfo: free sram: 32767 minimal sram: 31523
+I (42969) SystemInfo: free sram: 32763 minimal sram: 31523
+I (52969) SystemInfo: free sram: 32767 minimal sram: 31483

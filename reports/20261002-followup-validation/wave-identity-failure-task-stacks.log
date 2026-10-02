@@ -1,0 +1,120 @@
+0x40000400 in ?? ()
+[New Thread 1070276672]
+[New Thread 1070522364]
+[New Thread 1070272880]
+[New Thread 1070311224]
+[New Thread 1070355592]
+[New Thread 1070264256]
+[New Thread 1070370852]
+[New Thread 1070224764]
+[New Thread 1070360852]
+[New Thread 1070260312]
+[New Thread 1070258672]
+[New Thread 1070314048]
+[New Thread 1070279080]
+  Id   Target Id                                                     Frame
+* 1    Thread 1070274776 "IDLE0" (Name: IDLE0, State: Running @CPU0) 0x40000400 in ?? ()
+  2    Thread 1070276672 "IDLE1" (Name: IDLE1, State: Running @CPU1) 0x40000400 in ?? ()
+  3    Thread 1070522364 "taskLVGL" (Name: taskLVGL)                 0x4206c71c in lvgl_port_task (arg=...) at /Users/manson/ai/eidolon/eidolon-client-esp32/managed_components/espressif__esp_lvgl_port/src/lvgl9/esp_lvgl_port.c:253
+  4    Thread 1070272880 "main" (Name: main)                         0x400559e0 in ?? ()
+  5    Thread 1070311224 "hub_activation" (Name: hub_activation)     eidolon::HubActivator::Run (this=..., activated=...) at /Users/manson/ai/eidolon/eidolon-client-esp32/main/eidolon/hub_activator.cc:192
+  6    Thread 1070355592 "tiT" (Name: tiT)                           0x400559e0 in ?? ()
+  7    Thread 1070264256 "esp_timer" (Name: esp_timer)               0x400559e0 in ?? ()
+  8    Thread 1070370852 "wifi" (Name: wifi)                         0x400559e0 in ?? ()
+  9    Thread 1070224764 "mdns" (Name: mdns)                         0x400559e0 in ?? ()
+  10   Thread 1070360852 "sys_evt" (Name: sys_evt)                   0x400559e0 in ?? ()
+  11   Thread 1070260312 "ipc1" (Name: ipc1)                         0x400559e0 in ?? ()
+  12   Thread 1070258672 "ipc0" (Name: ipc0)                         0x400559e0 in ?? ()
+  13   Thread 1070314048 "eidolon_ctrl" (Name: eidolon_ctrl)         0x400559e0 in ?? ()
+  14   Thread 1070279080 "Tmr Svc" (Name: Tmr Svc)                   prvProcessReceivedCommands () at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/timers.c:856
+
+Thread 14 (Thread 1070279080 "Tmr Svc" (Name: Tmr Svc)):
+#0  prvProcessReceivedCommands () at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/timers.c:856
+#1  prvTimerTask (pvParameters=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/timers.c:688
+
+Thread 13 (Thread 1070314048 "eidolon_ctrl" (Name: eidolon_ctrl)):
+#0  0x400559e0 in ?? ()
+#1  0x40383f8a in vPortClearInterruptMaskFromISR (prev_level=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/include/freertos/portmacro.h:560
+#2  vPortExitCritical (mux=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/port.c:514
+#3  0x40386f60 in xTaskGenericNotifyWait (uxIndexToWait=..., ulBitsToClearOnEntry=..., ulBitsToClearOnExit=..., pulNotificationValue=..., xTicksToWait=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/tasks.c:5853
+#4  0x42059966 in eidolon::ControllerEventInbox<eidolon::EidolonVoiceController::Event>::Wait (this=...) at /Users/manson/ai/eidolon/eidolon-client-esp32/main/eidolon/controller_event_inbox.h:49
+#5  eidolon::EidolonVoiceController::ControllerLoop (this=...) at /Users/manson/ai/eidolon/eidolon-client-esp32/main/eidolon/eidolon_voice_controller.cc:313
+#6  0x42059a40 in eidolon::EidolonVoiceController::TaskTrampoline (arg=...) at /Users/manson/ai/eidolon/eidolon-client-esp32/main/eidolon/eidolon_voice_controller.cc:306
+
+Thread 12 (Thread 1070258672 "ipc0" (Name: ipc0)):
+#0  0x400559e0 in ?? ()
+#1  0x40383f8a in vPortClearInterruptMaskFromISR (prev_level=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/include/freertos/portmacro.h:560
+#2  vPortExitCritical (mux=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/port.c:514
+#3  0x40386e8d in ulTaskGenericNotifyTake (uxIndexToWait=..., xClearCountOnExit=..., xTicksToWait=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/tasks.c:5768
+#4  0x40379da9 in ipc_task (arg=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/esp_system/esp_ipc.c:62
+
+Thread 11 (Thread 1070260312 "ipc1" (Name: ipc1)):
+#0  0x400559e0 in ?? ()
+#1  0x40383f8a in vPortClearInterruptMaskFromISR (prev_level=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/include/freertos/portmacro.h:560
+#2  vPortExitCritical (mux=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/port.c:514
+#3  0x40386e8d in ulTaskGenericNotifyTake (uxIndexToWait=..., xClearCountOnExit=..., xTicksToWait=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/tasks.c:5768
+#4  0x40379da9 in ipc_task (arg=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/esp_system/esp_ipc.c:62
+
+Thread 10 (Thread 1070360852 "sys_evt" (Name: sys_evt)):
+#0  0x400559e0 in ?? ()
+#1  0x40383f8a in vPortClearInterruptMaskFromISR (prev_level=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/include/freertos/portmacro.h:560
+#2  vPortExitCritical (mux=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/port.c:514
+#3  0x40383a4e in xQueueReceive (xQueue=..., pvBuffer=..., xTicksToWait=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/queue.c:1632
+#4  0x421f1f44 in esp_event_loop_run (event_loop=..., ticks_to_run=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/esp_event/esp_event.c:644
+#5  0x421f20f6 in esp_event_loop_run_task (args=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/esp_event/esp_event.c:106
+
+Thread 9 (Thread 1070224764 "mdns" (Name: mdns)):
+#0  0x400559e0 in ?? ()
+#1  0x40383f8a in vPortClearInterruptMaskFromISR (prev_level=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/include/freertos/portmacro.h:560
+#2  vPortExitCritical (mux=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/port.c:514
+#3  0x40383a4e in xQueueReceive (xQueue=..., pvBuffer=..., xTicksToWait=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/queue.c:1632
+#4  0x4206f770 in service_task (pvParameters=...) at /Users/manson/ai/eidolon/eidolon-client-esp32/managed_components/espressif__mdns/mdns_service.c:226
+
+Thread 8 (Thread 1070370852 "wifi" (Name: wifi)):
+#0  0x400559e0 in ?? ()
+#1  0x40383f8a in vPortClearInterruptMaskFromISR (prev_level=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/include/freertos/portmacro.h:560
+#2  vPortExitCritical (mux=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/port.c:514
+#3  0x40383a4e in xQueueReceive (xQueue=..., pvBuffer=..., xTicksToWait=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/queue.c:1632
+#4  0x421488d0 in queue_recv_wrapper (queue=..., item=..., block_time_tick=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/esp_wifi/esp32s3/esp_adapter.c:317
+#5  0x421e991d in ppTask ()
+
+Thread 7 (Thread 1070264256 "esp_timer" (Name: esp_timer)):
+#0  0x400559e0 in ?? ()
+#1  0x40383f8a in vPortClearInterruptMaskFromISR (prev_level=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/include/freertos/portmacro.h:560
+#2  vPortExitCritical (mux=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/port.c:514
+#3  0x40386e8d in ulTaskGenericNotifyTake (uxIndexToWait=..., xClearCountOnExit=..., xTicksToWait=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/tasks.c:5768
+#4  0x42121594 in timer_task (arg=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/esp_timer/src/esp_timer.c:459
+
+Thread 6 (Thread 1070355592 "tiT" (Name: tiT)):
+#0  0x400559e0 in ?? ()
+#1  0x40383f8a in vPortClearInterruptMaskFromISR (prev_level=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/include/freertos/portmacro.h:560
+#2  vPortExitCritical (mux=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/port.c:514
+#3  0x40383a4e in xQueueReceive (xQueue=..., pvBuffer=..., xTicksToWait=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/queue.c:1632
+#4  0x42135da6 in sys_arch_mbox_fetch (mbox=..., msg=..., timeout=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/lwip/port/freertos/sys_arch.c:313
+#5  0x421278b5 in tcpip_timeouts_mbox_fetch (mbox=..., msg=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/lwip/lwip/src/api/tcpip.c:104
+#6  tcpip_thread (arg=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/lwip/lwip/src/api/tcpip.c:142
+
+Thread 5 (Thread 1070311224 "hub_activation" (Name: hub_activation)):
+#0  eidolon::HubActivator::Run (this=..., activated=...) at /Users/manson/ai/eidolon/eidolon-client-esp32/main/eidolon/hub_activator.cc:192
+#1  0x420178bd in Application::ActivationTask (this=...) at /Users/manson/ai/eidolon/eidolon-client-esp32/main/application.cc:1053
+#2  0x42017c0a in Application::ActivationWorkerTrampoline (arg=...) at /Users/manson/ai/eidolon/eidolon-client-esp32/main/application.cc:1030
+
+Thread 4 (Thread 1070272880 "main" (Name: main)):
+#0  0x400559e0 in ?? ()
+#1  0x40383f8a in vPortClearInterruptMaskFromISR (prev_level=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/include/freertos/portmacro.h:560
+#2  vPortExitCritical (mux=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/port.c:514
+#3  0x40383a4e in xQueueReceive (xQueue=..., pvBuffer=..., xTicksToWait=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/freertos/FreeRTOS-Kernel/queue.c:1632
+#4  0x421ef471 in s_i2c_send_commands (i2c_master=..., ticks_to_wait=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/esp_driver_i2c/i2c_master.c:588
+#5  0x421ef74d in s_i2c_transaction_start (i2c_dev=..., xfer_timeout_ms=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/esp_driver_i2c/i2c_master.c:724
+#6  0x421ef80d in s_i2c_synchronous_transaction (i2c_dev=..., i2c_ops=..., ops_dim=..., timeout_ms=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/esp_driver_i2c/i2c_master.c:1022
+#7  s_i2c_synchronous_transaction (i2c_dev=..., i2c_ops=..., ops_dim=..., timeout_ms=...) at /Users/manson/.espressif/v5.5.4/esp-idf/components/esp_driver_i2c/i2c_master.c:1002
+
+Thread 3 (Thread 1070522364 "taskLVGL" (Name: taskLVGL)):
+#0  0x4206c71c in lvgl_port_task (arg=...) at /Users/manson/ai/eidolon/eidolon-client-esp32/managed_components/espressif__esp_lvgl_port/src/lvgl9/esp_lvgl_port.c:253
+
+Thread 2 (Thread 1070276672 "IDLE1" (Name: IDLE1, State: Running @CPU1)):
+#0  0x40000400 in ?? ()
+
+Thread 1 (Thread 1070274776 "IDLE0" (Name: IDLE0, State: Running @CPU0)):
+#0  0x40000400 in ?? ()
+[Inferior 1 (Remote target) detached]

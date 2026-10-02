@@ -1,0 +1,42 @@
+[
+  {
+    "board": "box",
+    "returncode": 0,
+    "verified": true,
+    "seconds": 202.2,
+    "log": "reports/20261002-followup-validation/identity-flash/box-flash.log",
+    "raw_sha256": "5b030722cb6a28a907853aab57b32b8a02def937fe31bc90f7ebfc2e6c3884d0",
+    "firmware": "294f47f71",
+    "sdk": "f7b4279643451c43d0bc0017ac1f564971de6714"
+  },
+  {
+    "board": "stack",
+    "returncode": 0,
+    "verified": true,
+    "seconds": 195.6,
+    "log": "reports/20261002-followup-validation/identity-flash/stack-flash.log",
+    "raw_sha256": "e046b046a97a9631bc0ea52c3c2dfa47cb30d4369f194b055e6dfbc14c07556c",
+    "firmware": "294f47f71",
+    "sdk": "f7b4279643451c43d0bc0017ac1f564971de6714"
+  },
+  {
+    "board": "wave",
+    "returncode": 0,
+    "verified": true,
+    "seconds": 186.8,
+    "log": "reports/20261002-followup-validation/identity-flash/wave-flash.log",
+    "raw_sha256": "dcadc6a04abbe8d33983134dabb7755121210d8a2714512cc60f4b46ca870842",
+    "firmware": "294f47f71",
+    "sdk": "f7b4279643451c43d0bc0017ac1f564971de6714"
+  },
+  {
+    "board": "korvo",
+    "returncode": 0,
+    "verified": true,
+    "seconds": 264.6,
+    "log": "reports/20261002-followup-validation/identity-flash/korvo-flash.log",
+    "raw_sha256": "464ca8f6481c2bd44fc294ca08420b810dee2b76cb738c124d2a8268e8c55e25",
+    "firmware": "294f47f71",
+    "sdk": "f7b4279643451c43d0bc0017ac1f564971de6714"
+  }
+]

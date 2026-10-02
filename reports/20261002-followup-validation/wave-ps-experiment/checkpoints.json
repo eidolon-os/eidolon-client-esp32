@@ -1,0 +1,514 @@
+[
+  {
+    "result": "FAIL",
+    "reasons": [
+      "installed firmware/SDK differs from requested baseline",
+      "failure/recovery evidence in serial log"
+    ],
+    "stamps": [
+      [
+        "df9b84611+dirty",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE"
+    ],
+    "ready_ms": [],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "-",
+      "192.168.3.230",
+      "-",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [],
+    "heap_samples": [
+      [
+        15229,
+        82599
+      ],
+      [
+        25229,
+        83255
+      ],
+      [
+        35229,
+        82175
+      ],
+      [
+        45229,
+        85067
+      ],
+      [
+        55229,
+        82455
+      ],
+      [
+        65229,
+        82419
+      ],
+      [
+        75229,
+        83095
+      ],
+      [
+        85229,
+        84991
+      ],
+      [
+        95229,
+        85027
+      ],
+      [
+        105229,
+        82543
+      ],
+      [
+        115229,
+        82483
+      ],
+      [
+        125229,
+        82975
+      ],
+      [
+        135229,
+        81855
+      ],
+      [
+        145239,
+        82167
+      ],
+      [
+        155229,
+        84899
+      ],
+      [
+        165229,
+        84899
+      ],
+      [
+        175229,
+        84899
+      ]
+    ],
+    "settled_heap_delta": null,
+    "faults": [
+      "E (21719) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15321 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+      "E (37919) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (37949) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8119 status=0 socket_errno=119 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (68219) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=19707 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+      "E (84419) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (84449) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8119 status=0 socket_errno=119 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (121259) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=16269 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+      "E (145219) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15895 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0"
+    ],
+    "error_lines": [
+      "E (829) sh8601: swap_xy is not supported by this panel",
+      "E (21719) esp-tls: [sock=54] select() timeout",
+      "E (21719) esp-tls: Failed to open new connection",
+      "E (21719) transport_base: Failed to open a new connection",
+      "E (21719) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (21719) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15321 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+      "E (37919) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (37929) esp-tls: Failed to open new connection",
+      "E (37939) transport_base: Failed to open a new connection",
+      "E (37939) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (37949) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8119 status=0 socket_errno=119 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (68219) esp-tls: [sock=54] select() timeout",
+      "E (68219) esp-tls: Failed to open new connection",
+      "E (68219) transport_base: Failed to open a new connection",
+      "E (68219) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (68219) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=19707 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+      "E (84419) esp-tls: couldn't get hostname for :eidolon-hub-f89c0ecca5d0070a7989.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (84429) esp-tls: Failed to open new connection",
+      "E (84439) transport_base: Failed to open a new connection",
+      "E (84439) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (84449) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8119 status=0 socket_errno=119 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (121259) esp-tls: [sock=54] select() timeout",
+      "E (121259) esp-tls: Failed to open new connection",
+      "E (121259) transport_base: Failed to open a new connection",
+      "E (121259) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (121259) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=16269 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+      "E (145219) esp-tls: [sock=54] select() timeout",
+      "E (145219) esp-tls: Failed to open new connection",
+      "E (145219) transport_base: Failed to open a new connection",
+      "E (145219) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (145219) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15895 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0"
+    ],
+    "name": "wave",
+    "port": "/dev/cu.usbmodem21401",
+    "round": 1,
+    "duration_seconds": 180.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/wave-ps-experiment/wave-round-1.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "FAIL",
+    "reasons": [
+      "installed firmware/SDK differs from requested baseline"
+    ],
+    "stamps": [
+      [
+        "df9b84611+dirty",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      12389
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      163
+    ],
+    "heap_samples": [
+      [
+        10669,
+        85007
+      ],
+      [
+        22229,
+        50775
+      ],
+      [
+        32229,
+        50775
+      ],
+      [
+        42229,
+        50599
+      ],
+      [
+        52229,
+        50775
+      ],
+      [
+        62229,
+        50775
+      ],
+      [
+        72229,
+        50619
+      ],
+      [
+        82229,
+        50795
+      ],
+      [
+        92229,
+        50795
+      ],
+      [
+        102229,
+        50619
+      ],
+      [
+        112229,
+        50795
+      ],
+      [
+        122229,
+        50795
+      ],
+      [
+        132229,
+        50619
+      ],
+      [
+        142229,
+        50795
+      ],
+      [
+        152229,
+        50795
+      ],
+      [
+        162229,
+        50619
+      ],
+      [
+        172229,
+        50791
+      ]
+    ],
+    "settled_heap_delta": 192,
+    "faults": [],
+    "error_lines": [
+      "E (829) sh8601: swap_xy is not supported by this panel",
+      "E (11549) AGENT: 0 Not found for bind remote 192.168.3.230:53982",
+      "E (11549) AGENT: 0 Not found for bind remote 192.168.3.230:53982",
+      "E (11559) AGENT: 0 Not found for bind remote 192.168.3.230:53982",
+      "E (11569) AGENT: 0 Not found for bind remote 192.168.3.230:53982"
+    ],
+    "name": "wave",
+    "port": "/dev/cu.usbmodem21401",
+    "round": 2,
+    "duration_seconds": 180.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/wave-ps-experiment/wave-round-2.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "FAIL",
+    "reasons": [
+      "installed firmware/SDK differs from requested baseline"
+    ],
+    "stamps": [
+      [
+        "df9b84611+dirty",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      12409
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      163
+    ],
+    "heap_samples": [
+      [
+        10359,
+        85035
+      ],
+      [
+        22229,
+        50651
+      ],
+      [
+        32229,
+        50651
+      ],
+      [
+        42229,
+        50651
+      ],
+      [
+        52229,
+        50651
+      ],
+      [
+        62229,
+        50651
+      ],
+      [
+        72229,
+        50651
+      ],
+      [
+        82229,
+        50671
+      ],
+      [
+        92229,
+        50671
+      ],
+      [
+        102229,
+        50671
+      ],
+      [
+        112229,
+        50671
+      ],
+      [
+        122229,
+        50671
+      ],
+      [
+        132229,
+        50671
+      ],
+      [
+        142229,
+        50671
+      ],
+      [
+        152229,
+        50843
+      ],
+      [
+        162229,
+        50671
+      ],
+      [
+        172229,
+        50671
+      ]
+    ],
+    "settled_heap_delta": 20,
+    "faults": [],
+    "error_lines": [
+      "E (829) sh8601: swap_xy is not supported by this panel",
+      "E (11319) AGENT: 0 Not found for bind remote 192.168.3.230:51146",
+      "E (11319) AGENT: 0 Not found for bind remote 192.168.3.230:51146",
+      "E (11319) AGENT: 0 Not found for bind remote 192.168.3.230:51146",
+      "E (11319) AGENT: 0 Not found for bind remote 192.168.3.230:51146",
+      "E (11339) AGENT: 0 Not found for bind remote 192.168.3.230:51146",
+      "E (11339) AGENT: 0 Not found for bind remote 192.168.3.230:51146",
+      "E (11509) AGENT: 0 Not found for bind remote 192.168.3.230:51146",
+      "E (11589) AGENT: 0 Not found for bind remote 192.168.3.230:51146",
+      "E (11589) AGENT: 0 Not found for bind remote 192.168.3.230:51146",
+      "E (11589) AGENT: 0 Not found for bind remote 192.168.3.230:51146",
+      "E (11599) AGENT: 0 Not found for bind remote 192.168.3.230:51146",
+      "E (11599) AGENT: 0 Not found for bind remote 192.168.3.230:58797",
+      "E (11609) AGENT: 0 Not found for bind remote 192.168.3.230:58797",
+      "E (11789) AGENT: 0 Not found for bind remote 192.168.3.230:51146",
+      "E (11789) AGENT: 0 Not found for bind remote 192.168.3.230:51146",
+      "E (11789) AGENT: 0 Not found for bind remote 192.168.3.230:58797",
+      "E (11789) AGENT: 0 Not found for bind remote 192.168.3.230:58797"
+    ],
+    "name": "wave",
+    "port": "/dev/cu.usbmodem21401",
+    "round": 3,
+    "duration_seconds": 180.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/wave-ps-experiment/wave-round-3.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "FAIL",
+    "reasons": [
+      "installed firmware/SDK differs from requested baseline"
+    ],
+    "stamps": [
+      [
+        "df9b84611+dirty",
+        "f7b4279643451c43d0bc0017ac1f564971de6714"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      12069
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      163
+    ],
+    "heap_samples": [
+      [
+        10389,
+        85023
+      ],
+      [
+        21229,
+        50555
+      ],
+      [
+        31229,
+        50555
+      ],
+      [
+        41229,
+        50555
+      ],
+      [
+        51229,
+        50555
+      ],
+      [
+        61229,
+        50555
+      ],
+      [
+        71229,
+        50555
+      ],
+      [
+        81229,
+        50583
+      ],
+      [
+        91229,
+        50583
+      ],
+      [
+        101229,
+        50583
+      ],
+      [
+        111229,
+        50583
+      ],
+      [
+        121229,
+        50583
+      ],
+      [
+        131229,
+        50583
+      ],
+      [
+        141229,
+        50583
+      ],
+      [
+        151229,
+        50583
+      ],
+      [
+        161229,
+        50583
+      ],
+      [
+        171229,
+        50583
+      ]
+    ],
+    "settled_heap_delta": 28,
+    "faults": [],
+    "error_lines": [
+      "E (829) sh8601: swap_xy is not supported by this panel",
+      "E (11269) AGENT: 0 Not found for bind remote 192.168.3.230:52493",
+      "E (11289) AGENT: 0 Not found for bind remote 192.168.3.230:52493",
+      "E (11309) AGENT: 0 Not found for bind remote 192.168.3.230:52493",
+      "E (11319) AGENT: 0 Not found for bind remote 192.168.3.230:52493",
+      "E (11329) AGENT: 0 Not found for bind remote 192.168.3.230:52493"
+    ],
+    "name": "wave",
+    "port": "/dev/cu.usbmodem21401",
+    "round": 4,
+    "duration_seconds": 180.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/wave-ps-experiment/wave-round-4.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  }
+]

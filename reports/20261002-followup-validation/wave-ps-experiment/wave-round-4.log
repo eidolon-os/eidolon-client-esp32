@@ -1,0 +1,134 @@
+CAPTURE {"utc": "2026-10-02T03:33:13.909466+00:00", "name": "wave", "port": "/dev/cu.usbmodem21401", "round": 4, "duration": 180.0}
+I (369) main: EIDOLON-STORAGE owner_trust=ready bytes=65536
+W (369) Application: EIDOLON-BUILDSTAMP git=df9b84611+dirty sdk=f7b4279643451c43d0bc0017ac1f564971de6714 idf=5.5.4 branch=main built=Oct  2 2026 11:18:29
+I (379) Board: UUID=3926e0bc-4fb1-4463-b2ce-2bd4ee5cef10 SKU=m5stack-stackchan
+I (399) WaveshareEsp32s3TouchAMOLED2inch06: Init AXP2101
+I (889) EidolonUiPresenter: visible state=ASSETS scene=1
+I (1209) EidolonUiPresenter: visible state=BOOT scene=0
+I (1479) EidolonUiPresenter: visible state=NETWORK scene=2
+I (5729) EidolonUiPresenter: visible state=SERVICE scene=6
+I (5749) HubOnboarding: Hub attempt begin mode=activate generation=0
+I (5749) HubOnboarding: Hub step=trust-load elapsed_ms=0
+I (6269) HubOnboarding: Hub step=trust-bundle elapsed_ms=516
+I (6269) HubOnboarding: Hub step=directory-restore elapsed_ms=516
+I (6269) HubOnboarding: Hub step=generation-check elapsed_ms=516
+I (6269) HubOnboarding: Hub step=directory-fetch elapsed_ms=522
+I (6279) NetTrace: dns begin task=hub_activation host=eidolon-hub-f89c0ecca5d0070a7989.local
+I (6589) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=300
+I (6589) NetTrace: dns end task=hub_activation host=eidolon-hub-f89c0ecca5d0070a7989.local rc=0 ms=308 first=192.168.3.230
+I (6599) NetTrace: connect begin task=hub_activation fd=54 peer=192.168.3.230:9443
+I (6599) NetTrace: connect end fd=54 rc=-1 errno=119 ms=7
+I (7849) HubOnboarding: Hub step=claim-restore elapsed_ms=2102
+I (8019) NetTrace: dns begin task=hub_activation host=eidolon-hub-f89c0ecca5d0070a7989.local
+I (8119) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=106
+I (8119) NetTrace: dns end task=hub_activation host=eidolon-hub-f89c0ecca5d0070a7989.local rc=0 ms=106 first=192.168.3.230
+I (8139) NetTrace: connect begin task=hub_activation fd=54 peer=192.168.3.230:9443
+I (8139) NetTrace: connect end fd=54 rc=-1 errno=119 ms=7
+I (8999) HubOnboarding: Hub step=claim-cleanup elapsed_ms=3249
+I (8999) HubOnboarding: Hub step=configuration-proof elapsed_ms=3249
+I (9149) HubOnboarding: Hub step=configuration-fetch elapsed_ms=3399
+I (9149) NetTrace: dns begin task=hub_activation host=eidolon-hub-f89c0ecca5d0070a7989.local
+I (9349) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=198
+I (9349) NetTrace: dns end task=hub_activation host=eidolon-hub-f89c0ecca5d0070a7989.local rc=0 ms=201 first=192.168.3.230
+I (9359) NetTrace: connect begin task=hub_activation fd=54 peer=192.168.3.230:9443
+I (9369) NetTrace: connect end fd=54 rc=-1 errno=119 ms=7
+I (10389) SystemInfo: free sram: 85023 minimal sram: 79115
+I (10659) EidolonMicCap: Mic capture started topology=raw (codec=16000 Hz, out=16000 Hz, channels=1)
+I (10739) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-eed82aee54cac09ae11bc67c34612447e8c59a1c661cd2109384ee89a4e4f775 gen=1
+I (10739) NetTrace: dns begin task=websocket_task host=192.168.3.230
+I (10759) NetTrace: dns end task=websocket_task host=192.168.3.230 rc=0 ms=24 first=192.168.3.230
+I (10789) NetTrace: connect begin task=websocket_task fd=54 peer=192.168.3.230:7880
+I (10789) NetTrace: connect end fd=54 rc=-1 errno=119 ms=7
+I (11269) NetTrace: rtc input peer=0x3fcdf214 type=1 transport=- bytes=668
+I (11279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (11299) NetTrace: rx ip4=69 synack=4 signaling=15 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (11289) NetTrace: rtc result peer=0x3fcdf214 rc=0
+I (11319) NetTrace: rtc input peer=0x3fcdf214 type=2 transport=udp bytes=89
+I (11349) NetTrace: rtc result peer=0x3fcdf214 rc=0
+I (11979) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-eed82aee54cac09ae11bc67c34612447e8c59a1c661cd2109384ee89a4e4f775 gen=1
+I (12069) EidolonUiPresenter: visible state=READY scene=7
+I (16279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (16279) NetTrace: rx ip4=103 synack=4 signaling=22 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (16429) NetTrace: rtc input peer=0x3fcdf214 type=2 transport=udp bytes=122
+I (16429) NetTrace: rtc result peer=0x3fcdf214 rc=0
+I (21229) SystemInfo: free sram: 50555 minimal sram: 49799
+I (21279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (21279) NetTrace: rx ip4=124 synack=4 signaling=29 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (26279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (26279) NetTrace: rx ip4=141 synack=4 signaling=32 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (31229) SystemInfo: free sram: 50555 minimal sram: 49799
+I (31279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (31279) NetTrace: rx ip4=163 synack=4 signaling=37 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (36279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (36279) NetTrace: rx ip4=181 synack=4 signaling=40 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (41229) SystemInfo: free sram: 50555 minimal sram: 49799
+I (41279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (41279) NetTrace: rx ip4=200 synack=4 signaling=45 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (46279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (46279) NetTrace: rx ip4=218 synack=4 signaling=48 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (51229) SystemInfo: free sram: 50555 minimal sram: 49799
+I (51279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (51279) NetTrace: rx ip4=236 synack=4 signaling=52 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (56279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (56279) NetTrace: rx ip4=254 synack=4 signaling=56 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (61229) SystemInfo: free sram: 50555 minimal sram: 49799
+I (61279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (61279) NetTrace: rx ip4=274 synack=4 signaling=60 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (66279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (66279) NetTrace: rx ip4=293 synack=4 signaling=64 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (71229) SystemInfo: free sram: 50555 minimal sram: 49799
+I (71279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (71279) NetTrace: rx ip4=310 synack=4 signaling=68 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (76279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (76279) NetTrace: rx ip4=329 synack=4 signaling=72 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (81229) SystemInfo: free sram: 50583 minimal sram: 49799
+I (81279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (81279) NetTrace: rx ip4=346 synack=4 signaling=76 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (86279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (86279) NetTrace: rx ip4=364 synack=4 signaling=80 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (91229) SystemInfo: free sram: 50583 minimal sram: 49799
+I (91279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (91279) NetTrace: rx ip4=382 synack=4 signaling=84 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (96279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (96279) NetTrace: rx ip4=401 synack=4 signaling=88 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (101229) SystemInfo: free sram: 50583 minimal sram: 49799
+I (101279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (101279) NetTrace: rx ip4=417 synack=4 signaling=92 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (106279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (106279) NetTrace: rx ip4=435 synack=4 signaling=95 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (111229) SystemInfo: free sram: 50583 minimal sram: 49799
+I (111279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (111279) NetTrace: rx ip4=453 synack=4 signaling=100 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (116279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (116279) NetTrace: rx ip4=474 synack=4 signaling=103 mdns_answer=6 icmp_echo=0 bad_tcp_checksum=0
+I (121229) SystemInfo: free sram: 50583 minimal sram: 49799
+I (121279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (121279) NetExperiment: EXPERIMENT no_transition_needed
+I (121279) NetTrace: rx ip4=494 synack=4 signaling=108 mdns_answer=7 icmp_echo=0 bad_tcp_checksum=0
+I (126279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (126279) NetTrace: rx ip4=512 synack=4 signaling=111 mdns_answer=7 icmp_echo=0 bad_tcp_checksum=0
+I (131229) SystemInfo: free sram: 50583 minimal sram: 49799
+I (131279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (131279) NetTrace: rx ip4=530 synack=4 signaling=116 mdns_answer=7 icmp_echo=0 bad_tcp_checksum=0
+I (136279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (136279) NetTrace: rx ip4=547 synack=4 signaling=119 mdns_answer=7 icmp_echo=0 bad_tcp_checksum=0
+I (141229) SystemInfo: free sram: 50583 minimal sram: 49799
+I (141279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (141279) NetTrace: rx ip4=565 synack=4 signaling=124 mdns_answer=7 icmp_echo=0 bad_tcp_checksum=0
+I (146279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (146279) NetTrace: rx ip4=583 synack=4 signaling=127 mdns_answer=7 icmp_echo=0 bad_tcp_checksum=0
+I (151229) SystemInfo: free sram: 50583 minimal sram: 49799
+I (151279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (151279) NetTrace: rx ip4=602 synack=4 signaling=132 mdns_answer=7 icmp_echo=0 bad_tcp_checksum=0
+I (156279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (156279) NetTrace: rx ip4=620 synack=4 signaling=135 mdns_answer=7 icmp_echo=0 bad_tcp_checksum=0
+I (161229) SystemInfo: free sram: 50583 minimal sram: 49799
+I (161279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (161279) NetTrace: rx ip4=638 synack=4 signaling=140 mdns_answer=7 icmp_echo=0 bad_tcp_checksum=0
+I (166279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (166279) NetTrace: rx ip4=656 synack=4 signaling=143 mdns_answer=7 icmp_echo=0 bad_tcp_checksum=0
+I (171229) SystemInfo: free sram: 50583 minimal sram: 49799
+I (171279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (171279) NetTrace: rx ip4=674 synack=4 signaling=148 mdns_answer=7 icmp_echo=0 bad_tcp_checksum=0
+I (176279) NetExperiment: ps_snapshot rc=0 mode=0 uptime_ms=ld
+I (176279) NetTrace: rx ip4=692 synack=4 signaling=151 mdns_answer=7 icmp_echo=0 bad_tcp_checksum=0
