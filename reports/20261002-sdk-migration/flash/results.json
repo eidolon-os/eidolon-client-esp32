@@ -1,0 +1,30 @@
+[
+  {
+    "board": "box",
+    "returncode": 0,
+    "verified": true,
+    "seconds": 139.5,
+    "log": "/tmp/eidolon-sdk-migration-20261002/flash/box.log"
+  },
+  {
+    "board": "stack",
+    "returncode": 0,
+    "verified": true,
+    "seconds": 179.9,
+    "log": "/tmp/eidolon-sdk-migration-20261002/flash/stack.log"
+  },
+  {
+    "board": "wave",
+    "returncode": 0,
+    "verified": true,
+    "seconds": 190.5,
+    "log": "/tmp/eidolon-sdk-migration-20261002/flash/wave.log"
+  },
+  {
+    "board": "korvo",
+    "returncode": 0,
+    "verified": true,
+    "seconds": 345.2,
+    "log": "/tmp/eidolon-sdk-migration-20261002/flash/korvo.log"
+  }
+]

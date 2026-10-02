@@ -1,0 +1,8 @@
+>> idf.py -p /dev/cu.usbmodem21401 -DBOARD_NAME=esp32-s3-touch-amoled-2.06 -DBOARD_TYPE=waveshare/esp32-s3-touch-amoled-2.06 build
+Executing "cmake -G Ninja -DPYTHON_DEPS_CHECKED=1 -DPYTHON=/Users/manson/.espressif/python_env/idf5.5_py3.13_env/bin/python -DESP_PLATFORM=1 -DBOARD_NAME=esp32-s3-touch-amoled-2.06 -DBOARD_TYPE=waveshare/esp32-s3-touch-amoled-2.06 -DCCACHE_ENABLE=0 /Users/manson/ai/eidolon/eidolon-client-esp32"...
+-- App "eidolon" version: 1.0.0
+[2692/2801] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/eidolon/esp_idf_owner_data_erase_storage.cc.obj
+>> idf.py -p /dev/cu.usbmodem21401 -DBOARD_NAME=esp32-s3-touch-amoled-2.06 -DBOARD_TYPE=waveshare/esp32-s3-touch-amoled-2.06 app-flash
+Hash of data verified.
+Hash of data verified.
+EIDOLON partition contract: readback verified

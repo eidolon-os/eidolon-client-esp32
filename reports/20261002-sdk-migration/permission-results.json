@@ -1,0 +1,113 @@
+[
+  {
+    "phase": 1,
+    "enabled": false,
+    "result": "PASS",
+    "participant": {
+      "identity": "device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a",
+      "state": 2,
+      "can_publish": false,
+      "can_subscribe": true,
+      "tracks": []
+    },
+    "ready": true,
+    "rebuild": true,
+    "microphone_started": false
+  },
+  {
+    "phase": 2,
+    "enabled": true,
+    "result": "PASS",
+    "participant": {
+      "identity": "device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a",
+      "state": 2,
+      "can_publish": true,
+      "can_subscribe": true,
+      "tracks": [
+        {
+          "sid": "TR_AMLtnpnCCwKE5F",
+          "type": 0,
+          "source": 2,
+          "muted": false
+        }
+      ]
+    },
+    "ready": true,
+    "rebuild": true,
+    "microphone_started": true
+  },
+  {
+    "phase": 3,
+    "enabled": false,
+    "result": "PASS",
+    "participant": {
+      "identity": "device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a",
+      "state": 2,
+      "can_publish": false,
+      "can_subscribe": true,
+      "tracks": []
+    },
+    "ready": true,
+    "rebuild": true,
+    "microphone_started": false
+  },
+  {
+    "phase": 4,
+    "enabled": true,
+    "result": "PASS",
+    "participant": {
+      "identity": "device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a",
+      "state": 2,
+      "can_publish": true,
+      "can_subscribe": true,
+      "tracks": [
+        {
+          "sid": "TR_AMr2ia5qK9soJG",
+          "type": 0,
+          "source": 2,
+          "muted": false
+        }
+      ]
+    },
+    "ready": true,
+    "rebuild": true,
+    "microphone_started": true
+  },
+  {
+    "phase": 5,
+    "enabled": false,
+    "result": "PASS",
+    "participant": {
+      "identity": "device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a",
+      "state": 2,
+      "can_publish": false,
+      "can_subscribe": true,
+      "tracks": []
+    },
+    "ready": true,
+    "rebuild": true,
+    "microphone_started": false
+  },
+  {
+    "phase": 6,
+    "enabled": true,
+    "result": "PASS",
+    "participant": {
+      "identity": "device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a",
+      "state": 2,
+      "can_publish": true,
+      "can_subscribe": true,
+      "tracks": [
+        {
+          "sid": "TR_AMnZAdvvLqTPQn",
+          "type": 0,
+          "source": 2,
+          "muted": false
+        }
+      ]
+    },
+    "ready": true,
+    "rebuild": true,
+    "microphone_started": true
+  }
+]

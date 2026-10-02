@@ -1,0 +1,5 @@
+I (2254) INBOX_TEST: legacy saturation reproduced; 10000 coalesced signals, FIFO/rejection/recovery PASS
+I (4660) INBOX_TEST: real 80ms esp_timer / 2400ms consumer stall PASS old_dropped_ticks=6 old_control=rejected new_controls=24/24
+I (5161) INBOX_TEST: two producers/slow consumer PASS accepted=245 rejected=3755 maintenance=222/222
+I (5961) INBOX_TEST: 1000 empty-check/wait wakeups PASS
+I (5961) INBOX_TEST: ALL PASS

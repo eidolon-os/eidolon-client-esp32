@@ -1,0 +1,41 @@
+{
+  "firmware": "3835ca3c57ac92ded07fa3ff00a1a7bd1b64fe3b",
+  "sdk_pin": "3f98d8deed47d7e9b8ea9cb65b13d87c61174033",
+  "sdk_revert": "596377a2eec42e5ab589e3161260234938354f02",
+  "upstream_main": "fbf09edf27a504d82119f730a35bf00fa287f7c1",
+  "upstream_latest_tag": "v0.3.11",
+  "incoming_upstream_commits": 0,
+  "sdk_revert_tree_equals_published_pin": true,
+  "public_header_sha256": "8082f7dfbab56e40a4736f24bd02072541a5dfded439fd4d7b318b3c1defd595",
+  "flash_verified_boards": [
+    "box",
+    "stack",
+    "wave",
+    "korvo"
+  ],
+  "boot_initial": {
+    "PASS": 5,
+    "FAIL": 3
+  },
+  "boot_additional": {
+    "PASS": 1,
+    "FAIL": 1
+  },
+  "permission_updates_passed": 6,
+  "initial_serial_open_triggered_one_USB_UART_CHIP_RESET": true,
+  "permission_capture": {
+    "buildstamps": 1,
+    "graph_connections": 7,
+    "changed_configurations": 6,
+    "unchanged_configurations": 11,
+    "microphone_starts": 4,
+    "microphone_stops": 3,
+    "RTC_failures": 0
+  },
+  "receive_only_tracks": [
+    "TR_AypNzpbDHQ62q",
+    "TR_AEGiwiLd7qsqP"
+  ],
+  "original_microphone_setting_restored": true,
+  "pushed": false
+}

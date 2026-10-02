@@ -1,0 +1,20 @@
+CAPTURE {"utc": "2026-10-02T08:57:39.809662+00:00", "name": "wave", "port": "/dev/cu.usbmodem21401", "round": 1, "duration": 60.0}
+W (369) Application: EIDOLON-BUILDSTAMP git=3835ca3c5 sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=5.5.4 branch=main built=Oct  2 2026 16:46:46
+I (889) EidolonUiPresenter: visible state=ASSETS scene=1
+I (1209) EidolonUiPresenter: visible state=BOOT scene=0
+I (1559) EidolonUiPresenter: visible state=NETWORK scene=2
+I (5929) EidolonUiPresenter: visible state=SERVICE scene=6
+I (6769) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=276
+I (8519) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=100
+I (9639) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=104
+I (11149) SystemInfo: free sram: 85067 minimal sram: 79167
+W (11469) EidolonVoice: [dispatch] type=0 wait_ms=0 run_ms=163 pending=0
+I (13839) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=48
+I (16399) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=1282
+W (17499) EidolonVoice: [dispatch] type=27 wait_ms=-1 run_ms=4630 pending=1
+W (17529) EidolonVoice: [dispatch] type=10 wait_ms=4536 run_ms=30 pending=0
+I (17529) EidolonUiPresenter: visible state=READY scene=7
+I (27219) SystemInfo: free sram: 50507 minimal sram: 44191
+I (37219) SystemInfo: free sram: 50507 minimal sram: 44191
+I (47219) SystemInfo: free sram: 50507 minimal sram: 44191
+I (57219) SystemInfo: free sram: 50507 minimal sram: 44191

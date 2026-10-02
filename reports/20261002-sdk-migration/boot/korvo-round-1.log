@@ -1,0 +1,18 @@
+CAPTURE {"utc": "2026-10-02T08:57:39.809698+00:00", "name": "korvo", "port": "/dev/cu.usbserial-2130", "round": 1, "duration": 60.0}
+W (920) Application: EIDOLON-BUILDSTAMP git=3835ca3c5 sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=6.1 branch=main built=Oct  2 2026 16:50:16
+I (1160) EidolonUiPresenter: visible state=ASSETS scene=1
+I (1330) EidolonUiPresenter: visible state=BOOT scene=0
+I (1760) EidolonUiPresenter: visible state=NETWORK scene=2
+I (6170) EidolonUiPresenter: visible state=SERVICE scene=6
+I (14390) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_ERR_NOT_FOUND address=- ms=8100
+E (14390) esp-tls: couldn't get hostname for :eidolon-hub-b3c897513cdce96b1f15.local: getaddrinfo() returns 202, addrinfo=0
+E (14410) HubHttp: GET https://eidolon-hub-b3c897513cdce96b1f15.local:8443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8126 status=0 socket_errno=5 tls_error=0x8001 tls_code=0 tls_flags=0x0
+I (15380) SystemInfo: free sram: 212607 minimal sram: 109088
+I (25380) SystemInfo: free sram: 212607 minimal sram: 109088
+I (35380) SystemInfo: free sram: 212607 minimal sram: 109088
+W (39710) HubActivator: Hub activation failed stage=directory-fetch error=ESP_ERR_HTTP_CONNECT code=0x7002 http=0 attempt=1 retry_s=10
+I (45380) SystemInfo: free sram: 214127 minimal sram: 109088
+I (55380) SystemInfo: free sram: 210543 minimal sram: 109088
+I (57890) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_ERR_NOT_FOUND address=- ms=8085
+E (57890) esp-tls: couldn't get hostname for :eidolon-hub-b3c897513cdce96b1f15.local: getaddrinfo() returns 202, addrinfo=0
+E (57910) HubHttp: GET https://eidolon-hub-b3c897513cdce96b1f15.local:8443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8111 status=0 socket_errno=5 tls_error=0x8001 tls_code=0 tls_flags=0x0

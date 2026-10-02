@@ -1,0 +1,7 @@
+* Checking python version ... 3.13.13
+-- App "eidolon" version: 1.0.0
+[2700/2818] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/eidolon/esp_idf_owner_data_erase_storage.cc.obj
+Executing "cmake -G Ninja -B /Users/manson/ai/eidolon/eidolon-client-esp32/build/eidolon/korvo-1 -DPYTHON_DEPS_CHECKED=1 -DPYTHON=/Users/manson/.espressif/python_env/idf6.1_py3.13_env/bin/python -DESP_PLATFORM=1 -DIDF_TARGET=esp32s31 -DSDKCONFIG=/Users/manson/ai/eidolon/eidolon-client-esp32/build/eidolon/korvo-1/sdkconfig.korvo-1 -DSDKCONFIG_DEFAULTS=/Users/manson/ai/eidolon/eidolon-client-esp32/sdkconfig.defaults;/Users/manson/ai/eidolon/eidolon-client-esp32/sdkconfig.defaults.esp32s31;/Users/manson/ai/eidolon/eidolon-client-esp32/build/eidolon/korvo-1/sdkconfig.overlay.korvo-1 -DBOARD_NAME=korvo-1 -DBOARD_TYPE=korvo-1 -DBOARD_NAME=korvo-1 -DBOARD_TYPE=korvo-1 -DCCACHE_ENABLE=False /Users/manson/ai/eidolon/eidolon-client-esp32"...
+Hash of data verified.
+Hash of data verified.
+EIDOLON partition contract: readback verified

@@ -1,0 +1,35 @@
+CAPTURE {"utc": "2026-10-02T08:58:39.826417+00:00", "name": "wave", "port": "/dev/cu.usbmodem21401", "round": 2, "duration": 180.0}
+W (369) Application: EIDOLON-BUILDSTAMP git=3835ca3c5 sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=5.5.4 branch=main built=Oct  2 2026 16:46:46
+I (889) EidolonUiPresenter: visible state=ASSETS scene=1
+I (1209) EidolonUiPresenter: visible state=BOOT scene=0
+I (1539) EidolonUiPresenter: visible state=NETWORK scene=2
+I (5839) EidolonUiPresenter: visible state=SERVICE scene=6
+I (6759) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=266
+I (8499) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=269
+I (9629) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=42
+I (10639) SystemInfo: free sram: 85063 minimal sram: 79195
+W (10969) EidolonVoice: [dispatch] type=0 wait_ms=0 run_ms=163 pending=0
+I (13009) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=89
+I (14339) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=123
+W (15369) EidolonVoice: [dispatch] type=27 wait_ms=-1 run_ms=3373 pending=1
+W (15399) EidolonVoice: [dispatch] type=10 wait_ms=3285 run_ms=29 pending=0
+I (15409) EidolonUiPresenter: visible state=READY scene=7
+I (16379) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=116
+I (17719) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=78
+W (18779) EidolonVoice: [dispatch] type=27 wait_ms=-1 run_ms=3364 pending=0
+I (25219) SystemInfo: free sram: 50751 minimal sram: 44375
+I (35219) SystemInfo: free sram: 50579 minimal sram: 44375
+I (45219) SystemInfo: free sram: 50579 minimal sram: 44375
+I (55219) SystemInfo: free sram: 50579 minimal sram: 44375
+I (65219) SystemInfo: free sram: 50579 minimal sram: 44375
+I (75219) SystemInfo: free sram: 50579 minimal sram: 44375
+I (85219) SystemInfo: free sram: 50595 minimal sram: 44375
+I (95219) SystemInfo: free sram: 50595 minimal sram: 44375
+I (105219) SystemInfo: free sram: 50595 minimal sram: 44375
+I (115219) SystemInfo: free sram: 50595 minimal sram: 44375
+I (125219) SystemInfo: free sram: 50595 minimal sram: 44375
+I (135219) SystemInfo: free sram: 50595 minimal sram: 44375
+I (145219) SystemInfo: free sram: 50595 minimal sram: 44375
+I (155219) SystemInfo: free sram: 50595 minimal sram: 44375
+I (165219) SystemInfo: free sram: 50595 minimal sram: 44375
+I (175219) SystemInfo: free sram: 50595 minimal sram: 44375

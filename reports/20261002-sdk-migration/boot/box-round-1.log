@@ -1,0 +1,17 @@
+CAPTURE {"utc": "2026-10-02T08:57:39.809389+00:00", "name": "box", "port": "/dev/cu.usbmodem21201", "round": 1, "duration": 60.0}
+W (209) Application: EIDOLON-BUILDSTAMP git=3835ca3c5 sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=5.5.4 branch=main built=Oct  2 2026 16:40:05
+I (509) EidolonUiPresenter: visible state=ASSETS scene=1
+I (949) EidolonUiPresenter: visible state=BOOT scene=0
+I (1199) EidolonUiPresenter: visible state=NETWORK scene=2
+I (5439) EidolonUiPresenter: visible state=SERVICE scene=6
+I (6249) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=252
+I (14959) SystemInfo: free sram: 114579 minimal sram: 107171
+E (21269) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15272 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0
+I (24959) SystemInfo: free sram: 119159 minimal sram: 106871
+I (31959) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=2543
+I (34959) SystemInfo: free sram: 114083 minimal sram: 106871
+I (44959) SystemInfo: free sram: 114119 minimal sram: 106871
+E (46969) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=17560 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0
+W (47009) HubActivator: Hub activation failed stage=directory-fetch error=ESP_ERR_HTTP_CONNECT code=0x7002 http=0 attempt=1 retry_s=10
+I (54959) SystemInfo: free sram: 120639 minimal sram: 106871
+I (58269) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=735

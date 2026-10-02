@@ -1,0 +1,6 @@
+{"time": 1790931081.6093931, "event": "published", "round": 1, "track": "TR_AypNzpbDHQ62q"}
+{"time": 1790931083.6132483, "event": "participants", "round": 1, "identities": ["channel-provider-eidolon-device-a581e67a035ca24efd1198be", "device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a", "subscription-probe-1790931081391002325"]}
+{"time": 1790931083.6240509, "event": "left", "round": 1}
+{"time": 1790931086.8124285, "event": "published", "round": 2, "track": "TR_AEGiwiLd7qsqP"}
+{"time": 1790931088.8117943, "event": "participants", "round": 2, "identities": ["channel-provider-eidolon-device-a581e67a035ca24efd1198be", "device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a", "subscription-probe-1790931086626509314"]}
+{"time": 1790931088.819723, "event": "left", "round": 2}

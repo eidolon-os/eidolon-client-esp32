@@ -347,7 +347,8 @@ int main()
         current.output_policy = {true, 7, 3, true, true};
         current.expires_at_ms = 1700000100000LL;
         auto fresh = current;
-        fresh.clock.Observe(1700000000000LL, 50, 0);
+        fresh.clock.Observe(1700000000000LL, 50, 55);
+        assert(fresh.clock.Now(55) != current.clock.Now(55));
         assert(!eidolon::ChannelConfigurationChanged(current, fresh));
         const auto changed = [&](auto mutate) {
             auto candidate = current;

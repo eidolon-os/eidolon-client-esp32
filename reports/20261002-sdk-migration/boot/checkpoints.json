@@ -1,0 +1,789 @@
+[
+  {
+    "result": "FAIL",
+    "reasons": [
+      "failure/recovery evidence in serial log"
+    ],
+    "stamps": [
+      [
+        "3835ca3c5",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE"
+    ],
+    "ready_ms": [],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [],
+    "heap_samples": [
+      [
+        14959,
+        114579
+      ],
+      [
+        24959,
+        119159
+      ],
+      [
+        34959,
+        114083
+      ],
+      [
+        44959,
+        114119
+      ],
+      [
+        54959,
+        120639
+      ]
+    ],
+    "settled_heap_delta": null,
+    "faults": [
+      "E (21269) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15272 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+      "E (46969) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=17560 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0"
+    ],
+    "error_lines": [
+      "E (21269) esp-tls: [sock=54] select() timeout",
+      "E (21269) esp-tls: Failed to open new connection",
+      "E (21269) transport_base: Failed to open a new connection",
+      "E (21269) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (21269) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=15272 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0",
+      "E (46969) esp-tls: [sock=54] select() timeout",
+      "E (46969) esp-tls: Failed to open new connection",
+      "E (46969) transport_base: Failed to open a new connection",
+      "E (46969) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (46969) HubHttp: GET https://eidolon-hub-f89c0ecca5d0070a7989.local:9443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=17560 status=0 socket_errno=0 tls_error=0x8006 tls_code=0 tls_flags=0x0"
+    ],
+    "name": "box",
+    "port": "/dev/cu.usbmodem21201",
+    "round": 1,
+    "duration_seconds": 60.0,
+    "log": "/private/tmp/eidolon-sdk-migration-20261002/boot/box-round-1.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "3835ca3c5",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      15989
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      216
+    ],
+    "heap_samples": [
+      [
+        10069,
+        120479
+      ],
+      [
+        25969,
+        33691
+      ],
+      [
+        35959,
+        33575
+      ],
+      [
+        45969,
+        33691
+      ],
+      [
+        55959,
+        33691
+      ],
+      [
+        65969,
+        33691
+      ],
+      [
+        75959,
+        33691
+      ],
+      [
+        85959,
+        33691
+      ],
+      [
+        95959,
+        33691
+      ],
+      [
+        105959,
+        33691
+      ],
+      [
+        115959,
+        33691
+      ],
+      [
+        125959,
+        33711
+      ],
+      [
+        135959,
+        34347
+      ],
+      [
+        145959,
+        34347
+      ],
+      [
+        155959,
+        34347
+      ],
+      [
+        165959,
+        34351
+      ],
+      [
+        175959,
+        34351
+      ]
+    ],
+    "settled_heap_delta": 660,
+    "faults": [],
+    "error_lines": [
+      "E (10359) MODEL_LOADER: Can not find model in partition table",
+      "E (10979) AGENT: 0 Not found for bind remote 192.168.3.230:56632",
+      "E (10979) AGENT: 0 Not found for bind remote 192.168.3.230:56632",
+      "E (10979) AGENT: 0 Not found for bind remote 192.168.3.230:56632",
+      "E (10989) AGENT: 0 Not found for bind remote 192.168.3.230:56632",
+      "E (11099) AGENT: 0 Not found for bind remote 192.168.3.230:56632",
+      "E (11099) AGENT: 0 Not found for bind remote 192.168.3.230:56632",
+      "E (11099) AGENT: 0 Not found for bind remote 192.168.3.230:56632",
+      "E (11109) AGENT: 0 Not found for bind remote 192.168.3.230:51552",
+      "E (11109) AGENT: 0 Not found for bind remote 192.168.3.230:51552",
+      "E (11299) AGENT: 0 Not found for bind remote 192.168.3.230:56632",
+      "E (11299) AGENT: 0 Not found for bind remote 192.168.3.230:56632",
+      "E (11299) AGENT: 0 Not found for bind remote 192.168.3.230:51552",
+      "E (11309) AGENT: 0 Not found for bind remote 192.168.3.230:51552"
+    ],
+    "name": "box",
+    "port": "/dev/cu.usbmodem21201",
+    "round": 2,
+    "duration_seconds": 180.0,
+    "log": "/private/tmp/eidolon-sdk-migration-20261002/boot/box-round-2.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "3835ca3c5",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      16561
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      164
+    ],
+    "heap_samples": [
+      [
+        11061,
+        87851
+      ],
+      [
+        25651,
+        61791
+      ],
+      [
+        35651,
+        61791
+      ],
+      [
+        45651,
+        61791
+      ],
+      [
+        55651,
+        61791
+      ]
+    ],
+    "settled_heap_delta": 0,
+    "faults": [],
+    "error_lines": [
+      "E (12021) AGENT: 0 Not found for bind remote 192.168.3.230:55433",
+      "E (12031) AGENT: 0 Not found for bind remote 192.168.3.230:55433",
+      "E (12041) AGENT: 0 Not found for bind remote 192.168.3.230:55433",
+      "E (12041) AGENT: 0 Not found for bind remote 192.168.3.230:55433",
+      "E (12051) AGENT: 0 Not found for bind remote 192.168.3.230:55433",
+      "E (12051) AGENT: 0 Not found for bind remote 192.168.3.230:55433",
+      "E (12221) AGENT: 0 Not found for bind remote 192.168.3.230:55433",
+      "E (12221) AGENT: 0 Not found for bind remote 192.168.3.230:55433",
+      "E (12241) AGENT: 0 Not found for bind remote 192.168.3.230:55433",
+      "E (12241) AGENT: 0 Not found for bind remote 192.168.3.230:55433",
+      "E (12241) AGENT: 0 Not found for bind remote 192.168.3.230:56789",
+      "E (12241) AGENT: 0 Not found for bind remote 192.168.3.230:56789"
+    ],
+    "name": "stack",
+    "port": "/dev/cu.usbmodem21101",
+    "round": 1,
+    "duration_seconds": 60.0,
+    "log": "/private/tmp/eidolon-sdk-migration-20261002/boot/stack-round-1.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "3835ca3c5",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      15681
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      164
+    ],
+    "heap_samples": [
+      [
+        10551,
+        87819
+      ],
+      [
+        25651,
+        61807
+      ],
+      [
+        35651,
+        61807
+      ],
+      [
+        45651,
+        61807
+      ],
+      [
+        55651,
+        61807
+      ],
+      [
+        65651,
+        61807
+      ],
+      [
+        75651,
+        61807
+      ],
+      [
+        85661,
+        61807
+      ],
+      [
+        95651,
+        61807
+      ],
+      [
+        105651,
+        61807
+      ],
+      [
+        115651,
+        61807
+      ],
+      [
+        125651,
+        61807
+      ],
+      [
+        135661,
+        61807
+      ],
+      [
+        145661,
+        61807
+      ],
+      [
+        155661,
+        61807
+      ],
+      [
+        165651,
+        61807
+      ],
+      [
+        175651,
+        61807
+      ]
+    ],
+    "settled_heap_delta": 0,
+    "faults": [],
+    "error_lines": [
+      "E (11411) AGENT: 0 Not found for bind remote 192.168.3.230:58513",
+      "E (11411) AGENT: 0 Not found for bind remote 192.168.3.230:58513",
+      "E (11411) AGENT: 0 Not found for bind remote 192.168.3.230:58513",
+      "E (11421) AGENT: 0 Not found for bind remote 192.168.3.230:58513",
+      "E (11431) AGENT: 0 Not found for bind remote 192.168.3.230:58513",
+      "E (11541) AGENT: 0 Not found for bind remote 192.168.3.230:58513",
+      "E (11541) AGENT: 0 Not found for bind remote 192.168.3.230:58513",
+      "E (11541) AGENT: 0 Not found for bind remote 192.168.3.230:54650",
+      "E (11541) AGENT: 0 Not found for bind remote 192.168.3.230:54650"
+    ],
+    "name": "stack",
+    "port": "/dev/cu.usbmodem21101",
+    "round": 2,
+    "duration_seconds": 180.0,
+    "log": "/private/tmp/eidolon-sdk-migration-20261002/boot/stack-round-2.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "3835ca3c5",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      17529
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      163
+    ],
+    "heap_samples": [
+      [
+        11149,
+        85067
+      ],
+      [
+        27219,
+        50507
+      ],
+      [
+        37219,
+        50507
+      ],
+      [
+        47219,
+        50507
+      ],
+      [
+        57219,
+        50507
+      ]
+    ],
+    "settled_heap_delta": 0,
+    "faults": [],
+    "error_lines": [
+      "E (829) sh8601: swap_xy is not supported by this panel",
+      "E (12019) AGENT: 0 Not found for bind remote 192.168.3.230:51280",
+      "E (12029) AGENT: 0 Not found for bind remote 192.168.3.230:51280",
+      "E (12039) AGENT: 0 Not found for bind remote 192.168.3.230:51280",
+      "E (12039) AGENT: 0 Not found for bind remote 192.168.3.230:51280",
+      "E (12049) AGENT: 0 Not found for bind remote 192.168.3.230:51280",
+      "E (12049) AGENT: 0 Not found for bind remote 192.168.3.230:51280"
+    ],
+    "name": "wave",
+    "port": "/dev/cu.usbmodem21401",
+    "round": 1,
+    "duration_seconds": 60.0,
+    "log": "/private/tmp/eidolon-sdk-migration-20261002/boot/wave-round-1.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "3835ca3c5",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      15409
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      163
+    ],
+    "heap_samples": [
+      [
+        10639,
+        85063
+      ],
+      [
+        25219,
+        50751
+      ],
+      [
+        35219,
+        50579
+      ],
+      [
+        45219,
+        50579
+      ],
+      [
+        55219,
+        50579
+      ],
+      [
+        65219,
+        50579
+      ],
+      [
+        75219,
+        50579
+      ],
+      [
+        85219,
+        50595
+      ],
+      [
+        95219,
+        50595
+      ],
+      [
+        105219,
+        50595
+      ],
+      [
+        115219,
+        50595
+      ],
+      [
+        125219,
+        50595
+      ],
+      [
+        135219,
+        50595
+      ],
+      [
+        145219,
+        50595
+      ],
+      [
+        155219,
+        50595
+      ],
+      [
+        165219,
+        50595
+      ],
+      [
+        175219,
+        50595
+      ]
+    ],
+    "settled_heap_delta": 16,
+    "faults": [],
+    "error_lines": [
+      "E (829) sh8601: swap_xy is not supported by this panel",
+      "E (11489) AGENT: 0 Not found for bind remote 192.168.3.230:56534",
+      "E (11489) AGENT: 0 Not found for bind remote 192.168.3.230:56534",
+      "E (11489) AGENT: 0 Not found for bind remote 192.168.3.230:56534",
+      "E (11499) AGENT: 0 Not found for bind remote 192.168.3.230:56534",
+      "E (11509) AGENT: 0 Not found for bind remote 192.168.3.230:56534",
+      "E (11509) AGENT: 0 Not found for bind remote 192.168.3.230:56534"
+    ],
+    "name": "wave",
+    "port": "/dev/cu.usbmodem21401",
+    "round": 2,
+    "duration_seconds": 180.0,
+    "log": "/private/tmp/eidolon-sdk-migration-20261002/boot/wave-round-2.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "FAIL",
+    "reasons": [
+      "failure/recovery evidence in serial log"
+    ],
+    "stamps": [
+      [
+        "3835ca3c5",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE"
+    ],
+    "ready_ms": [],
+    "resolved_addresses": [
+      "-",
+      "-"
+    ],
+    "activation_dispatch_ms": [],
+    "heap_samples": [
+      [
+        15380,
+        212607
+      ],
+      [
+        25380,
+        212607
+      ],
+      [
+        35380,
+        212607
+      ],
+      [
+        45380,
+        214127
+      ],
+      [
+        55380,
+        210543
+      ]
+    ],
+    "settled_heap_delta": null,
+    "faults": [
+      "E (14390) esp-tls: couldn't get hostname for :eidolon-hub-b3c897513cdce96b1f15.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (14410) HubHttp: GET https://eidolon-hub-b3c897513cdce96b1f15.local:8443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8126 status=0 socket_errno=5 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (57890) esp-tls: couldn't get hostname for :eidolon-hub-b3c897513cdce96b1f15.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (57910) HubHttp: GET https://eidolon-hub-b3c897513cdce96b1f15.local:8443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8111 status=0 socket_errno=5 tls_error=0x8001 tls_code=0 tls_flags=0x0"
+    ],
+    "error_lines": [
+      "E (14390) esp-tls: couldn't get hostname for :eidolon-hub-b3c897513cdce96b1f15.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (14400) esp-tls: Failed to open new connection",
+      "E (14400) transport_base: Failed to open a new connection",
+      "E (14410) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (14410) HubHttp: GET https://eidolon-hub-b3c897513cdce96b1f15.local:8443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8126 status=0 socket_errno=5 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (57890) esp-tls: couldn't get hostname for :eidolon-hub-b3c897513cdce96b1f15.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (57900) esp-tls: Failed to open new connection",
+      "E (57900) transport_base: Failed to open a new connection",
+      "E (57910) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (57910) HubHttp: GET https://eidolon-hub-b3c897513cdce96b1f15.local:8443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8111 status=0 socket_errno=5 tls_error=0x8001 tls_code=0 tls_flags=0x0"
+    ],
+    "name": "korvo",
+    "port": "/dev/cu.usbserial-2130",
+    "round": 1,
+    "duration_seconds": 60.0,
+    "log": "/private/tmp/eidolon-sdk-migration-20261002/boot/korvo-round-1.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "FAIL",
+    "reasons": [
+      "failure/recovery evidence in serial log"
+    ],
+    "stamps": [
+      [
+        "3835ca3c5",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE"
+    ],
+    "ready_ms": [],
+    "resolved_addresses": [
+      "-",
+      "-",
+      "-"
+    ],
+    "activation_dispatch_ms": [],
+    "heap_samples": [
+      [
+        15380,
+        212623
+      ],
+      [
+        25380,
+        212623
+      ],
+      [
+        35380,
+        212623
+      ],
+      [
+        45380,
+        214115
+      ],
+      [
+        55380,
+        210495
+      ],
+      [
+        65380,
+        212507
+      ],
+      [
+        75380,
+        212507
+      ],
+      [
+        85380,
+        214107
+      ],
+      [
+        95380,
+        214107
+      ],
+      [
+        105380,
+        210539
+      ],
+      [
+        115380,
+        212531
+      ],
+      [
+        125380,
+        212551
+      ],
+      [
+        135380,
+        212551
+      ],
+      [
+        145380,
+        214135
+      ],
+      [
+        155380,
+        214135
+      ],
+      [
+        165380,
+        214135
+      ],
+      [
+        175380,
+        214135
+      ]
+    ],
+    "settled_heap_delta": null,
+    "faults": [
+      "E (14340) esp-tls: couldn't get hostname for :eidolon-hub-b3c897513cdce96b1f15.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (14370) HubHttp: GET https://eidolon-hub-b3c897513cdce96b1f15.local:8443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8126 status=0 socket_errno=5 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (57840) esp-tls: couldn't get hostname for :eidolon-hub-b3c897513cdce96b1f15.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (57870) HubHttp: GET https://eidolon-hub-b3c897513cdce96b1f15.local:8443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8103 status=0 socket_errno=5 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (111340) esp-tls: couldn't get hostname for :eidolon-hub-b3c897513cdce96b1f15.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (111370) HubHttp: GET https://eidolon-hub-b3c897513cdce96b1f15.local:8443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8105 status=0 socket_errno=5 tls_error=0x8001 tls_code=0 tls_flags=0x0"
+    ],
+    "error_lines": [
+      "E (14340) esp-tls: couldn't get hostname for :eidolon-hub-b3c897513cdce96b1f15.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (14350) esp-tls: Failed to open new connection",
+      "E (14360) transport_base: Failed to open a new connection",
+      "E (14360) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (14370) HubHttp: GET https://eidolon-hub-b3c897513cdce96b1f15.local:8443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8126 status=0 socket_errno=5 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (57840) esp-tls: couldn't get hostname for :eidolon-hub-b3c897513cdce96b1f15.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (57850) esp-tls: Failed to open new connection",
+      "E (57860) transport_base: Failed to open a new connection",
+      "E (57860) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (57870) HubHttp: GET https://eidolon-hub-b3c897513cdce96b1f15.local:8443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8103 status=0 socket_errno=5 tls_error=0x8001 tls_code=0 tls_flags=0x0",
+      "E (111340) esp-tls: couldn't get hostname for :eidolon-hub-b3c897513cdce96b1f15.local: getaddrinfo() returns 202, addrinfo=0",
+      "E (111350) esp-tls: Failed to open new connection",
+      "E (111360) transport_base: Failed to open a new connection",
+      "E (111360) HTTP_CLIENT: Connection failed, sock < 0",
+      "E (111370) HubHttp: GET https://eidolon-hub-b3c897513cdce96b1f15.local:8443/api/device-onboarding/v1/descriptor phase=open error=ESP_ERR_HTTP_CONNECT raw=28674 elapsed_ms=8105 status=0 socket_errno=5 tls_error=0x8001 tls_code=0 tls_flags=0x0"
+    ],
+    "name": "korvo",
+    "port": "/dev/cu.usbserial-2130",
+    "round": 2,
+    "duration_seconds": 180.0,
+    "log": "/private/tmp/eidolon-sdk-migration-20261002/boot/korvo-round-2.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  }
+]
