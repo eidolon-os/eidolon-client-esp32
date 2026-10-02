@@ -32,6 +32,17 @@ inline bool ChannelBindingExpired(const Esp32HubConfig& config, int64_t monotoni
     return now > 0 && now >= config.expires_at_ms;
 }
 
+// A standing connection can outlive its join credential. Schedule its renewal
+// on the controller actor even when there is no disconnect or user activity.
+// Unknown boot-local time has no schedulable deadline; onboarding supplies it.
+inline int64_t ChannelBindingRenewalDelayMs(const Esp32HubConfig& config, int64_t monotonic_ms)
+{
+    if (config.status != HubConfigStatus::Active || config.expires_at_ms <= 0) return -1;
+    const int64_t now = config.clock.Now(monotonic_ms);
+    if (now <= 0) return -1;
+    return now >= config.expires_at_ms ? 0 : config.expires_at_ms - now;
+}
+
 // Enrollment permits recovery; disposable transport credentials permit only
 // connecting. Expiry must never prevent obtaining their replacement.
 inline bool ChannelRecoveryAllowed(HubConfigStatus status, bool has_authority,

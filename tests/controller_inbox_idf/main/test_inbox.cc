@@ -170,10 +170,32 @@ static void wakeups() {
     vSemaphoreDelete(p.done);
     ESP_LOGI("INBOX_TEST", "1000 empty-check/wait wakeups PASS");
 }
+static void timed_wait() {
+    Inbox inbox(24);
+    const auto self = xTaskGetCurrentTaskHandle();
+    const auto timeout = pdMS_TO_TICKS(50);
+    auto before = xTaskGetTickCount();
+    assert(inbox.Wait(timeout) == 0);
+    assert(xTaskGetTickCount() - before >= timeout);
+    // A consumed queue notification must not make a remaining FIFO item wait.
+    assert(inbox.Post({0, 0}, self));
+    assert(inbox.Post({0, 1}, self));
+    assert(inbox.Wait(timeout) == 0);
+    Event event;
+    assert(inbox.Take(event) && event.sequence == 0);
+    before = xTaskGetTickCount();
+    assert(inbox.Wait(pdMS_TO_TICKS(1000)) == 0);
+    assert(xTaskGetTickCount() - before < pdMS_TO_TICKS(100));
+    assert(inbox.Take(event) && event.sequence == 1);
+    inbox.Signal(self, Inbox::kConfigurationInvalidated);
+    assert(inbox.Wait(timeout) == Inbox::kConfigurationInvalidated);
+    ESP_LOGI("INBOX_TEST", "finite deadline, backlog, pending configuration signal PASS");
+}
 extern "C" void app_main() {
     saturation();
     real_timer_stall();
     concurrent_slow_consumer();
     wakeups();
+    timed_wait();
     ESP_LOGI("INBOX_TEST", "ALL PASS");
 }

@@ -44,9 +44,9 @@ public:
     // leaves a notification pending, so it cannot be lost. FIFO backlog avoids
     // sleeping even when multiple QueueReady notifications have coalesced.
     // The caller handles at most one FIFO event and each signal per iteration.
-    uint32_t Wait() {
+    uint32_t Wait(TickType_t timeout = portMAX_DELAY) {
         uint32_t bits = 0;
-        xTaskNotifyWait(0, UINT32_MAX, &bits, Pending() ? 0 : portMAX_DELAY);
+        xTaskNotifyWait(0, UINT32_MAX, &bits, Pending() ? 0 : timeout);
         return bits & (kAudioTick | kSessionActivity | kConfigurationInvalidated);
     }
 

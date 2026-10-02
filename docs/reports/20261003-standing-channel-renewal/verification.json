@@ -1,0 +1,80 @@
+{
+  "status": "PASS",
+  "firmware": {
+    "base_commit": "e97675235",
+    "build": "2026-10-02 23:51:30 +08:00",
+    "sdk": "3f98d8deed47d7e9b8ea9cb65b13d87c61174033",
+    "idf": "6.1",
+    "app_sha256": "9428c0f77fae19c374307dcfb394626b3662b40dc6581526bbdf11e2ee7b38f4",
+    "source_sha256": {
+      "main/eidolon/channel_recovery.h": "48ced695326b5ff289b68e59c65785da752a8bf7e72f5b16cfe71101a61e80a5",
+      "main/eidolon/controller_event_inbox.h": "62107440c941652e02f6d913951b3a8c5428ff08908a3fafac9b1b190ee03baa",
+      "main/eidolon/eidolon_voice_controller.cc": "05b1e8fffeff54b9c2738da70764e1fe7b24d94128487d3c5ef63f814bf865f3",
+      "main/eidolon/eidolon_voice_controller.h": "6c1ed13367d8fae10a87111b09f9e696ef15bb32c7b9fb19a38d11716bd96268",
+      "main/eidolon/livekit_session.cc": "e36b2164c6c8185980588581132faf0bffdfdec2dbead8d83c4005881fcd26d8"
+    }
+  },
+  "local_tests": {
+    "production_controller_loop": "ASan/UBSan PASS: idle expiry, flood fairness, unchanged config retry spacing, refresh failure handoff, authorization/shared/disconnected guards, unknown clock, tick rounding",
+    "baseline_counterexample": "The same test rejects the previous production ControllerLoop because an idle connection never renews.",
+    "freertos": "ESP-IDF 5.5.4 actual kernel in ESP32 QEMU: timed wait, backlog, pending config notification plus existing saturation/concurrent producer/wakeup cases PASS",
+    "existing_regressions": "channel recovery, controller permission refresh (2 tests), configuration snapshot PASS",
+    "channel": "443 Provider/smarthome Python tests PASS"
+  },
+  "deployment": {
+    "host": "opi5max",
+    "release": "rk3588-panel-sync-20261002-1",
+    "channel_commit": "59f4fae35a28a431dc797a557168e206271404a4",
+    "unchanged_other_components": true,
+    "gates": "activate, doctor, app_ready applied",
+    "firmware": "app-only flash, readback and build stamp verified; existing Owner binding retained",
+    "Mac": "source-mode channel-provider restarted under ordinary user",
+    "adapter_sha256_both_hosts": "f917531798a20ccd8ddc2b2796dbad42440fc0af47a124f2110ed3e143eecaff"
+  },
+  "initial_hil": {
+    "snapshots": [
+      {
+        "command_id": "smarthome.snapshot:6057fe6f0aa24070b4f7c2daee2523be",
+        "provider_time": "2026-10-02T23:57:15+08:00"
+      },
+      {
+        "command_id": "smarthome.snapshot:676b752e4a8448698786de8bab24443d",
+        "provider_time": "2026-10-02T23:57:34+08:00"
+      }
+    ],
+    "bytes": 3457,
+    "reliable": true,
+    "applied_devices": 18,
+    "applied_areas": 7,
+    "applied_scenes": 4,
+    "device_outcome": 0,
+    "reconnection": "Device recovered both observed transport interruptions during official release activation without manual device restart."
+  },
+  "natural_expiry": {
+    "expires_at_ms": 1790958095643,
+    "expected_time": "2026-10-03T00:21:35.643+08:00",
+    "pending": false,
+    "result": "PASS",
+    "new_lease": {
+      "status": "active",
+      "created_at_ms": 1790958096499,
+      "expires_at_ms": 1790959896499
+    },
+    "previous_lease_fenced": true,
+    "refresh_trigger_monotonic_ms": 1594822,
+    "snapshot_applied_monotonic_ms": 1600472,
+    "trigger_to_application_ms": 5650,
+    "snapshot_command_id": "smarthome.snapshot:8733da35c1034b26a81b560a00533f90",
+    "provider_published_at": "2026-10-03T00:21:40.539+08:00",
+    "provider_reliable": true,
+    "snapshot_bytes": 3457,
+    "applied_devices": 18,
+    "applied_areas": 7,
+    "applied_scenes": 4,
+    "device_outcome": 0,
+    "manual_device_or_host_restart_during_renewal": false,
+    "credential_expiry_events": 1,
+    "observed_post_renewal_seconds": 68
+  },
+  "limits": "No claim that all Wi-Fi/SCTP/SDK packet-loss causes are identified, or that reliable transport replaces snapshot resynchronization."
+}

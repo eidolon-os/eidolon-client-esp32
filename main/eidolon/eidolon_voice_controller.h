@@ -407,6 +407,7 @@ private:
     // two it is.
     bool standby_ = false;
     bool config_refresh_required_ = false;
+    int64_t channel_lease_retry_at_ms_ = 0;  // Controller-task monotonic deadline.
     std::atomic<uint32_t> configuration_generation_{0};
     // Correlation key for the one logical conversation currently desired by
     // this device. It survives channel reconnects and fences late lifecycle

@@ -260,7 +260,14 @@ void LiveKitSession::OnDataReceived(const livekit_data_received_t* data, void* c
                    session->provider_identity_ == data->sender_identity;
     }
     // Larger temporary bindings are accepted only from the authenticated Provider.
-    if (data->payload.size > (provider ? 160 * 1024U : 4096U)) return;
+    if (data->payload.size > (provider ? 160 * 1024U : 4096U)) {
+        ESP_LOGW(TAG, "Control packet rejected: bytes=%u provider=%d",
+                 static_cast<unsigned>(data->payload.size), provider);
+        return;
+    }
+    ESP_LOGI(TAG, "Control packet received: bytes=%u provider=%d gen=%lu",
+             static_cast<unsigned>(data->payload.size), provider,
+             static_cast<unsigned long>(session->generation_));
     std::string payload(reinterpret_cast<const char*>(data->payload.bytes), data->payload.size);
     session->on_control_command_(payload, session->generation_, session->IsAgent(data->sender_identity), provider);
 }

@@ -18,7 +18,9 @@ signals without FIFO occupancy; real 80 ms esp_timer with a 2.4 s consumer stall
 ordered drain and capacity recovery; signals posted during handling; two
 concurrent producers with a controlled 100 ms consumer stall, exact accepted vs
 processed accounting and per-producer FIFO ordering; maintenance progress under
-command pressure; 1,000 posts across empty/wait transitions.
+command pressure; 1,000 posts across empty/wait transitions; finite deadline wakeup without
+notifications, FIFO backlog bypassing that deadline, and pending configuration
+notification delivery during timed waits.
 
 The caller owns rejected event payloads and handles protocol acknowledgements.
 This transport test does not claim to cover controller parsing, network command

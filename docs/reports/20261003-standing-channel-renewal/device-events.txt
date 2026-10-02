@@ -1,0 +1,40 @@
+[   0.94] W (912) Application: EIDOLON-BUILDSTAMP git=e97675235+dirty sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=6.1 branch=main built=Oct  2 2026 23:51:30
+[   8.36] I (8332) SystemInfo: free sram: 214203 minimal sram: 105172
+[  11.26] I (11232) EidolonVoice: [lifecycle] Owner configuration current gen=1 revision=1
+[  11.29] I (11252) EidolonVoice: [lifecycle] operational_ready=1 reason=channel_connected room_kind=control gen=1
+[  11.29] I (11262) Application: [EIDOLON_UI] queue operational_ready=1
+[  12.72] I (12702) EidolonVoice: [lifecycle] Owner configuration current gen=1 revision=1
+[ 110.33] I (110302) EidolonVoice: [lifecycle] operational_ready=0 reason=channel_reconnecting room_kind=control gen=1
+[ 110.34] I (110312) Application: [EIDOLON_UI] queue operational_ready=0
+[ 124.31] I (124292) EidolonVoice: [lifecycle] Owner configuration current gen=1 revision=1
+[ 124.34] I (124312) EidolonVoice: [lifecycle] operational_ready=1 reason=channel_connected room_kind=control gen=1
+[ 124.35] I (124312) Application: [EIDOLON_UI] queue operational_ready=1
+[ 125.75] I (125722) EidolonVoice: [lifecycle] Owner configuration current gen=1 revision=1
+[ 135.72] I (135702) LiveKitSession: Control packet received: bytes=3457 provider=1 gen=1
+[ 135.73] I (135712) EidolonVoice: [smarthome] command received id=smarthome.snapshot:6057fe6f0aa24070b4f7c2daee2523be op=smarthome.snapshot gen=1
+[ 135.74] I (135712) HomePanel: [smarthome] snapshot revision=1 devices=18 areas=7 scenes=4
+[ 135.76] I (135732) EidolonVoice: [smarthome] command handled id=smarthome.snapshot:6057fe6f0aa24070b4f7c2daee2523be outcome=0
+[ 149.63] I (149612) EidolonVoice: [lifecycle] operational_ready=0 reason=channel_reconnecting room_kind=control gen=1
+[ 149.64] I (149612) Application: [EIDOLON_UI] queue operational_ready=0
+[ 152.37] I (152352) EidolonVoice: [lifecycle] Owner configuration current gen=1 revision=1
+[ 152.41] I (152372) EidolonVoice: [lifecycle] operational_ready=1 reason=channel_connected room_kind=control gen=1
+[ 152.41] I (152382) Application: [EIDOLON_UI] queue operational_ready=1
+[ 153.91] I (153892) EidolonVoice: [lifecycle] Owner configuration current gen=1 revision=1
+[ 154.13] I (154112) LiveKitSession: Control packet received: bytes=3457 provider=1 gen=1
+[ 154.15] I (154122) EidolonVoice: [smarthome] command received id=smarthome.snapshot:676b752e4a8448698786de8bab24443d op=smarthome.snapshot gen=1
+[ 154.15] I (154132) HomePanel: [smarthome] snapshot revision=1 devices=18 areas=7 scenes=4
+[ 154.17] I (154142) EidolonVoice: [smarthome] command handled id=smarthome.snapshot:676b752e4a8448698786de8bab24443d outcome=0
+[1594.86] I (1594822) EidolonVoice: [lifecycle] channel credential expired; refreshing Owner configuration
+[1596.35] I (1596312) EidolonVoice: [lifecycle] Owner configuration invalidated gen=1
+[1596.36] I (1596312) EidolonVoice: [lifecycle] superseded gen=2 reason=configuration_changed (state=ConfigReady)
+[1596.82] I (1596772) EidolonVoice: [lifecycle] operational_ready=0 reason=configuration_changed room_kind=control gen=2
+[1596.83] I (1596782) Application: [EIDOLON_UI] queue operational_ready=0
+[1598.97] I (1598932) EidolonVoice: [lifecycle] Owner configuration current gen=3 revision=1
+[1599.00] I (1598952) EidolonVoice: [lifecycle] operational_ready=1 reason=channel_connected room_kind=control gen=3
+[1599.01] I (1598962) Application: [EIDOLON_UI] queue operational_ready=1
+[1600.28] I (1600242) EidolonVoice: [lifecycle] Owner configuration current gen=3 revision=1
+[1600.50] I (1600462) LiveKitSession: Control packet received: bytes=3457 provider=1 gen=3
+[1600.51] I (1600462) EidolonVoice: [smarthome] command received id=smarthome.snapshot:8733da35c1034b26a81b560a00533f90 op=smarthome.snapshot gen=3
+[1600.52] I (1600472) HomePanel: [smarthome] snapshot revision=1 devices=18 areas=7 scenes=4
+[1600.54] I (1600492) EidolonVoice: [smarthome] command handled id=smarthome.snapshot:8733da35c1034b26a81b560a00533f90 outcome=0
+[1678.41] I (1678372) SystemInfo: free sram: 146703 minimal sram: 32612

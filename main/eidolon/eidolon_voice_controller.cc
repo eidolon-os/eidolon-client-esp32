@@ -310,7 +310,18 @@ void EidolonVoiceController::TaskTrampoline(void* arg)
 void EidolonVoiceController::ControllerLoop()
 {
     for (;;) {
-        const uint32_t signals = inbox_.Wait();
+        TickType_t timeout = portMAX_DELAY;
+        if (!shared_visit_ && session_.IsConnected() && CanRecoverChannel()) {
+            const int64_t now_ms = esp_timer_get_time() / 1000;
+            int64_t delay = ChannelBindingRenewalDelayMs(config_, now_ms);
+            if (delay >= 0) delay = std::max(delay, channel_lease_retry_at_ms_ - now_ms);
+            if (delay >= 0) {
+                // Round up and reserve portMAX_DELAY for an indefinite wait.
+                const int64_t ticks = (delay + portTICK_PERIOD_MS - 1) / portTICK_PERIOD_MS;
+                timeout = static_cast<TickType_t>(std::clamp<int64_t>(ticks, 1, portMAX_DELAY - 1));
+            }
+        }
+        const uint32_t signals = inbox_.Wait(timeout);
         Event ev;
         if (inbox_.Take(ev)) {
             DispatchAndRelease(ev);
@@ -332,6 +343,20 @@ void EidolonVoiceController::ControllerLoop()
             ev = {};
             ev.type = EventType::AudioTick;
             DispatchAndRelease(ev);
+        }
+        // Re-evaluate after queued events: they may revoke, refresh, disconnect
+        // or replace the channel. Reuse the same authenticated refresh and
+        // recovery path as Owner configuration invalidation, including backoff.
+        if (!shared_visit_ && session_.IsConnected() && CanRecoverChannel() &&
+            ChannelBindingRenewalDelayMs(config_, esp_timer_get_time() / 1000) == 0 &&
+            esp_timer_get_time() / 1000 >= channel_lease_retry_at_ms_) {
+            ESP_LOGI(TAG, "[lifecycle] channel credential expired; refreshing Owner configuration");
+            DoConfigurationInvalidated(session_generation_);
+            // HubClock uses a conservative upper bound. The Hub may still
+            // consider the same credential valid; wait before pulling again.
+            const int64_t now_ms = esp_timer_get_time() / 1000;
+            channel_lease_retry_at_ms_ =
+                ChannelBindingRenewalDelayMs(config_, now_ms) == 0 ? now_ms + 1000 : 0;
         }
     }
 }
@@ -1847,7 +1872,12 @@ void EidolonVoiceController::FinishSharedVisit(const char* reason, bool reconnec
 
 void EidolonVoiceController::DoControlCommand(const std::string& payload, uint32_t generation, bool agent, bool provider)
 {
-    if (generation != session_generation_) return;
+    if (generation != session_generation_) {
+        ESP_LOGW(TAG, "Control packet rejected: stale generation=%lu current=%lu",
+                 static_cast<unsigned long>(generation),
+                 static_cast<unsigned long>(session_generation_));
+        return;
+    }
     ControlCommand command = ParseControlCommand(
         payload, config_.clock.Now(esp_timer_get_time() / 1000));
     if (!command.valid) {
@@ -1861,6 +1891,8 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload, uint32
     }
 #if CONFIG_EIDOLON_SMARTHOME_PANEL
     if (smarthome::IsSmartHomeOp(command.op)) {
+        ESP_LOGI(TAG, "[smarthome] command received id=%s op=%s gen=%lu",
+                 command.id.c_str(), command.op.c_str(), static_cast<unsigned long>(generation));
         if (!provider || !command.is_v1 || command.capability_version != smarthome::kCapabilityVersion ||
             !command.clock_known || !command.bounded_deadline || shared_visit_) {
             ESP_LOGW(TAG, "[smarthome] rejected unauthorized panel command");
@@ -1868,14 +1900,19 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload, uint32
         }
         auto* view = GetEidolonView();
         auto* panel = view ? view->SmartHomePanel() : nullptr;
-        if (panel == nullptr) return;
+        if (panel == nullptr) {
+            ESP_LOGW(TAG, "[smarthome] command rejected id=%s: panel unavailable", command.id.c_str());
+            return;
+        }
         smarthome::Message message;
         std::string error;
         if (!smarthome::ParseMessage(command.op, command.payload, message, &error)) {
             ESP_LOGW(TAG, "[smarthome] rejected panel payload: %s", error.c_str());
             return;
         }
-        panel->Apply(std::move(message));
+        const auto outcome = panel->Apply(std::move(message));
+        ESP_LOGI(TAG, "[smarthome] command handled id=%s outcome=%d",
+                 command.id.c_str(), static_cast<int>(outcome));
         return;
     }
 #endif
