@@ -3553,6 +3553,9 @@ esp_err_t EidolonVoiceController::ConnectChannel()
     if (config_refresh_required_) {
         const esp_err_t err = RefreshHubConfig(/*persist=*/false);
         if (err != ESP_OK) return err;
+        if (HasChannelConfig() && !current_conversation_id_.empty()) {
+            SetState(VoiceSessionState::Reconnecting, "permissions_config_refreshed");
+        }
     }
     if (!HasChannelConfig()) return ESP_ERR_INVALID_STATE;
 
@@ -3865,11 +3868,11 @@ void EidolonVoiceController::DoPermissionsChanged(uint32_t generation)
         FinishSharedVisit("shared_permissions_changed");
         return;
     }
+    // A graph rebuild is a transport interruption, not a request to end the
+    // conversation. Keep desired state and the confirmed id; the existing
+    // Connected handler re-announces it and restores only fresh allowed media.
     if (!current_conversation_id_.empty()) {
-        PublishSessionRequest(kSessionCloseType, current_conversation_id_);
-        HandleSessionEnd(EndReason::Superseded);
-    } else {
-        CompletePendingRoomJoinCommand("failed", "ROOM_PERMISSIONS_CHANGED");
+        SetState(VoiceSessionState::Reconnecting, "permissions_changed");
     }
     DisarmConnectWatchdog();
     MarkSessionSuperseded("permissions_changed");
