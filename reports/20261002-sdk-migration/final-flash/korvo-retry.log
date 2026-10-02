@@ -1,0 +1,13 @@
+EIDOLON partition contract: preflight passed
+Wrote 4096 bytes at 0x00020000 in 0.2 seconds (211.7 kbit/s).
+Wrote 4096 bytes at 0x00029000 in 0.2 seconds (214.2 kbit/s).
+Wrote 3334144 bytes at 0x00032000 in 132.8 seconds (200.9 kbit/s).
+Hash of data verified.
+Wrote 8192 bytes (54 compressed) at 0x0000d000 in 0.0 seconds (1759.5 kbit/s).
+Hash of data verified.
+EIDOLON partition contract: readback verified
+EIDOLON application boot selection activated: ota_0
+>> [common] Device reports: EIDOLON-STORAGE owner_trust=ready bytes=65536
+EIDOLON-BUILDSTAMP git=849b920ec sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=6.1 branch=main built=Oct  2 2026 20:55:42
+EIDOLON-BOARD sku=korvo-1
+>> [common] VERIFIED: device runs the just-built firmware (git=849b920ec sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=6.1).

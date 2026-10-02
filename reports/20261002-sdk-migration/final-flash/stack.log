@@ -1,0 +1,11 @@
+EIDOLON partition contract: preflight passed
+Wrote 3115328 bytes (1867753 compressed) at 0x00020000 in 16.6 seconds (effective 1503.1 kbit/s)...
+Hash of data verified.
+Wrote 8192 bytes (54 compressed) at 0x0000d000 in 0.0 seconds (effective 1742.2 kbit/s)...
+Hash of data verified.
+EIDOLON partition contract: readback verified
+EIDOLON application boot selection activated: ota_0
+>> [common] Device reports: EIDOLON-STORAGE owner_trust=ready bytes=65536
+EIDOLON-BUILDSTAMP git=849b920ec sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=5.5.4 branch=main built=Oct  2 2026 20:44:36
+EIDOLON-BOARD sku=m5stack-stackchan
+>> [common] VERIFIED: device runs the just-built firmware (git=849b920ec sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=5.5.4).

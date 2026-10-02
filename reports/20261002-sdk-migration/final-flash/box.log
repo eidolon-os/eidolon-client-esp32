@@ -1,0 +1,11 @@
+EIDOLON partition contract: preflight passed
+Wrote 3523856 bytes (2063023 compressed) at 0x00020000 in 22.6 seconds (effective 1248.8 kbit/s)...
+Hash of data verified.
+Wrote 8192 bytes (54 compressed) at 0x0000d000 in 0.1 seconds (effective 983.7 kbit/s)...
+Hash of data verified.
+EIDOLON partition contract: readback verified
+EIDOLON application boot selection activated: ota_0
+>> [common] Device reports: EIDOLON-STORAGE owner_trust=ready bytes=65536
+EIDOLON-BUILDSTAMP git=849b920ec sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=5.5.4 branch=main built=Oct  2 2026 20:39:14
+EIDOLON-BOARD sku=esp-box-3
+>> [common] VERIFIED: device runs the just-built firmware (git=849b920ec sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=5.5.4).

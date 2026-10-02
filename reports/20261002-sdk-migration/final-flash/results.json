@@ -1,0 +1,55 @@
+{
+  "firmware_commit": "849b920ecfc170076c4d19a6f45def9e53f2a5cd",
+  "sdk_pin": "3f98d8deed47d7e9b8ea9cb65b13d87c61174033",
+  "action": "flash --app-only",
+  "verification_scope": "partition preflight, application write hash, partition readback, OTA boot selection, runtime build stamp, board SKU and Owner storage initialization; no functional or network stability validation",
+  "results": [
+    {
+      "board": "BOX-3",
+      "port": "/dev/cu.usbmodem21201",
+      "idf": "5.5.4",
+      "returncode": 0,
+      "verified": true,
+      "excerpt": "box.log",
+      "original_log": "/tmp/eidolon-final-flash-20261002/box.log",
+      "original_log_sha256": "c6b089b23a8cb9b5bb7348f1311ed4aeaff5cbf9535e5572c63e4a5c4ea700d1"
+    },
+    {
+      "board": "StackChan",
+      "port": "/dev/cu.usbmodem21101",
+      "idf": "5.5.4",
+      "returncode": 0,
+      "verified": true,
+      "excerpt": "stack.log",
+      "original_log": "/tmp/eidolon-final-flash-20261002/stack.log",
+      "original_log_sha256": "a6316187506f55d354fe943c1c3f87aaef7931e4f2432da319a265752abcbb92"
+    },
+    {
+      "board": "Waveshare AMOLED 2.06",
+      "port": "/dev/cu.usbmodem21401",
+      "idf": "5.5.4",
+      "returncode": 0,
+      "verified": true,
+      "excerpt": "wave.log",
+      "original_log": "/tmp/eidolon-final-flash-20261002/wave.log",
+      "original_log_sha256": "d4436d6547d734f396e6522a36d47cd8ba4bdbdb4dd9f33da7a2734e6e092a0e"
+    },
+    {
+      "board": "Korvo-1",
+      "port": "/dev/cu.usbserial-2130",
+      "idf": "6.1",
+      "returncode": 0,
+      "verified": true,
+      "excerpt": "korvo-retry.log",
+      "original_log": "/tmp/eidolon-final-flash-20261002/korvo-retry.log",
+      "original_log_sha256": "71800ea8607790ade550f01cfa2a4f1133db8e039134a9a90503e6900d51cc28"
+    }
+  ],
+  "korvo_first_attempt": {
+    "returncode": 1,
+    "stage": "dependency fetch before any flash write",
+    "error": "Git fetch curl 52 Empty reply from server",
+    "original_log_sha256": "011ef774cac1a3f3a16d2c26803363fe2e3e000125e963fa1f1a75b810d4c94a",
+    "retry": "process-only GitHub SSH rewrite and HTTP/1.1 for remaining HTTP; no persistent config changes"
+  }
+}
