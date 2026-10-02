@@ -1,6 +1,7 @@
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
+#include <atomic>
 #include <esp_peer.h>
 #include <esp_log.h>
 #include <esp_timer.h>
@@ -8,6 +9,8 @@
 #include <freertos/task.h>
 #include <lwip/netdb.h>
 #include <lwip/sockets.h>
+#include <lwip/ip4.h>
+#include <lwip/inet_chksum.h>
 
 // Optional linker instrumentation: observe the actual resolver/socket calls,
 // never repeat a lookup or change DNS, timeout, TLS, or routing behavior.
@@ -15,8 +18,38 @@ extern "C" int __real_lwip_getaddrinfo(const char*, const char*,
                                       const struct addrinfo*, struct addrinfo**);
 extern "C" int __real_lwip_connect(int, const struct sockaddr*, socklen_t);
 extern "C" int __real_esp_peer_send_msg(esp_peer_handle_t, esp_peer_msg_t*);
+extern "C" err_t __real_ip4_input(struct pbuf*, struct netif*);
+extern "C" u16_t __real_inet_chksum_pseudo(struct pbuf*, u8_t, u16_t,
+                                           const ip4_addr_t*, const ip4_addr_t*);
 
 namespace {
+// Count arrivals before lwIP validation. No logging, allocation, packet mutation
+// or additional checksum calculation runs on the TCPIP receive path.
+std::atomic<unsigned> rx_ip4{0}, rx_synack{0}, rx_signaling{0}, rx_mdns{0},
+    rx_echo{0}, rx_bad_tcp_checksum{0};
+std::atomic<const pbuf*> receiving{nullptr};
+
+void ReceiveSnapshot(void*) {
+    ESP_LOGI("NetTrace", "rx ip4=%u synack=%u signaling=%u mdns_answer=%u "
+             "icmp_echo=%u bad_tcp_checksum=%u",
+             rx_ip4.load(std::memory_order_relaxed), rx_synack.load(std::memory_order_relaxed),
+             rx_signaling.load(std::memory_order_relaxed), rx_mdns.load(std::memory_order_relaxed),
+             rx_echo.load(std::memory_order_relaxed), rx_bad_tcp_checksum.load(std::memory_order_relaxed));
+}
+
+void StartReceiveSnapshots() {
+    static esp_timer_handle_t timer = nullptr;
+    if (timer) return;
+    const esp_timer_create_args_t args = {.callback=ReceiveSnapshot, .name="net_rx_trace"};
+    if (esp_timer_create(&args, &timer) == ESP_OK) {
+        esp_timer_start_periodic(timer, 5000000);
+    }
+}
+
+unsigned Be16(const unsigned char* bytes) {
+    return (static_cast<unsigned>(bytes[0]) << 8) | bytes[1];
+}
+
 void Address(const struct sockaddr* address, char* text, size_t size, unsigned& port) {
     text[0] = '\0';
     port = 0;
@@ -36,9 +69,52 @@ void Address(const struct sockaddr* address, char* text, size_t size, unsigned& 
 }
 }
 
+extern "C" err_t __wrap_ip4_input(struct pbuf* packet, struct netif* input) {
+    rx_ip4.fetch_add(1, std::memory_order_relaxed);
+    unsigned char header[80] = {};
+    const size_t length = pbuf_copy_partial(packet, header, sizeof(header), 0);
+    const size_t ip_length = (header[0] & 15) * 4;
+    if (length >= 20 && (header[0] >> 4) == 4 && ip_length >= 20 &&
+        length >= ip_length && !(Be16(header + 6) & 0x1fff)) {
+        const auto* transport = header + ip_length;
+        const size_t available = length - ip_length;
+        if (header[9] == 6 && available >= 20) {
+            if ((transport[13] & 0x12) == 0x12) rx_synack.fetch_add(1, std::memory_order_relaxed);
+            if (Be16(transport) == 7880) rx_signaling.fetch_add(1, std::memory_order_relaxed);
+        } else if (header[9] == 17 && available >= 20 &&
+                   Be16(transport) == 5353 && (transport[10] & 0x80)) {
+            rx_mdns.fetch_add(1, std::memory_order_relaxed);
+        } else if (header[9] == 1 && available >= 8 && transport[0] == 8) {
+            rx_echo.fetch_add(1, std::memory_order_relaxed);
+        }
+    }
+    receiving.store(packet, std::memory_order_relaxed);
+    const err_t result = __real_ip4_input(packet, input);
+    receiving.store(nullptr, std::memory_order_relaxed);
+    return result;
+}
+
+extern "C" u16_t __wrap_inet_chksum_pseudo(struct pbuf* packet, u8_t protocol,
+                                            u16_t length, const ip4_addr_t* source,
+                                            const ip4_addr_t* destination) {
+    const u16_t result = __real_inet_chksum_pseudo(packet, protocol, length, source, destination);
+    if (protocol == 6 && result && receiving.load(std::memory_order_relaxed) == packet) {
+        rx_bad_tcp_checksum.fetch_add(1, std::memory_order_relaxed);
+    }
+    return result;
+}
+
 extern "C" int __wrap_lwip_getaddrinfo(const char* host, const char* service,
                                       const struct addrinfo* hints, struct addrinfo** out) {
     const int before = errno;
+    // DNS callers can run concurrently. Creation is serialized outside TCPIP.
+    static portMUX_TYPE init_mux = portMUX_INITIALIZER_UNLOCKED;
+    static bool started = false;
+    bool start_snapshots = false;
+    portENTER_CRITICAL(&init_mux);
+    if (!started) { started = true; start_snapshots = true; }
+    portEXIT_CRITICAL(&init_mux);
+    if (start_snapshots) StartReceiveSnapshots();
     const auto start = esp_timer_get_time();
     ESP_LOGI("NetTrace", "dns begin task=%s host=%s", pcTaskGetName(nullptr), host ? host : "");
     errno = before;

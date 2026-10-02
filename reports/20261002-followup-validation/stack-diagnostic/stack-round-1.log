@@ -1,0 +1,55 @@
+CAPTURE {"utc": "2026-10-02T02:19:34.084893+00:00", "name": "stack", "port": "/dev/cu.usbmodem21101", "round": 1, "duration": 60.0}
+I (360) esp_psram: Reserving pool of 8K of internal memory for DMA/internal allocations
+I (390) main: EIDOLON-STORAGE owner_trust=ready bytes=65536
+W (390) Application: EIDOLON-BUILDSTAMP git=c41956d6a+dirty sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=5.5.4 branch=main built=Oct  2 2026 10:15:00
+W (400) Application: EIDOLON-PROFILE mode=half_duplex device_aec=0 capture=raw
+W (730) lcd_panel.io.spi: Callback on_color_trans_done was already set and now it was overwritten!
+I (1440) StackChanBody: servo body ready
+I (1630) Application: Hub activation actor created=1 stack=16384 memory=internal free_internal=192667
+I (6740) mdns_mem: mDNS task will be created from internal RAM
+I (7000) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=256
+I (8740) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=159
+I (9870) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=43
+W (11000) EidolonMem: [mem] activation_done internal free=87579 largest_block=69632 free_blocks=19 allocated=194936 min_free=81903
+W (11010) EidolonMem: [mem] activation_done internal-dma free=80231 largest_block=69632 allocated=194712
+W (11140) EidolonMem: [mem] activation_done stacks internal=15 psram=0 total_tasks=15
+I (11150) Application: [EIDOLON_UI] firmware ready version=1.0.0
+I (11160) EidolonVoice: [lifecycle] SetState Idle -> WaitingBinding reason=config_activated room_kind=none gen=0
+I (11730) NetTrace: rx ip4=46 synack=3 signaling=1 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (16730) NetTrace: rx ip4=53 synack=3 signaling=1 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (17030) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=184
+I (18160) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=92
+W (19040) EidolonVoice: [dispatch] type=22 wait_ms=0 run_ms=2860 pending=0
+I (21730) NetTrace: rx ip4=79 synack=5 signaling=1 mdns_answer=7 icmp_echo=0 bad_tcp_checksum=0
+I (26730) NetTrace: rx ip4=86 synack=5 signaling=1 mdns_answer=10 icmp_echo=0 bad_tcp_checksum=0
+I (31730) NetTrace: rx ip4=88 synack=5 signaling=1 mdns_answer=10 icmp_echo=0 bad_tcp_checksum=0
+I (32490) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=7784
+I (34850) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=1229
+I (35880) EidolonVoice: [lifecycle] SetState WaitingBinding -> ConfigReady reason=config_refreshed room_kind=none gen=0
+I (35890) Application: [EIDOLON_UI] queue session_state=ConfigReady
+I (35900) EidolonVoice: Administrator approval complete; provider binding is ready
+I (35900) EidolonVoice: [lifecycle] begin gen=1 room_kind=control (state=ConfigReady)
+I (35990) EidolonAudioIn: audio platform ready
+I (36000) EidolonMicCap: Mic capture started topology=raw (codec=24000 Hz, out=16000 Hz, channels=1)
+I (36010) EidolonLKBoard: LiveKit board media ready (input=24000 Hz, output=24000 Hz)
+I (36020) LiveKitSession: [mem] room_create verdict=sufficient internal free=92759 largest_block=65536 free_blocks=5 need_contiguous=9472 need_total=19712
+W (36050) EidolonVoice: [dispatch] type=22 wait_ms=0 run_ms=12012 pending=0
+I (36090) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1
+I (36120) EidolonVoice: [lifecycle] lk_event=Connecting room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=None room=eidolon-device-02554c8b8ffbe75bfbe32274
+I (36730) NetTrace: rx ip4=138 synack=8 signaling=14 mdns_answer=16 icmp_echo=0 bad_tcp_checksum=0
+I (37290) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1
+I (37310) EidolonVoice: [lifecycle] lk_event=Connected room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=None room=eidolon-device-02554c8b8ffbe75bfbe32274
+I (37370) EidolonVoice: [lifecycle] operational_ready=1 reason=channel_connected room_kind=control gen=1
+I (37380) Application: [EIDOLON_UI] queue operational_ready=1
+I (37380) EidolonUiPresenter: visible state=READY scene=7
+I (41730) NetTrace: rx ip4=177 synack=8 signaling=22 mdns_answer=16 icmp_echo=0 bad_tcp_checksum=0
+I (46730) NetTrace: rx ip4=210 synack=8 signaling=27 mdns_answer=23 icmp_echo=0 bad_tcp_checksum=0
+I (51730) NetTrace: rx ip4=241 synack=8 signaling=30 mdns_answer=30 icmp_echo=0 bad_tcp_checksum=0
+I (56730) NetTrace: rx ip4=260 synack=8 signaling=35 mdns_answer=30 icmp_echo=0 bad_tcp_checksum=0
+I (59520) GMF_CAPTURE_APATH: Drop for disable
+I (59600) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1
+E (59610) LiveKitSession: Failure: Unreachable
+I (59620) EidolonVoice: [lifecycle] lk_event=Reconnecting room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=Unreachable room=eidolon-device-02554c8b8ffbe75bfbe32274
+I (59640) EidolonVoice: [lifecycle] operational_ready=0 reason=channel_reconnecting room_kind=control gen=1
+I (59640) Application: [EIDOLON_UI] queue operational_ready=0
+I (59650) EidolonUiPresenter: visible state=RETRY scene=10

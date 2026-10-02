@@ -9,7 +9,7 @@
 namespace eidolon {
 
 // The controller owns task-notification index 0. Ordered events stay in the
-// FreeRTOS FIFO; these two level-triggered requests carry no history or payload.
+// FreeRTOS FIFO; level-triggered requests carry no history or payload.
 // Producers and the consumer must be stopped before destruction.
 template<class Event>
 class ControllerEventInbox {
@@ -17,6 +17,7 @@ public:
     static constexpr uint32_t kAudioTick = 1U << 0;
     static constexpr uint32_t kSessionActivity = 1U << 1;
     static constexpr uint32_t kQueueReady = 1U << 2;
+    static constexpr uint32_t kPermissionsChanged = 1U << 3;
 
     explicit ControllerEventInbox(UBaseType_t capacity)
         : queue_(xQueueCreate(capacity, sizeof(Event))) {
@@ -46,7 +47,7 @@ public:
     uint32_t Wait() {
         uint32_t bits = 0;
         xTaskNotifyWait(0, UINT32_MAX, &bits, Pending() ? 0 : portMAX_DELAY);
-        return bits & (kAudioTick | kSessionActivity);
+        return bits & (kAudioTick | kSessionActivity | kPermissionsChanged);
     }
 
 private:

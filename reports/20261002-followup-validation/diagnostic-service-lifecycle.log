@@ -1,0 +1,18 @@
+Oct 02 10:19:24 eidolon-opi5max systemd[1]: Stopping eidolon-channel-provider.service - Eidolon Hub Channel Provider...
+Oct 02 10:19:24 eidolon-opi5max systemd[1]: Stopped eidolon-channel-provider.service - Eidolon Hub Channel Provider.
+Oct 02 10:19:33 eidolon-opi5max systemd[1]: Stopping eidolon-livekit.service - Eidolon LiveKit RTC server...
+Oct 02 10:19:53 eidolon-opi5max systemd[1]: eidolon-livekit.service: State 'stop-sigterm' timed out. Killing.
+Oct 02 10:19:53 eidolon-opi5max systemd[1]: eidolon-livekit.service: Killing process 528574 (livekit-server) with signal SIGKILL.
+Oct 02 10:19:53 eidolon-opi5max systemd[1]: eidolon-livekit.service: Main process exited, code=killed, status=9/KILL
+Oct 02 10:19:53 eidolon-opi5max systemd[1]: Stopped eidolon-livekit.service - Eidolon LiveKit RTC server.
+Oct 02 10:19:54 eidolon-opi5max systemd[1]: Stopping eidolon-hub.service - Eidolon Hub device admission authority...
+Oct 02 10:19:54 eidolon-opi5max systemd[1]: Stopped eidolon-hub.service - Eidolon Hub device admission authority.
+Oct 02 10:20:00 eidolon-opi5max systemd[1]: Started eidolon-livekit.service - Eidolon LiveKit RTC server.
+Oct 02 10:20:00 eidolon-opi5max systemd[1]: Started eidolon-channel-provider.service - Eidolon Hub Channel Provider.
+Oct 02 10:20:00 eidolon-opi5max systemd[1]: Started eidolon-hub.service - Eidolon Hub device admission authority.
+Oct 02 10:20:13 eidolon-opi5max systemd[1]: Stopping eidolon-livekit.service - Eidolon LiveKit RTC server...
+Oct 02 10:20:33 eidolon-opi5max systemd[1]: eidolon-livekit.service: State 'stop-sigterm' timed out. Killing.
+Oct 02 10:20:33 eidolon-opi5max systemd[1]: eidolon-livekit.service: Killing process 546577 (livekit-server) with signal SIGKILL.
+Oct 02 10:20:33 eidolon-opi5max systemd[1]: eidolon-livekit.service: Main process exited, code=killed, status=9/KILL
+Oct 02 10:20:33 eidolon-opi5max systemd[1]: Stopped eidolon-livekit.service - Eidolon LiveKit RTC server.
+Oct 02 10:20:33 eidolon-opi5max systemd[1]: Started eidolon-livekit.service - Eidolon LiveKit RTC server.

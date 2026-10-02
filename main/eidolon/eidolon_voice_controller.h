@@ -9,6 +9,7 @@
 #include <freertos/task.h>
 #include <deque>
 #include <functional>
+#include <atomic>
 #include <string>
 #include <type_traits>
 
@@ -158,6 +159,7 @@ private:
         SharedDeadline,
         IdleLeave,
         FullDuplexIdleFallback,
+        PermissionsChanged,
     };
     struct Event {
         EventType type;
@@ -201,6 +203,7 @@ private:
     bool DoCommissioningQuiesce();
     esp_err_t DoJoinRoom();
     esp_err_t DoLeaveRoom();
+    void DoPermissionsChanged(uint32_t generation);
     void DoSetMicEnabled(bool enabled);
     void DoPttPressed();
     void DoPttReleased();
@@ -403,6 +406,8 @@ private:
     // stood in. The channel no longer moves, so the device says which of the
     // two it is.
     bool standby_ = false;
+    bool config_refresh_required_ = false;
+    std::atomic<uint32_t> permissions_generation_{0};
     // Correlation key for the one logical conversation currently desired by
     // this device. It survives channel reconnects and fences late lifecycle
     // packets from a conversation that has already been closed or superseded.

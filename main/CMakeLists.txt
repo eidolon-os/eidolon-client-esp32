@@ -1587,7 +1587,7 @@ endif()
 
 if(CONFIG_EIDOLON_NETWORK_DIAGNOSTICS)
     target_sources(${COMPONENT_LIB} PRIVATE "eidolon/network_diagnostics.cc")
-    target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--wrap=lwip_getaddrinfo" "-Wl,--wrap=lwip_connect" "-Wl,--wrap=esp_peer_send_msg")
+    target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--wrap=lwip_getaddrinfo" "-Wl,--wrap=lwip_connect" "-Wl,--wrap=esp_peer_send_msg" "-Wl,--wrap=ip4_input" "-Wl,--wrap=inet_chksum_pseudo")
 endif()
 
 # The synchronous netconn hook runs on the requesting task, never TCPIP.

@@ -1,0 +1,1596 @@
+[
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "e75d1807c",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      12909
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      215
+    ],
+    "heap_samples": [
+      [
+        11209,
+        120435
+      ],
+      [
+        21969,
+        32603
+      ],
+      [
+        31959,
+        32603
+      ],
+      [
+        41969,
+        32603
+      ],
+      [
+        51959,
+        31859
+      ],
+      [
+        61969,
+        32603
+      ],
+      [
+        71959,
+        32603
+      ],
+      [
+        81959,
+        32603
+      ]
+    ],
+    "settled_heap_delta": 0,
+    "faults": [],
+    "error_lines": [
+      "E (11499) MODEL_LOADER: Can not find model in partition table",
+      "E (12179) AGENT: 0 Not found for bind remote 192.168.3.230:50383",
+      "E (12179) AGENT: 0 Not found for bind remote 192.168.3.230:50383",
+      "E (12189) AGENT: 0 Not found for bind remote 192.168.3.230:50383",
+      "E (12189) AGENT: 0 Not found for bind remote 192.168.3.230:50383",
+      "E (12279) AGENT: 0 Not found for bind remote 192.168.3.230:50383",
+      "E (12289) AGENT: 0 Not found for bind remote 192.168.3.230:50383",
+      "E (12289) AGENT: 0 Not found for bind remote 192.168.3.230:50245",
+      "E (12289) AGENT: 0 Not found for bind remote 192.168.3.230:50245"
+    ],
+    "name": "box",
+    "port": "/dev/cu.usbmodem21201",
+    "round": 1,
+    "duration_seconds": 90.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/boot/box-round-1.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "e75d1807c",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      12319
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      216
+    ],
+    "heap_samples": [
+      [
+        10019,
+        120507
+      ],
+      [
+        21959,
+        32603
+      ],
+      [
+        31959,
+        32603
+      ],
+      [
+        41959,
+        32603
+      ],
+      [
+        51959,
+        32603
+      ],
+      [
+        61959,
+        32603
+      ],
+      [
+        71959,
+        32603
+      ],
+      [
+        81969,
+        32603
+      ]
+    ],
+    "settled_heap_delta": 0,
+    "faults": [],
+    "error_lines": [
+      "E (10309) MODEL_LOADER: Can not find model in partition table",
+      "E (11029) AGENT: 0 Not found for bind remote 192.168.3.230:52057",
+      "E (11029) AGENT: 0 Not found for bind remote 192.168.3.230:52057",
+      "E (11029) AGENT: 0 Not found for bind remote 192.168.3.230:52057",
+      "E (11039) AGENT: 0 Not found for bind remote 192.168.3.230:52057",
+      "E (11049) AGENT: 0 Not found for bind remote 192.168.3.230:52057",
+      "E (11049) AGENT: 0 Not found for bind remote 192.168.3.230:52057",
+      "E (11269) AGENT: 0 Not found for bind remote 192.168.3.230:52057",
+      "E (11269) AGENT: 0 Not found for bind remote 192.168.3.230:52057",
+      "E (11269) AGENT: 0 Not found for bind remote 192.168.3.230:52057",
+      "E (11289) AGENT: 0 Not found for bind remote 192.168.3.230:52057",
+      "E (11289) AGENT: 0 Not found for bind remote 192.168.3.230:55264",
+      "E (11289) AGENT: 0 Not found for bind remote 192.168.3.230:55264",
+      "E (11479) AGENT: 0 Not found for bind remote 192.168.3.230:52057",
+      "E (11479) AGENT: 0 Not found for bind remote 192.168.3.230:52057",
+      "E (11479) AGENT: 0 Not found for bind remote 192.168.3.230:55264",
+      "E (11479) AGENT: 0 Not found for bind remote 192.168.3.230:55264",
+      "E (11679) AGENT: 0 Not found for bind remote 192.168.3.230:52057",
+      "E (11679) AGENT: 0 Not found for bind remote 192.168.3.230:52057",
+      "E (11679) AGENT: 0 Not found for bind remote 192.168.3.230:55264",
+      "E (11689) AGENT: 0 Not found for bind remote 192.168.3.230:55264"
+    ],
+    "name": "box",
+    "port": "/dev/cu.usbmodem21201",
+    "round": 2,
+    "duration_seconds": 90.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/boot/box-round-2.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "FAIL",
+    "reasons": [
+      "failure/recovery evidence in serial log"
+    ],
+    "stamps": [
+      [
+        "e75d1807c",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY",
+      "RETRY",
+      "READY",
+      "RETRY",
+      "READY"
+    ],
+    "ready_ms": [
+      11969,
+      67719,
+      122029
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      216
+    ],
+    "heap_samples": [
+      [
+        10119,
+        120359
+      ],
+      [
+        20959,
+        32711
+      ],
+      [
+        30969,
+        31963
+      ],
+      [
+        40959,
+        32707
+      ],
+      [
+        50959,
+        32707
+      ],
+      [
+        76959,
+        33015
+      ],
+      [
+        86959,
+        33015
+      ],
+      [
+        96969,
+        42067
+      ],
+      [
+        106959,
+        38899
+      ],
+      [
+        116959,
+        38899
+      ],
+      [
+        131959,
+        33359
+      ],
+      [
+        141959,
+        33359
+      ],
+      [
+        151959,
+        33359
+      ],
+      [
+        161959,
+        33359
+      ],
+      [
+        171959,
+        33359
+      ],
+      [
+        181959,
+        33359
+      ],
+      [
+        191969,
+        33359
+      ],
+      [
+        201959,
+        33359
+      ],
+      [
+        211959,
+        33359
+      ],
+      [
+        221959,
+        33359
+      ],
+      [
+        231969,
+        33359
+      ],
+      [
+        241959,
+        33359
+      ],
+      [
+        251959,
+        33359
+      ],
+      [
+        261959,
+        33359
+      ],
+      [
+        271959,
+        33359
+      ],
+      [
+        281959,
+        33359
+      ],
+      [
+        291959,
+        33359
+      ]
+    ],
+    "settled_heap_delta": 652,
+    "faults": [
+      "I (58659) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1",
+      "E (58669) LiveKitSession: Failure: Unreachable",
+      "I (60719) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1",
+      "E (60729) LiveKitSession: Failure: Unreachable",
+      "I (61209) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1",
+      "E (61219) LiveKitSession: Failure: Unreachable",
+      "I (62859) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1",
+      "E (62869) LiveKitSession: Failure: Unreachable",
+      "I (96979) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1",
+      "E (96989) LiveKitSession: Failure: Unreachable",
+      "I (107989) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1",
+      "E (108009) LiveKitSession: Failure: Unreachable",
+      "I (119119) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-7daac20ee4bcccdbc70c2979e8635f4b300ecb8b3534ca5961e3daa1fa38834a gen=1",
+      "E (119139) LiveKitSession: Failure: Unreachable"
+    ],
+    "error_lines": [
+      "E (10409) MODEL_LOADER: Can not find model in partition table",
+      "E (11049) AGENT: 0 Not found for bind remote 192.168.3.230:56083",
+      "E (11049) AGENT: 0 Not found for bind remote 192.168.3.230:56083",
+      "E (11049) AGENT: 0 Not found for bind remote 192.168.3.230:56083",
+      "E (11059) AGENT: 0 Not found for bind remote 192.168.3.230:56083",
+      "E (11069) AGENT: 0 Not found for bind remote 192.168.3.230:56083",
+      "E (11359) AGENT: 0 Not found for bind remote 192.168.3.230:50272",
+      "E (11359) AGENT: 0 Not found for bind remote 192.168.3.230:50272",
+      "E (57669) transport_ws: Error read data(-1)",
+      "E (57669) websocket_client: esp_transport_read() failed with -1, transport_error=ESP_ERR_ESP_TLS_TCP_CLOSED_FIN, tls_error_code=0, tls_flags=0, errno=128",
+      "E (57669) websocket_client: Error receive data",
+      "E (57719) UDP: Failed to select: Bad file number",
+      "E (57719) PEER_DEF: agent_recv failed -1",
+      "E (57719) PEER_DEF: Peer disconnected",
+      "E (57729) PEER_DEF: Try to rebuild connection",
+      "E (57919) AGENT: 0 Failed to receive request",
+      "E (58079) AGENT: 0 Failed to receive request",
+      "E (58239) AGENT: 0 Failed to receive request",
+      "E (58399) AGENT: 0 Failed to receive request",
+      "E (58559) AGENT: 0 Failed to receive request",
+      "E (58669) LiveKitSession: Failure: Unreachable",
+      "E (60679) esp-tls: [sock=54] delayed connect error: Connection reset by peer",
+      "E (60689) transport_base: Failed to open a new connection: 32772",
+      "E (60689) transport_ws: Error connecting to host 192.168.3.230:7880",
+      "E (60689) websocket_client: esp_transport_connect() failed with -1, transport_error=ESP_ERR_ESP_TLS_FAILED_CONNECT_TO_HOST, tls_error_code=0, tls_flags=0, esp_ws_handshake_status_code=0, errno=119",
+      "E (60729) LiveKitSession: Failure: Unreachable",
+      "E (61179) esp-tls: [sock=54] delayed connect error: Connection reset by peer",
+      "E (61179) transport_base: Failed to open a new connection: 32772",
+      "E (61179) transport_ws: Error connecting to host 192.168.3.230:7880",
+      "E (61179) websocket_client: esp_transport_connect() failed with -1, transport_error=ESP_ERR_ESP_TLS_FAILED_CONNECT_TO_HOST, tls_error_code=0, tls_flags=0, esp_ws_handshake_status_code=0, errno=119",
+      "E (61219) LiveKitSession: Failure: Unreachable",
+      "E (62829) esp-tls: [sock=54] delayed connect error: Connection reset by peer",
+      "E (62829) transport_base: Failed to open a new connection: 32772",
+      "E (62829) transport_ws: Error connecting to host 192.168.3.230:7880",
+      "E (62829) websocket_client: esp_transport_connect() failed with -1, transport_error=ESP_ERR_ESP_TLS_FAILED_CONNECT_TO_HOST, tls_error_code=0, tls_flags=0, esp_ws_handshake_status_code=0, errno=119",
+      "E (62869) LiveKitSession: Failure: Unreachable",
+      "E (66859) AGENT: 0 Not found for bind remote 192.168.3.230:54141",
+      "E (66859) AGENT: 0 Not found for bind remote 192.168.3.230:54141",
+      "E (66869) AGENT: 0 Not found for bind remote 192.168.3.230:54141",
+      "E (66869) AGENT: 0 Not found for bind remote 192.168.3.230:54141",
+      "E (66959) AGENT: 0 Not found for bind remote 192.168.3.230:54141",
+      "E (66969) AGENT: 0 Not found for bind remote 192.168.3.230:54141",
+      "E (66969) AGENT: 0 Not found for bind remote 192.168.3.230:59187",
+      "E (66969) AGENT: 0 Not found for bind remote 192.168.3.230:59187",
+      "E (96849) transport_ws: Error read data(-1)",
+      "E (96849) websocket_client: esp_transport_read() failed with -1, transport_error=ESP_ERR_ESP_TLS_TCP_CLOSED_FIN, tls_error_code=0, tls_flags=0, errno=128",
+      "E (96859) websocket_client: Error receive data",
+      "E (96989) LiveKitSession: Failure: Unreachable",
+      "E (107969) esp-tls: [sock=54] select() timeout",
+      "E (107969) transport_base: Failed to open a new connection: 32774",
+      "E (107969) transport_ws: Error connecting to host 192.168.3.230:7880",
+      "E (107969) websocket_client: esp_transport_connect() failed with -1, transport_error=ESP_ERR_ESP_TLS_CONNECTION_TIMEOUT, tls_error_code=0, tls_flags=0, esp_ws_handshake_status_code=0, errno=119",
+      "E (108009) LiveKitSession: Failure: Unreachable",
+      "E (119099) esp-tls: [sock=54] select() timeout",
+      "E (119099) transport_base: Failed to open a new connection: 32774",
+      "E (119099) transport_ws: Error connecting to host 192.168.3.230:7880",
+      "E (119099) websocket_client: esp_transport_connect() failed with -1, transport_error=ESP_ERR_ESP_TLS_CONNECTION_TIMEOUT, tls_error_code=0, tls_flags=0, esp_ws_handshake_status_code=0, errno=119",
+      "E (119139) LiveKitSession: Failure: Unreachable",
+      "E (120859) AGENT: 0 Not found for bind remote 192.168.3.230:50960",
+      "E (120869) AGENT: 0 Not found for bind remote 192.168.3.230:50960",
+      "E (120879) AGENT: 0 Not found for bind remote 192.168.3.230:50960",
+      "E (120889) AGENT: 0 Not found for bind remote 192.168.3.230:50960",
+      "E (120889) AGENT: 0 Not found for bind remote 192.168.3.230:50960",
+      "E (120899) AGENT: 0 Not found for bind remote 192.168.3.230:50960",
+      "E (120909) AGENT: 0 Not found for bind remote 192.168.3.230:50960",
+      "E (120979) AGENT: 0 Not found for bind remote 192.168.3.230:50960",
+      "E (120989) AGENT: 0 Not found for bind remote 192.168.3.230:50960",
+      "E (120989) AGENT: 0 Not found for bind remote 192.168.3.230:57073",
+      "E (120989) AGENT: 0 Not found for bind remote 192.168.3.230:57073",
+      "E (121179) AGENT: 0 Not found for bind remote 192.168.3.230:50960",
+      "E (121189) AGENT: 0 Not found for bind remote 192.168.3.230:50960",
+      "E (121189) AGENT: 0 Not found for bind remote 192.168.3.230:57073",
+      "E (121189) AGENT: 0 Not found for bind remote 192.168.3.230:57073",
+      "E (121419) AGENT: 0 Not found for bind remote 192.168.3.230:57073",
+      "E (121429) AGENT: 0 Not found for bind remote 192.168.3.230:57073"
+    ],
+    "name": "box",
+    "port": "/dev/cu.usbmodem21201",
+    "round": 3,
+    "duration_seconds": 300.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/boot/box-round-3.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "e75d1807c",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      12291
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      171
+    ],
+    "heap_samples": [
+      [
+        10681,
+        87875
+      ],
+      [
+        21651,
+        61951
+      ],
+      [
+        31651,
+        61951
+      ],
+      [
+        41651,
+        61951
+      ],
+      [
+        51651,
+        61951
+      ],
+      [
+        61651,
+        61951
+      ],
+      [
+        71651,
+        61951
+      ],
+      [
+        81651,
+        61951
+      ]
+    ],
+    "settled_heap_delta": 0,
+    "faults": [],
+    "error_lines": [
+      "E (11551) AGENT: 0 Not found for bind remote 192.168.3.230:59729",
+      "E (11551) AGENT: 0 Not found for bind remote 192.168.3.230:59729",
+      "E (11561) AGENT: 0 Not found for bind remote 192.168.3.230:59729",
+      "E (11581) AGENT: 0 Not found for bind remote 192.168.3.230:59729",
+      "E (11671) AGENT: 0 Not found for bind remote 192.168.3.230:59729",
+      "E (11671) AGENT: 0 Not found for bind remote 192.168.3.230:59729",
+      "E (11671) AGENT: 0 Not found for bind remote 192.168.3.230:53077",
+      "E (11681) AGENT: 0 Not found for bind remote 192.168.3.230:53077"
+    ],
+    "name": "stack",
+    "port": "/dev/cu.usbmodem21101",
+    "round": 1,
+    "duration_seconds": 90.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/boot/stack-round-1.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "e75d1807c",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      12201
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      164
+    ],
+    "heap_samples": [
+      [
+        10671,
+        87835
+      ],
+      [
+        21651,
+        62031
+      ],
+      [
+        31651,
+        62031
+      ],
+      [
+        41651,
+        62031
+      ],
+      [
+        51651,
+        62031
+      ],
+      [
+        61651,
+        62031
+      ],
+      [
+        71651,
+        62031
+      ],
+      [
+        81651,
+        62031
+      ]
+    ],
+    "settled_heap_delta": 0,
+    "faults": [],
+    "error_lines": [
+      "E (11561) AGENT: 0 Not found for bind remote 192.168.3.230:58245",
+      "E (11571) AGENT: 0 Not found for bind remote 192.168.3.230:58245",
+      "E (11581) AGENT: 0 Not found for bind remote 192.168.3.230:58245",
+      "E (11581) AGENT: 0 Not found for bind remote 192.168.3.230:58245"
+    ],
+    "name": "stack",
+    "port": "/dev/cu.usbmodem21101",
+    "round": 2,
+    "duration_seconds": 90.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/boot/stack-round-2.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "FAIL",
+    "reasons": [
+      "failure/recovery evidence in serial log"
+    ],
+    "stamps": [
+      [
+        "e75d1807c",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY",
+      "RETRY",
+      "READY",
+      "RETRY",
+      "READY"
+    ],
+    "ready_ms": [
+      12731,
+      67681,
+      132621
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      164
+    ],
+    "heap_samples": [
+      [
+        10681,
+        87843
+      ],
+      [
+        22651,
+        61983
+      ],
+      [
+        32651,
+        61983
+      ],
+      [
+        42651,
+        61983
+      ],
+      [
+        52651,
+        61983
+      ],
+      [
+        67651,
+        62487
+      ],
+      [
+        77651,
+        61995
+      ],
+      [
+        87651,
+        61995
+      ],
+      [
+        106651,
+        70199
+      ],
+      [
+        116651,
+        70199
+      ],
+      [
+        126651,
+        97667
+      ],
+      [
+        140651,
+        61535
+      ],
+      [
+        150651,
+        61535
+      ],
+      [
+        160651,
+        61535
+      ],
+      [
+        170651,
+        61535
+      ],
+      [
+        180651,
+        61535
+      ],
+      [
+        190651,
+        61535
+      ],
+      [
+        200651,
+        61535
+      ],
+      [
+        210651,
+        61711
+      ],
+      [
+        220651,
+        61535
+      ],
+      [
+        230651,
+        61535
+      ],
+      [
+        240651,
+        61535
+      ],
+      [
+        250651,
+        61535
+      ],
+      [
+        260651,
+        61535
+      ],
+      [
+        270651,
+        61707
+      ],
+      [
+        280651,
+        61535
+      ],
+      [
+        290651,
+        61535
+      ]
+    ],
+    "settled_heap_delta": -448,
+    "faults": [
+      "I (57771) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1",
+      "E (57791) LiveKitSession: Failure: Unreachable",
+      "I (58751) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1",
+      "E (58761) LiveKitSession: Failure: Unreachable",
+      "I (59621) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1",
+      "E (59631) LiveKitSession: Failure: Unreachable",
+      "I (60761) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1",
+      "E (60781) LiveKitSession: Failure: Unreachable",
+      "I (62871) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1",
+      "E (62881) LiveKitSession: Failure: Unreachable",
+      "I (96961) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1",
+      "E (96981) LiveKitSession: Failure: Unreachable",
+      "I (107911) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1",
+      "E (107931) LiveKitSession: Failure: Unreachable",
+      "I (118441) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1",
+      "E (118461) LiveKitSession: Failure: Unreachable"
+    ],
+    "error_lines": [
+      "E (11581) AGENT: 0 Not found for bind remote 192.168.3.230:56577",
+      "E (11581) AGENT: 0 Not found for bind remote 192.168.3.230:56577",
+      "E (11581) AGENT: 0 Not found for bind remote 192.168.3.230:56577",
+      "E (11581) AGENT: 0 Not found for bind remote 192.168.3.230:56577",
+      "E (11591) AGENT: 0 Not found for bind remote 192.168.3.230:56577",
+      "E (11601) AGENT: 0 Not found for bind remote 192.168.3.230:56577",
+      "E (11691) AGENT: 0 Not found for bind remote 192.168.3.230:56577",
+      "E (11691) AGENT: 0 Not found for bind remote 192.168.3.230:56577",
+      "E (11691) AGENT: 0 Not found for bind remote 192.168.3.230:52656",
+      "E (11701) AGENT: 0 Not found for bind remote 192.168.3.230:52656",
+      "E (11891) AGENT: 0 Not found for bind remote 192.168.3.230:56577",
+      "E (11891) AGENT: 0 Not found for bind remote 192.168.3.230:56577",
+      "E (11891) AGENT: 0 Not found for bind remote 192.168.3.230:52656",
+      "E (11891) AGENT: 0 Not found for bind remote 192.168.3.230:52656",
+      "E (12121) AGENT: 0 Not found for bind remote 192.168.3.230:52656",
+      "E (12131) AGENT: 0 Not found for bind remote 192.168.3.230:52656",
+      "E (57681) transport_ws: Error read data(-1)",
+      "E (57681) websocket_client: esp_transport_read() failed with -1, transport_error=ESP_ERR_ESP_TLS_TCP_CLOSED_FIN, tls_error_code=0, tls_flags=0, errno=128",
+      "E (57681) websocket_client: Error receive data",
+      "E (57791) LiveKitSession: Failure: Unreachable",
+      "E (58711) esp-tls: [sock=54] delayed connect error: Connection reset by peer",
+      "E (58711) transport_base: Failed to open a new connection: 32772",
+      "E (58721) transport_ws: Error connecting to host 192.168.3.230:7880",
+      "E (58721) websocket_client: esp_transport_connect() failed with -1, transport_error=ESP_ERR_ESP_TLS_FAILED_CONNECT_TO_HOST, tls_error_code=0, tls_flags=0, esp_ws_handshake_status_code=0, errno=119",
+      "E (58761) LiveKitSession: Failure: Unreachable",
+      "E (59591) esp-tls: [sock=54] delayed connect error: Connection reset by peer",
+      "E (59591) transport_base: Failed to open a new connection: 32772",
+      "E (59591) transport_ws: Error connecting to host 192.168.3.230:7880",
+      "E (59591) websocket_client: esp_transport_connect() failed with -1, transport_error=ESP_ERR_ESP_TLS_FAILED_CONNECT_TO_HOST, tls_error_code=0, tls_flags=0, esp_ws_handshake_status_code=0, errno=119",
+      "E (59631) LiveKitSession: Failure: Unreachable",
+      "E (60731) esp-tls: [sock=54] delayed connect error: Connection reset by peer",
+      "E (60731) transport_base: Failed to open a new connection: 32772",
+      "E (60731) transport_ws: Error connecting to host 192.168.3.230:7880",
+      "E (60741) websocket_client: esp_transport_connect() failed with -1, transport_error=ESP_ERR_ESP_TLS_FAILED_CONNECT_TO_HOST, tls_error_code=0, tls_flags=0, esp_ws_handshake_status_code=0, errno=119",
+      "E (60781) LiveKitSession: Failure: Unreachable",
+      "E (62841) esp-tls: [sock=54] delayed connect error: Connection reset by peer",
+      "E (62841) transport_base: Failed to open a new connection: 32772",
+      "E (62841) transport_ws: Error connecting to host 192.168.3.230:7880",
+      "E (62851) websocket_client: esp_transport_connect() failed with -1, transport_error=ESP_ERR_ESP_TLS_FAILED_CONNECT_TO_HOST, tls_error_code=0, tls_flags=0, esp_ws_handshake_status_code=0, errno=119",
+      "E (62881) LiveKitSession: Failure: Unreachable",
+      "E (66871) AGENT: 0 Not found for bind remote 192.168.3.230:54685",
+      "E (66871) AGENT: 0 Not found for bind remote 192.168.3.230:54685",
+      "E (66871) AGENT: 0 Not found for bind remote 192.168.3.230:54685",
+      "E (66881) AGENT: 0 Not found for bind remote 192.168.3.230:54685",
+      "E (66971) AGENT: 0 Not found for bind remote 192.168.3.230:54685",
+      "E (66981) AGENT: 0 Not found for bind remote 192.168.3.230:54685",
+      "E (66981) AGENT: 0 Not found for bind remote 192.168.3.230:59411",
+      "E (66981) AGENT: 0 Not found for bind remote 192.168.3.230:59411",
+      "E (96861) transport_ws: Error read data(-1)",
+      "E (96861) websocket_client: esp_transport_read() failed with -1, transport_error=ESP_ERR_ESP_TLS_TCP_CLOSED_FIN, tls_error_code=0, tls_flags=0, errno=128",
+      "E (96871) websocket_client: Error receive data",
+      "E (96981) LiveKitSession: Failure: Unreachable",
+      "E (107891) esp-tls: [sock=54] select() timeout",
+      "E (107891) transport_base: Failed to open a new connection: 32774",
+      "E (107891) transport_ws: Error connecting to host 192.168.3.230:7880",
+      "E (107891) websocket_client: esp_transport_connect() failed with -1, transport_error=ESP_ERR_ESP_TLS_CONNECTION_TIMEOUT, tls_error_code=0, tls_flags=0, esp_ws_handshake_status_code=0, errno=119",
+      "E (107931) LiveKitSession: Failure: Unreachable",
+      "E (118421) esp-tls: [sock=54] select() timeout",
+      "E (118421) transport_base: Failed to open a new connection: 32774",
+      "E (118421) transport_ws: Error connecting to host 192.168.3.230:7880",
+      "E (118421) websocket_client: esp_transport_connect() failed with -1, transport_error=ESP_ERR_ESP_TLS_CONNECTION_TIMEOUT, tls_error_code=0, tls_flags=0, esp_ws_handshake_status_code=0, errno=119",
+      "E (118461) LiveKitSession: Failure: Unreachable",
+      "E (121011) AGENT: 0 Not found for bind remote 192.168.3.230:58892",
+      "E (121011) AGENT: 0 Not found for bind remote 192.168.3.230:58892",
+      "E (121011) AGENT: 0 Not found for bind remote 192.168.3.230:58892",
+      "E (121021) AGENT: 0 Not found for bind remote 192.168.3.230:58892",
+      "E (121031) AGENT: 0 Not found for bind remote 192.168.3.230:58892",
+      "E (121041) AGENT: 0 Not found for bind remote 192.168.3.230:58892",
+      "E (121111) AGENT: 0 Not found for bind remote 192.168.3.230:58892",
+      "E (121121) AGENT: 0 Not found for bind remote 192.168.3.230:58892",
+      "E (121121) AGENT: 0 Not found for bind remote 192.168.3.230:59780",
+      "E (121121) AGENT: 0 Not found for bind remote 192.168.3.230:59780",
+      "E (121321) AGENT: 0 Not found for bind remote 192.168.3.230:58892",
+      "E (121321) AGENT: 0 Not found for bind remote 192.168.3.230:58892",
+      "E (121321) AGENT: 0 Not found for bind remote 192.168.3.230:59780",
+      "E (121321) AGENT: 0 Not found for bind remote 192.168.3.230:59780",
+      "E (121551) AGENT: 0 Not found for bind remote 192.168.3.230:59780",
+      "E (121561) AGENT: 0 Not found for bind remote 192.168.3.230:59780",
+      "E (122181) PEER_DEF: agent_recv failed -3",
+      "E (122181) PEER_DEF: Peer disconnected",
+      "E (122191) PEER_DEF: Try to rebuild connection",
+      "E (131741) AGENT: 0 Not found for bind remote 192.168.3.230:52800",
+      "E (131751) AGENT: 0 Not found for bind remote 192.168.3.230:52800",
+      "E (131751) AGENT: 0 Not found for bind remote 192.168.3.230:52800",
+      "E (131761) AGENT: 0 Not found for bind remote 192.168.3.230:52800",
+      "E (131781) AGENT: 0 Not found for bind remote 192.168.3.230:52800",
+      "E (131981) AGENT: 0 Not found for bind remote 192.168.3.230:52800",
+      "E (131991) AGENT: 0 Not found for bind remote 192.168.3.230:52800",
+      "E (131991) AGENT: 0 Not found for bind remote 192.168.3.230:52800",
+      "E (131991) AGENT: 0 Not found for bind remote 192.168.3.230:52800",
+      "E (132001) AGENT: 0 Not found for bind remote 192.168.3.230:57744",
+      "E (132001) AGENT: 0 Not found for bind remote 192.168.3.230:57744"
+    ],
+    "name": "stack",
+    "port": "/dev/cu.usbmodem21101",
+    "round": 3,
+    "duration_seconds": 300.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/boot/stack-round-3.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "e75d1807c",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      12049
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      163
+    ],
+    "heap_samples": [
+      [
+        10369,
+        85099
+      ],
+      [
+        21219,
+        50655
+      ],
+      [
+        31219,
+        50655
+      ],
+      [
+        41219,
+        50655
+      ],
+      [
+        51219,
+        50655
+      ],
+      [
+        61219,
+        50655
+      ],
+      [
+        71219,
+        50827
+      ],
+      [
+        81219,
+        50655
+      ]
+    ],
+    "settled_heap_delta": 0,
+    "faults": [],
+    "error_lines": [
+      "E (829) sh8601: swap_xy is not supported by this panel",
+      "E (11219) AGENT: 0 Not found for bind remote 192.168.3.230:57424",
+      "E (11219) AGENT: 0 Not found for bind remote 192.168.3.230:57424",
+      "E (11229) AGENT: 0 Not found for bind remote 192.168.3.230:57424",
+      "E (11229) AGENT: 0 Not found for bind remote 192.168.3.230:57424",
+      "E (11239) AGENT: 0 Not found for bind remote 192.168.3.230:57424"
+    ],
+    "name": "wave",
+    "port": "/dev/cu.usbmodem21401",
+    "round": 1,
+    "duration_seconds": 90.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/boot/wave-round-1.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "e75d1807c",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      11929
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      163
+    ],
+    "heap_samples": [
+      [
+        10249,
+        85059
+      ],
+      [
+        21219,
+        50743
+      ],
+      [
+        31219,
+        50743
+      ],
+      [
+        41219,
+        50743
+      ],
+      [
+        51219,
+        50743
+      ],
+      [
+        61219,
+        50743
+      ],
+      [
+        71219,
+        50743
+      ],
+      [
+        81219,
+        50755
+      ]
+    ],
+    "settled_heap_delta": 12,
+    "faults": [],
+    "error_lines": [
+      "E (829) sh8601: swap_xy is not supported by this panel",
+      "E (11099) AGENT: 0 Not found for bind remote 192.168.3.230:56557",
+      "E (11099) AGENT: 0 Not found for bind remote 192.168.3.230:56557",
+      "E (11109) AGENT: 0 Not found for bind remote 192.168.3.230:56557",
+      "E (11109) AGENT: 0 Not found for bind remote 192.168.3.230:56557",
+      "E (11339) AGENT: 0 Not found for bind remote 192.168.3.230:54337",
+      "E (11349) AGENT: 0 Not found for bind remote 192.168.3.230:54337"
+    ],
+    "name": "wave",
+    "port": "/dev/cu.usbmodem21401",
+    "round": 2,
+    "duration_seconds": 90.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/boot/wave-round-2.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "FAIL",
+    "reasons": [
+      "failure/recovery evidence in serial log"
+    ],
+    "stamps": [
+      [
+        "e75d1807c",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY",
+      "RETRY",
+      "READY",
+      "RETRY",
+      "READY"
+    ],
+    "ready_ms": [
+      12859,
+      67789,
+      121599
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      163
+    ],
+    "heap_samples": [
+      [
+        11209,
+        85067
+      ],
+      [
+        22219,
+        50815
+      ],
+      [
+        32219,
+        50635
+      ],
+      [
+        42219,
+        50635
+      ],
+      [
+        52219,
+        50635
+      ],
+      [
+        67219,
+        55271
+      ],
+      [
+        77219,
+        50699
+      ],
+      [
+        87219,
+        50699
+      ],
+      [
+        106219,
+        58775
+      ],
+      [
+        116219,
+        58775
+      ],
+      [
+        131219,
+        50635
+      ],
+      [
+        141219,
+        50635
+      ],
+      [
+        151219,
+        50807
+      ],
+      [
+        161219,
+        50807
+      ],
+      [
+        171219,
+        50635
+      ],
+      [
+        181219,
+        50635
+      ],
+      [
+        191219,
+        50635
+      ],
+      [
+        201219,
+        50635
+      ],
+      [
+        211219,
+        50635
+      ],
+      [
+        221219,
+        50635
+      ],
+      [
+        231219,
+        50635
+      ],
+      [
+        241219,
+        50635
+      ],
+      [
+        251219,
+        50635
+      ],
+      [
+        261219,
+        50635
+      ],
+      [
+        271219,
+        50635
+      ],
+      [
+        281219,
+        50635
+      ],
+      [
+        291219,
+        50635
+      ]
+    ],
+    "settled_heap_delta": 0,
+    "faults": [
+      "I (57679) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-eed82aee54cac09ae11bc67c34612447e8c59a1c661cd2109384ee89a4e4f775 gen=1",
+      "E (57699) LiveKitSession: Failure: Unreachable",
+      "I (58529) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-eed82aee54cac09ae11bc67c34612447e8c59a1c661cd2109384ee89a4e4f775 gen=1",
+      "E (58539) LiveKitSession: Failure: Unreachable",
+      "I (59379) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-eed82aee54cac09ae11bc67c34612447e8c59a1c661cd2109384ee89a4e4f775 gen=1",
+      "E (59389) LiveKitSession: Failure: Unreachable",
+      "I (60649) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-eed82aee54cac09ae11bc67c34612447e8c59a1c661cd2109384ee89a4e4f775 gen=1",
+      "E (60669) LiveKitSession: Failure: Unreachable",
+      "I (62869) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-eed82aee54cac09ae11bc67c34612447e8c59a1c661cd2109384ee89a4e4f775 gen=1",
+      "E (62879) LiveKitSession: Failure: Unreachable",
+      "I (96889) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-eed82aee54cac09ae11bc67c34612447e8c59a1c661cd2109384ee89a4e4f775 gen=1",
+      "E (96909) LiveKitSession: Failure: Unreachable",
+      "I (107949) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-eed82aee54cac09ae11bc67c34612447e8c59a1c661cd2109384ee89a4e4f775 gen=1",
+      "E (107969) LiveKitSession: Failure: Unreachable",
+      "I (118469) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-eed82aee54cac09ae11bc67c34612447e8c59a1c661cd2109384ee89a4e4f775 gen=1",
+      "E (118489) LiveKitSession: Failure: Unreachable"
+    ],
+    "error_lines": [
+      "E (829) sh8601: swap_xy is not supported by this panel",
+      "E (12119) AGENT: 0 Not found for bind remote 192.168.3.230:56474",
+      "E (12119) AGENT: 0 Not found for bind remote 192.168.3.230:56474",
+      "E (12119) AGENT: 0 Not found for bind remote 192.168.3.230:56474",
+      "E (12129) AGENT: 0 Not found for bind remote 192.168.3.230:56474",
+      "E (12139) AGENT: 0 Not found for bind remote 192.168.3.230:56474",
+      "E (12149) AGENT: 0 Not found for bind remote 192.168.3.230:56474",
+      "E (12239) AGENT: 0 Not found for bind remote 192.168.3.230:56474",
+      "E (12269) AGENT: 0 Not found for bind remote 192.168.3.230:52528",
+      "E (12279) AGENT: 0 Not found for bind remote 192.168.3.230:52528",
+      "E (57599) transport_ws: Error read data(-1)",
+      "E (57599) websocket_client: esp_transport_read() failed with -1, transport_error=ESP_ERR_ESP_TLS_TCP_CLOSED_FIN, tls_error_code=0, tls_flags=0, errno=128",
+      "E (57609) websocket_client: Error receive data",
+      "E (57699) LiveKitSession: Failure: Unreachable",
+      "E (58489) esp-tls: [sock=54] delayed connect error: Connection reset by peer",
+      "E (58499) transport_base: Failed to open a new connection: 32772",
+      "E (58499) transport_ws: Error connecting to host 192.168.3.230:7880",
+      "E (58499) websocket_client: esp_transport_connect() failed with -1, transport_error=ESP_ERR_ESP_TLS_FAILED_CONNECT_TO_HOST, tls_error_code=0, tls_flags=0, esp_ws_handshake_status_code=0, errno=119",
+      "E (58539) LiveKitSession: Failure: Unreachable",
+      "E (59339) esp-tls: [sock=54] delayed connect error: Connection reset by peer",
+      "E (59339) transport_base: Failed to open a new connection: 32772",
+      "E (59349) transport_ws: Error connecting to host 192.168.3.230:7880",
+      "E (59349) websocket_client: esp_transport_connect() failed with -1, transport_error=ESP_ERR_ESP_TLS_FAILED_CONNECT_TO_HOST, tls_error_code=0, tls_flags=0, esp_ws_handshake_status_code=0, errno=119",
+      "E (59389) LiveKitSession: Failure: Unreachable",
+      "E (60619) esp-tls: [sock=54] delayed connect error: Connection reset by peer",
+      "E (60619) transport_base: Failed to open a new connection: 32772",
+      "E (60619) transport_ws: Error connecting to host 192.168.3.230:7880",
+      "E (60629) websocket_client: esp_transport_connect() failed with -1, transport_error=ESP_ERR_ESP_TLS_FAILED_CONNECT_TO_HOST, tls_error_code=0, tls_flags=0, esp_ws_handshake_status_code=0, errno=119",
+      "E (60669) LiveKitSession: Failure: Unreachable",
+      "E (62829) esp-tls: [sock=54] delayed connect error: Connection reset by peer",
+      "E (62829) transport_base: Failed to open a new connection: 32772",
+      "E (62839) transport_ws: Error connecting to host 192.168.3.230:7880",
+      "E (62839) websocket_client: esp_transport_connect() failed with -1, transport_error=ESP_ERR_ESP_TLS_FAILED_CONNECT_TO_HOST, tls_error_code=0, tls_flags=0, esp_ws_handshake_status_code=0, errno=119",
+      "E (62879) LiveKitSession: Failure: Unreachable",
+      "E (66979) AGENT: 0 Not found for bind remote 192.168.3.230:51306",
+      "E (66989) AGENT: 0 Not found for bind remote 192.168.3.230:51306",
+      "E (66989) AGENT: 0 Not found for bind remote 192.168.3.230:51306",
+      "E (66989) AGENT: 0 Not found for bind remote 192.168.3.230:51306",
+      "E (67089) AGENT: 0 Not found for bind remote 192.168.3.230:51306",
+      "E (67099) AGENT: 0 Not found for bind remote 192.168.3.230:51306",
+      "E (67099) AGENT: 0 Not found for bind remote 192.168.3.230:54586",
+      "E (67099) AGENT: 0 Not found for bind remote 192.168.3.230:54586",
+      "E (96789) transport_ws: Error read data(-1)",
+      "E (96789) websocket_client: esp_transport_read() failed with -1, transport_error=ESP_ERR_ESP_TLS_TCP_CLOSED_FIN, tls_error_code=0, tls_flags=0, errno=128",
+      "E (96789) websocket_client: Error receive data",
+      "E (96909) LiveKitSession: Failure: Unreachable",
+      "E (107929) esp-tls: [sock=54] select() timeout",
+      "E (107929) transport_base: Failed to open a new connection: 32774",
+      "E (107929) transport_ws: Error connecting to host 192.168.3.230:7880",
+      "E (107929) websocket_client: esp_transport_connect() failed with -1, transport_error=ESP_ERR_ESP_TLS_CONNECTION_TIMEOUT, tls_error_code=0, tls_flags=0, esp_ws_handshake_status_code=0, errno=119",
+      "E (107969) LiveKitSession: Failure: Unreachable",
+      "E (118449) esp-tls: [sock=54] select() timeout",
+      "E (118449) transport_base: Failed to open a new connection: 32774",
+      "E (118449) transport_ws: Error connecting to host 192.168.3.230:7880",
+      "E (118449) websocket_client: esp_transport_connect() failed with -1, transport_error=ESP_ERR_ESP_TLS_CONNECTION_TIMEOUT, tls_error_code=0, tls_flags=0, esp_ws_handshake_status_code=0, errno=119",
+      "E (118489) LiveKitSession: Failure: Unreachable",
+      "E (120929) AGENT: 0 Not found for bind remote 192.168.3.230:58845",
+      "E (120929) AGENT: 0 Not found for bind remote 192.168.3.230:58845",
+      "E (120939) AGENT: 0 Not found for bind remote 192.168.3.230:58845",
+      "E (120939) AGENT: 0 Not found for bind remote 192.168.3.230:58845",
+      "E (120949) AGENT: 0 Not found for bind remote 192.168.3.230:58845",
+      "E (120959) AGENT: 0 Not found for bind remote 192.168.3.230:58845"
+    ],
+    "name": "wave",
+    "port": "/dev/cu.usbmodem21401",
+    "round": 3,
+    "duration_seconds": 300.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/boot/wave-round-3.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "e75d1807c",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      9790
+    ],
+    "resolved_addresses": [
+      "192.168.3.182",
+      "192.168.3.182",
+      "192.168.3.182"
+    ],
+    "activation_dispatch_ms": [
+      195
+    ],
+    "heap_samples": [
+      [
+        8220,
+        214115
+      ],
+      [
+        19380,
+        147707
+      ],
+      [
+        29380,
+        146671
+      ],
+      [
+        39380,
+        147511
+      ],
+      [
+        49380,
+        147091
+      ],
+      [
+        59380,
+        146671
+      ],
+      [
+        69380,
+        147511
+      ],
+      [
+        79380,
+        147091
+      ],
+      [
+        89380,
+        147511
+      ]
+    ],
+    "settled_heap_delta": 0,
+    "faults": [],
+    "error_lines": [
+      "E (8850) AGENT: 0 Not found for bind remote 192.168.3.182:56620",
+      "E (8860) AGENT: 0 Not found for bind remote 192.168.3.182:56620",
+      "E (8870) AGENT: 0 Not found for bind remote 192.168.3.182:56620",
+      "E (8870) AGENT: 0 Not found for bind remote 192.168.3.182:56620",
+      "E (8880) AGENT: 0 Not found for bind remote 192.168.3.182:56620",
+      "E (8880) AGENT: 0 Not found for bind remote 192.168.3.182:56620",
+      "E (8890) AGENT: 0 Not found for bind remote 192.168.3.182:56620",
+      "E (8960) AGENT: 0 Not found for bind remote 192.168.3.182:56620",
+      "E (9260) AGENT: 0 Not found for bind remote 192.168.3.182:55017",
+      "E (9260) AGENT: 0 Not found for bind remote 192.168.3.182:55017",
+      "E (9260) AGENT: 0 Not found for bind remote 192.168.3.182:55017",
+      "E (9270) AGENT: 0 Not found for bind remote 192.168.3.182:55017"
+    ],
+    "name": "korvo",
+    "port": "/dev/cu.usbserial-2130",
+    "round": 1,
+    "duration_seconds": 90.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/boot/korvo-round-1.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "e75d1807c",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      9680
+    ],
+    "resolved_addresses": [
+      "192.168.3.182",
+      "192.168.3.182",
+      "192.168.3.182"
+    ],
+    "activation_dispatch_ms": [
+      194
+    ],
+    "heap_samples": [
+      [
+        8210,
+        214067
+      ],
+      [
+        19360,
+        147475
+      ],
+      [
+        29360,
+        147475
+      ],
+      [
+        39360,
+        147475
+      ],
+      [
+        49360,
+        147475
+      ],
+      [
+        59360,
+        147443
+      ],
+      [
+        69360,
+        147443
+      ],
+      [
+        79360,
+        147443
+      ],
+      [
+        89360,
+        147443
+      ]
+    ],
+    "settled_heap_delta": -32,
+    "faults": [],
+    "error_lines": [
+      "E (8850) AGENT: 0 Not found for bind remote 192.168.3.182:57431",
+      "E (8860) AGENT: 0 Not found for bind remote 192.168.3.182:57431",
+      "E (8870) AGENT: 0 Not found for bind remote 192.168.3.182:57431",
+      "E (8870) AGENT: 0 Not found for bind remote 192.168.3.182:57431",
+      "E (8880) AGENT: 0 Not found for bind remote 192.168.3.182:57431",
+      "E (8880) AGENT: 0 Not found for bind remote 192.168.3.182:57431",
+      "E (8890) AGENT: 0 Not found for bind remote 192.168.3.182:57431",
+      "E (9180) AGENT: 0 Not found for bind remote 192.168.3.182:58591",
+      "E (9190) AGENT: 0 Not found for bind remote 192.168.3.182:58591",
+      "E (9190) AGENT: 0 Not found for bind remote 192.168.3.182:58591",
+      "E (9200) AGENT: 0 Not found for bind remote 192.168.3.182:58591"
+    ],
+    "name": "korvo",
+    "port": "/dev/cu.usbserial-2130",
+    "round": 2,
+    "duration_seconds": 90.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/boot/korvo-round-2.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "PASS",
+    "reasons": [],
+    "stamps": [
+      [
+        "e75d1807c",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      9360
+    ],
+    "resolved_addresses": [
+      "192.168.3.182",
+      "192.168.3.182",
+      "192.168.3.182"
+    ],
+    "activation_dispatch_ms": [
+      195
+    ],
+    "heap_samples": [
+      [
+        7880,
+        214103
+      ],
+      [
+        18380,
+        147411
+      ],
+      [
+        28380,
+        147551
+      ],
+      [
+        38380,
+        147551
+      ],
+      [
+        48380,
+        147551
+      ],
+      [
+        58380,
+        147383
+      ],
+      [
+        68380,
+        147551
+      ],
+      [
+        78380,
+        147551
+      ],
+      [
+        88380,
+        146963
+      ],
+      [
+        98380,
+        147383
+      ],
+      [
+        108380,
+        147551
+      ],
+      [
+        118380,
+        147131
+      ],
+      [
+        128380,
+        147787
+      ],
+      [
+        138380,
+        148039
+      ],
+      [
+        148380,
+        147787
+      ],
+      [
+        158380,
+        148039
+      ],
+      [
+        168380,
+        148039
+      ],
+      [
+        178380,
+        148207
+      ],
+      [
+        188380,
+        148207
+      ],
+      [
+        198380,
+        147787
+      ],
+      [
+        208380,
+        147619
+      ],
+      [
+        218380,
+        148039
+      ],
+      [
+        228380,
+        147619
+      ],
+      [
+        238380,
+        147619
+      ],
+      [
+        248380,
+        148039
+      ],
+      [
+        258380,
+        148039
+      ],
+      [
+        268380,
+        147619
+      ],
+      [
+        278380,
+        148039
+      ],
+      [
+        288380,
+        148039
+      ],
+      [
+        298380,
+        148039
+      ]
+    ],
+    "settled_heap_delta": 488,
+    "faults": [],
+    "error_lines": [
+      "E (8510) AGENT: 0 Not found for bind remote 192.168.3.182:58506",
+      "E (8530) AGENT: 0 Not found for bind remote 192.168.3.182:58506",
+      "E (8530) AGENT: 0 Not found for bind remote 192.168.3.182:58506",
+      "E (8540) AGENT: 0 Not found for bind remote 192.168.3.182:58506",
+      "E (8540) AGENT: 0 Not found for bind remote 192.168.3.182:58506",
+      "E (8550) AGENT: 0 Not found for bind remote 192.168.3.182:58506",
+      "E (8560) AGENT: 0 Not found for bind remote 192.168.3.182:58506",
+      "E (8860) AGENT: 0 Not found for bind remote 192.168.3.182:51481",
+      "E (8860) AGENT: 0 Not found for bind remote 192.168.3.182:51481",
+      "E (8870) AGENT: 0 Not found for bind remote 192.168.3.182:51481",
+      "E (8870) AGENT: 0 Not found for bind remote 192.168.3.182:51481"
+    ],
+    "name": "korvo",
+    "port": "/dev/cu.usbserial-2130",
+    "round": 3,
+    "duration_seconds": 300.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/boot/korvo-round-3.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  }
+]

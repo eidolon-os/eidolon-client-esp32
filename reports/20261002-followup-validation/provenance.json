@@ -1,0 +1,126 @@
+[
+  {
+    "file": "boot/checkpoints.json",
+    "sha256": "563e331d709460666100d327afcf185896567ba77891229e9d00e03ce28889c2"
+  },
+  {
+    "file": "stack-diagnostic/checkpoints.json",
+    "sha256": "a929aad00d375d3ffad42cef06577422f470c7587b127ea3a38c62aced32d2a5"
+  },
+  {
+    "file": "service-lifecycle.jsonl",
+    "sha256": "a8aa189c62128625e67414c89736309525f4666be658a9bc6eaf9fd830b54d12"
+  },
+  {
+    "file": "diagnostic-service-lifecycle.log",
+    "sha256": "10d2b1b0330b19b5a9cf2b4c06f57fa9b5982906a020392e37291071752a5703"
+  },
+  {
+    "file": "boot/box-round-1.log",
+    "raw_sha256": "cddc9bfce442c03de0637120c75c2bfd89fd0fe622304b8785a74be5fd29c3ec",
+    "excerpt": true
+  },
+  {
+    "file": "boot/box-round-2.log",
+    "raw_sha256": "2d452c0dc623230624336fb73012e68314fc6cbfe358c681525794f5118d8c7c",
+    "excerpt": true
+  },
+  {
+    "file": "boot/box-round-3.log",
+    "raw_sha256": "7d130f640cb307b2ef51f0e02945bd6c14fd69b17777b4a5397a140f61802167",
+    "excerpt": true
+  },
+  {
+    "file": "boot/korvo-round-1.log",
+    "raw_sha256": "36b226b47b6918b031c1af65587df8f81659aa1261e102b5426c460d22719800",
+    "excerpt": true
+  },
+  {
+    "file": "boot/korvo-round-2.log",
+    "raw_sha256": "2dbd6982a871f104c054e8891601ca23bde51ce78b2beecf13dfcd6ce18fdbd2",
+    "excerpt": true
+  },
+  {
+    "file": "boot/korvo-round-3.log",
+    "raw_sha256": "61ccba3edbd08ed7fb14de8dc10de659d912642407b9d09405d2b7ac1421166c",
+    "excerpt": true
+  },
+  {
+    "file": "boot/stack-round-1.log",
+    "raw_sha256": "5f7a6702f705a76eb27ca6342ce6e8762aedde18e3608213ac7f8ee96dd034fe",
+    "excerpt": true
+  },
+  {
+    "file": "boot/stack-round-2.log",
+    "raw_sha256": "385b3999c956c2ab4de3a695000edb70994d451b38dbe6479516f9c32714523a",
+    "excerpt": true
+  },
+  {
+    "file": "boot/stack-round-3.log",
+    "raw_sha256": "5e06c5bd386bb8f0a98ce8773db1f7211f4032105e548e518bc35e0c12d81ade",
+    "excerpt": true
+  },
+  {
+    "file": "boot/wave-round-1.log",
+    "raw_sha256": "ec7a1ac7be624bddde9966ffb282cbaeb19b94e77c0f8b53c7072c0d63415ec5",
+    "excerpt": true
+  },
+  {
+    "file": "boot/wave-round-2.log",
+    "raw_sha256": "8eca87b6f2ef3cc293a6487628f8c0681a18a6e03c907a63e7d17d0ebdbe5553",
+    "excerpt": true
+  },
+  {
+    "file": "boot/wave-round-3.log",
+    "raw_sha256": "55759f3f026f55971c039b210c6ba1768bfd0b3aa1ed3c7a2991cd2a9fd4c877",
+    "excerpt": true
+  },
+  {
+    "file": "stack-diagnostic/stack-round-1.log",
+    "raw_sha256": "94c9dab8f355b8f05457e356000a33b13878bc2848c7ec839e4741c7a6f02045",
+    "excerpt": true
+  },
+  {
+    "file": "stack-diagnostic/stack-round-2.log",
+    "raw_sha256": "43914c6908b58276fc54ea0766300456a067002c4ea8f91e2ec75b9e4662258e",
+    "excerpt": true
+  },
+  {
+    "file": "stack-diagnostic/stack-round-3.log",
+    "raw_sha256": "f68319bcb9994cf28ecf9f34af843cce61f1099a380df626244c7a2df04bfe45",
+    "excerpt": true
+  },
+  {
+    "file": "stack-diagnostic/stack-round-4.log",
+    "raw_sha256": "300f3fbe7738f362a5202372178f230ea59657870b84bef8af83f7fe6e98bf4f",
+    "excerpt": true
+  },
+  {
+    "file": "stack-diagnostic/stack-round-5.log",
+    "raw_sha256": "00977df4b288a80afaec7f39c3d67ce55f868f416a62f28e1f2280ccb4eb28ad",
+    "excerpt": true
+  },
+  {
+    "file": "hub-wire.jsonl",
+    "raw_sha256": "bc8ec34f246235a3475aa449035ab71bb4165851c2de40b08c2a2a179d43b03a",
+    "excerpt": true
+  },
+  {
+    "file": "diagnostic-hub-wire.jsonl",
+    "raw_sha256": "de1349c54d4b599c4000b60145c84d14077724e20010d3c84d143e0a6dcee25e",
+    "excerpt": true
+  },
+  {
+    "file": "box-permissions-toggle.log",
+    "raw_sha256": "86553e51cbee87f4abaa4f08022db068a4aa4b2eeeb47f8ab7840eb741eca926",
+    "excerpt": true
+  },
+  {
+    "file": "participants-disabled.jsonl",
+    "box_only": true
+  },
+  {
+    "file": "participants-enabled.jsonl",
+    "box_only": true
+  }
+]

@@ -151,11 +151,12 @@ dependencies:
   #   - receive-only and data-only rooms do not allocate/start a capture sink;
   #   - disabled TCP ICE candidates cannot fail a UDP-only peer before UDP arrives.
   #   - receive-only peers advertise a receive codec without enabling publication.
+  #   - local participant permissions reach the public callback for config invalidation.
   # https over ssh so a build needs no SSH access to the fork.
   livekit/livekit:
     git: https://github.com/eidolon-os/client-sdk-esp32.git
     path: components/livekit
-    version: "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+    version: "f7b4279643451c43d0bc0017ac1f564971de6714"
     rules:
     - if: target in [esp32s3, esp32p4, esp32s31]
 

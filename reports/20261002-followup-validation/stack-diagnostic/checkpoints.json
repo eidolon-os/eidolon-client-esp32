@@ -1,0 +1,430 @@
+[
+  {
+    "result": "FAIL",
+    "reasons": [
+      "installed firmware/SDK differs from requested baseline",
+      "failure/recovery evidence in serial log"
+    ],
+    "stamps": [
+      [
+        "c41956d6a+dirty",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY",
+      "RETRY"
+    ],
+    "ready_ms": [
+      37380
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [],
+    "heap_samples": [
+      [
+        10990,
+        88091
+      ],
+      [
+        20650,
+        87875
+      ],
+      [
+        30650,
+        84311
+      ],
+      [
+        46650,
+        61831
+      ],
+      [
+        56650,
+        61831
+      ]
+    ],
+    "settled_heap_delta": null,
+    "faults": [
+      "I (59600) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1",
+      "E (59610) LiveKitSession: Failure: Unreachable"
+    ],
+    "error_lines": [
+      "E (36640) AGENT: 0 Not found for bind remote 192.168.3.230:54839",
+      "E (36650) AGENT: 0 Not found for bind remote 192.168.3.230:54839",
+      "E (36650) AGENT: 0 Not found for bind remote 192.168.3.230:54839",
+      "E (36670) AGENT: 0 Not found for bind remote 192.168.3.230:54839",
+      "E (36750) AGENT: 0 Not found for bind remote 192.168.3.230:54839",
+      "E (36750) AGENT: 0 Not found for bind remote 192.168.3.230:54839",
+      "E (36750) AGENT: 0 Not found for bind remote 192.168.3.230:52123",
+      "E (36750) AGENT: 0 Not found for bind remote 192.168.3.230:52123",
+      "E (59510) transport_ws: Error read data(-1)",
+      "E (59510) websocket_client: esp_transport_read() failed with -1, transport_error=ESP_ERR_ESP_TLS_TCP_CLOSED_FIN, tls_error_code=0, tls_flags=0, errno=128",
+      "E (59510) websocket_client: Error receive data",
+      "E (59610) LiveKitSession: Failure: Unreachable"
+    ],
+    "name": "stack",
+    "port": "/dev/cu.usbmodem21101",
+    "round": 1,
+    "duration_seconds": 60.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/stack-diagnostic/stack-round-1.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "FAIL",
+    "reasons": [
+      "installed firmware/SDK differs from requested baseline"
+    ],
+    "stamps": [
+      [
+        "c41956d6a+dirty",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      12680
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      164
+    ],
+    "heap_samples": [
+      [
+        10830,
+        87771
+      ],
+      [
+        22650,
+        62167
+      ],
+      [
+        32650,
+        61991
+      ],
+      [
+        42650,
+        61991
+      ],
+      [
+        52650,
+        61991
+      ]
+    ],
+    "settled_heap_delta": 0,
+    "faults": [],
+    "error_lines": [
+      "E (11740) AGENT: 0 Not found for bind remote 192.168.3.230:52597",
+      "E (11740) AGENT: 0 Not found for bind remote 192.168.3.230:52597",
+      "E (11740) AGENT: 0 Not found for bind remote 192.168.3.230:52597",
+      "E (11750) AGENT: 0 Not found for bind remote 192.168.3.230:52597",
+      "E (11850) AGENT: 0 Not found for bind remote 192.168.3.230:52597",
+      "E (11850) AGENT: 0 Not found for bind remote 192.168.3.230:52597",
+      "E (11850) AGENT: 0 Not found for bind remote 192.168.3.230:53838",
+      "E (11860) AGENT: 0 Not found for bind remote 192.168.3.230:53838",
+      "E (12090) AGENT: 0 Not found for bind remote 192.168.3.230:53838",
+      "E (12090) AGENT: 0 Not found for bind remote 192.168.3.230:53838"
+    ],
+    "name": "stack",
+    "port": "/dev/cu.usbmodem21101",
+    "round": 2,
+    "duration_seconds": 60.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/stack-diagnostic/stack-round-2.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "FAIL",
+    "reasons": [
+      "installed firmware/SDK differs from requested baseline"
+    ],
+    "stamps": [
+      [
+        "c41956d6a+dirty",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      12810
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      163
+    ],
+    "heap_samples": [
+      [
+        10860,
+        87663
+      ],
+      [
+        22650,
+        62115
+      ],
+      [
+        32650,
+        61943
+      ],
+      [
+        42650,
+        62115
+      ],
+      [
+        52660,
+        62119
+      ]
+    ],
+    "settled_heap_delta": 4,
+    "faults": [],
+    "error_lines": [
+      "E (11780) AGENT: 0 Not found for bind remote 192.168.3.230:57108",
+      "E (11780) AGENT: 0 Not found for bind remote 192.168.3.230:57108",
+      "E (11780) AGENT: 0 Not found for bind remote 192.168.3.230:57108",
+      "E (11780) AGENT: 0 Not found for bind remote 192.168.3.230:57108",
+      "E (11800) AGENT: 0 Not found for bind remote 192.168.3.230:57108",
+      "E (11800) AGENT: 0 Not found for bind remote 192.168.3.230:57108",
+      "E (11960) AGENT: 0 Not found for bind remote 192.168.3.230:57108",
+      "E (11960) AGENT: 0 Not found for bind remote 192.168.3.230:57108",
+      "E (11960) AGENT: 0 Not found for bind remote 192.168.3.230:54195",
+      "E (11960) AGENT: 0 Not found for bind remote 192.168.3.230:54195",
+      "E (12160) AGENT: 0 Not found for bind remote 192.168.3.230:57108",
+      "E (12160) AGENT: 0 Not found for bind remote 192.168.3.230:57108",
+      "E (12160) AGENT: 0 Not found for bind remote 192.168.3.230:54195",
+      "E (12160) AGENT: 0 Not found for bind remote 192.168.3.230:54195"
+    ],
+    "name": "stack",
+    "port": "/dev/cu.usbmodem21101",
+    "round": 3,
+    "duration_seconds": 60.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/stack-diagnostic/stack-round-3.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "FAIL",
+    "reasons": [
+      "installed firmware/SDK differs from requested baseline"
+    ],
+    "stamps": [
+      [
+        "c41956d6a+dirty",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      12560
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      164
+    ],
+    "heap_samples": [
+      [
+        10650,
+        87743
+      ],
+      [
+        21650,
+        61879
+      ],
+      [
+        31650,
+        62051
+      ],
+      [
+        41650,
+        61879
+      ],
+      [
+        51650,
+        61847
+      ]
+    ],
+    "settled_heap_delta": -32,
+    "faults": [],
+    "error_lines": [
+      "E (11570) AGENT: 0 Not found for bind remote 192.168.3.230:59978",
+      "E (11570) AGENT: 0 Not found for bind remote 192.168.3.230:59978",
+      "E (11570) AGENT: 0 Not found for bind remote 192.168.3.230:59978",
+      "E (11580) AGENT: 0 Not found for bind remote 192.168.3.230:59978",
+      "E (11590) AGENT: 0 Not found for bind remote 192.168.3.230:59978",
+      "E (11730) AGENT: 0 Not found for bind remote 192.168.3.230:59978",
+      "E (11730) AGENT: 0 Not found for bind remote 192.168.3.230:59978",
+      "E (11730) AGENT: 0 Not found for bind remote 192.168.3.230:58631",
+      "E (11740) AGENT: 0 Not found for bind remote 192.168.3.230:58631",
+      "E (11970) AGENT: 0 Not found for bind remote 192.168.3.230:58631",
+      "E (11970) AGENT: 0 Not found for bind remote 192.168.3.230:58631"
+    ],
+    "name": "stack",
+    "port": "/dev/cu.usbmodem21101",
+    "round": 4,
+    "duration_seconds": 60.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/stack-diagnostic/stack-round-4.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  },
+  {
+    "result": "FAIL",
+    "reasons": [
+      "installed firmware/SDK differs from requested baseline"
+    ],
+    "stamps": [
+      [
+        "c41956d6a+dirty",
+        "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+      ]
+    ],
+    "states": [
+      "ASSETS",
+      "BOOT",
+      "NETWORK",
+      "SERVICE",
+      "READY"
+    ],
+    "ready_ms": [
+      12460
+    ],
+    "resolved_addresses": [
+      "192.168.3.230",
+      "192.168.3.230",
+      "192.168.3.230"
+    ],
+    "activation_dispatch_ms": [
+      164
+    ],
+    "heap_samples": [
+      [
+        10620,
+        87763
+      ],
+      [
+        21650,
+        61927
+      ],
+      [
+        31650,
+        61927
+      ],
+      [
+        41650,
+        62099
+      ],
+      [
+        51650,
+        62099
+      ],
+      [
+        61650,
+        61927
+      ],
+      [
+        71650,
+        62099
+      ],
+      [
+        81650,
+        62099
+      ],
+      [
+        91650,
+        62099
+      ],
+      [
+        101650,
+        61927
+      ],
+      [
+        111650,
+        61927
+      ],
+      [
+        121650,
+        61927
+      ],
+      [
+        131650,
+        62111
+      ],
+      [
+        141650,
+        62111
+      ],
+      [
+        151650,
+        62111
+      ],
+      [
+        161650,
+        62111
+      ],
+      [
+        171650,
+        62111
+      ]
+    ],
+    "settled_heap_delta": 12,
+    "faults": [],
+    "error_lines": [
+      "E (11530) AGENT: 0 Not found for bind remote 192.168.3.230:53288",
+      "E (11530) AGENT: 0 Not found for bind remote 192.168.3.230:53288",
+      "E (11540) AGENT: 0 Not found for bind remote 192.168.3.230:53288",
+      "E (11540) AGENT: 0 Not found for bind remote 192.168.3.230:53288",
+      "E (11550) AGENT: 0 Not found for bind remote 192.168.3.230:53288",
+      "E (11630) AGENT: 0 Not found for bind remote 192.168.3.230:53288",
+      "E (11630) AGENT: 0 Not found for bind remote 192.168.3.230:53288",
+      "E (11630) AGENT: 0 Not found for bind remote 192.168.3.230:55638",
+      "E (11640) AGENT: 0 Not found for bind remote 192.168.3.230:55638",
+      "E (11870) AGENT: 0 Not found for bind remote 192.168.3.230:55638",
+      "E (11870) AGENT: 0 Not found for bind remote 192.168.3.230:55638"
+    ],
+    "name": "stack",
+    "port": "/dev/cu.usbmodem21101",
+    "round": 5,
+    "duration_seconds": 180.0,
+    "log": "/private/tmp/eidolon-hil-20261002-followup/stack-diagnostic/stack-round-5.log",
+    "serial_disconnects": 0,
+    "serial_errors": []
+  }
+]

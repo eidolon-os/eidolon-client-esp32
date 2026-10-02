@@ -1,0 +1,102 @@
+CAPTURE {"utc": "2026-10-02T02:01:34.974511+00:00", "name": "stack", "port": "/dev/cu.usbmodem21101", "round": 3, "duration": 300.0}
+I (361) esp_psram: Reserving pool of 8K of internal memory for DMA/internal allocations
+I (391) main: EIDOLON-STORAGE owner_trust=ready bytes=65536
+W (391) Application: EIDOLON-BUILDSTAMP git=e75d1807c sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=5.5.4 branch=main built=Oct  2 2026 02:00:19
+W (401) Application: EIDOLON-PROFILE mode=half_duplex device_aec=0 capture=raw
+W (731) lcd_panel.io.spi: Callback on_color_trans_done was already set and now it was overwritten!
+I (1441) StackChanBody: servo body ready
+I (1641) Application: Hub activation actor created=1 stack=16384 memory=internal free_internal=192715
+I (6831) mdns_mem: mDNS task will be created from internal RAM
+I (7011) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=175
+I (8651) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=225
+I (9771) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=120
+W (10691) EidolonMem: [mem] activation_done internal free=87843 largest_block=69632 free_blocks=14 allocated=194904 min_free=81923
+W (10701) EidolonMem: [mem] activation_done internal-dma free=80107 largest_block=69632 allocated=194872
+W (10841) EidolonMem: [mem] activation_done stacks internal=15 psram=0 total_tasks=15
+I (10841) Application: [EIDOLON_UI] firmware ready version=1.0.0
+I (10861) EidolonVoice: [lifecycle] SetState Idle -> ConfigReady reason=config_activated room_kind=none gen=0
+I (10871) Application: [EIDOLON_UI] queue session_state=ConfigReady
+I (10881) EidolonVoice: [lifecycle] begin gen=1 room_kind=control (state=ConfigReady)
+I (10961) EidolonAudioIn: audio platform ready
+I (10981) EidolonMicCap: Mic capture started topology=raw (codec=24000 Hz, out=16000 Hz, channels=1)
+I (10991) EidolonLKBoard: LiveKit board media ready (input=24000 Hz, output=24000 Hz)
+I (10991) LiveKitSession: [mem] room_create verdict=sufficient internal free=92627 largest_block=69632 free_blocks=5 need_contiguous=9472 need_total=19712
+W (11021) EidolonVoice: [dispatch] type=0 wait_ms=0 run_ms=164 pending=0
+I (11051) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1
+I (11071) EidolonVoice: [lifecycle] lk_event=Connecting room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=None room=eidolon-device-02554c8b8ffbe75bfbe32274
+W (11191) EidolonVoice: [dispatch] type=10 wait_ms=0 run_ms=117 pending=0
+I (12641) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1
+I (12651) EidolonVoice: [lifecycle] lk_event=Connected room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=None room=eidolon-device-02554c8b8ffbe75bfbe32274
+I (12711) EidolonVoice: [lifecycle] operational_ready=1 reason=channel_connected room_kind=control gen=1
+I (12721) Application: [EIDOLON_UI] queue operational_ready=1
+I (12731) EidolonUiPresenter: visible state=READY scene=7
+I (57771) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1
+E (57791) LiveKitSession: Failure: Unreachable
+I (57791) EidolonVoice: [lifecycle] lk_event=Reconnecting room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=Unreachable room=eidolon-device-02554c8b8ffbe75bfbe32274
+I (57811) EidolonVoice: [lifecycle] operational_ready=0 reason=channel_reconnecting room_kind=control gen=1
+I (57821) Application: [EIDOLON_UI] queue operational_ready=0
+I (57831) EidolonUiPresenter: visible state=RETRY scene=10
+I (58751) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1
+E (58761) LiveKitSession: Failure: Unreachable
+I (58771) EidolonVoice: [lifecycle] lk_event=Reconnecting room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=Unreachable room=eidolon-device-02554c8b8ffbe75bfbe32274
+I (59621) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1
+E (59631) LiveKitSession: Failure: Unreachable
+I (59641) EidolonVoice: [lifecycle] lk_event=Reconnecting room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=Unreachable room=eidolon-device-02554c8b8ffbe75bfbe32274
+I (60761) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1
+E (60781) LiveKitSession: Failure: Unreachable
+I (60781) EidolonVoice: [lifecycle] lk_event=Reconnecting room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=Unreachable room=eidolon-device-02554c8b8ffbe75bfbe32274
+I (62871) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1
+E (62881) LiveKitSession: Failure: Unreachable
+I (62891) EidolonVoice: [lifecycle] lk_event=Reconnecting room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=Unreachable room=eidolon-device-02554c8b8ffbe75bfbe32274
+I (67581) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1
+I (67601) EidolonVoice: [lifecycle] lk_event=Connected room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=None room=eidolon-device-02554c8b8ffbe75bfbe32274
+I (67671) EidolonVoice: [lifecycle] operational_ready=1 reason=channel_connected room_kind=control gen=1
+I (67671) Application: [EIDOLON_UI] queue operational_ready=1
+I (67681) EidolonUiPresenter: visible state=READY scene=7
+I (96961) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1
+E (96981) LiveKitSession: Failure: Unreachable
+I (96981) EidolonVoice: [lifecycle] lk_event=Reconnecting room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=Unreachable room=eidolon-device-02554c8b8ffbe75bfbe32274
+I (97001) EidolonVoice: [lifecycle] operational_ready=0 reason=channel_reconnecting room_kind=control gen=1
+I (97011) Application: [EIDOLON_UI] queue operational_ready=0
+I (97021) EidolonUiPresenter: visible state=RETRY scene=10
+E (107891) esp-tls: [sock=54] select() timeout
+I (107911) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1
+E (107931) LiveKitSession: Failure: Unreachable
+I (107931) EidolonVoice: [lifecycle] lk_event=Reconnecting room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=Unreachable room=eidolon-device-02554c8b8ffbe75bfbe32274
+E (118421) esp-tls: [sock=54] select() timeout
+I (118441) LiveKitSession: [lifecycle] room state=Reconnecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1
+E (118461) LiveKitSession: Failure: Unreachable
+I (118461) EidolonVoice: [lifecycle] lk_event=Reconnecting room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=Unreachable room=eidolon-device-02554c8b8ffbe75bfbe32274
+W (122011) EidolonVoice: [lifecycle] connect watchdog fired state=ConfigReady room_kind=control gen=1; forcing recovery
+I (122071) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1
+I (122211) LiveKitSession: [lifecycle] room state=Disconnected room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1
+I (122421) EidolonMicCap: Mic capture stopped
+I (122421) EidolonVoice: [lifecycle] superseded gen=2 reason=connect_timeout (state=ConfigReady)
+I (122431) EidolonVoice: [lifecycle] channel reconnect scheduled reason=connect_timeout attempt=2 delay_ms=4000 gen=2
+W (122441) EidolonVoice: [dispatch] type=24 wait_ms=0 run_ms=424 pending=2
+I (122441) EidolonVoice: [lifecycle] lk_event=Connected room_kind=control event_gen=1 cur_gen=2 STALE state=ConfigReady switching=0 failure=None room=eidolon-device-02554c8b8ffbe75bfbe32274
+I (122461) EidolonVoice: [lifecycle] dropping stale lk_event=Connected (event_gen=1 cur_gen=2)
+W (122471) EidolonVoice: [dispatch] type=10 wait_ms=361 run_ms=24 pending=1
+I (122481) EidolonVoice: [lifecycle] lk_event=Disconnected room_kind=control event_gen=1 cur_gen=2 STALE state=ConfigReady switching=0 failure=None room=eidolon-device-02554c8b8ffbe75bfbe32274
+I (122491) EidolonVoice: [lifecycle] dropping stale lk_event=Disconnected (event_gen=1 cur_gen=2)
+W (122501) EidolonVoice: [dispatch] type=10 wait_ms=257 run_ms=25 pending=0
+I (126441) EidolonVoice: [lifecycle] channel reconnect tick attempt=2 gen=2
+I (127221) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=267
+I (128761) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=113
+I (129891) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=90
+I (131351) EidolonVoice: [lifecycle] SetState ConfigReady -> ServerUnreachable reason=reconnect_exhausted room_kind=control gen=2
+I (131361) EidolonVoice: [lifecycle] begin gen=3 room_kind=control (state=ServerUnreachable)
+I (131381) EidolonMicCap: Mic capture started topology=raw (codec=24000 Hz, out=16000 Hz, channels=1)
+I (131391) EidolonLKBoard: LiveKit board media ready (input=24000 Hz, output=24000 Hz)
+I (131401) LiveKitSession: [mem] room_create verdict=sufficient internal free=91987 largest_block=45056 free_blocks=12 need_contiguous=9472 need_total=19712
+W (131431) EidolonVoice: [dispatch] type=23 wait_ms=0 run_ms=4995 pending=0
+I (131461) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=3
+I (131481) EidolonVoice: [lifecycle] lk_event=Connecting room_kind=control event_gen=3 cur_gen=3 state=ServerUnreachable switching=0 failure=None room=eidolon-device-02554c8b8ffbe75bfbe32274
+I (132531) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=3
+I (132551) EidolonVoice: [lifecycle] lk_event=Connected room_kind=control event_gen=3 cur_gen=3 state=ServerUnreachable switching=0 failure=None room=eidolon-device-02554c8b8ffbe75bfbe32274
+I (132611) EidolonVoice: [lifecycle] operational_ready=1 reason=channel_connected room_kind=control gen=3
+I (132621) Application: [EIDOLON_UI] queue operational_ready=1
+I (132621) EidolonUiPresenter: visible state=READY scene=7
+I (132621) EidolonVoice: [lifecycle] SetState ServerUnreachable -> ConfigReady reason=channel_connected room_kind=control gen=3
+I (132641) Application: [EIDOLON_UI] queue session_state=ConfigReady
+W (132641) EidolonVoice: [dispatch] type=10 wait_ms=0 run_ms=95 pending=0

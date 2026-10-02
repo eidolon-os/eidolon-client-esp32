@@ -1,0 +1,41 @@
+CAPTURE {"utc": "2026-10-02T02:20:34.267974+00:00", "name": "stack", "port": "/dev/cu.usbmodem21101", "round": 2, "duration": 60.0}
+I (360) esp_psram: Reserving pool of 8K of internal memory for DMA/internal allocations
+I (390) main: EIDOLON-STORAGE owner_trust=ready bytes=65536
+W (390) Application: EIDOLON-BUILDSTAMP git=c41956d6a+dirty sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=5.5.4 branch=main built=Oct  2 2026 10:15:00
+W (400) Application: EIDOLON-PROFILE mode=half_duplex device_aec=0 capture=raw
+W (730) lcd_panel.io.spi: Callback on_color_trans_done was already set and now it was overwritten!
+I (1440) StackChanBody: servo body ready
+I (1630) Application: Hub activation actor created=1 stack=16384 memory=internal free_internal=192667
+I (6670) mdns_mem: mDNS task will be created from internal RAM
+I (6920) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=252
+I (8700) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=141
+I (9810) LocalMdns: resolve name=eidolon-hub-f89c0ecca5d0070a7989.local family=0 result=ESP_OK address=192.168.3.230 ms=65
+W (10840) EidolonMem: [mem] activation_done internal free=87807 largest_block=69632 free_blocks=15 allocated=194892 min_free=81835
+W (10850) EidolonMem: [mem] activation_done internal-dma free=80035 largest_block=69632 allocated=194892
+W (10980) EidolonMem: [mem] activation_done stacks internal=15 psram=0 total_tasks=15
+I (10990) Application: [EIDOLON_UI] firmware ready version=1.0.0
+I (11010) EidolonVoice: [lifecycle] SetState Idle -> ConfigReady reason=config_activated room_kind=none gen=0
+I (11020) Application: [EIDOLON_UI] queue session_state=ConfigReady
+I (11020) EidolonVoice: [lifecycle] begin gen=1 room_kind=control (state=ConfigReady)
+I (11110) EidolonAudioIn: audio platform ready
+I (11120) EidolonMicCap: Mic capture started topology=raw (codec=24000 Hz, out=16000 Hz, channels=1)
+I (11130) EidolonLKBoard: LiveKit board media ready (input=24000 Hz, output=24000 Hz)
+I (11140) LiveKitSession: [mem] room_create verdict=sufficient internal free=92563 largest_block=69632 free_blocks=5 need_contiguous=9472 need_total=19712
+W (11170) EidolonVoice: [dispatch] type=0 wait_ms=0 run_ms=164 pending=0
+I (11210) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1
+I (11240) EidolonVoice: [lifecycle] lk_event=Connecting room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=None room=eidolon-device-02554c8b8ffbe75bfbe32274
+I (11660) NetTrace: rx ip4=49 synack=4 signaling=10 mdns_answer=3 icmp_echo=0 bad_tcp_checksum=0
+I (12590) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-bef7ac2bc5d40ddf567790b03a0463905a2814d8b1ea5a5025c3da78849be9d0 gen=1
+I (12660) EidolonVoice: [lifecycle] lk_event=Connected room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=None room=eidolon-device-02554c8b8ffbe75bfbe32274
+I (12670) EidolonVoice: [lifecycle] operational_ready=1 reason=channel_connected room_kind=control gen=1
+I (12670) Application: [EIDOLON_UI] queue operational_ready=1
+I (12680) EidolonUiPresenter: visible state=READY scene=7
+I (16660) NetTrace: rx ip4=102 synack=4 signaling=20 mdns_answer=6 icmp_echo=0 bad_tcp_checksum=0
+I (21660) NetTrace: rx ip4=123 synack=4 signaling=27 mdns_answer=6 icmp_echo=0 bad_tcp_checksum=0
+I (26660) NetTrace: rx ip4=139 synack=4 signaling=30 mdns_answer=6 icmp_echo=0 bad_tcp_checksum=0
+I (31660) NetTrace: rx ip4=157 synack=4 signaling=35 mdns_answer=6 icmp_echo=0 bad_tcp_checksum=0
+I (36660) NetTrace: rx ip4=175 synack=4 signaling=38 mdns_answer=6 icmp_echo=0 bad_tcp_checksum=0
+I (41660) NetTrace: rx ip4=194 synack=4 signaling=43 mdns_answer=6 icmp_echo=0 bad_tcp_checksum=0
+I (46660) NetTrace: rx ip4=212 synack=4 signaling=46 mdns_answer=6 icmp_echo=0 bad_tcp_checksum=0
+I (51660) NetTrace: rx ip4=229 synack=4 signaling=50 mdns_answer=6 icmp_echo=0 bad_tcp_checksum=0
+I (56660) NetTrace: rx ip4=248 synack=4 signaling=54 mdns_answer=6 icmp_echo=0 bad_tcp_checksum=0

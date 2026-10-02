@@ -25,7 +25,9 @@ static void saturation() {
     assert(inbox.Pending() == 0);
     for (int i = 0; i < 24; ++i) assert(inbox.Post({0, i}, self));
     assert(!inbox.Post({0, 24}, self)); // genuine command pressure still rejects
-    assert(inbox.Wait() == (tick | activity));
+    // Configuration invalidation must survive a full command queue, too.
+    for (int i = 0; i < 10000; ++i) inbox.Signal(self, Inbox::kPermissionsChanged);
+    assert(inbox.Wait() == (tick | activity | Inbox::kPermissionsChanged));
     assert(inbox.Take(event) && event.sequence == 0);
     // A signal during handling survives clear-on-exit for the next iteration.
     inbox.Signal(self, tick);

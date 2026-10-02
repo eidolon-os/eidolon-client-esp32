@@ -15,6 +15,7 @@
 #include "session_memory_admission_core.h"
 #include "pending_session_control.h"
 #include "transcription_stream.h"
+#include "local_permission_observer.h"
 
 namespace eidolon {
 
@@ -29,6 +30,7 @@ enum class LiveKitConnectionState {
 class LiveKitSession {
 public:
     using StateCallback = std::function<void(LiveKitConnectionState, uint32_t generation)>;
+    using PermissionsCallback = std::function<void(uint32_t generation)>;
     using TranscriptionCallback = std::function<void(const TranscriptionEvent& event)>;
     using AgentPlaybackCallback = std::function<void(bool speaking, uint32_t generation)>;
     using AgentPhaseCallback = std::function<void(AgentPhase phase)>;
@@ -69,6 +71,7 @@ public:
                           bool reliable = true);
 
     void SetOnStateChanged(StateCallback cb) { on_state_changed_ = std::move(cb); }
+    void SetOnPermissionsChanged(PermissionsCallback cb) { on_permissions_changed_ = std::move(cb); }
     void SetOnTranscription(TranscriptionCallback cb) { on_transcription_ = std::move(cb); }
     void SetOnAgentPlayback(AgentPlaybackCallback cb) { on_agent_playback_ = std::move(cb); }
     void SetOnAgentPhase(AgentPhaseCallback cb) { on_agent_phase_ = std::move(cb); }
@@ -87,6 +90,7 @@ private:
     static void OnParticipantInfo(const livekit_participant_info_t* info, void* ctx);
     bool IsAgent(const char* identity);
     std::mutex peers_mutex_;
+    LocalPermissionObserver local_permissions_;
     std::array<std::string, 4> agent_peers_;
     PendingSessionControl pending_session_control_;
     static void OnDataReceived(const livekit_data_received_t* data, void* ctx);
@@ -119,6 +123,7 @@ private:
     SessionMemoryRetryLedger memory_ledger_;
     uint32_t generation_ = 0;
     StateCallback on_state_changed_;
+    PermissionsCallback on_permissions_changed_;
     TranscriptionCallback on_transcription_;
     AgentPhaseCallback on_agent_phase_;
     AgentPlaybackCallback on_agent_playback_;

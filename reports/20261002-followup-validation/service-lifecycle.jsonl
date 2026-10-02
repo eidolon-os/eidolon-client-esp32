@@ -1,0 +1,19 @@
+{"epoch_us": "1790906522787970", "unit": "init.scope", "message": "Stopping eidolon-channel-provider.service - Eidolon Hub Channel Provider..."}
+{"epoch_us": "1790906523487005", "unit": "init.scope", "message": "Stopped eidolon-channel-provider.service - Eidolon Hub Channel Provider."}
+{"epoch_us": "1790906532740002", "unit": "init.scope", "message": "Stopping eidolon-livekit.service - Eidolon LiveKit RTC server..."}
+{"epoch_us": "1790906532740656", "unit": "eidolon-livekit.service", "message": {"level": "info", "ts": 1790906532.7398632, "msg": "exit requested, shutting down", "signal": "terminated"}}
+{"epoch_us": "1790906552884969", "unit": "init.scope", "message": "eidolon-livekit.service: State 'stop-sigterm' timed out. Killing."}
+{"epoch_us": "1790906552898758", "unit": "init.scope", "message": "eidolon-livekit.service: Main process exited, code=killed, status=9/KILL"}
+{"epoch_us": "1790906552899620", "unit": "init.scope", "message": "Stopped eidolon-livekit.service - Eidolon LiveKit RTC server."}
+{"epoch_us": "1790906553164337", "unit": "init.scope", "message": "Stopping eidolon-hub.service - Eidolon Hub device admission authority..."}
+{"epoch_us": "1790906553227318", "unit": "eidolon-hub.service", "message": "INFO:     Shutting down"}
+{"epoch_us": "1790906553399144", "unit": "init.scope", "message": "Stopped eidolon-hub.service - Eidolon Hub device admission authority."}
+{"epoch_us": "1790906559166530", "unit": "init.scope", "message": "Started eidolon-livekit.service - Eidolon LiveKit RTC server."}
+{"epoch_us": "1790906559173832", "unit": "init.scope", "message": "Started eidolon-channel-provider.service - Eidolon Hub Channel Provider."}
+{"epoch_us": "1790906559180799", "unit": "init.scope", "message": "Started eidolon-hub.service - Eidolon Hub device admission authority."}
+{"epoch_us": "1790906572075949", "unit": "init.scope", "message": "Stopping eidolon-livekit.service - Eidolon LiveKit RTC server..."}
+{"epoch_us": "1790906572076368", "unit": "eidolon-livekit.service", "message": {"level": "info", "ts": 1790906572.0762393, "msg": "exit requested, shutting down", "signal": "terminated"}}
+{"epoch_us": "1790906592076928", "unit": "init.scope", "message": "eidolon-livekit.service: State 'stop-sigterm' timed out. Killing."}
+{"epoch_us": "1790906592089784", "unit": "init.scope", "message": "eidolon-livekit.service: Main process exited, code=killed, status=9/KILL"}
+{"epoch_us": "1790906592090476", "unit": "init.scope", "message": "Stopped eidolon-livekit.service - Eidolon LiveKit RTC server."}
+{"epoch_us": "1790906592105715", "unit": "init.scope", "message": "Started eidolon-livekit.service - Eidolon LiveKit RTC server."}

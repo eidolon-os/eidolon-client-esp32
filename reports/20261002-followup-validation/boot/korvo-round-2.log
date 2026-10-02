@@ -1,0 +1,32 @@
+CAPTURE {"utc": "2026-10-02T02:00:04.887430+00:00", "name": "korvo", "port": "/dev/cu.usbserial-2130", "round": 2, "duration": 90.0}
+I (890) esp_psram: Reserving pool of 96K of internal memory for DMA/internal allocations
+I (920) main: EIDOLON-STORAGE owner_trust=ready bytes=65536
+W (920) Application: EIDOLON-BUILDSTAMP git=e75d1807c sdk=3f98d8deed47d7e9b8ea9cb65b13d87c61174033 idf=6.1 branch=main built=Oct  2 2026 02:07:09
+W (930) Application: EIDOLON-PROFILE mode=half_duplex device_aec=0 capture=raw
+I (980) Korvo1Board: [ui] GT1151 touch ready
+I (1000) Korvo1Board: [ui] LVGL touch ready
+I (1360) Application: Hub activation actor created=1 stack=16384 memory=internal free_internal=287599
+I (6220) mdns_mem: mDNS task will be created from internal RAM
+I (6500) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.3.182 ms=281
+I (7400) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.3.182 ms=252
+I (7830) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.3.182 ms=46
+W (8220) EidolonMem: [mem] activation_done internal free=214039 largest_block=94208 free_blocks=80 allocated=274280 min_free=103632
+W (8230) EidolonMem: [mem] activation_done internal-dma free=182083 largest_block=94208 allocated=274280
+W (8360) EidolonMem: [mem] activation_done stacks internal=14 psram=0 total_tasks=14
+I (8360) Application: [EIDOLON_UI] firmware ready version=1.0.0
+I (8380) EidolonVoice: [lifecycle] SetState Idle -> ConfigReady reason=config_activated room_kind=none gen=0
+I (8390) Application: [EIDOLON_UI] queue session_state=ConfigReady
+I (8400) EidolonVoice: [lifecycle] begin gen=1 room_kind=control (state=ConfigReady)
+I (8450) ES8389: Set internal reference signal
+I (8520) EidolonAudioIn: audio platform ready
+I (8530) EidolonMicCap: Mic capture started topology=raw (codec=16000 Hz, out=16000 Hz, channels=2)
+I (8540) EidolonLKBoard: LiveKit board media ready (input=16000 Hz, output=16000 Hz)
+I (8540) LiveKitSession: [mem] room_create verdict=sufficient internal free=191543 largest_block=94208 free_blocks=38 need_contiguous=9472 need_total=19712
+W (8580) EidolonVoice: [dispatch] type=0 wait_ms=0 run_ms=194 pending=0
+I (8600) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-69ab20f5bdd16b5fd5f2cff9451bfe60d8f7a0b5c26dba88e6fcdafe4be5fc5b gen=1
+I (8620) EidolonVoice: [lifecycle] lk_event=Connecting room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=None room=eidolon-device-2f20df7d0c6ebd741d5b96c1
+I (9590) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-69ab20f5bdd16b5fd5f2cff9451bfe60d8f7a0b5c26dba88e6fcdafe4be5fc5b gen=1
+I (9610) EidolonVoice: [lifecycle] lk_event=Connected room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=None room=eidolon-device-2f20df7d0c6ebd741d5b96c1
+I (9660) EidolonVoice: [lifecycle] operational_ready=1 reason=channel_connected room_kind=control gen=1
+I (9670) Application: [EIDOLON_UI] queue operational_ready=1
+I (9680) EidolonUiPresenter: visible state=READY scene=7
