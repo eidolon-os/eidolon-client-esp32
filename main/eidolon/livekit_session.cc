@@ -155,14 +155,15 @@ void LiveKitSession::OnParticipantInfo(const livekit_participant_info_t* info, v
     if (!session || !info || !info->identity || std::strlen(info->identity)>128) return;
     std::string pending;
     uint32_t generation;
-    bool permissions_changed = false;
+    bool configuration_hint = false;
     {
         std::lock_guard<std::mutex> lock(session->peers_mutex_);
         generation=session->generation_;
-        if (info->state != LIVEKIT_PARTICIPANT_STATE_DISCONNECTED) {
-            permissions_changed = session->local_permissions_.Observe(
-                info->is_local, info->can_publish, info->can_subscribe, info->can_publish_data);
-        }
+        // The official callback delivers local ParticipantUpdate too. It does
+        // not expose permissions, so this is only a hint to compare fresh
+        // authenticated Owner configuration, never a reason to reopen media.
+        configuration_hint = info->state == LIVEKIT_PARTICIPANT_STATE_ACTIVE &&
+            !session->identity_.empty() && session->identity_ == info->identity;
         for (auto& peer:session->agent_peers_) {
             if (peer==info->identity) { peer.clear(); break; }
         }
@@ -176,9 +177,8 @@ void LiveKitSession::OnParticipantInfo(const livekit_participant_info_t* info, v
         pending=session->pending_session_control_.Resolve(
             info->identity,registered,generation,esp_timer_get_time()/1000);
     }
-    if (permissions_changed && session->on_permissions_changed_) {
-        ESP_LOGI(TAG, "Local participant permissions changed; refreshing Owner configuration");
-        session->on_permissions_changed_(generation);
+    if (configuration_hint && session->on_configuration_invalidated_) {
+        session->on_configuration_invalidated_(generation);
     }
     if (!pending.empty() && session->on_session_control_) {
         ESP_LOGI(TAG,"Delivering session control after Agent signalling confirmation");
@@ -496,7 +496,6 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
     room_options.on_state_changed = OnRoomStateChanged;
     {
         std::lock_guard<std::mutex> lock(peers_mutex_);
-        local_permissions_.Reset();
         for (auto& peer:agent_peers_) peer.clear();
         pending_session_control_.Clear();
     }

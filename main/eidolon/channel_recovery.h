@@ -8,6 +8,22 @@
 
 namespace eidolon {
 
+// A clock anchor changes on every authenticated pull, but is not a new media
+// graph. Credentials, routes, policy and format are graph inputs.
+inline bool ChannelConfigurationChanged(const Esp32HubConfig& current,
+                                        const Esp32HubConfig& fresh)
+{
+    return current.status != fresh.status ||
+        !(current.output_policy == fresh.output_policy) ||
+        current.sample_rate != fresh.sample_rate || current.channels != fresh.channels ||
+        current.expires_at_ms != fresh.expires_at_ms ||
+        current.session.identity != fresh.session.identity ||
+        current.session.room_name != fresh.session.room_name ||
+        current.session.server_url != fresh.session.server_url ||
+        current.session.server_urls != fresh.session.server_urls ||
+        current.session.token != fresh.session.token;
+}
+
 inline bool ChannelBindingExpired(const Esp32HubConfig& config, int64_t monotonic_ms)
 {
     if (config.expires_at_ms <= 0) return true;

@@ -337,6 +337,36 @@ void TestRegistrationCredentialsWinAndGenerationNeverRollsBack()
 
 int main()
 {
+    // A participant update is only a hint: a new clock observation and
+    // identical config must not retire a healthy media graph.
+    {
+        eidolon::Esp32HubConfig current;
+        current.status = eidolon::HubConfigStatus::Active;
+        current.session = Room("token");
+        current.session.server_urls = {"wss://livekit.test"};
+        current.output_policy = {true, 7, 3, true, true};
+        current.expires_at_ms = 1700000100000LL;
+        auto fresh = current;
+        fresh.clock.Observe(1700000000000LL, 50, 0);
+        assert(!eidolon::ChannelConfigurationChanged(current, fresh));
+        const auto changed = [&](auto mutate) {
+            auto candidate = current;
+            mutate(candidate);
+            assert(eidolon::ChannelConfigurationChanged(current, candidate));
+        };
+        changed([](auto& c) { ++c.output_policy.revision; });
+        changed([](auto& c) { c.output_policy.microphone = false; });
+        changed([](auto& c) { c.output_policy.allowed = 1; });
+        changed([](auto& c) { c.status = eidolon::HubConfigStatus::WaitingBinding; });
+        changed([](auto& c) { c.session.token = "rotated"; });
+        changed([](auto& c) { c.session.identity = "replacement"; });
+        changed([](auto& c) { c.session.room_name = "replacement"; });
+        changed([](auto& c) { c.session.server_url = "wss://other.test"; });
+        changed([](auto& c) { c.session.server_urls.push_back("wss://other.test"); });
+        changed([](auto& c) { ++c.expires_at_ms; });
+        changed([](auto& c) { c.sample_rate = 48000; });
+        changed([](auto& c) { c.channels = 2; });
+    }
     TestExpiredCredentialsStillRecoverAfterRefreshFailures();
     TestRecoveryRespectsAuthorityAndNetworkBoundaries();
     TestFlappingConnectionPreservesBackoffUntilStable();

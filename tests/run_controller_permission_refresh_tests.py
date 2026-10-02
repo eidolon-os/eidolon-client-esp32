@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Execute the production permission handler with isolated transport boundaries."""
+"""Execute the configuration refresh handler with isolated transport boundaries."""
 import os
 from pathlib import Path
 import subprocess
@@ -78,15 +78,21 @@ int main() {
 
     def test_preserve_desired_conversation_and_fail_closed(self):
         source = (ROOT / 'main/eidolon/eidolon_voice_controller.cc').read_text()
-        start = source.index('void EidolonVoiceController::DoPermissionsChanged(')
+        start = source.index('esp_err_t EidolonVoiceController::DoConfigurationInvalidated(')
         handler = source[start:source.index('\n}\n', start) + 3]
         harness = r'''
 #include <cassert>
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <algorithm>
 #define ESP_LOGI(...) ((void)0)
-constexpr int ESP_OK=0;
+using esp_err_t=int;
+constexpr int ESP_OK=0, ESP_ERR_INVALID_STATE=-1, ESP_ERR_NOT_ALLOWED=-2;
+constexpr int kActiveAckSettleDelay=150;
+constexpr auto kControlOpConfigRefresh="config.refresh";
+struct ControlCommand { std::string id,op; };
+void vTaskDelay(int) {}
 [[maybe_unused]] constexpr auto kSessionCloseType="close";
 enum class VoiceSessionState { Reconnecting };
 enum class EndReason { Superseded };
@@ -96,6 +102,9 @@ public:
   uint32_t session_generation_=7;
   bool shared_visit_=false, standby_=false, config_refresh_required_=false;
   bool conversation_confirmed_=true, audio_open=true;
+  bool changed=true, channel_available=true;
+  int refresh_error=0, refreshes=0, receipts=0;
+  struct { struct { uint32_t revision=7; } output_policy; } config_;
   std::string current_conversation_id_="confirmed-id", pending_join="request-id";
   std::vector<std::string> calls;
   int connect_error=ESP_OK, terminal_ends=0, closes_sent=0, shared_ends=0;
@@ -105,6 +114,15 @@ public:
   struct Recovery { std::vector<std::string>* calls;
     void OnDisconnected(int64_t) { calls->push_back("recovery"); }
   } channel_recovery_{&calls};
+  int RefreshHubConfig(bool persist, bool *different) {
+    assert(!persist); ++refreshes; *different=changed;
+    if (!refresh_error) config_refresh_required_=false;
+    return refresh_error;
+  }
+  bool HasChannelConfig() const { return channel_available; }
+  void AckCommand(const ControlCommand& c,const char*,const char*) {
+    assert(c.op=="config.refresh"); ++receipts; calls.push_back("receipt");
+  }
   void CloseConversationAudio() { audio_open=false; calls.push_back("audio-close"); }
   void FinishSharedVisit(const char*) { ++shared_ends; }
   void SetState(VoiceSessionState, const char*) { calls.push_back("reconnecting"); }
@@ -112,7 +130,7 @@ public:
   void MarkSessionSuperseded(const char*) { ++session_generation_; }
   void SetOperationalReady(bool ready,const char*) { assert(!ready); }
   int ConnectChannel() {
-    assert(!audio_open && config_refresh_required_);
+    assert(!audio_open && !config_refresh_required_);
     assert(!calls.empty() && calls.front()=="audio-close");
     calls.push_back("fresh-owner-connect"); return connect_error;
   }
@@ -120,29 +138,57 @@ public:
   void PublishSessionRequest(const char*, const std::string&) { ++closes_sent; }
   void HandleSessionEnd(EndReason) { ++terminal_ends; current_conversation_id_.clear(); }
   void CompletePendingRoomJoinCommand(const char*,const char*) { pending_join.clear(); }
-  void DoPermissionsChanged(uint32_t generation);
+  int DoConfigurationInvalidated(uint32_t generation, const std::string* command_id=nullptr);
 };
 HANDLER
 int main() {
   EidolonVoiceController stale;
-  stale.DoPermissionsChanged(6);
+  stale.DoConfigurationInvalidated(6);
   assert(stale.calls.empty() && stale.audio_open);
   EidolonVoiceController active;
-  active.DoPermissionsChanged(7);
+  active.DoConfigurationInvalidated(7);
   assert(active.current_conversation_id_=="confirmed-id");
   assert(active.conversation_confirmed_ && active.pending_join=="request-id");
   assert(active.terminal_ends==0 && active.closes_sent==0);
   assert(active.calls.back()=="fresh-owner-connect" && active.standby_);
   EidolonVoiceController failed;
-  failed.connect_error=-1; failed.DoPermissionsChanged(7);
+  failed.refresh_error=-3; failed.DoConfigurationInvalidated(7);
   assert(!failed.audio_open && failed.config_refresh_required_);
   assert(failed.current_conversation_id_=="confirmed-id");
   assert(failed.calls.back()=="backoff");
   EidolonVoiceController idle;
-  idle.current_conversation_id_.clear(); idle.DoPermissionsChanged(7);
+  idle.current_conversation_id_.clear(); idle.DoConfigurationInvalidated(7);
   assert(idle.current_conversation_id_.empty() && idle.terminal_ends==0);
+  EidolonVoiceController same;
+  same.changed=false;
+  for (int i=0;i<40;++i) assert(same.DoConfigurationInvalidated(7)==ESP_OK);
+  assert(same.calls.empty() && same.audio_open && same.session_generation_==7);
+  assert(same.current_conversation_id_=="confirmed-id" && same.pending_join=="request-id");
+  EidolonVoiceController unchanged_visit;
+  unchanged_visit.shared_visit_=true; unchanged_visit.changed=false;
+  unchanged_visit.DoConfigurationInvalidated(7);
+  assert(unchanged_visit.audio_open && unchanged_visit.shared_ends==0);
+  EidolonVoiceController rejected;
+  rejected.refresh_error=ESP_ERR_NOT_ALLOWED;
+  assert(rejected.DoConfigurationInvalidated(7)==ESP_ERR_NOT_ALLOWED);
+  assert(!rejected.audio_open && rejected.config_refresh_required_);
+  assert(rejected.calls.back()=="recovery");
+  EidolonVoiceController waiting;
+  waiting.channel_available=false; waiting.DoConfigurationInvalidated(7);
+  assert(!waiting.audio_open && waiting.calls.back()=="recovery");
+  EidolonVoiceController command;
+  const std::string id="refresh-id";
+  assert(command.DoConfigurationInvalidated(7,&id)==ESP_OK);
+  assert(command.receipts==1 && command.refreshes==1);
+  assert(command.calls[0]=="audio-close" && command.calls[1]=="receipt");
+  assert(std::find(command.calls.begin(),command.calls.end(),"receipt") <
+         std::find(command.calls.begin(),command.calls.end(),"disconnect"));
+  EidolonVoiceController unchanged_command;
+  unchanged_command.changed=false;
+  unchanged_command.DoConfigurationInvalidated(7,&id);
+  assert(unchanged_command.audio_open && unchanged_command.receipts==1);
   EidolonVoiceController visit;
-  visit.shared_visit_=true; visit.DoPermissionsChanged(7);
+  visit.shared_visit_=true; visit.DoConfigurationInvalidated(7);
   assert(!visit.audio_open && visit.shared_ends==1);
   assert(!visit.config_refresh_required_); // no standing-policy widening
 }

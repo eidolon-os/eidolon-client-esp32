@@ -140,7 +140,7 @@ dependencies:
 
   # Our fork of livekit/client-sdk-esp32, pinned to a commit: managed_components/
   # is not tracked, so the fork is the only place a fix to this SDK survives.
-  # Always the head of the fork's eidolon_dev branch, which carries our changes
+  # A published, immutable fork commit, which carries our changes
   # on top of upstream/main (v0.3.11 at the time of this pin):
   #   - the engine releases a subscribed audio track when it goes away, so a
   #     connection can carry more than one conversation;
@@ -151,12 +151,11 @@ dependencies:
   #   - receive-only and data-only rooms do not allocate/start a capture sink;
   #   - disabled TCP ICE candidates cannot fail a UDP-only peer before UDP arrives.
   #   - receive-only peers advertise a receive codec without enabling publication.
-  #   - local participant permissions reach the public callback for config invalidation.
   # https over ssh so a build needs no SSH access to the fork.
   livekit/livekit:
     git: https://github.com/eidolon-os/client-sdk-esp32.git
     path: components/livekit
-    version: "f7b4279643451c43d0bc0017ac1f564971de6714"
+    version: "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
     rules:
     - if: target in [esp32s3, esp32p4, esp32s31]
 

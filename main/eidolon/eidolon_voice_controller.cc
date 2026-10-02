@@ -315,10 +315,10 @@ void EidolonVoiceController::ControllerLoop()
         if (inbox_.Take(ev)) {
             DispatchAndRelease(ev);
         }
-        if (signals & ControllerEventInbox<Event>::kPermissionsChanged) {
+        if (signals & ControllerEventInbox<Event>::kConfigurationInvalidated) {
             ev = {};
-            ev.type = EventType::PermissionsChanged;
-            ev.generation = permissions_generation_.load(std::memory_order_acquire);
+            ev.type = EventType::ConfigurationInvalidated;
+            ev.generation = configuration_generation_.load(std::memory_order_acquire);
             DispatchAndRelease(ev);
         }
         // Bound work on both sides: a command flood cannot starve maintenance,
@@ -374,11 +374,11 @@ esp_err_t EidolonVoiceController::Enqueue(Event ev)
             : ControllerEventInbox<Event>::kSessionActivity);
         return ESP_OK;
     }
-    if (ev.type == EventType::PermissionsChanged) {
+    if (ev.type == EventType::ConfigurationInvalidated) {
         // Invalidation asks for current configuration, not each intermediate
-        // permission snapshot. A command backlog must not drop this hint.
-        permissions_generation_.store(ev.generation, std::memory_order_release);
-        inbox_.Signal(task_, ControllerEventInbox<Event>::kPermissionsChanged);
+        // transport update. A command backlog must not drop this hint.
+        configuration_generation_.store(ev.generation, std::memory_order_release);
+        inbox_.Signal(task_, ControllerEventInbox<Event>::kConfigurationInvalidated);
         return ESP_OK;
     }
     // The queue copies the struct (including the payload pointer); on success the
@@ -450,8 +450,8 @@ void EidolonVoiceController::Dispatch(const Event& ev)
     case EventType::LiveKitState:
         DoLiveKitState(ev.lk_state, ev.generation);
         break;
-    case EventType::PermissionsChanged:
-        DoPermissionsChanged(ev.generation);
+    case EventType::ConfigurationInvalidated:
+        DoConfigurationInvalidated(ev.generation);
         break;
 #if CONFIG_EIDOLON_GUARD_SERVICE
     case EventType::GuardObservation:
@@ -884,8 +884,9 @@ esp_err_t EidolonVoiceController::LoadAuthorityRoutes(bool restore_from_storage)
     return ESP_OK;
 }
 
-esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist)
+esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist, bool* channel_changed)
 {
+    if (channel_changed) *channel_changed = false;
     if (device_control_uri_.empty()) {
         return ESP_ERR_INVALID_STATE;
     }
@@ -921,6 +922,17 @@ esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist)
     if (err != ESP_OK) {
         return err;
     }
+    if (channel_changed) {
+        *channel_changed = ChannelConfigurationChanged(config_, fresh);
+        if (!*channel_changed) {
+            // Initial ACTIVE and local track updates also reach the official
+            // participant callback. Refresh only the clock; retain the current
+            // conversation, output gate and connection when config is equal.
+            config_.clock = fresh.clock;
+            config_refresh_required_ = false;
+            return ESP_OK;
+        }
+    }
     if (!CurrentOutputGate().Bind(fresh.output_policy)) return ESP_ERR_INVALID_STATE;
     if (persist) {
         // Provider credentials may rotate on every approved handoff. The
@@ -931,7 +943,7 @@ esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist)
             return err;
         }
     }
-    if (!(fresh.output_policy==config_.output_policy) && session_.IsConnected()) {
+    if (!channel_changed && !(fresh.output_policy==config_.output_policy) && session_.IsConnected()) {
         CurrentOutputGate().Close();
         CloseConversationAudio();
         session_.Disconnect(); // policy changes rebuild the media graph too
@@ -2473,21 +2485,11 @@ void EidolonVoiceController::HandleConfigRefreshCommand(const std::string& comma
     command.id = command_id;
     command.op = kControlOpConfigRefresh;
 
-    if (RefreshHubConfig() != ESP_OK) {
+    if (DoConfigurationInvalidated(session_generation_, &command_id) != ESP_OK) {
         ESP_LOGW(TAG, "Control-triggered config refresh failed");
         AckCommand(command, "failed", "CONFIG_REFRESH_FAILED");
         return;
     }
-
-    if (config_.status == HubConfigStatus::Active) {
-        AckCommand(command, "succeeded", "OK", "", "{\"status\":\"active\"}");
-        vTaskDelay(kActiveAckSettleDelay);
-        ConnectChannel();
-        return;
-    }
-
-    AckCommand(command, "succeeded", "OK");
-    ConnectChannel();
 }
 
 #if CONFIG_EIDOLON_GUARD_SERVICE
@@ -3213,9 +3215,9 @@ void EidolonVoiceController::DoActivation(const Esp32HubConfig& config)
         ev.generation = generation;
         Enqueue(ev);
     });
-    session_.SetOnPermissionsChanged([this](uint32_t generation) {
+    session_.SetOnConfigurationInvalidated([this](uint32_t generation) {
         Event ev;
-        ev.type = EventType::PermissionsChanged;
+        ev.type = EventType::ConfigurationInvalidated;
         ev.generation = generation;
         Enqueue(ev);
     });
@@ -3546,7 +3548,7 @@ esp_err_t EidolonVoiceController::ConnectChannel()
     if (!channel_recovery_.network_available()) {
         return ESP_ERR_INVALID_STATE;
     }
-    // Permission signalling is only an invalidation hint. The authenticated
+    // Transport signalling is only an invalidation hint. The authenticated
     // Owner configuration decides the next graph, including whether input is
     // allowed. Keep the hint across HTTP failure so the existing channel
     // backoff retries the refresh rather than reopening a stale graph.
@@ -3554,7 +3556,7 @@ esp_err_t EidolonVoiceController::ConnectChannel()
         const esp_err_t err = RefreshHubConfig(/*persist=*/false);
         if (err != ESP_OK) return err;
         if (HasChannelConfig() && !current_conversation_id_.empty()) {
-            SetState(VoiceSessionState::Reconnecting, "permissions_config_refreshed");
+            SetState(VoiceSessionState::Reconnecting, "channel_config_refreshed");
         }
     }
     if (!HasChannelConfig()) return ESP_ERR_INVALID_STATE;
@@ -3857,31 +3859,63 @@ uint64_t EidolonVoiceController::GuardEventTimestampMs(uint64_t monotonic_ms)
 }
 #endif
 
-void EidolonVoiceController::DoPermissionsChanged(uint32_t generation)
+esp_err_t EidolonVoiceController::DoConfigurationInvalidated(uint32_t generation,
+                                                            const std::string* command_id)
 {
-    if (generation != session_generation_) return;
-    ESP_LOGI(TAG, "[lifecycle] local permissions invalidated configuration gen=%lu",
+    if (generation != session_generation_) return ESP_ERR_INVALID_STATE;
+    bool changed = false;
+    const esp_err_t refreshed = RefreshHubConfig(/*persist=*/false, &changed);
+    const auto acknowledge = [this, command_id]() {
+        if (!command_id) return;
+        ControlCommand command;
+        command.id = *command_id;
+        command.op = kControlOpConfigRefresh;
+        AckCommand(command, "succeeded", "OK");
+    };
+    if (refreshed == ESP_OK && !changed) {
+        ESP_LOGI(TAG, "[lifecycle] Owner configuration current gen=%lu revision=%lu",
+                 static_cast<unsigned long>(generation),
+                 static_cast<unsigned long>(config_.output_policy.revision));
+        acknowledge();
+        return ESP_OK;
+    }
+    ESP_LOGI(TAG, "[lifecycle] Owner configuration invalidated gen=%lu",
              static_cast<unsigned long>(generation));
     CloseConversationAudio();
+    if (refreshed == ESP_OK && command_id) {
+        // Receipt belongs to the old room. Flush it before retiring that room;
+        // neither a duplicate hint nor a reconnect failure needs a new fetch.
+        acknowledge();
+        vTaskDelay(kActiveAckSettleDelay);
+    }
     if (shared_visit_) {
         // A temporary visit must not be widened using its standing policy.
-        FinishSharedVisit("shared_permissions_changed");
-        return;
+        FinishSharedVisit("shared_configuration_changed");
+        return refreshed;
     }
     // A graph rebuild is a transport interruption, not a request to end the
     // conversation. Keep desired state and the confirmed id; the existing
     // Connected handler re-announces it and restores only fresh allowed media.
-    if (!current_conversation_id_.empty()) {
-        SetState(VoiceSessionState::Reconnecting, "permissions_changed");
+    if (refreshed == ESP_OK && HasChannelConfig() && !current_conversation_id_.empty()) {
+        SetState(VoiceSessionState::Reconnecting, "configuration_changed");
     }
     DisarmConnectWatchdog();
-    MarkSessionSuperseded("permissions_changed");
+    MarkSessionSuperseded("configuration_changed");
     session_.Disconnect();
     standby_ = true;
-    SetOperationalReady(false, "permissions_changed");
+    SetOperationalReady(false, "configuration_changed");
     channel_recovery_.OnDisconnected(esp_timer_get_time() / 1000);
-    config_refresh_required_ = true;
-    if (ConnectChannel() != ESP_OK) ScheduleChannelReconnect("permissions_refresh_failed");
+    config_refresh_required_ = refreshed != ESP_OK;
+    if (refreshed != ESP_OK) {
+        // An unavailable Authority leaves media closed. The existing channel
+        // backoff must fetch fresh config before it can reopen any graph.
+        if (refreshed != ESP_ERR_NOT_ALLOWED) ScheduleChannelReconnect("configuration_refresh_failed");
+        return refreshed;
+    }
+    if (!HasChannelConfig()) return ESP_OK;
+    const esp_err_t connected = ConnectChannel();
+    if (connected != ESP_OK) ScheduleChannelReconnect("configuration_connect_failed");
+    return ESP_OK;
 }
 
 esp_err_t EidolonVoiceController::DoLeaveRoom()
