@@ -648,8 +648,52 @@ void TestChangeWordingAndNavigation() {
 
 }  // namespace
 
+
+// A real Provider may declare fewer traits than the type's preset (a light that
+// cannot dim) and then report only those keys. The wire allows it; the panel
+// must parse it, keep the missing reading unknown, and still draw the tile.
+void TestPartialStateDevice() {
+    const std::string payload = Mutate(PayloadOf("panel-snapshot.json"), [](cJSON* root) {
+        cJSON* devices = cJSON_GetObjectItemCaseSensitive(root, "devices");
+        for (cJSON* device = devices->child; device; device = device->next) {
+            const cJSON* id = cJSON_GetObjectItemCaseSensitive(device, "device_id");
+            if (std::string(id->valuestring) == "living.main_light") {
+                cJSON* state = cJSON_GetObjectItemCaseSensitive(device, "state");
+                cJSON_DeleteItemFromObject(state, "level");
+            }
+        }
+    });
+    Message message;
+    std::string error;
+    const bool parsed = ParseMessage(kOpSnapshot, payload, message, &error);
+    if (!parsed) std::fprintf(stderr, "partial snapshot rejected: %s\n", error.c_str());
+    CHECK(parsed);
+    SmartHomeStore store;
+    CHECK(store.ApplySnapshot(std::move(message.snapshot)) == ApplyOutcome::Applied);
+    const Device& light = Find(store, "living.main_light");
+    CHECK(light.has_state && light.online);
+    CHECK(light.state.on.known);
+    CHECK(!light.state.level.known);
+    CHECK(!DeviceStateText(light).empty());
+    // A delta that only carries the on/off reading applies the same way.
+    const std::string delta_payload = Mutate(PayloadOf("panel-delta.json"), [](cJSON* root) {
+        cJSON* changes = cJSON_GetObjectItemCaseSensitive(root, "changes");
+        cJSON* first = changes->child;
+        cJSON_ReplaceItemInObject(first, "device_id", cJSON_CreateString("living.main_light"));
+        cJSON* state = cJSON_CreateObject();
+        cJSON_AddBoolToObject(state, "on", false);
+        cJSON_ReplaceItemInObject(first, "state", state);
+    });
+    Message delta;
+    CHECK(ParseMessage(kOpDelta, delta_payload, delta, &error));
+    CHECK(store.ApplyDelta(delta.delta, kUtc) == ApplyOutcome::Applied);
+    CHECK(!Find(store, "living.main_light").state.on.value);
+    CHECK(!Find(store, "living.main_light").state.level.known);
+}
+
 int main() {
     TestSnapshotGolden();
+    TestPartialStateDevice();
     TestDeltaGoldenAndSequence();
     TestSnapshotReplacesAndLinkStaleness();
     TestVoiceResults();
