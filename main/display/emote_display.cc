@@ -360,6 +360,14 @@ bool EmoteDisplay::InsertAnimDialog(const char* emoji_name, uint32_t duration_ms
     return false;
 }
 
+void EmoteDisplay::SetChromeLayoutDeltas(ChromeLayoutDeltas deltas)
+{
+    chrome_layout_deltas_ = deltas;
+    if (assets_loaded_) {
+        EnsureVoiceChromeObjects();
+    }
+}
+
 void EmoteDisplay::OnAssetsUnloaded()
 {
     assets_loaded_ = false;
@@ -450,7 +458,16 @@ bool EmoteDisplay::EnsureVoiceChromeObjects()
         }
 
         emote_lock(emote_handle_);
-        gfx_obj_align(obj, layout.align, layout.x, layout.y);
+        int16_t y = layout.y;
+        if (layout.align == GFX_ALIGN_TOP_MID) {
+            y += chrome_layout_deltas_.top_y;
+        } else if (layout.align == GFX_ALIGN_BOTTOM_MID) {
+            y += chrome_layout_deltas_.bottom_y;
+        }
+        if (layout.name == kStateLabel) {
+            y += chrome_layout_deltas_.state_y;
+        }
+        gfx_obj_align(obj, layout.align, layout.x, y);
         gfx_obj_set_size(obj, layout.width, layout.height);
         gfx_label_set_text_align(obj, layout.text_align);
         gfx_label_set_long_mode(obj, layout.long_mode);

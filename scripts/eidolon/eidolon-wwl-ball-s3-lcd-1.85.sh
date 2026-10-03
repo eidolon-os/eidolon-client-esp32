@@ -73,9 +73,13 @@ CONFIG_EIDOLON_UI_TALK_BUTTON=y
 CONFIG_USE_AUDIO_PROCESSOR=n
 CONFIG_USE_DEVICE_AEC=n
 CONFIG_USE_SERVER_AEC=n
-CONFIG_USE_DEFAULT_MESSAGE_STYLE=y
-# CONFIG_USE_EMOTE_MESSAGE_STYLE is not set
+# CONFIG_USE_DEFAULT_MESSAGE_STYLE is not set
+CONFIG_USE_EMOTE_MESSAGE_STYLE=y
 # CONFIG_USE_WECHAT_MESSAGE_STYLE is not set
+# CONFIG_FLASH_DEFAULT_ASSETS is not set
+# CONFIG_FLASH_CUSTOM_ASSETS is not set
+# CONFIG_FLASH_NONE_ASSETS is not set
+CONFIG_FLASH_EXPRESSION_ASSETS=y
 # CONFIG_EIDOLON_WAKE_WORD_ENABLE is not set
 CONFIG_WAKE_WORD_DISABLED=y
 # CONFIG_USE_ESP_WAKE_WORD is not set
@@ -104,9 +108,13 @@ ensure_wwl_sdkconfig() {
   set_sdkconfig_bool USE_AUDIO_PROCESSOR n
   set_sdkconfig_bool USE_DEVICE_AEC n
   set_sdkconfig_bool USE_SERVER_AEC n
-  set_sdkconfig_bool USE_DEFAULT_MESSAGE_STYLE y
-  set_sdkconfig_bool USE_EMOTE_MESSAGE_STYLE n
+  set_sdkconfig_bool USE_DEFAULT_MESSAGE_STYLE n
+  set_sdkconfig_bool USE_EMOTE_MESSAGE_STYLE y
   set_sdkconfig_bool USE_WECHAT_MESSAGE_STYLE n
+  set_sdkconfig_bool FLASH_DEFAULT_ASSETS n
+  set_sdkconfig_bool FLASH_CUSTOM_ASSETS n
+  set_sdkconfig_bool FLASH_NONE_ASSETS n
+  set_sdkconfig_bool FLASH_EXPRESSION_ASSETS y
   set_sdkconfig_bool EIDOLON_WAKE_WORD_ENABLE n
   set_sdkconfig_bool WAKE_WORD_DISABLED y
   set_sdkconfig_bool USE_ESP_WAKE_WORD n

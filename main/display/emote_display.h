@@ -9,6 +9,16 @@
 
 namespace emote {
 
+// Board-scoped y offsets for the centered voice-chrome labels, in pixels.
+// Zero deltas keep the default chrome geometry, so boards that never call
+// SetChromeLayoutDeltas are unaffected. A positive top_y moves the top chrome
+// (mode/state labels) down; a negative bottom_y moves the bottom caption up.
+struct ChromeLayoutDeltas {
+    int16_t top_y = 0;
+    int16_t bottom_y = 0;
+    int16_t state_y = 0;
+};
+
 class EmoteDisplay : public Display {
 public:
     EmoteDisplay(esp_lcd_panel_handle_t panel, esp_lcd_panel_io_handle_t panel_io, int width, int height);
@@ -31,6 +41,8 @@ public:
     bool InsertAnimDialog(const char* emoji_name, uint32_t duration_ms);
     void OnAssetsUnloaded() override;
     void OnAssetsLoaded();
+
+    void SetChromeLayoutDeltas(ChromeLayoutDeltas deltas);
 
     void RefreshAll();
 
@@ -62,6 +74,7 @@ private:
     PresenceState presence_state_ = PresenceState::Unavailable;
     PresenceState applied_presence_state_ = PresenceState::Unavailable;
     bool presence_applied_ = false;
+    ChromeLayoutDeltas chrome_layout_deltas_;
 
     bool EnsureVoiceChromeObjects();
     void ApplyVoiceChrome();

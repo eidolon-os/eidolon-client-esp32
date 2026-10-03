@@ -81,6 +81,7 @@ bash tests/run_owner_trust_storage_policy_tests.sh
 bash tests/run_owner_trust_commissioner_tests.sh
 bash tests/run_eidolon_common_tests.sh
 python tests/serial_buildstamp_reconnect_test.py
+python tests/wwl_ball_emote_display_test.py
 ```
 
 The Python test imports IDF's real partition parser. No duplicate CSV parser,

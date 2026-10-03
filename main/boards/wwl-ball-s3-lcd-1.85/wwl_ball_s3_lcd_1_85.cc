@@ -3,6 +3,7 @@
 #include "audio/audio_codec.h"
 #include "display/display.h"
 #include "display/lcd_display.h"
+#include "display/emote_display.h"
 #include "application.h"
 #include "button.h"
 #include "config.h"
@@ -258,7 +259,7 @@ class WwlBallS3Lcd185Board final : public WifiBoard {
 private:
     i2c_master_bus_handle_t i2c_bus_ = nullptr;
     esp_io_expander_handle_t io_expander_ = nullptr;
-    LcdDisplay* display_ = nullptr;
+    Display* display_ = nullptr;
     Button boot_button_;
     Button power_button_;
     uint8_t saved_brightness_ = 75;
@@ -342,9 +343,18 @@ private:
         ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
         ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(panel, DISPLAY_SWAP_XY));
         ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y));
+#if CONFIG_USE_EMOTE_MESSAGE_STYLE
+        auto* emote_display = new emote::EmoteDisplay(panel, panel_io, DISPLAY_WIDTH, DISPLAY_HEIGHT);
+        // The half-scale (emoji_small) face frees two 25px font lines at the top
+        // and bottom of the panel; shift the centered top chrome down two lines
+        // and lift the bottom caption up two lines so the chrome clears the face.
+        emote_display->SetChromeLayoutDeltas({128, -50, 148});
+        display_ = emote_display;
+#else
         display_ = new SpiLcdDisplay(panel_io, panel, DISPLAY_WIDTH, DISPLAY_HEIGHT,
                                      DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X,
                                      DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
+#endif
     }
 
     static void PowerLatchTimerCallback(void* arg) {
