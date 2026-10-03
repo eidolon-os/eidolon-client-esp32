@@ -14,6 +14,7 @@
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_st77916.h>
 #include <esp_log.h>
+#include <esp_timer.h>
 #include <esp_codec_dev_defaults.h>
 
 #include <cassert>
@@ -259,6 +260,12 @@ private:
     esp_io_expander_handle_t io_expander_ = nullptr;
     LcdDisplay* display_ = nullptr;
     Button boot_button_;
+    Button power_button_;
+    uint8_t saved_brightness_ = 75;
+    // Standby is tracked independently from backlight brightness so a short-press
+    // screen-off is never mistaken for the power-latch power-off standby.
+    bool power_standby_ = false;
+    esp_timer_handle_t power_latch_timer_ = nullptr;
 
     void InitializeI2c() {
         const i2c_master_bus_config_t config = {
@@ -340,6 +347,80 @@ private:
                                      DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
     }
 
+    static void PowerLatchTimerCallback(void* arg) {
+        static_cast<WwlBallS3Lcd185Board*>(arg)->ReassertPowerLatch();
+    }
+
+    void InitializePowerLatchTimer() {
+        const esp_timer_create_args_t timer_args = {
+            .callback = PowerLatchTimerCallback,
+            .arg = this,
+            .dispatch_method = ESP_TIMER_TASK,
+            .name = "wwl_pwr_latch",
+            .skip_unhandled_events = true,
+        };
+        ESP_ERROR_CHECK(esp_timer_create(&timer_args, &power_latch_timer_));
+    }
+
+    // The board has an external power latch on PWR_Control_PIN (GPIO7) instead of
+    // ESP32 deep sleep. Pulling it low starts the Xiaozhi-style power-off standby,
+    // but the MCU keeps running and the button must still be able to wake the
+    // board, so GPIO7 is reasserted high a few seconds later.
+    void ReassertPowerLatch() {
+        gpio_set_level(PWR_Control_PIN, true);
+        ESP_LOGI(TAG, "power latch reasserted; POWER can wake the board");
+    }
+
+    void EnterPowerStandby() {
+        Backlight* backlight = GetBacklight();
+        if (backlight->brightness() > 0) {
+            saved_brightness_ = backlight->brightness();
+        }
+        backlight->SetBrightness(0);
+        gpio_set_level(PWR_Control_PIN, false);
+        power_standby_ = true;
+
+        esp_err_t err = esp_timer_stop(power_latch_timer_);
+        if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+            ESP_LOGW(TAG, "power latch timer stop failed: %s", esp_err_to_name(err));
+        }
+        err = esp_timer_start_once(power_latch_timer_, 5 * 1000 * 1000);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "power latch timer start failed: %s", esp_err_to_name(err));
+        }
+        ESP_LOGI(TAG, "entered power-off standby");
+    }
+
+    void WakeFromPowerStandby() {
+        gpio_set_level(PWR_Control_PIN, true);
+        GetBacklight()->SetBrightness(saved_brightness_);
+        power_standby_ = false;
+
+        esp_err_t err = esp_timer_stop(power_latch_timer_);
+        if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+            ESP_LOGW(TAG, "power latch timer stop failed: %s", esp_err_to_name(err));
+        }
+        ESP_LOGI(TAG, "woke from power-off standby");
+    }
+
+    void TogglePowerStandby() {
+        if (power_standby_) {
+            WakeFromPowerStandby();
+        } else {
+            EnterPowerStandby();
+        }
+    }
+
+    void ToggleDisplay() {
+        Backlight* backlight = GetBacklight();
+        if (backlight->brightness() == 0) {
+            backlight->SetBrightness(saved_brightness_);
+            return;
+        }
+        saved_brightness_ = backlight->brightness();
+        backlight->SetBrightness(0);
+    }
+
     void InitializeButtons() {
 #if CONFIG_EIDOLON_HUB_MODE
         eidolon::SetEidolonSetupHandler([this]() { EnterWifiConfigMode(); });
@@ -377,13 +458,18 @@ private:
             Application::GetInstance().Schedule([this]() { EnterWifiConfigMode(); });
 #endif
         });
+        power_button_.OnClick([this]() {
+            ToggleDisplay();
+        });
+        power_button_.OnLongPress([this]() { TogglePowerStandby(); });
     }
 
 public:
-    WwlBallS3Lcd185Board() : boot_button_(BOOT_BUTTON_GPIO) {
+    WwlBallS3Lcd185Board() : boot_button_(BOOT_BUTTON_GPIO), power_button_(PWR_BUTTON_GPIO) {
         gpio_reset_pin(PWR_Control_PIN);
         gpio_set_direction(PWR_Control_PIN, GPIO_MODE_OUTPUT);
         gpio_set_level(PWR_Control_PIN, true);
+        InitializePowerLatchTimer();
         InitializeI2c();
         InitializeTca9554();
         InitializeSpi();
