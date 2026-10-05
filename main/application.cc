@@ -284,17 +284,7 @@ void Application::StartEidolonWakeWord()
 
         EidolonAudioInputCallbacks callbacks;
         callbacks.on_wake_word_detected = [this](const std::string& wake_word) {
-            (void)wake_word;
-            Schedule([this]() {
-                if (!voice_transport_) {
-                    return;
-                }
-                if (voice_transport_->GetSessionState() != eidolon::VoiceSessionState::ConfigReady) {
-                    return;
-                }
-                ESP_LOGI(TAG, "Wake word -> ToggleVoiceSession");
-                ToggleVoiceSession();
-            });
+            WakeWordInvoke(wake_word);
         };
         eidolon_audio_input_service_->SetCallbacks(callbacks);
         eidolon_audio_input_service_->Start();
@@ -1854,6 +1844,15 @@ bool Application::UpgradeFirmware(const std::string& url, const std::string& ver
 }
 
 void Application::WakeWordInvoke(const std::string& wake_word) {
+#if CONFIG_EIDOLON_HUB_MODE
+    Schedule([this]() {
+        if (voice_transport_ && voice_transport_->GetSessionState() == eidolon::VoiceSessionState::ConfigReady) {
+            RequestVoiceJoin();
+        }
+    });
+    return;
+#endif
+
     if (!protocol_) {
         return;
     }

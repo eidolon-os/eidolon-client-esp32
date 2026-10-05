@@ -10,6 +10,17 @@
 class NoAudioCodec : public AudioCodec {
 protected:
     std::mutex data_if_mutex_;
+    struct OutputBridge {
+        audio_codec_data_if_t api{};
+        struct FormatGuard {
+            audio_codec_if_t api{};
+            OutputBridge* owner = nullptr;
+        } format;
+        NoAudioCodec* codec = nullptr;
+        bool valid_format = false;
+    };
+    mutable OutputBridge output_bridge_;
+    mutable esp_codec_dev_handle_t playback_dev_ = nullptr;
 
     virtual int Write(const int16_t* data, int samples) override;
     virtual int Read(int16_t* dest, int samples) override;
@@ -18,6 +29,7 @@ protected:
 
 public:
     virtual ~NoAudioCodec();
+    esp_codec_dev_handle_t GetOutputDeviceHandle() const override;
 };
 
 class NoAudioCodecDuplex : public NoAudioCodec {

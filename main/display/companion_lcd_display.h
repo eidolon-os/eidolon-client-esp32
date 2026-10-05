@@ -10,7 +10,7 @@ class LvglFont;
 class CompanionLcdDisplay : public SpiLcdDisplay {
 public:
     CompanionLcdDisplay(esp_lcd_panel_io_handle_t io,esp_lcd_panel_handle_t panel,
-        int width,int height,int ox,int oy,bool mx,bool my,bool swap);
+        int width,int height,int ox,int oy,bool mx,bool my,bool swap,int safe_inset=0);
     ~CompanionLcdDisplay() override;
     void SetupUI() override;
     void SetTheme(Theme* theme) override;
@@ -28,6 +28,7 @@ private:
     static bool OnTransfer(esp_lcd_panel_io_handle_t,esp_lcd_panel_io_event_data_t*,void*);
     static void OnFlush(lv_event_t* event);
     static void OnTimer(lv_timer_t* timer);
+    int safe_inset_=0;
     eidolon::CompanionFaceView face_;
     std::shared_ptr<LvglFont> fallback_font_;
     std::shared_ptr<LvglFont> content_font_;

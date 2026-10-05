@@ -1,6 +1,6 @@
 # Eidolon board build and flash contract
 
-Use the board's script under `scripts/eidolon/`. All six board scripts call
+Use the board's script under `scripts/eidolon/`. All maintained board scripts call
 `eidolon_flash` in `eidolon-common.sh`: build → preflight → IDF write → partition
 readback → official OTA activation → runtime build-stamp verification. There is
 no project `idf_ext.py` hook. Direct `idf.py`, raw esptool, Ninja flash targets and

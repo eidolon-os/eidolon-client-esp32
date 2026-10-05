@@ -1,0 +1,39 @@
+{
+  "board": "xiaoling",
+  "sdk_commit": "3f98d8deed47d7e9b8ea9cb65b13d87c61174033",
+  "idf": "5.5.4",
+  "source_sha256": {
+    "main/boards/xiaoling/xiaoling.cc": "888cb68341d84307136970eaff30d9a3ab04759b5e237cbc5eac6374e4c391d5",
+    "main/boards/xiaoling/config.h": "a77ca63a1e567985f5edfdff47444e5438c3cd41d2c52ec4626fa963137fffcc",
+    "main/boards/xiaoling/config.json": "fc18fe66394b508fb46f5f1453721b1a7de46b6d6e78601075dc0bb292b16296",
+    "main/boards/xiaoling/lcd_init.h": "f281d9b22aafb357ea5e2658bebb5c5c4c41169ccb61ecf2891daee042aaa9ff",
+    "main/boards/xiaoling/wake_frame.h": "68bfbb35ef5315fee8daf25adbd5058db297f452657edcc088cd32e29120a869",
+    "main/audio/codecs/no_audio_codec.cc": "6edddc34a11f3a29068ef0ccab00e52e29d78b3dc97f30940ad8635748aa61c5",
+    "main/application.cc": "3d227a8fd258876a66a84a43c313e1ed7e82651535040944f1ec4807446d65a7",
+    "main/display/companion_lcd_display.cc": "3ce74d705d6347a864ca98d48b1e5ef6ea781dfdbb4b2f73f926bdaf1cd675c3",
+    "scripts/eidolon/eidolon-xiaoling.sh": "766a462d413d50346dabbfb219f82475f5be2978858d2a05560939d72040cb96"
+  },
+  "verified_tests": [
+    "xiaoling_wake_frame_test: fragmented, corrupt, repeated and back-to-back frames",
+    "companion_ui_tests: existing UI plus 360px round-panel safe viewport",
+    "declared_board_test: 7 passed",
+    "board_flash_entry_test: 3 passed"
+  ],
+  "hardware": {
+    "chip": "ESP32-S3 v0.2",
+    "psram": "8MB octal",
+    "lcd_id": "00 02 7f 7f"
+  },
+  "flash": "passed: write hashes, partition readback, official OTA activation, running build stamp",
+  "end_to_end_voice": "not_run: requires provisioning and Hub approval",
+  "boot": "25-second boot capture: ST77916 initialized, half_duplex/device_aec=0/capture=raw, assets loaded, commissioning advertising; no panic/reboot loop observed",
+  "provisioning_ssid": "eidolon-c177e0",
+  "binary_sha256": "aa1b7447e610755b24feea461604874fdf53d381433772b7740733887bb9b5e3",
+  "binary_size_bytes": 3133248,
+  "logs_sha256": {
+    "xiaoling-erase.log": "ddfde9610962a0d9184cd7a94e9c81418889df2b6b5efc14ad6c480ecab1ad07",
+    "xiaoling-flash.log": "1276c1981f4874068cfc0f3ae127860bb0fedefe0fa116d70096e52b236f1cc3",
+    "xiaoling-boot.log": "8c912f2118e5f95d335a8cb93a46b40b7ba8e359f6cb0b1bf01f9fe9fdf13654",
+    "xiaoling-ui-tests.log": "4472bcf0c17de7de7c43b01dfa025444363d1a24c6ce3a8fc4b8dd0fa0fcc6ad"
+  }
+}

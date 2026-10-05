@@ -292,6 +292,10 @@ choice BOARD_TYPE
     config BOARD_TYPE_M5STACK_STOPWATCH
         bool "M5Stack StopWatch"
         depends on IDF_TARGET_ESP32S3
+    config BOARD_TYPE_XIAOLING
+        bool "Xiaoling (ESP32-S3 round LCD, external wake chip)"
+        depends on IDF_TARGET_ESP32S3
+
     config BOARD_TYPE_M5STACK_CORE_S3
         bool "M5Stack CoreS3"
         depends on IDF_TARGET_ESP32S3
@@ -1155,7 +1159,7 @@ menu "TAIJIPAI_S3_CONFIG"
 endmenu
 
 menu "Eidolon Hub"
-    depends on BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_2_06 || BOARD_TYPE_ESP_BOX_3 || BOARD_TYPE_ATK_DNESP32S3 || BOARD_TYPE_M5STACK_CORE_S3 || BOARD_TYPE_M5STACK_STACKCHAN || BOARD_TYPE_KORVO_1
+    depends on BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_2_06 || BOARD_TYPE_ESP_BOX_3 || BOARD_TYPE_ATK_DNESP32S3 || BOARD_TYPE_M5STACK_CORE_S3 || BOARD_TYPE_M5STACK_STACKCHAN || BOARD_TYPE_KORVO_1 || BOARD_TYPE_XIAOLING
 
     config EIDOLON_HUB_MODE
         bool "Enable Eidolon Hub mDNS discovery and config"
@@ -1176,7 +1180,7 @@ menu "Eidolon Hub"
 
     config EIDOLON_COMPANION_FACE
         bool
-        default y if EIDOLON_HUB_MODE && (BOARD_TYPE_ESP_BOX_3 || BOARD_TYPE_M5STACK_STACKCHAN || BOARD_TYPE_M5STACK_CORE_S3)
+        default y if EIDOLON_HUB_MODE && (BOARD_TYPE_XIAOLING || BOARD_TYPE_ESP_BOX_3 || BOARD_TYPE_M5STACK_STACKCHAN || BOARD_TYPE_M5STACK_CORE_S3)
 
     config EIDOLON_OUTPUT_POLICY_V1
         bool "Require explicit Owner output policy and session output plan"

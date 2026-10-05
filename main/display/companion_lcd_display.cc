@@ -3,8 +3,8 @@
 #include "eidolon/eidolon_view.h"
 #include <esp_check.h>
 CompanionLcdDisplay::CompanionLcdDisplay(esp_lcd_panel_io_handle_t io,esp_lcd_panel_handle_t panel,
-    int width,int height,int ox,int oy,bool mx,bool my,bool swap)
-    : SpiLcdDisplay(io,panel,width,height,ox,oy,mx,my,swap,false,10) {
+    int width,int height,int ox,int oy,bool mx,bool my,bool swap,int safe_inset)
+    : SpiLcdDisplay(io,panel,width,height,ox,oy,mx,my,swap,false,10), safe_inset_(safe_inset) {
     // Same completion contract as esp_lvgl_port, plus a frame completion stamp.
     // No LVGL object access, allocation or network work in the SPI ISR.
     const esp_lcd_panel_io_callbacks_t callbacks={.on_color_trans_done=OnTransfer};
@@ -49,7 +49,18 @@ void CompanionLcdDisplay::SetupUI() {
     // Use the board-sized boot font for chrome, not the legacy 30px UI patch.
     fallback_font_=LvglThemeManager::GetInstance().GetTheme("light")->text_font();
     content_font_=fallback_font_;
+    if (safe_inset_ > 0) {
+        auto* viewport=lv_obj_create(screen);
+        lv_obj_remove_style_all(viewport);
+        lv_obj_set_size(viewport,width_-2*safe_inset_,height_-2*safe_inset_);
+        lv_obj_center(viewport);
+        screen=viewport;
+    }
     face_.Build({screen,fallback_font_->font(),this,theme->icon_font()->font()});
+    if (safe_inset_ > 0) {
+        lv_obj_set_style_bg_color(lv_display_get_screen_active(display_),
+                                 lv_obj_get_style_bg_color(screen, LV_PART_MAIN), 0);
+    }
     // Base service owns only hardware indicators. The view owns lifecycle and
     // notification text, so there is no second status label over the face.
     const auto indicators=face_.indicators();

@@ -35,6 +35,7 @@ Eidolon ESP32 Client 是 Eidolon 具身智能硬件的设备端固件。它把 E
 | 硬件配置 | 构建脚本 |
 | --- | --- |
 | Waveshare ESP32-S3-Touch-AMOLED-2.06 | `scripts/eidolon/eidolon-esp32-s3-touch-amoled-2.06.sh` |
+| Xiaoling（ESP32-S3 圆屏 / 独立唤醒芯片） | `scripts/eidolon/eidolon-xiaoling.sh` |
 | Espressif ESP-BOX-3 | `scripts/eidolon/eidolon-esp-box-3.sh` |
 | ALIENTEK ATK-DNESP32S3 | `scripts/eidolon/eidolon-atk-dnesp32s3.sh` |
 | M5Stack CoreS3 | `scripts/eidolon/eidolon-m5stack-core-s3.sh` |

@@ -8,12 +8,65 @@
 #define TAG "NoAudioCodec"
 
 NoAudioCodec::~NoAudioCodec() {
-    if (rx_handle_ != nullptr) {
+    if (playback_dev_) {
+        esp_codec_dev_close(playback_dev_);
+        esp_codec_dev_delete(playback_dev_);
+    }
+    if (rx_handle_ != nullptr && input_enabled_) {
         ESP_ERROR_CHECK(i2s_channel_disable(rx_handle_));
     }
-    if (tx_handle_ != nullptr) {
+    if (tx_handle_ != nullptr && output_enabled_) {
         ESP_ERROR_CHECK(i2s_channel_disable(tx_handle_));
     }
+}
+
+// Lazy PCM16 device facade for consumers such as av_render and audio cues.
+// Keep the existing I2S32 framing, slot selection and software volume in Write;
+// opening/closing this output device never owns or reconfigures the microphone.
+esp_codec_dev_handle_t NoAudioCodec::GetOutputDeviceHandle() const {
+    if (playback_dev_) return playback_dev_;
+    auto& bridge = output_bridge_;
+    bridge.codec = const_cast<NoAudioCodec*>(this);
+    bridge.api.is_open = [](const audio_codec_data_if_t*) { return true; };
+    bridge.api.set_fmt = [](const audio_codec_data_if_t* api, esp_codec_dev_type_t,
+                            esp_codec_dev_sample_info_t* fs) {
+        auto* b = reinterpret_cast<OutputBridge*>(const_cast<audio_codec_data_if_t*>(api));
+        b->valid_format = fs && fs->bits_per_sample == 16 &&
+            fs->channel == b->codec->output_channels() &&
+            fs->sample_rate == b->codec->output_sample_rate();
+        return b->valid_format ? ESP_CODEC_DEV_OK : ESP_CODEC_DEV_NOT_SUPPORT;
+    };
+    bridge.api.enable = [](const audio_codec_data_if_t* api, esp_codec_dev_type_t, bool enabled) {
+        auto* b = reinterpret_cast<const OutputBridge*>(api);
+        if (enabled && !b->valid_format) return ESP_CODEC_DEV_NOT_SUPPORT;
+        b->codec->EnableOutput(enabled);
+        return ESP_CODEC_DEV_OK;
+    };
+    bridge.api.write = [](const audio_codec_data_if_t* api, uint8_t* data, int size) {
+        auto* b = reinterpret_cast<const OutputBridge*>(api);
+        if (!b->valid_format || !data || size < 0 || size % sizeof(int16_t)) return ESP_CODEC_DEV_INVALID_ARG;
+        const int samples = size / sizeof(int16_t);
+        return b->codec->Write(reinterpret_cast<int16_t*>(data), samples) == samples
+            ? ESP_CODEC_DEV_OK : ESP_CODEC_DEV_DRV_ERR;
+    };
+    // esp_codec_dev ignores data_if->set_fmt's return value. Enforce the
+    // format through codec_if->set_fs too, whose failure propagates to open().
+    bridge.format.owner = &bridge;
+    bridge.format.api.set_fs = [](const audio_codec_if_t* api, esp_codec_dev_sample_info_t*) {
+        const auto* guard = reinterpret_cast<const OutputBridge::FormatGuard*>(api);
+        return guard->owner->valid_format ? ESP_CODEC_DEV_OK : ESP_CODEC_DEV_NOT_SUPPORT;
+    };
+    esp_codec_dev_cfg_t cfg = {};
+    cfg.dev_type = ESP_CODEC_DEV_TYPE_OUT;
+    cfg.data_if = &bridge.api;
+    cfg.codec_if = &bridge.format.api;
+    playback_dev_ = esp_codec_dev_new(&cfg);
+    if (playback_dev_) {
+        // Cached even before software volume is allocated on open. Unity gain:
+        // the board's existing Write() owns its configured output volume.
+        esp_codec_dev_set_out_vol(playback_dev_, 100);
+    }
+    return playback_dev_;
 }
 
 NoAudioCodecDuplex::NoAudioCodecDuplex(int input_sample_rate, int output_sample_rate, gpio_num_t bclk, gpio_num_t ws, gpio_num_t dout, gpio_num_t din) {

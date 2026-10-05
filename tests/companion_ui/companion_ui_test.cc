@@ -300,6 +300,31 @@ int main(int argc,char** argv) {
         gate.Close();view.Render(model);assert(!Find(screen,model.subtitle));
         view.SetContentFont(&font_noto_basic_16_4);
     }
+    // Xiaoling: the same view lives in an inscribed square on a round panel.
+    // Exercise non-touch status/chrome and conversation at the actual safe size.
+    lv_display_set_resolution(disp,360,360);
+    {
+        auto* screen=lv_obj_create(nullptr);lv_screen_load(screen);
+        auto* viewport=lv_obj_create(screen);lv_obj_remove_style_all(viewport);
+        lv_obj_set_size(viewport,252,252);lv_obj_center(viewport);
+        CompanionFaceView view;
+        view.Build({viewport,&font_puhui_basic_20_4,&display,&font_awesome_20_4});
+        assert(gate.Bind({true,99,expression|dialogue|speech}));
+        EidolonUiModel model;model.scene=UiScene::Conversation;
+        model.status_text="Listening";model.mode_label="HALF";
+        model.touch_navigation=false;model.turn=TurnPhase::UserSpeaking;
+        model.primary_presentation=UiActionPresentation::Hidden;
+        model.subtitle="Hello Xiaoling";
+        view.Render(model);lv_obj_update_layout(screen);
+        const companion::Rect safe{54,54,252,252};
+        Within(viewport,safe);
+        Within(view.indicators().network,safe);
+        Within(view.indicators().battery,safe);
+        auto* status=Find(viewport,"Listening");assert(status);Within(status,safe);
+        // The farthest safe-square corners must remain inside the physical disk.
+        assert(126*126*2 <= 180*180);
+        Screenshot(screen,std::string(argv[1])+"/xiaoling-round-conversation.ppm");
+    }
     lv_deinit();
     std::puts("Companion UI: both board fonts, layout bounds, scroll, notifications, silent modes and PTT events passed");
 }
