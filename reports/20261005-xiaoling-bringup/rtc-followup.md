@@ -203,3 +203,159 @@ Evidence: /tmp/xiaoling-auto-acceptance.log, /tmp/xiaoling-auto-restored.log,
 /tmp/xiaoling-auto-final-host.json, /tmp/xiaoling-wifi-disconnect-gdb.log,
 /tmp/xiaoling-jtag-wifi.log. Raw serial logs may contain transient RTC credentials;
 they remain local and are not checked in.
+
+## 2026-10-08 real router power-cycle acceptance — failed
+
+The user power-cycled the Wi-Fi router while the unchanged xiaoling firmware
+was in standby. USB capture /tmp/xiaoling-ap-power-cycle.log was active before
+the outage; no debugger or fault injector was attached during this test.
+
+Capture-relative timing (seconds):
+
+- 146.831: Wi-Fi disconnect reason 200; readiness cleared at 146.841.
+- 171.271: saved SSID rediscovered, now on channel 1 instead of 11.
+- 172.531: DHCP acquired 192.168.3.41 instead of 192.168.3.38, 25.700 seconds
+  after the disconnect. Credentials were reused without user action.
+- 189.351: Hub mDNS resolved the Mac's new 192.168.3.40 address instead of
+  192.168.3.228, after an initial lookup timed out while networking recovered.
+- 193.691: RTC connection attempted against the correct new Host address.
+- 220.191: adapter timed out waiting for room disconnect.
+- 225.341: SDK logged “Engine task did not exit in time; forcing deletion”.
+- 226.361: a subsequent connection attempt began; at 226.731 the device
+  panicked with an interrupt watchdog timeout and rebooted itself.
+
+The matching ELF decodes CPU1's stack to peer_task (peer.c:74), through
+media_lib_event_group_set_bits / xEventGroupSetBits / spinlock_acquire.
+SDK engine_destroy can force-delete its engine task and then call peer_destroy
+directly; peer_destroy deletes the event group and frees the peer without joining
+its task. This is a concrete lifetime hazard consistent with the observed crash;
+the exact interleaving still needs a deterministic regression test and fix in
+vendor/client-sdk-esp32, not a board-specific workaround.
+
+After reboot, Wi-Fi and mDNS again succeeded but Hub HTTPS opens repeatedly
+timed out (TLS error 0x8006). Local Mac checks report healthy services and its new
+LAN Hub endpoint returns HTTP 200, while three Mac-to-device pings received no
+reply. These observations do not establish the cause of the post-reboot network
+failure. Later Host ICE logs include its new IP; the deeper comparison below
+corrects the initial inference that this ruled out stale ICE addresses throughout
+the outage. Packet-header capture was unavailable without sudo
+authentication. Full automatic recovery and post-outage conversation have not
+passed; retain this failure even if a later manual intervention restores service.
+
+### Cross-device root-cause comparison
+
+The Host timeline shows both devices initially attempted reconnection before
+LiveKit completed its network refresh. Xiaoling joined at 15:08:29.851 and box-3
+at 15:08:30.845. The old server sent ICE candidates advertising 192.168.3.228
+at 15:08:35.108 and 15:08:36.193 respectively, although Hub discovery already
+advertised the Mac's new 192.168.3.40 address. This is a real signalling/media
+readiness mismatch, not a failed device mDNS lookup.
+
+The eidolond read-only audit confirms system.runtime.restart for livekit at
+2026-10-08T07:08:32.312094Z. LiveKit logged shutdown at local 15:08:32.368 and
+startup with nodeIP=192.168.3.40 at 15:08:42.441. Box-3 joined the new instance
+at 15:08:42.898, selected a UDP host pair (.40 to .42) at 15:08:43.241, and became
+active at 15:08:43.638. Its recovery was therefore not a successful first attempt.
+Xiaoling instead remained stuck on the older connection's teardown, hit the
+adapter deadline and engine forced-deletion path, and panicked on the next retry.
+The exact blocking call inside the old engine was not captured, and must not be
+attributed to half/full duplex, CPU load or heap pressure without evidence.
+
+Both installed build stamps identify SDK b7717a1 and IDF 5.5.4. Both boards use
+WifiBoard and the shared EidolonVoiceController network recovery. Their complete
+firmware images are not identical: hardware/audio profiles differ, and xiaoling
+also has the later HTTP clock-boundary change. No board-specific network-recovery
+branch was found. The compared effective Wi-Fi/LwIP/FreeRTOS/LiveKit settings do
+not differ; TLS certificate-bundle selection differs but no certificate rejection
+was observed. SDK peer.c and engine.c match the vendor checkout byte-for-byte.
+
+A bounded host reproduction extracts unchanged production peer_task and
+peer_destroy function bodies, substitutes the RTOS/transport with a pthread
+barrier, and invokes peer_destroy while the peer task remains inside its loop,
+as permitted by engine_destroy's forced-exit path. AddressSanitizer deterministically
+reports heap-use-after-free when the peer resumes. This validates the unsafe
+lifetime sequence independently of either board; it does not reproduce the
+unknown original engine blocking call or the exact ESP32 watchdog symptom.
+Local reproduction: /tmp/xiaoling-peer-lifetime-repro.c and .log.
+
+The device eventually logged operational_ready=1 at capture time 704.411 seconds
+(557.570 seconds after readiness was lost), without another captured boot.
+Whether the user made any intervening network changes has been asked but is not
+yet confirmed. This late readiness does not convert the watchdog test into a pass.
+
+### Minimal repair boundary (analysis, not deployed)
+
+The old ICE-address window is a transient input that retry must tolerate. Keep
+the existing eidolond network refresh and device ChannelRecovery backoff; no new
+Host/device coordination protocol or board-specific recovery branch is justified
+by this test alone.
+
+The concrete SDK contract conflict is more important: signaling send_request
+passes portMAX_DELAY to WebSocket send (including Leave), and WebSocket close's
+250-ms argument does not bound its whole call. The installed WebSocket component
+sends the close frame with portMAX_DELAY and can subsequently wait indefinitely
+for STOPPED_BIT. Meanwhile engine_destroy waits only 5000 ms, force-deletes the
+engine task, and releases peer resources without ensuring the peer has exited.
+The public room destroy ignores the engine destruction result and frees its own
+state. The adapter likewise clears its handle even if destruction reports failure.
+Increasing those wait constants does not repair this ownership violation.
+
+Preferred scope: cooperative, bounded/cancellable signalling shutdown using
+existing transport stop primitives, and one safe peer stop/join/free sequence
+shared by close, backoff, connect failure and destruction. Never free resources
+owned by an unjoined task. If shutdown is not complete, propagate that result and
+retain ownership; the existing recovery mechanism must finish closing the old
+instance before admitting a new connection. Do not add another retry scheduler,
+parallel room, intentional board reboot, or a leaked-object fallback.
+
+Acceptance should exercise both devices against a delayed/blackholed signalling
+transport and a server restart during ICE establishment, with delayed peer exit.
+Assertions: no freeing before task completion; no overlapping attempts; retained
+callbacks stay valid until shutdown; recovery proceeds once the transport is back;
+no reboot or memory growth over repeated cycles. A narrow diagnostic at shutdown
+phase boundaries is still needed to identify the exact engine blocking call in
+the physical failure; the current evidence must not claim that specific call has
+already been observed.
+
+## 2026-10-08 SDK upstream sync and shutdown ownership repair
+
+Fetched official upstream/main at d492fa8. The two commits beyond the existing
+base update example-agent Python dependencies only; they do not change RTC
+teardown. Merged upstream into the clean local eidolon_dev branch as ebf1284,
+preserving the existing fork changes. Fork origin/eidolon_dev was also fetched
+and confirmed to be an ancestor, with no divergent remote changes.
+
+SDK repair d10c950a4b325c3af5b619f35ad72ff7677c8f87 makes shutdown cooperative:
+the engine task cleans up transport workers before reporting completion. A
+5-second join timeout now returns an error with ownership retained, rather than
+force-deleting the engine. The public room API propagates that result and keeps
+the room/callback context valid. Peer destruction always stops and joins its loop
+before closing the native connection and freeing the event group, including a
+failed connect. A failed thread creation clears the running flag. Cross-task
+stop flags are atomic. Signal sends use the existing finite network timeout, and
+transport teardown uses the existing WebSocket stop/join API without waiting for
+a remote close handshake.
+
+The shared ESP32 LiveKitSession adapter retains its room and media on a pending
+shutdown. Connect must successfully close that room before updating generation,
+identity or media resources and creating its replacement. Existing controller
+backoff remains the retry owner; no new timers, room instances, board-specific
+branch or reboot policy were introduced. The manifest pins the new SDK commit;
+managed components are resolved by the component manager, not edited directly.
+
+Validation so far: all seven SDK host tests passed, including ASan/UBSan delayed
+peer-loop exit across 32 cycles, failed connection/thread creation, engine join
+timeout followed by retry, retained public-room context and bounded signalling.
+ICE candidate regression passed. The actual adapter Disconnect body/Connect
+admission guard passed ASan/UBSan ownership tests; channel recovery and Hub clock
+boundary regressions passed. Physical AP power-cycle acceptance still requires
+the newly built firmware and must not be inferred from host tests.
+
+Both xiaoling and box-3 full ESP-IDF 5.5.4 builds subsequently passed against
+the new pin. The component-manager lock resolves d10c950 and the managed source
+matches that SDK commit. Fork eidolon_dev was pushed without force; a fresh
+ls-remote read confirmed d10c950a4b325c3af5b619f35ad72ff7677c8f87, and the local
+branch is synchronized with origin. No device was flashed during this SDK
+update, so router-power-cycle validation of this fix is still pending.
+Build logs: /tmp/xiaoling-shutdown-fix-build.log and
+/tmp/box3-shutdown-fix-build.log.

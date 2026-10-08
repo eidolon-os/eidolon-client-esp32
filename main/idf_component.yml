@@ -156,7 +156,7 @@ dependencies:
   livekit/livekit:
     git: https://github.com/eidolon-os/client-sdk-esp32.git
     path: components/livekit
-    version: "b7717a1cc3f913d8d460c6ed1c04c830181a27b9"
+    version: "d10c950a4b325c3af5b619f35ad72ff7677c8f87"
     rules:
     - if: target in [esp32s3, esp32p4, esp32s31]
 

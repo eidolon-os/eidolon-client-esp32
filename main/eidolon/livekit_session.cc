@@ -455,7 +455,8 @@ void LiveKitSession::ReleaseMediaBoard()
 esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generation)
 {
     if (room_handle_ != nullptr) {
-        Disconnect();
+        const esp_err_t closed = Disconnect();
+        if (closed != ESP_OK) return closed;
     }
 
     transcription_stream_.Clear();
@@ -563,11 +564,7 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
     if (livekit_room_connect(room_handle_, config.session.server_url.c_str(),
                              config.session.token.c_str()) != LIVEKIT_ERR_NONE) {
         ESP_LOGE(TAG, "livekit_room_connect failed");
-        UnregisterStreamHandlers();
-        livekit_room_destroy(room_handle_);
-        room_handle_ = nullptr;
-        using_media_ = false;
-        ReleaseMediaBoard();
+        Disconnect();
         return ESP_FAIL;
     }
 
@@ -617,7 +614,10 @@ esp_err_t LiveKitSession::Disconnect()
     vTaskDelay(pdMS_TO_TICKS(150));
 
     if (livekit_room_destroy(handle) != LIVEKIT_ERR_NONE) {
-        ESP_LOGW(TAG, "livekit_room_destroy failed");
+        // Keep both the room and media alive until the SDK finishes joining its
+        // workers. Connect retries this close before admitting another room.
+        ESP_LOGW(TAG, "LiveKit shutdown pending; retaining room and media");
+        return ESP_ERR_TIMEOUT;
     }
     {
         std::lock_guard<std::mutex> lock(peers_mutex_);
