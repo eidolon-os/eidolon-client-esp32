@@ -32,6 +32,17 @@ inline bool ChannelBindingExpired(const Esp32HubConfig& config, int64_t monotoni
     return now > 0 && now >= config.expires_at_ms;
 }
 
+// Only a live, authenticated, boot-local binding may bypass recovery on open.
+// The Provider still authorizes every session_open against its current state.
+inline bool CanOpenOnStandingChannel(const Esp32HubConfig& config, bool connected,
+                                     bool refresh_required, bool identity_rejected,
+                                     int64_t monotonic_ms)
+{
+    return connected && !refresh_required && !identity_rejected &&
+        config.status == HubConfigStatus::Active && config.session.usable() &&
+        config.clock.Now(monotonic_ms) > 0 && !ChannelBindingExpired(config, monotonic_ms);
+}
+
 // A standing connection can outlive its join credential. Schedule its renewal
 // on the controller actor even when there is no disconnect or user activity.
 // Unknown boot-local time has no schedulable deadline; onboarding supplies it.

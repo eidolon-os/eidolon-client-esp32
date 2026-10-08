@@ -968,7 +968,7 @@ esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist, bool* channel_c
     if (!CurrentOutputGate().Bind(fresh.output_policy)) return ESP_ERR_INVALID_STATE;
     if (persist) {
         // Provider credentials may rotate on every approved handoff. The
-        // per-JOIN refresh keeps fresh credentials in RAM to avoid NVS wear.
+        // recovery refresh keeps fresh credentials in RAM to avoid NVS wear.
         HubConfigStore store;
         err = store.SaveHubConfig(fresh);
         if (err != ESP_OK) {
@@ -983,7 +983,9 @@ esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist, bool* channel_c
     if (!CurrentOutputGate().Bind(fresh.output_policy)) return ESP_ERR_INVALID_STATE;
     config_ = std::move(fresh);
     config_refresh_required_ = false;
-    SetState(StateForConfig(config_), "config_refreshed");
+    if (state_ != VoiceSessionState::Opening || config_.status != HubConfigStatus::Active) {
+        SetState(StateForConfig(config_), "config_refreshed");
+    }
     if (config_.status == HubConfigStatus::PendingApproval ||
         config_.status == HubConfigStatus::WaitingBinding) {
         ScheduleOnboardingPoll();
@@ -3507,23 +3509,28 @@ esp_err_t EidolonVoiceController::DoJoinRoom()
         }
     }
 
-    // Ask Hub for a current provider binding before every JOIN. The provider
-    // owns room/token rotation semantics; the device treats the binding as
-    // opaque until it validates the versioned LiveKit payload. RAM-only
-    // (persist=false) avoids NVS wear. Done before moving to Connecting so
-    // RefreshHubConfig's internal SetState(ConfigReady) stays a no-op.
-    esp_err_t refresh_err = RefreshHubConfig(/*persist=*/false);
-    if (refresh_err == ESP_ERR_NOT_ALLOWED) {
-        // Hub revoked this identity; RefreshHubConfig already surfaced
-        // Unauthorized. Don't attempt to join on a rejected key.
-        return refresh_err;
+    const bool identity_rejected = state_ == VoiceSessionState::Unauthorized;
+    const bool reuse_channel = CanOpenOnStandingChannel(
+        config_, session_.IsConnected(), config_refresh_required_,
+        identity_rejected, esp_timer_get_time() / 1000);
+    last_end_reason_ = EndReason::None;
+    SetState(VoiceSessionState::Opening, "join_requested");
+    const int64_t prepare_started_us = esp_timer_get_time();
+    esp_err_t refresh_err = ESP_OK;
+    if (!reuse_channel) {
+        // A failed recovery must remain invalidated on the next user attempt.
+        config_refresh_required_ = true;
+        refresh_err = RefreshHubConfig(/*persist=*/false);
+        if (refresh_err == ESP_ERR_NOT_ALLOWED) return refresh_err;
+        if (refresh_err != ESP_OK) {
+            SetState(VoiceSessionState::Error, "join_refresh_failed");
+            ScheduleChannelReconnect("join_refresh_failed");
+            return refresh_err;
+        }
     }
-    if (refresh_err != ESP_OK) {
-        // Hub unreachable: an unexpired cached room+token can provide bounded
-        // recovery. HasActiveConfig below rejects it after Provider expiry.
-        ESP_LOGW(TAG, "Join: Hub config refresh failed (%s); using cached room=%s",
-                 esp_err_to_name(refresh_err), config_.session.room_name.c_str());
-    }
+    ESP_LOGI(TAG, "[lifecycle] join prepared reuse_channel=%d elapsed_ms=%lld",
+             reuse_channel ? 1 : 0,
+             static_cast<long long>((esp_timer_get_time() - prepare_started_us) / 1000));
     if (!HasActiveConfig()) {
         ESP_LOGW(TAG, "Join blocked: config status=%s",
                  HubConfigStatusToString(config_.status));

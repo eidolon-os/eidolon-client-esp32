@@ -66,3 +66,59 @@ hardware changes were made based solely on the RTC failure.
 Local diagnostic files (not checked in, may contain session credentials):
 `/tmp/xiaoling-voice-current.log`, `/tmp/xiaoling-rtc-build.log`,
 `/tmp/xiaoling-rtc-flash.log`, `/tmp/xiaoling-rtc-fixed.log`.
+
+## 2026-10-08 shared room-open latency optimization
+
+The previous warm-standby BOOT request spent 11.064 s in Hub Resume before
+sending session_open, reached Listening at about 13.7 s and the ready cue at
+about 17.3 s. The Host additionally serialized TTS pool warmup (1.545 s in that
+session) ahead of AgentSession media startup.
+
+The shared controller now reuses a connected Active binding only when its
+boot-local clock is known, the credential is unexpired, no invalidation is
+pending, and the identity is not rejected. Other cases use existing recovery;
+a failed recovery remains invalidated rather than falling back to that snapshot.
+Opening is displayed before recovery starts. The Provider's existing locked
+per-open authorization and Agent runtime binding resolution remain authoritative.
+No board-specific latency policy, token cache or renewal timer was added.
+
+Channel's StreamingPipeline (used by xiaoling half-duplex and box-3) now overlaps
+existing provider prewarm with AgentSession startup using a scoped TaskGroup.
+Both operations finish before session confirmation. The public Agent on_enter
+callback waits until that confirmation has been sent before scheduling welcome
+audio. No private LiveKit media interface or replacement connection pool is used.
+A media_started trace mark separates media startup from warmup_done.
+
+Validation: six device test runners passed, including the actual controller
+DoJoinRoom body, lease renewal, permission invalidation and configuration snapshot
+handlers under ASan/UBSan where supported. Channel's applicable authorization,
+startup, failure/cancellation, route and real streaming welcome tests: 203 passed.
+An expanded welcome matrix still has the previously identified PTT fixture issue
+(missing _destination; 26 failures in that selected run), unrelated to this change.
+
+Deployment: xiaoling app-only flash verified partition readback, boot selection
+and firmware build stamp (2026-10-08 11:41:00, SDK b7717a1). Mac Channel restarted
+through eidolond; all 15 Host health checks passed. The first post-flash boot
+experienced repeated LAN Hub connection timeouts; a subsequent ordinary reset
+restored Hub activation and standing RTC, operational_ready=1 at ~14.5 s uptime.
+The cause of that transient failure is not established. Wi-Fi/identity were retained.
+
+Follow-up hardware tests: xiaoling opened twice at 12:14 and produced three
+recognized turns and replies. Host job-to-confirmation was 0.532/0.423 s;
+job-to-device playback-state telemetry was 1.26/1.07 s. Device serial capture
+had expired before that test, so these are not BOOT-to-audible-cue measurements.
+The user confirmed both session terminations were intentional BOOT exits.
+
+Box-3 was subsequently app-only flashed, build stamp 2026-10-08 12:24:13,
+with the same SDK, preserving identity, Wi-Fi, full duplex and device AEC.
+Its two device-request-to-Listening measurements were 1.04/about 1.00 s.
+Both opens logged reuse_channel=1 with preparation elapsed_ms=0. First entry
+reached a nonzero cue playback sample at 2.24 s; the second cue had playback
+state but no captured nonzero sample, so audible delivery remains unconfirmed.
+Three turns (哈喽 / 没啥 / 你在哪儿) took 3.704/1.380/1.525 s from speech stop
+to Host first reply audio. The greeting included 2.073 s from final transcript
+to turn commit; this endpointing delay remains to investigate. The last reply
+was cut short by intentional device leave. The full 60-second idle hardware
+regression is still pending. Box-3 logs: /tmp/box3-open-optimization-runtime.log.
+Local logs: /tmp/xiaoling-open-optimization-{build-final,flash,runtime,reboot}.log;
+/tmp/room-open-host-tests-final.log; /tmp/room-open-host-status.json.

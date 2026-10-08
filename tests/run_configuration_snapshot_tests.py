@@ -47,20 +47,21 @@ struct HubOnboardingClient {
     }
 };
 struct HubConfigStore { int SaveHubConfig(const Esp32HubConfig&) { ++writes;return store_error; } };
-enum class VoiceSessionState { ConfigReady, Unauthorized };
+enum class VoiceSessionState { ConfigReady, Unauthorized, Opening };
 static void esp_timer_stop(void*) {}
 class EidolonVoiceController {
 public:
     std::string device_control_uri_="https://owner.test";
     Esp32HubConfig config_;
     bool config_refresh_required_=true;
+    VoiceSessionState state_=VoiceSessionState::ConfigReady;
     int state_changes=0, closes=0, polls=0, network_lost=0;
     void* onboarding_poll_timer_=nullptr;
     struct { int disconnects=0; bool IsConnected() { return true; }
              void Disconnect() { ++disconnects; } } session_;
     std::string OperationalDeviceInstanceId() { return "device"; }
     void DoNetworkLost() { ++network_lost; }
-    void SetState(VoiceSessionState,const char*) { ++state_changes; }
+    void SetState(VoiceSessionState state,const char*) { state_=state; ++state_changes; }
     VoiceSessionState StateForConfig(const Esp32HubConfig&) { return VoiceSessionState::ConfigReady; }
     void ScheduleOnboardingPoll() { ++polls; }
     void CloseConversationAudio() { ++closes; CurrentOutputGate().Close(); }
@@ -109,6 +110,12 @@ int main() {
     response=controller.config_; response.output_policy.revision=9;
     assert(controller.RefreshHubConfig(false)==ESP_OK);
     assert(controller.session_.disconnects==1 && controller.closes==1); // ordinary caller unchanged
+    // Recovering for a user-requested open must not flash the idle UI.
+    controller.state_=VoiceSessionState::Opening;
+    const int previous_changes=controller.state_changes;
+    assert(controller.RefreshHubConfig(false)==ESP_OK);
+    assert(controller.state_==VoiceSessionState::Opening);
+    assert(controller.state_changes==previous_changes);
     http_error=ESP_ERR_NOT_ALLOWED; response.status=HubConfigStatus::RecoveryRequired;
     response.recovery_hint="reapprove";
     assert(controller.RefreshHubConfig(false,&changed)==ESP_ERR_NOT_ALLOWED);

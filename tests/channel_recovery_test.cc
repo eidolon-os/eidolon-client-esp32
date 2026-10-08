@@ -93,6 +93,28 @@ eidolon::RoomConfig Room(const char* token, const char* identity = "device")
     };
 }
 
+void TestStandingChannelOpenAdmission()
+{
+    using namespace eidolon;
+    Esp32HubConfig config;
+    config.status = HubConfigStatus::Active;
+    config.session = Room("token");
+    config.expires_at_ms = 1700000010000LL;
+    // A persisted credential without a clock anchor must first recover.
+    assert(!CanOpenOnStandingChannel(config, true, false, false, 1000));
+    config.clock.Observe(1700000000000LL, 0, 0);
+    assert(CanOpenOnStandingChannel(config, true, false, false, 1000));
+    assert(!CanOpenOnStandingChannel(config, false, false, false, 1000));
+    assert(!CanOpenOnStandingChannel(config, true, true, false, 1000));
+    assert(!CanOpenOnStandingChannel(config, true, false, true, 1000));
+    assert(!CanOpenOnStandingChannel(config, true, false, false, 10000));
+    for (auto status : {HubConfigStatus::Revoked, HubConfigStatus::WaitingBinding,
+                        HubConfigStatus::RecoveryRequired, HubConfigStatus::PendingApproval}) {
+        config.status = status;
+        assert(!CanOpenOnStandingChannel(config, true, false, false, 1000));
+    }
+}
+
 void TestExpiredCredentialsStillRecoverAfterRefreshFailures()
 {
     using namespace eidolon;
@@ -368,6 +390,7 @@ int main()
         changed([](auto& c) { c.sample_rate = 48000; });
         changed([](auto& c) { c.channels = 2; });
     }
+    TestStandingChannelOpenAdmission();
     TestExpiredCredentialsStillRecoverAfterRefreshFailures();
     TestRecoveryRespectsAuthorityAndNetworkBoundaries();
     TestFlappingConnectionPreservesBackoffUntilStable();
