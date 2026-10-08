@@ -140,7 +140,7 @@ dependencies:
 
   # Our fork of livekit/client-sdk-esp32, pinned to a commit: managed_components/
   # is not tracked, so the fork is the only place a fix to this SDK survives.
-  # A published, immutable fork commit, which carries our changes
+  # An immutable fork commit, which carries our changes
   # on top of upstream/main (v0.3.11 at the time of this pin):
   #   - the engine releases a subscribed audio track when it goes away, so a
   #     connection can carry more than one conversation;
@@ -150,12 +150,13 @@ dependencies:
   #     state's exit hook before the new state's enter hook;
   #   - receive-only and data-only rooms do not allocate/start a capture sink;
   #   - disabled TCP ICE candidates cannot fail a UDP-only peer before UDP arrives.
+  #   - disabled IPv6 ICE candidates cannot fail an IPv4-only peer.
   #   - receive-only peers advertise a receive codec without enabling publication.
   # https over ssh so a build needs no SSH access to the fork.
   livekit/livekit:
     git: https://github.com/eidolon-os/client-sdk-esp32.git
     path: components/livekit
-    version: "3f98d8deed47d7e9b8ea9cb65b13d87c61174033"
+    version: "b7717a1cc3f913d8d460c6ed1c04c830181a27b9"
     rules:
     - if: target in [esp32s3, esp32p4, esp32s31]
 
