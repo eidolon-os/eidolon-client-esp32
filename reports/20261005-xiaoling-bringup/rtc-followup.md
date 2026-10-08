@@ -166,3 +166,40 @@ Local evidence: /tmp/xiaoling-acceptance-fixed.log,
 /tmp/xiaoling-acceptance-{build,flash,error-audio-tests}.log,
 /tmp/xiaoling-acceptance-livekit-restart.json,
 /tmp/xiaoling-acceptance-final-host-status.json.
+
+## 2026-10-08 automated physical acceptance (14:54–15:00)
+
+Mac's Tingting speech output successfully woke the independent chip and supplied
+“我今天有点难过，你能安慰我一下吗？” through the real microphone. In session
+esp32-86a0245d-1ee9fc10-00000001, the expression receipt reached completed,
+sequence 3, elapsed_ms=1875, with no expiry rejection. CompanionFaceView emits
+these receipts after its display flush boundary, so this validates device-side
+render execution. No camera inspection of the actual pixels was performed.
+
+For terminal-error audio, the verified local Agent RPC process was temporarily
+paused with finally-based recovery and an independent timed resume guard. The
+real microphone request reached the existing 30-second first-delta timeout.
+Session esp32-823e8c20-bbd23f22-00000002 recorded recoverable=false and
+silent_failure_fallback={attempted:true, spoken:true,
+reason:llm_error_without_delta}. The device entered playback at 213.311 seconds,
+reported nonzero playback RMS (0.103 and 0.127), and returned to silent at
+216.721 seconds. The existing fallback text is “刚才卡了一下，请再说一遍好吗？”.
+This closes the real transport/device audio-output test; no independent acoustic
+recording was made. The Agent process was resumed successfully.
+
+Wi-Fi link-loss injection remains unverified. An attempted USB JTAG/GDB call to
+the existing esp_wifi_disconnect API did not reach the function: the Python GDB
+variant crashed locally, and the no-Python attempt failed in OpenOCD flash-map
+probing, triggering device cache/panic errors. These were induced during debug
+attachment, not an observed normal-operation Wi-Fi failure. Debugging was stopped;
+the official serial reset restored the unchanged installed firmware and existing
+identity/Wi-Fi. Operational readiness returned at 14.503 seconds after reset.
+No Flash write, erasure, router change or product-code change was made. All 15
+Mac Host health checks were healthy afterward. AP-loss recovery needs a working
+AP-control path or a separate controlled hardware test; RTC outage recovery above
+must not be substituted for it.
+
+Evidence: /tmp/xiaoling-auto-acceptance.log, /tmp/xiaoling-auto-restored.log,
+/tmp/xiaoling-auto-final-host.json, /tmp/xiaoling-wifi-disconnect-gdb.log,
+/tmp/xiaoling-jtag-wifi.log. Raw serial logs may contain transient RTC credentials;
+they remain local and are not checked in.
