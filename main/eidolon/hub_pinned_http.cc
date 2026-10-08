@@ -26,14 +26,26 @@ namespace {
 // something this firmware knows how to consume.
 constexpr size_t kMaxResponseBytes = 32 * 1024;
 
+struct HubDateObservation {
+    int64_t utc_ms = 0;
+    int64_t request_start_ms = -1;
+};
+
 // Records what the Hub said the time was, for the caller that has to judge one
 // of the Hub's own deadlines. Nothing else in this response can supply it: the
 // header is gone by the time the body is read, and this device's own wall clock
 // is never set in this build.
 esp_err_t CaptureHubDate(esp_http_client_event_t* event)
 {
-    if (event == nullptr || event->event_id != HTTP_EVENT_ON_HEADER ||
-        event->user_data == nullptr || event->header_key == nullptr ||
+    if (event == nullptr || event->user_data == nullptr) return ESP_OK;
+    auto& observation = *static_cast<HubDateObservation*>(event->user_data);
+    if (event->event_id == HTTP_EVENT_ON_CONNECTED) {
+        // TLS is authenticated, but no HTTP data has been sent yet. DNS/TCP/TLS
+        // happen before the server can generate this response's Date header.
+        observation.request_start_ms = esp_timer_get_time() / 1000;
+        return ESP_OK;
+    }
+    if (event->event_id != HTTP_EVENT_ON_HEADER || event->header_key == nullptr ||
         event->header_value == nullptr ||
         strcasecmp(event->header_key, "Date") != 0) {
         return ESP_OK;
@@ -44,7 +56,7 @@ esp_err_t CaptureHubDate(esp_http_client_event_t* event)
                  event->header_value);
         return ESP_OK;
     }
-    *static_cast<int64_t*>(event->user_data) = stated;
+    observation.utc_ms = stated;
     return ESP_OK;
 }
 
@@ -117,9 +129,10 @@ esp_err_t HubHttpRequest(const std::string& method,
     // bind only this transport adapter to the address family it actually serves.
     config.addr_type = HTTP_ADDR_TYPE_INET;
     // Kept across the whole call: the handler fires while headers are parsed,
-    // and `out` outlives every one of those.
+    // and the observation outlives every one of those.
+    HubDateObservation date_observation;
     config.event_handler = CaptureHubDate;
-    config.user_data = &out.hub_utc_millis;
+    config.user_data = &date_observation;
 
     const int64_t diagnostic_start_ms = esp_timer_get_time() / 1000;
     esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -136,7 +149,6 @@ esp_err_t HubHttpRequest(const std::string& method,
         esp_http_client_set_header(client, "Content-Type", "application/json");
     }
 
-    const int64_t request_start_ms = esp_timer_get_time() / 1000;
     err = esp_http_client_open(client, request_body.size());
     if (err != ESP_OK) {
         LogRequestFailure(client, method, url, "open", err, err, diagnostic_start_ms);
@@ -209,7 +221,9 @@ esp_err_t HubHttpRequest(const std::string& method,
                      static_cast<unsigned long>(esp_timer_get_time() / 1000 - diagnostic_start_ms));
         }
         out.body = std::move(body);
-        out.clock.Observe(out.hub_utc_millis, request_start_ms, esp_timer_get_time() / 1000);
+        out.hub_utc_millis = date_observation.utc_ms;
+        out.clock.Observe(out.hub_utc_millis, date_observation.request_start_ms,
+                          esp_timer_get_time() / 1000);
     }
     esp_http_client_close(client);
     esp_http_client_cleanup(client);

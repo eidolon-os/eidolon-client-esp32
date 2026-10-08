@@ -122,3 +122,47 @@ was cut short by intentional device leave. The full 60-second idle hardware
 regression is still pending. Box-3 logs: /tmp/box3-open-optimization-runtime.log.
 Local logs: /tmp/xiaoling-open-optimization-{build-final,flash,runtime,reboot}.log;
 /tmp/room-open-host-tests-final.log; /tmp/room-open-host-status.json.
+
+## 2026-10-08 xiaoling acceptance follow-up
+
+External-chip wake is physically confirmed: the user said “你好，小灵”, heard
+the room cue and received a long story. A later pair of UART wake detections
+opened only one room; the user reported possibly saying two wake phrases.
+There is no evidence here of an unsolicited duplicate wake-chip event.
+
+The first unattended story revealed a shared Channel issue: transcriptless VAD
+candidates caused a “没听清” fallback, whose playback renewed the idle window.
+Channel now discards those candidates without speaking. Actual terminal output
+failures retain their existing once-per-turn spoken fallback. Regression tests
+cover repeated transcriptless noise and a real AgentSession producing non-silent
+audio through a scripted TTS provider after a terminal error: 55 tests passed.
+The latter is integration coverage, not a hardware acoustic fault-injection test.
+
+After deployment, trace esp32-8d62f61e-ed9715c6-00000001 played a 76.656-second
+reply without the 60-second timer cutting it off. Host playback ended at
+13:12:36.060; idle disconnect fired at 13:13:36.059 (59.999 seconds later).
+The device received idle_normal_end and returned to ConfigReady. A subsequent
+empty VAD candidate neither produced fallback audio nor extended that deadline.
+
+The HTTP Date observation previously included DNS/TCP/TLS setup in its clock
+uncertainty, which could falsely expire short-lived expression commands. The
+observation now starts at IDF HTTP_EVENT_ON_CONNECTED, before HTTP request data
+is sent. Conservative Date rounding, HTTP elapsed time and expiry enforcement
+remain intact. Production-handler ASan/UBSan tests cover slow TLS, slow HTTP,
+missing connection events and invalid dates; deadline and date-parser tests pass.
+Xiaoling was app-only flashed with build stamp 2026-10-08 13:08:26, SDK b7717a1.
+Box-3 has not received this clock-boundary change yet. The two story turns chose
+presentation.intent=none, so they do not establish successful expression receipt
+or visible animation; an actual expression-producing turn remains pending.
+
+An official Ops restart of LiveKit tested standing-channel transport recovery:
+operational_ready changed to 0 at device uptime 305.961 seconds and back to 1
+at 311.431 seconds, a 5.470-second recovery without reprovisioning. This validates
+RTC service outage recovery, not Wi-Fi access-point loss. All 15 Mac Host health
+checks passed after the test. Wi-Fi AP-loss recovery and audible terminal-error
+fallback on the physical device remain unverified.
+
+Local evidence: /tmp/xiaoling-acceptance-fixed.log,
+/tmp/xiaoling-acceptance-{build,flash,error-audio-tests}.log,
+/tmp/xiaoling-acceptance-livekit-restart.json,
+/tmp/xiaoling-acceptance-final-host-status.json.
