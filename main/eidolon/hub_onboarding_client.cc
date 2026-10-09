@@ -433,11 +433,12 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
     HubChannelAssignment assignment;
     AcceptedManifestRef accepted_manifest;
     DeviceOutputPolicy output_policy;
+    std::string channel_problem_code;
     const char* rejection_reason = nullptr;
     device_foundation::v1::DeviceRef authority_ref;
     if (!ParseDeviceConfigurationResponse(
             response.body, nonce, claim, status, assignment, accepted_manifest,
-            &output_policy, &rejection_reason, &authority_ref)) {
+            &output_policy, &rejection_reason, &authority_ref, &channel_problem_code)) {
         ESP_LOGW(TAG, "Configuration validation failed stage=%s",
                  rejection_reason ? rejection_reason : "unknown");
         return ESP_ERR_INVALID_RESPONSE;
@@ -472,6 +473,7 @@ esp_err_t HubOnboardingClient::PullActiveConfiguration(
     out.clock = response.clock;
     out.status = status;
     out.output_policy = output_policy;
+    out.channel_problem_code = std::move(channel_problem_code);
     if (status == HubConfigStatus::Active) {
         if (!DecodeChannelAssignment(assignment, out)) {
             ESP_LOGW(TAG, "Configuration validation failed stage=livekit_binding");

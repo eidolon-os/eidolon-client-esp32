@@ -88,6 +88,7 @@ public:
     // recent value) and the authoritative decisions re-check state on the task.
     VoiceSessionState GetState() const { return state_; }
     HubConfigStatus GetConfigStatus() const { return config_.status; }
+    const std::string& ChannelProblemCode() const { return config_.channel_problem_code; }
     static const char* VoiceStateName(VoiceSessionState state);
     // Why the last voice session ended (None until the channel reports one via
     // session_end). Read by the UI to distinguish a normal end from a JOIN

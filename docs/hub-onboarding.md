@@ -272,3 +272,14 @@ Application 任务队列，再执行物理恢复授权、身份创建和配网�
 2026-10-10 真机暴露了两个入口问题：StackChan 触摸绕过授权，旧移除记录阻止开窗；
 Waveshare 长按在 esp_timer 回调中创建身份并写入 NVS，触发看门狗。统一入口复用
 既有恢复事务与应用队列，不清除移除日志或重建另一套恢复状态机。
+
+
+### Binding blocked by an Owner decision
+
+The optional `channel_problem` in a successful configuration response carries
+why an active Claim has no Channel. `OUTPUT_POLICY_REQUIRED` keeps the existing
+WaitingBinding lifecycle, but the screen asks the Owner to set this device's
+input/output permissions in the management app. Configuration polling remains
+active to pick up that decision; Hub suppresses repeated rejected provisions.
+An older Host with no field clears the previous diagnostic. The diagnostic is
+not a credential, Claim state, or an instruction to reset/re-enroll the device.

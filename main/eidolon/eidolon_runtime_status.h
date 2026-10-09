@@ -81,6 +81,7 @@ struct VoiceRuntimeStatus {
     ConversationPhase conversation = ConversationPhase::Closed;
     EndReason end_reason = EndReason::None;
     bool mic_enabled = true;
+    std::string service_detail;
 };
 
 struct EidolonRuntimeStatus {

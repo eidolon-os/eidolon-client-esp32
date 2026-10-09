@@ -18,6 +18,15 @@ int main() {
     assert(!UiStateProjector::AllowsIntent(presenter.runtime_status(),UiIntent::OpenConversation));
     voice.service=ServicePhase::Ready;presenter.ApplyVoiceStatus(voice);
     assert(UiStateProjector::AllowsIntent(presenter.runtime_status(),UiIntent::OpenConversation));
+    // A policy decision is distinct from waiting for the service to start.
+    voice.service=ServicePhase::Preparing;
+    voice.service_detail="Ask the Owner to set this device's input and output permissions";
+    presenter.ApplyVoiceStatus(voice);
+    assert(presenter.runtime_status().service_detail==voice.service_detail);
+    voice.service_detail.clear();
+    presenter.ApplyVoiceStatus(voice);
+    assert(presenter.runtime_status().service_detail.empty());
+    voice.service=ServicePhase::Ready;presenter.ApplyVoiceStatus(voice);
     // Late room text must not become the next conversation's first caption.
     presenter.OnTranscription({TranscriptionSource::Agent,"old room",true});
     assert(presenter.runtime_status().last_transcription.empty());

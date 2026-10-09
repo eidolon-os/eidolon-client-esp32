@@ -455,7 +455,8 @@ bool ParseDeviceConfigurationResponse(
     AcceptedManifestRef& accepted_manifest,
     DeviceOutputPolicy* output_policy,
     const char** rejection_reason,
-    device_foundation::v1::DeviceRef* authority_ref)
+    device_foundation::v1::DeviceRef* authority_ref,
+    std::string* channel_problem_code)
 {
     if (rejection_reason) *rejection_reason = nullptr;
     cJSON* root = cJSON_ParseWithLength(body.data(), body.size());
@@ -488,6 +489,13 @@ bool ParseDeviceConfigurationResponse(
     if (!ParseOutputPolicy(cJSON_GetObjectItemCaseSensitive(root,"output_policy"),policy)) {
         return reject("output_policy");
     }
+    const cJSON* problem = cJSON_GetObjectItemCaseSensitive(root, "channel_problem");
+    if (problem && !cJSON_IsNull(problem) &&
+        (!cJSON_IsObject(problem) || JsonString(problem, "code").empty() ||
+         !cJSON_IsBool(cJSON_GetObjectItemCaseSensitive(problem, "retryable")))) {
+        return reject("channel_problem");
+    }
+    if (channel_problem_code) *channel_problem_code = JsonString(problem, "code");
     if (output_policy) *output_policy=policy;
     if (authority_ref) *authority_ref = ref;
     accepted_manifest = AcceptedManifestRef{};

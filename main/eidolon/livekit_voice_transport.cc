@@ -77,7 +77,7 @@ VoiceRuntimeStatus LiveKitVoiceTransport::BuildRuntimeStatus(VoiceSessionState s
         enrollment = EnrollmentPhase::Revoked;
         break;
     }
-    return VoiceRuntimeProjector::Project({
+    auto result = VoiceRuntimeProjector::Project({
         .session = state,
         .enrollment = enrollment,
         .end_reason = controller_->LastEndReason(),
@@ -85,6 +85,15 @@ VoiceRuntimeStatus LiveKitVoiceTransport::BuildRuntimeStatus(VoiceSessionState s
         .service_was_ready = service_was_ready_.load(),
         .mic_enabled = mic_enabled_.load(),
     });
+    if (state == VoiceSessionState::WaitingBinding) {
+        const auto& problem = controller_->ChannelProblemCode();
+        if (problem == "OUTPUT_POLICY_REQUIRED") {
+            result.service_detail = "Ask the Owner to set this device's input and output permissions";
+        } else if (!problem.empty()) {
+            result.service_detail = "Service unavailable. Check this device in the management app";
+        }
+    }
+    return result;
 }
 
 void LiveKitVoiceTransport::NotifyRuntimeStatus(VoiceSessionState state)

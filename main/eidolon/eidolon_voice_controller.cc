@@ -840,6 +840,11 @@ void EidolonVoiceController::MarkSessionSuperseded(const char* reason)
 void EidolonVoiceController::SetState(VoiceSessionState state, const char* reason)
 {
     if (state_ == state) {
+        // Configuration can change the reason for waiting without changing the
+        // transport state (e.g. Owner policy required -> provider unavailable).
+        if (state == VoiceSessionState::WaitingBinding && on_state_changed_) {
+            on_state_changed_(state);
+        }
         return;
     }
     VoiceSessionState prev = state_;
@@ -1718,7 +1723,8 @@ const char* EidolonVoiceController::JoinBlockedCode() const
     case HubConfigStatus::PendingApproval:
         return "NEEDS_APPROVAL";
     case HubConfigStatus::WaitingBinding:
-        return "NEEDS_BINDING";
+        return config_.channel_problem_code == "OUTPUT_POLICY_REQUIRED"
+            ? "OUTPUT_POLICY_REQUIRED" : "NEEDS_BINDING";
     case HubConfigStatus::RecoveryRequired:
     case HubConfigStatus::Revoked:
         return "UNAUTHORIZED";

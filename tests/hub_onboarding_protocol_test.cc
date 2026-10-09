@@ -412,6 +412,24 @@ void TestConfigurationResponseMatchesTheGoldenVector()
             // holds the Claim and the Channel has not answered yet.
             assert(status == HubConfigStatus::WaitingBinding);
             assert(assignment.opaque_binding.empty());
+            cJSON* pending = cJSON_Parse(body.c_str());
+            cJSON* problem = cJSON_AddObjectToObject(pending, "channel_problem");
+            cJSON_AddStringToObject(problem, "code", "OUTPUT_POLICY_REQUIRED");
+            cJSON_AddBoolToObject(problem, "retryable", false);
+            char* encoded = cJSON_PrintUnformatted(pending);
+            std::string code;
+            assert(eidolon::ParseDeviceConfigurationResponse(
+                encoded, nonce, claim, status, assignment, accepted_manifest,
+                nullptr, &reason, nullptr, &code));
+            assert(status == HubConfigStatus::WaitingBinding);
+            assert(code == "OUTPUT_POLICY_REQUIRED");
+            cJSON_free(encoded);
+            cJSON_Delete(pending);
+            // Older Hosts clear an earlier problem instead of leaving stale UI.
+            assert(eidolon::ParseDeviceConfigurationResponse(
+                body, nonce, claim, status, assignment, accepted_manifest,
+                nullptr, &reason, nullptr, &code));
+            assert(code.empty());
         } else {
             assert(body_state == "revoked");
             assert(status == HubConfigStatus::Revoked);

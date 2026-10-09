@@ -60,6 +60,7 @@ void EidolonUiPresenter::ApplyVoiceStatus(const VoiceRuntimeStatus& voice)
     }
     status_.enrollment = voice.enrollment;
     status_.service = voice.service;
+    status_.service_detail = voice.service_detail;
     status_.conversation = voice.conversation;
     status_.end_reason = voice.end_reason;
     status_.mic_enabled = voice.mic_enabled;

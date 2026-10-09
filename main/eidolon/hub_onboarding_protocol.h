@@ -48,7 +48,8 @@ bool ParseDeviceConfigurationResponse(
     AcceptedManifestRef& accepted_manifest,
     DeviceOutputPolicy* output_policy = nullptr,
     const char** rejection_reason = nullptr,
-    device_foundation::v1::DeviceRef* authority_ref = nullptr);
+    device_foundation::v1::DeviceRef* authority_ref = nullptr,
+    std::string* channel_problem_code = nullptr);
 
 
 // Temporary invitation only. Parsing never writes a Claim or cached configuration.

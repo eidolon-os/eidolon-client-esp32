@@ -28,6 +28,8 @@ constexpr Entry kTexts[] = {
     {"Updating device...", "请勿断电"},
     {"Approve this device in Eidolon", "请在手机 Eidolon 中批准这台面板"},
     {"Preparing your service...", "正在准备服务"},
+    {"Ask the Owner to set this device's input and output permissions", "请在管理端设置这台设备的输入输出权限"},
+    {"Service unavailable. Check this device in the management app", "服务暂不可用，请在管理端检查这台设备"},
     {"Connection interrupted. Trying to resume...", "连接中断，正在尝试恢复"},
     {"Voice service disabled; reset is required", "语音服务已停用，需要重置设备"},
     {"Use the physical recovery procedure", "长按 SET 键进入恢复流程"},

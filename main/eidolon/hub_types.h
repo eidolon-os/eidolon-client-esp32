@@ -99,6 +99,7 @@ struct Esp32HubConfig {
     HubConfigStatus status = HubConfigStatus::PendingApproval;
     // Local UI guidance; never a remote Claim or cached channel credential.
     std::string recovery_hint;
+    std::string channel_problem_code;
     // The one channel this device has. It used to be two — a control room it
     // lived in and a voice room it visited — which cost a room teardown and
     // rebuild at the start of every conversation, and left the device
