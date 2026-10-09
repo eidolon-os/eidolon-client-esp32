@@ -136,6 +136,16 @@ OwnerChanged、AuthorityReset、AuthorityRollback、ForeignPrincipal 和 OwnerRe
 分别分类。Owner/generation 不匹配不再删除 Claim 并沿用旧身份重新申请。
 配置恢复状态也不再显示成“已被 Owner 移除”。
 
+**Proposal 在 Authority 侧结束（`PROPOSAL_EXPIRED` / `GRANT_EXPIRED` / `NOT_FOUND`）不是 Owner 说不。**
+2026-10-10 之前，collect/ACK 收到这些答复会保留 checkpoint、进入 "Waiting for Owner to restore
+device access" 终态——而 Hub 并没有这条恢复路径，设备从此既不重申请也批不了（korvo-1 真机复现：
+15 分钟内 Owner 的手机没能到达 Host）。现在 `AbandonFinishedProposal` 调 `AbandonPendingProposal()`
+丢弃 checkpoint（销毁本次 handoff 材料），并在同一次 attempt 内用 `enrolled-base-key-v1` 重新 propose；
+Hub 按 Owner 在配网时记录的 standing 自动裁决（见 `eidolon_hub/docs/adr/20261010-admission-standing-at-issuance.md`）。
+只有放弃不成立时——Claim 已激活（对 Proposal 的答复不是对 Claim 的授权）或存储失败——才仍进入
+等待 Owner 的恢复态。Owner 真正的拒绝/移除仍由 Hub 的 `requires_fresh_presence` 在 propose 时以 403 答复，
+不会进入这条路径。
+
 ## 历史存储与故障边界
 
 - 旧版正常存储可读取；下一次成功配置迁移成原子身份项。

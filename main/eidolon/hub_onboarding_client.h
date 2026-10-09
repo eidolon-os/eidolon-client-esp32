@@ -67,6 +67,13 @@ private:
         const device_foundation::v1::OwnerDomainDescriptor& descriptor,
         const std::string& device_id, ActiveClaimState& claim,
         Esp32HubConfig& out);
+    // The Authority has finished this Proposal without the Owner saying no —
+    // it expired, its Grant expired, or the Authority no longer holds it.
+    // Drop the checkpoint so the next attempt proposes again on this key;
+    // the standing the Owner recorded at commissioning decides that Proposal
+    // as it decided this one. Only when nothing can be dropped — a Claim is
+    // active, or storage failed — is the Owner asked to intervene.
+    esp_err_t AbandonFinishedProposal(DeviceClaimConsumerCore& core, int status);
     esp_err_t RunAccepted(const device_foundation::v1::OwnerDomainDescriptor& descriptor,
                           const std::string& device_id,
                           Esp32HubConfig& out);
@@ -74,6 +81,8 @@ private:
     bool ContextCurrent() const;
     ClaimConsumerContext context_;
     std::string recovery_hint_;
+    // Set by AbandonFinishedProposal for the one attempt that follows it.
+    bool proposal_abandoned_ = false;
     uint32_t setup_generation_ = 0;
     OwnerTrustBundle trust_;
 };

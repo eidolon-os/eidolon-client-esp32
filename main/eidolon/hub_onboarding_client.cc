@@ -711,6 +711,35 @@ esp_err_t HubOnboardingClient::StandDownRevoked(const ActiveClaimState& claim,
     return ESP_ERR_NOT_ALLOWED;
 }
 
+esp_err_t HubOnboardingClient::AbandonFinishedProposal(
+    DeviceClaimConsumerCore& core, int status)
+{
+    // What this used to do was keep the checkpoint and wait for the Owner to
+    // "restore device access" — a recovery the Authority never had. A device
+    // whose Proposal timed out before anyone approved it then asked forever
+    // about a Proposal that would never exist again, and never proposed a
+    // new one. The Owner's decision does not expire with the Proposal: it was
+    // recorded at commissioning, and a fresh Proposal on this key is decided
+    // by it. So the checkpoint is dropped and the next attempt proposes.
+    const auto abandoned = core.AbandonPendingProposal();
+    if (abandoned.result == DeviceClaimConsumerResult::ProposalAbandoned ||
+        abandoned.result == DeviceClaimConsumerResult::NoPendingEnrollment) {
+        ESP_LOGW(TAG,
+                 "Proposal is finished at the Authority (HTTP %d); proposing "
+                 "again on this key",
+                 status);
+        diagnostic_.stage = "claim-abandoned";
+        proposal_abandoned_ = true;
+        return ESP_ERR_INVALID_STATE;
+    }
+    // A Claim is active, so an answer about a Proposal is not authority over
+    // it; or storage failed. Neither is something to retry blindly.
+    ESP_LOGW(TAG, "Finished Proposal could not be abandoned (%d); waiting for the Owner",
+             static_cast<int>(abandoned.result));
+    recovery_hint_ = "Waiting for Owner to restore device access";
+    return ESP_ERR_NOT_ALLOWED;
+}
+
 esp_err_t HubOnboardingClient::ProposeFreshClaim(
     const device_foundation::v1::OwnerDomainDescriptor& descriptor,
     const std::string& device_id,
@@ -718,8 +747,20 @@ esp_err_t HubOnboardingClient::ProposeFreshClaim(
     Esp32HubConfig& out)
 {
     bool activated = false;
-    const esp_err_t err =
-        ContinueCanonicalClaim(descriptor, device_id, claim, activated);
+    esp_err_t err = ESP_FAIL;
+    // Once: an abandoned Proposal is followed by a fresh one in the same
+    // attempt rather than after a retry delay, because nothing about the
+    // network or the Authority went wrong — only the Proposal's clock ran
+    // out. A second abandonment in one attempt is left to the retry schedule.
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        proposal_abandoned_ = false;
+        err = ContinueCanonicalClaim(descriptor, device_id, claim, activated);
+        if (err == ESP_ERR_INVALID_STATE && proposal_abandoned_ && attempt == 0 &&
+            ContextCurrent()) {
+            continue;
+        }
+        break;
+    }
     if (err != ESP_OK) {
         if (err == ESP_ERR_NOT_ALLOWED && !recovery_hint_.empty()) {
             out = {};
@@ -1035,10 +1076,7 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
             return ESP_OK;
         }
         if (IsFinishedProposalProblem(response.status, response.body)) {
-            // Expiry/404 cannot revoke a Decision. Keep the Proposal and its
-            // proof material for Authority recovery instead of losing approval.
-            recovery_hint_ = "Waiting for Owner to restore device access";
-            return ESP_ERR_NOT_ALLOWED;
+            return AbandonFinishedProposal(core, response.status);
         }
         if (response.status != 200) return StatusError(response.status);
         device_foundation::v1::CollectClaimGrantResult collected;
@@ -1095,10 +1133,7 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
         if (err != ESP_OK) return err;
         if (!ContextCurrent()) return ESP_ERR_INVALID_STATE;
         if (IsFinishedProposalProblem(response.status, response.body)) {
-            // Expiry/404 cannot revoke a Decision. Keep the Proposal and its
-            // proof material for Authority recovery instead of losing approval.
-            recovery_hint_ = "Waiting for Owner to restore device access";
-            return ESP_ERR_NOT_ALLOWED;
+            return AbandonFinishedProposal(core, response.status);
         }
         if (response.status != 200) return StatusError(response.status);
         outcome = core.AcceptGrantAck(response.body);
