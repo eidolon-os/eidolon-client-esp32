@@ -227,7 +227,7 @@ private:
                 // 长按 >=2s：任意状态下进入 WiFi 配网。这是 CoreS3 的可靠配网入口，
                 // 不依赖开机那几秒的短触窗口（其他板子有 boot 按键，CoreS3 没有）。
                 ESP_LOGI(TAG, "Long-press detected: entering WiFi config mode");
-                StartWifiConfigMode();
+                EnterWifiConfigMode();
                 return;
             }
         }
@@ -235,7 +235,7 @@ private:
 
     void InitializeFt6336TouchPad() {
 #if CONFIG_EIDOLON_HUB_MODE
-        eidolon::SetEidolonSetupHandler([this]() { StartWifiConfigMode(); });
+        eidolon::SetEidolonSetupHandler([this]() { EnterWifiConfigMode(); });
         if (!RegisterFtTouchInput(i2c_bus_,DISPLAY_WIDTH,DISPLAY_HEIGHT))
             ESP_LOGE(TAG,"Touch registration failed; screen controls unavailable");
 #else

@@ -42,17 +42,6 @@ protected:
     void OpenSetupWithoutAnyonePresent();
 
     /**
-     * Enter WiFi configuration mode.
-     *
-     * The act itself, not a decision about whether it may happen: the caller
-     * is asserting that somebody authorized this. EnterWifiConfigMode is the
-     * physical-presence door and is what a board's button or touch gesture
-     * should call; two boards (m5stack-core-s3, m5stack-stackchan) call this
-     * directly instead, which is a pre-existing gap, not a pattern to copy.
-     */
-    void StartWifiConfigMode();
-
-    /**
      * WiFi connection timeout callback
      */
     static void OnWifiConnectTimeout(void* arg);
@@ -87,6 +76,12 @@ public:
      * Check if in WiFi config mode
      */
     bool IsInWifiConfigMode() const;
+
+private:
+    // Only the two authorized paths in WifiBoard may open the window.
+    // Board input handlers must use the public physical-presence entry.
+    void StartWifiConfigMode();
+    void EnterWifiConfigModeOnApplicationTask();
 };
 
 #endif // WIFI_BOARD_H

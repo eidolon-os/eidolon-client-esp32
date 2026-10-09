@@ -336,6 +336,16 @@ void WifiBoard::StartWifiConfigMode() {
 }
 
 void WifiBoard::EnterWifiConfigMode() {
+    // Physical inputs may run on esp_timer or while LVGL holds its lock.
+    // Recovery writes NVS and creates a key; execute it on the existing app
+    // task, never inside a timer/UI callback. Automatic setup never uses this
+    // entry and therefore cannot acquire physical-presence authorization.
+    Application::GetInstance().Schedule([this]() {
+        EnterWifiConfigModeOnApplicationTask();
+    });
+}
+
+void WifiBoard::EnterWifiConfigModeOnApplicationTask() {
     ESP_LOGI(TAG, "EnterWifiConfigMode called");
 #if CONFIG_EIDOLON_HUB_MODE
     if (eidolon::boot_storage_error != ESP_OK) {
