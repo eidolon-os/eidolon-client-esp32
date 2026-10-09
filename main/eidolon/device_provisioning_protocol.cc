@@ -170,6 +170,12 @@ bool ParseTrustHandover(const std::string& body, TrustHandover& out)
         return false;
     }
     handover.prepare_only = cJSON_IsTrue(prepare);
+    const cJSON* replace = cJSON_GetObjectItemCaseSensitive(root, "replace_revoked_identity");
+    if (replace != nullptr && !cJSON_IsBool(replace)) {
+        cJSON_Delete(root);
+        return false;
+    }
+    handover.replace_revoked_identity = cJSON_IsTrue(replace);
     handover.owner_domain_id = JsonString(root, "owner_domain_id");
     handover.owner_root_certificate_pem =
         JsonString(root, "owner_root_certificate");

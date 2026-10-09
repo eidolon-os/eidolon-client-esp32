@@ -190,6 +190,19 @@ void LoadedTerminalWithoutAckEvidenceFailsClosed() {
     assert(adapter.prepare_calls == 0);
 }
 
+void PreviousInstanceEraseCannotDeleteSameOwnerReclaimedDevice() {
+    Journal journal;
+    Adapter adapter;
+    Clock clock;
+    Signer signer;
+    auto reclaimed = Ref();
+    reclaimed.device_instance_id = "new-instance";
+    DeviceLocalEraseCore core(reclaimed, journal, adapter, clock, signer);
+    const auto result = core.Handle(Command(), "sha256:" + std::string(64, '3'));
+    assert(result.result == DeviceEraseCoreResult::StaleGeneration);
+    assert(adapter.prepare_calls == 0 && adapter.finalize_calls == 0);
+}
+
 void DeadlineAndOldGenerationNeverReachTheAdapter() {
     Journal journal;
     Adapter adapter;
@@ -431,6 +444,7 @@ int main() {
     DuplicateAndRestartReplayOneAckWithoutSecondErase();
     SameIdDifferentPayloadIsAnIdempotencyConflict();
     LoadedTerminalWithoutAckEvidenceFailsClosed();
+    PreviousInstanceEraseCannotDeleteSameOwnerReclaimedDevice();
     DeadlineAndOldGenerationNeverReachTheAdapter();
     PermanentFailureIsSignedAndReplayedAsTerminal();
     RetryableStorageFailureDoesNotSignOrAck();

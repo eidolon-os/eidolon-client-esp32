@@ -125,6 +125,20 @@ void NetworkMaintenanceReferencesIdentityAcrossBootGenerations() {
         AssertOwner("owner-a");
     }
 }
+void SameOwnerReclaimReplacesStaleActiveClaimAtCommit() {
+    SeedOwnerA();
+    const auto old_id = DeviceIdentity::GetInstance().DeviceInstanceId();
+    Prepare(2, "owner-a", true);
+    // Host revocation has not reached this offline device: local state is still active.
+    assert(has_claim && DeviceIdentity::GetInstance().DeviceInstanceId() == old_id);
+    bool replaced = false;
+    assert(CommitCommissioningTransaction(2, "rejoin-network", "new-password", &replaced) ==
+           CommissioningTransactionResult::Committed);
+    AssertOwner("owner-a");
+    assert(replaced && !has_claim && !has_enrollment);
+    assert(DeviceIdentity::GetInstance().DeviceInstanceId() != old_id);
+    assert(SsidManager::GetInstance().GetSsidList().size() == 1);
+}
 void SelectedIdentityCannotFallBackToAnOldKey() {
     SeedOwnerA();
     disk["eidolon_id"].erase(ActiveIdentityKey());
@@ -406,6 +420,7 @@ OwnerDataEraseStorageResult EspIdfOwnerDataEraseStorage::VerifyTargetErased(cons
 }
 int main() {
     NetworkMaintenanceReferencesIdentityAcrossBootGenerations();
+    SameOwnerReclaimReplacesStaleActiveClaimAtCommit();
     SelectedIdentityCannotFallBackToAnOldKey();
     ExplicitReplacementCannotReuseAMaintenanceCandidate();
     RevokedClaimCannotUseLeftoverEnrollmentForMaintenance();

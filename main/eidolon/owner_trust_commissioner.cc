@@ -63,7 +63,8 @@ OwnerTrustCommissioningOutcome OwnerTrustCommissioner::Commission(
     PreparedCommissioningIdentity identity;
     if (!credentials_.Prepare(descriptor.owner_domain_id,
                               descriptor.owner_domain_generation,
-                              setup_generation, replace_identity, identity)) {
+                              setup_generation,
+                              replace_identity || handover.replace_revoked_identity, identity)) {
         return {OwnerTrustCommissioningCode::StorageUnavailable, {}};
     }
     if (handover.prepare_only) {

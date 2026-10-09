@@ -266,6 +266,14 @@ void PreparePreservesTrustAndEnforcesSameOwnerRevisionFloor() {
     assert(result.code == OwnerTrustCommissioningCode::Prepared);
     assert(!result.identity.device_instance_id.empty());
     assert(store.calls == 0 && credentials.calls == 0 && !credentials.replaced);
+    auto reclaim = prepare;
+    reclaim.insert(1, "\"replace_revoked_identity\":true,");
+    assert(commissioner.Commission(reclaim, 9, [] { return true; }).code == OwnerTrustCommissioningCode::Prepared);
+    assert(credentials.replaced);
+    assert(store.calls == 0 && credentials.calls == 0);
+    auto invalid = prepare;
+    invalid.insert(1, "\"replace_revoked_identity\":\"true\",");
+    assert(commissioner.Commission(invalid, 9, [] { return true; }).code == OwnerTrustCommissioningCode::Unsupported);
     auto revision = [&](const std::string& text, const std::string& from, const std::string& to) {
         auto changed = text;
         changed.replace(changed.find(from), from.size(), to);

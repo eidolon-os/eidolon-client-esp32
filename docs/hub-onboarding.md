@@ -56,9 +56,18 @@ AuthorityLocator 与通道恢复流程。Idle 只说明配置资源已释放；�
 继续使用现有 `eidolon-trust` 自定义配置 endpoint、已有物理开窗和认证会话。
 不增加一个独立配置通道。
 
-1. 手机读取目标 Owner 的签名目录和证书。
+1. 手机读取目标 Owner 的签名目录、证书和分页 Claim 状态；查询失败不进入设备网络。
 2. 第一次连接设备时，在现有 trust handover 中附带 `prepare_only: true`。
    设备验证目标、比较当前身份归属；可续用时引用生效身份，否则准备候选 key。
+   若 Host 已将该 device instance 撤销，手机在两次 handover 中均发送
+   `replace_revoked_identity: true`，要求同 Owner 下也准备新身份及新 voucher。
+   这是物理配置窗口内的新生命周期请求，不是恢复旧 Claim 的权限；固件仍验证
+   Owner 目录、防回滚边界与 voucher 绑定，最终批准仍由 Host 决定。
+   普通网络恢复入口遇到撤销记录须返回重新添加，不能静默更换身份。
+   手机要求新 device id 和 `requires_voucher: true`；设备未满足则在写网络前停止。
+   提交复用现有 commissioning replacement 事务：清理旧 Owner 数据/Claim、保留
+   本次指定网络、切换候选身份。旧 erase 仍绑定旧 instance，不能作用到新生命周期。
+   准备阶段不清除生效状态，取消可回滚；不修改或豁免 Host 的旧删除指令。
 3. 返回 `prepared: true`、目标 `owner_domain_id`、候选 `device_id` 和
    `identity_fingerprint`（`sha256:`）及 `requires_voucher`。生效 trust 与身份此时不变。
    只有同 Owner、同 Owner generation、同 key 且有可续用 Claim/Enrollment 才返回 false。

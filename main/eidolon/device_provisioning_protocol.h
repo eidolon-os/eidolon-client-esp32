@@ -50,6 +50,8 @@ std::string BuildSetupDescriptorJson(
 struct TrustHandover {
     // Authenticated first visit, before the Controller requests a key-bound voucher.
     bool prepare_only = false;
+    // A physical setup session may request a new lifecycle even for the same Owner.
+    bool replace_revoked_identity = false;
     std::string owner_domain_id;
     std::string owner_domain_descriptor_json;
     std::string owner_root_certificate_pem;
