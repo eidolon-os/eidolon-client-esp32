@@ -23,6 +23,17 @@
 `DeviceClaimConsumerCore` 负责 Enrollment / Grant / ACK。
 `DeviceAuthorityLocator` 继续负责已验证目录和逻辑 Authority 的解析。
 
+## 配网界面与准入状态
+
+Admission 的 `PROPOSAL_EXPIRED` / `GRANT_EXPIRED`（410）及明确的 `NOT_FOUND`（404）
+走现有 `RecoveryRequired`，保留恢复材料；HTTP 状态本身不代表 Claim 被撤销。
+实际撤销仍走 `Revoked`，不因进入配网而恢复授权。
+
+配置 actor 已确认 Advertising / SessionActive 并投影 `RuntimePhase::Commissioning` 时，
+界面优先显示“设备配网”和现有手机添加指引。旧的撤销状态不能覆盖已经开放的配网入口；
+这里只改变显示，不清除 Claim 状态、不放开会话权限。退出配置回到恢复状态后，真实撤销
+仍显示“设备已移除”，普通恢复显示“需要恢复”。
+
 ## 配置退出与网络恢复
 
 配置 actor 负责事务收敛、关闭配置 transport 和交回无线电控制权。成功提交与安全取消

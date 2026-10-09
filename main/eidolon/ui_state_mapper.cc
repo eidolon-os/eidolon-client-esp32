@@ -75,6 +75,12 @@ UiScene ConversationScene(const EidolonRuntimeStatus& status)
 
 UiScene SelectScene(const EidolonRuntimeStatus& status)
 {
+    // The commissioning actor publishes this only after setup is available.
+    // Show the current physical-presence operation without clearing the old
+    // Claim verdict or treating an open setup window as renewed admission.
+    if (status.runtime == RuntimePhase::Commissioning) {
+        return UiScene::Commissioning;
+    }
     if (status.enrollment == EnrollmentPhase::Revoked) {
         return UiScene::Removed;
     }

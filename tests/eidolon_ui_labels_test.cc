@@ -52,6 +52,35 @@ void TestSafetyAndRuntimePrecedence()
     assert(!model.show_end_action);
 }
 
+void TestOpenSetupIsVisibleWithoutRestoringAdmission()
+{
+    for (const auto enrollment : {EnrollmentPhase::Unknown,
+                                  EnrollmentPhase::PendingReview,
+                                  EnrollmentPhase::Revoked}) {
+        auto status = ReadyStatus();
+        status.enrollment = enrollment;
+        status.service = ServicePhase::Unavailable;
+        status.runtime = RuntimePhase::Commissioning;
+        status.runtime_detail = "Ready for secure device setup";
+        status.enrollment_detail = "Previous enrollment is no longer usable";
+        auto model = ProjectWithTouch(status);
+        assert(model.scene == UiScene::Commissioning);
+        Expect(model.detail_text, "Ready for secure device setup");
+        assert(!model.primary_enabled);
+        assert(!model.show_end_action);
+        assert(status.enrollment == enrollment);
+
+        // Closing setup must reveal the underlying recovery/removal verdict.
+        status.runtime = RuntimePhase::RecoveryRequired;
+        status.runtime_detail = "Waiting for Owner to restore device access";
+        model = ProjectWithTouch(status);
+        assert(model.scene == (enrollment == EnrollmentPhase::Revoked
+                                   ? UiScene::Removed
+                                   : UiScene::RecoveryRequired));
+        assert(!model.primary_enabled);
+    }
+}
+
 void TestEnrollmentAndServiceAreOrthogonal()
 {
     auto status = ReadyStatus();
@@ -252,6 +281,7 @@ int main()
     Expect(EidolonBrandLabel(), "EIDOLON");
     TestStartupDoesNotClaimReadinessOrOwnershipEarly();
     TestSafetyAndRuntimePrecedence();
+    TestOpenSetupIsVisibleWithoutRestoringAdmission();
     TestEnrollmentAndServiceAreOrthogonal();
     TestRecoverableServiceLossIsNotADeviceError();
     TestConversationRequiresExplicitStart();
