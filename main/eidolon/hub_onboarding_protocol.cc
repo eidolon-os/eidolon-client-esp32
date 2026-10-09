@@ -438,6 +438,8 @@ std::string BuildDeviceManifestJson(const std::string& board_name, const DeviceC
     // Keep a compact deterministic representation for the manifest wire
     // contract: keys stay sorted so the Host's manifest revision is stable
     // across boots that declare the same thing.
+    if (capabilities.motion && capabilities.stackchan_head)
+        properties += ",{\"name\":\"motion.profile\",\"observable\":false,\"schema\":{\"const\":\"stackchan.head.v1\",\"type\":\"string\"},\"writable\":false}";
     const std::string actions = capabilities.expression ? expression::kManifestActions : "[]";
     return "{\"actions\":" + actions + ",\"events\":[],\"media\":[" + media +
            "],\"properties\":[" + properties +

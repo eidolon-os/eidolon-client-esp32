@@ -141,6 +141,11 @@ int main() {
     std::ifstream file("tests/fixtures/presentation/silent-session.json");
     std::ostringstream buffer; buffer<<file.rdbuf();
     auto* json=cJSON_Parse(buffer.str().c_str());
-    assert(ParseSessionOutputPlan(json,plan)); cJSON_Delete(json);
+    assert(ParseSessionOutputPlan(json,plan));
+    cJSON_AddStringToObject(json,"motion_profile","stackchan.head.v1");
+    assert(ParseSessionOutputPlan(json,plan));
+    cJSON_ReplaceItemInObjectCaseSensitive(json,"motion_profile",cJSON_CreateString("unsupported"));
+    assert(!ParseSessionOutputPlan(json,plan));
+    cJSON_Delete(json);
     assert(plan.face_profile && plan.selected==expression && plan.session_id=="session-1");
 }

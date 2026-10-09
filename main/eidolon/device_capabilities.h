@@ -16,6 +16,7 @@ struct DeviceCapabilities {
     bool expression = false;
     bool audio_cue = false;
     bool motion = false;
+    bool stackchan_head = false;
     uint32_t OutputMask() const {
         using presentation::Output;
         return (speaker ? static_cast<uint32_t>(Output::Speech) : 0u) |
@@ -49,6 +50,9 @@ inline DeviceCapabilities CompiledDeviceCapabilities() {
 #endif
 #if CONFIG_EIDOLON_CAP_MOTION
     capabilities.motion = true;
+#endif
+#if CONFIG_BOARD_TYPE_M5STACK_STACKCHAN && CONFIG_EIDOLON_CAP_MOTION
+    capabilities.stackchan_head = true;
 #endif
     return capabilities;
 }

@@ -287,7 +287,7 @@ void StackChanBody::HeadGesture(const std::string& name, int times, float x, flo
                                 int hold_ms, int return_ms, eidolon::HeadMotionObserver observer) {
     using S = eidolon::HeadMotionStatus;
     const bool known = name=="nod" || name=="shake" || name=="perk_up" ||
-        name=="droop" || name=="glance" || name=="wake_wobble";
+        name=="droop" || name=="glance" || name=="wake_wobble" || name=="home";
     const char* refusal = !ready_ ? "NO_HEAD_MOTION" : !known ? "UNKNOWN_GESTURE" :
         (times<0 || times>3 || hold_ms<0 || hold_ms>2000 || return_ms<0 || return_ms>2000 ||
          !std::isfinite(x) || !std::isfinite(y)) ? "INVALID_ARGUMENT" :
@@ -338,7 +338,10 @@ void StackChanBody::RunGesture() {
     ESP_LOGI(TAG, "gesture: %s", g.name.c_str());
     // Each step checks GestureContinue after moving; a safety.stop mid-gesture returns
     // early WITHOUT homing, so the head stays limp instead of driving back to center.
-    if (g.name == "nod") {  // pitch oscillation (yes)
+    if (g.name == "home") {
+        GoHome();
+        GestureContinue(650);
+    } else if (g.name == "nod") {  // pitch oscillation (yes)
         for (int i = 0; i < times; ++i) {
             SetHeadAngles(0.0f, kHomePitchDeg - 12.0f); if (!GestureContinue(280)) return;
             SetHeadAngles(0.0f, kHomePitchDeg + 10.0f); if (!GestureContinue(280)) return;

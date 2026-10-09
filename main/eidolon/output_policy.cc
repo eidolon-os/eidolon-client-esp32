@@ -70,7 +70,7 @@ bool ParseOutputPolicy(const cJSON* json,DeviceOutputPolicy& output) {
     candidate.known=true;output=candidate;return true;
 }
 bool ParseSessionOutputPlan(const cJSON* json,SessionOutputPlan& output) {
-    if (!Keys(json,{"schema_version","session_id","policy_revision","outputs","expression_profile","inputs"}) ||
+    if (!Keys(json,{"schema_version","session_id","policy_revision","outputs","expression_profile","motion_profile","inputs"}) ||
         !Version(json)) return false;
     SessionOutputPlan plan;
     const auto* inputs=cJSON_GetObjectItemCaseSensitive(json,"inputs");
@@ -88,6 +88,9 @@ bool ParseSessionOutputPlan(const cJSON* json,SessionOutputPlan& output) {
     plan.face_profile=cJSON_IsString(profile) && !std::strcmp(profile->valuestring,expression::kProfile);
     if ((profile && !cJSON_IsNull(profile) && !plan.face_profile) ||
         plan.face_profile!=bool(plan.selected&OutputBit(presentation::Output::Expression))) return false;
+    auto* motion_profile=cJSON_GetObjectItemCaseSensitive(json,"motion_profile");
+    if (motion_profile && !cJSON_IsNull(motion_profile) &&
+        (!cJSON_IsString(motion_profile) || std::strcmp(motion_profile->valuestring,"stackchan.head.v1"))) return false;
     output=std::move(plan);return true;
 }
 bool DeviceOutputGate::Bind(const DeviceOutputPolicy& policy) {

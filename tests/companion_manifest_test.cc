@@ -49,6 +49,10 @@ int main() {
     manifest=eidolon::BuildDeviceManifestJson("head-fixture",text);
     assert(manifest.find("output.motion")!=std::string::npos);
     assert(text.OutputMask() & eidolon::OutputBit(eidolon::presentation::Output::Motion));
+    assert(manifest.find("stackchan.head.v1")==std::string::npos);
+    text.stackchan_head=true;
+    manifest=eidolon::BuildDeviceManifestJson("stackchan-fixture",text);
+    assert(manifest.find("stackchan.head.v1")!=std::string::npos);
     text.speaker=false;
     manifest=eidolon::BuildDeviceManifestJson("no-audio-fixture",text);
     json=cJSON_Parse(manifest.c_str());assert(json);
