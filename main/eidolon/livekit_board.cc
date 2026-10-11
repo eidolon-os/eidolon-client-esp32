@@ -269,6 +269,17 @@ static esp_err_t build_renderer(esp_codec_dev_handle_t play_handle, uint32_t out
     frame_info.channel = static_cast<uint8_t>(output_channels);
     frame_info.bits_per_sample = 16;
     av_render_set_fixed_frame_info(s_av_renderer, &frame_info);
+
+    // Playout buffer. The renderer otherwise plays each frame as it arrives,
+    // and nothing upstream of it smooths Wi-Fi delivery: a gap longer than the
+    // I2S DMA buffer is heard as a hole. The threshold is counted in bytes of
+    // the queue it applies to, which holds output-format PCM.
+#if CONFIG_EIDOLON_LIVEKIT_PLAYOUT_BUFFER_MS > 0
+    const uint32_t bytes_per_ms = output_sample_rate * static_cast<uint32_t>(output_channels) *
+                                  sizeof(int16_t) / 1000;
+    av_render_set_audio_threshold(s_av_renderer,
+                                  bytes_per_ms * CONFIG_EIDOLON_LIVEKIT_PLAYOUT_BUFFER_MS);
+#endif
     return ESP_OK;
 }
 

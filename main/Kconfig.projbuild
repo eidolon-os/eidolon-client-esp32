@@ -1477,6 +1477,19 @@ menu "Eidolon Hub"
         default 50
         depends on EIDOLON_HUB_MODE
 
+    config EIDOLON_LIVEKIT_PLAYOUT_BUFFER_MS
+        int "LiveKit playout buffer (ms)"
+        range 0 500
+        default 150
+        depends on EIDOLON_HUB_MODE
+        help
+            Audio the renderer holds before it starts playing a reply, and refills
+            to whenever its queue runs nearly dry. Without it frames are played
+            the moment they arrive, so any Wi-Fi delivery gap longer than the
+            output's own DMA buffering is an audible hole. Costs this much
+            latency at the start of each utterance; uses the renderer FIFO that
+            is already allocated. 0 restores play-on-arrival.
+
     config EIDOLON_WAKE_WORD_ENABLE
         bool "Enable microWakeWord (hey jarvis) wake word"
         default y
