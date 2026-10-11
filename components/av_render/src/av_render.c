@@ -39,6 +39,106 @@
 
 #define TAG "AV_RENDER"
 
+#if CONFIG_AV_RENDER_AUDIO_RX_DIAG
+#include "esp_timer.h"
+
+/* Downlink audio timing, measured where frames enter the renderer and where
+ * the renderer hands them to the audio output. Two windows, each touched by one
+ * thread only (the network task, the render thread), logged every 5 s. */
+typedef struct {
+    bool     started;
+    int64_t  window_start_us;
+    int64_t  last_us;
+    uint32_t last_pts;
+    uint32_t frames;
+    uint32_t gap_40;
+    uint32_t gap_100;
+    uint32_t max_gap_ms;
+    uint32_t min_step;
+    uint32_t max_step;
+    uint32_t missing_steps;
+    uint32_t backwards;
+} rx_diag_window_t;
+
+static rx_diag_window_t s_rx_in;
+static rx_diag_window_t s_rx_out;
+
+static void rx_diag_report(rx_diag_window_t *w, const char *side, const char *why)
+{
+    if (w->frames) {
+        ESP_LOGW(TAG, "[rx_diag] %s frames=%" PRIu32 " gap>40ms=%" PRIu32 " gap>100ms=%" PRIu32
+                 " max_gap=%" PRIu32 "ms pts_step=%" PRIu32 "..%" PRIu32 " missing_steps=%" PRIu32
+                 " backwards=%" PRIu32 " (%s)",
+                 side, w->frames, w->gap_40, w->gap_100, w->max_gap_ms,
+                 w->min_step == UINT32_MAX ? 0 : w->min_step, w->max_step,
+                 w->missing_steps, w->backwards, why);
+    }
+}
+
+static void rx_diag_restart(rx_diag_window_t *w, int64_t now, uint32_t pts)
+{
+    uint32_t min_step = w->started ? w->min_step : UINT32_MAX;
+    memset(w, 0, sizeof(*w));
+    w->started = true;
+    w->window_start_us = now;
+    w->last_us = now;
+    w->last_pts = pts;
+    w->min_step = min_step;
+}
+
+static void rx_diag_note(rx_diag_window_t *w, const char *side, uint32_t pts)
+{
+    int64_t now = esp_timer_get_time();
+    if (!w->started) {
+        rx_diag_restart(w, now, pts);
+        return;
+    }
+    uint32_t gap_ms = (uint32_t)((now - w->last_us) / 1000);
+    if (gap_ms > 1000) {
+        /* A pause between utterances, not a hole in one. */
+        rx_diag_report(w, side, "segment end");
+        rx_diag_restart(w, now, pts);
+        return;
+    }
+    w->frames++;
+    if (gap_ms > 40) {
+        w->gap_40++;
+    }
+    if (gap_ms > 100) {
+        w->gap_100++;
+    }
+    if (gap_ms > w->max_gap_ms) {
+        w->max_gap_ms = gap_ms;
+    }
+    int32_t step = (int32_t)(pts - w->last_pts);
+    if (step < 0) {
+        w->backwards++;
+    } else if (step > 0) {
+        uint32_t u = (uint32_t)step;
+        if (u < w->min_step) {
+            w->min_step = u;
+        }
+        if (u > w->max_step) {
+            w->max_step = u;
+        }
+        if (w->min_step != UINT32_MAX && u > w->min_step + w->min_step / 2) {
+            w->missing_steps += u / w->min_step - 1;
+        }
+    }
+    w->last_us = now;
+    w->last_pts = pts;
+    if (now - w->window_start_us >= 5000000) {
+        rx_diag_report(w, side, "5s");
+        rx_diag_restart(w, now, pts);
+    }
+}
+#define RX_DIAG_IN(pts)  rx_diag_note(&s_rx_in, "in", (pts))
+#define RX_DIAG_OUT(pts) rx_diag_note(&s_rx_out, "out", (pts))
+#else
+#define RX_DIAG_IN(pts)
+#define RX_DIAG_OUT(pts)
+#endif
+
 #define ADEC_CLOSED_BITS     (1 << 0)
 #define VDEC_CLOSED_BITS     (1 << 1)
 #define A_RENDER_CLOSED_BITS (1 << 2)
@@ -613,6 +713,9 @@ static int _render_write_audio(av_render_thread_res_t *res, av_render_audio_fram
     res->render->a_render_res->audio_send_pts = audio_frame->pts;
     int ret = 0;
     if (res->flushing == false) {
+        if (audio_frame->size) {
+            RX_DIAG_OUT(audio_frame->pts);
+        }
         ret = audio_render_write(res->render->cfg.audio_render, audio_frame);
         if (ret != 0) {
             ESP_LOGE(TAG, "Fail to render audio ret %d", ret);
@@ -1548,6 +1651,9 @@ int av_render_add_audio_data(av_render_handle_t h, av_render_audio_data_t *audio
     av_render_t *render = (av_render_t *)h;
     if (render == NULL || audio_data == NULL) {
         return ESP_MEDIA_ERR_INVALID_ARG;
+    }
+    if (audio_data->size) {
+        RX_DIAG_IN(audio_data->pts);
     }
     media_lib_mutex_lock(render->api_lock, MEDIA_LIB_MAX_LOCK_TIME);
     int ret = 0;

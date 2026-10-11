@@ -14,6 +14,7 @@
 #   EIDOLON_IDF_PATH                   ESP-IDF root directory
 #   EIDOLON_INTERACTION_MODE          full_duplex (default), half_duplex, ptt
 #   EIDOLON_RUNTIME_DIAGNOSTICS       Strong stack guards/watchpoint: y/n (default n)
+#   EIDOLON_AUDIO_RX_DIAG             Log downlink audio arrival/output gaps: y/n (default n)
 #   IDF_PATH                           ESP-IDF root directory
 
 set -euo pipefail
@@ -31,6 +32,7 @@ SDKCONFIG_FILE="${BUILD_DIR}/sdkconfig.esp-box-3"
 SDKCONFIG_OVERLAY="${BUILD_DIR}/sdkconfig.overlay.esp-box-3"
 PORT="${EIDOLON_PORT:-}"
 RUNTIME_DIAGNOSTICS="${EIDOLON_RUNTIME_DIAGNOSTICS:-n}"
+AUDIO_RX_DIAG="${EIDOLON_AUDIO_RX_DIAG:-n}"
 # Input/turn-taking is independent of the face renderer and Hub output policy.
 INTERACTION_MODE="${EIDOLON_INTERACTION_MODE:-full_duplex}"
 PTT_ENABLED=n
@@ -227,6 +229,13 @@ ensure_box3_sdkconfig() {
   set_sdkconfig_value EIDOLON_FULL_DUPLEX_IDLE_FALLBACK_MS 75000
   set_sdkconfig_value MMAP_FILE_NAME_LENGTH 32
   set_sdkconfig_value PARTITION_TABLE_CUSTOM_FILENAME '"partitions/v2/16m_eidolon_box3.csv"'
+
+  # Downlink audio timing (components/av_render). Same rule as the crash
+  # diagnostics below: always written, so a normal build never inherits it.
+  case "${AUDIO_RX_DIAG}" in
+    y|n) set_sdkconfig_bool AV_RENDER_AUDIO_RX_DIAG "${AUDIO_RX_DIAG}" ;;
+    *) die "EIDOLON_AUDIO_RX_DIAG must be y or n" ;;
+  esac
 
   # Reproducible, opt-in crash diagnostics. Keep this out of normal firmware:
   # the guards deliberately trade code size for exact evidence. Explicitly

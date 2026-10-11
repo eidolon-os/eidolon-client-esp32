@@ -11,12 +11,16 @@ SCRIPT = ROOT / "scripts/eidolon/eidolon-esp-box-3.sh"
 
 
 class Box3InputModeTest(unittest.TestCase):
-    def configure(self, mode):
+    def configure(self, mode, extra_env=None, existing_sdkconfig=""):
         with tempfile.TemporaryDirectory() as directory:
             env = os.environ.copy()
             env.pop("EIDOLON_INTERACTION_MODE", None)
+            env.pop("EIDOLON_AUDIO_RX_DIAG", None)
             if mode is not None:
                 env["EIDOLON_INTERACTION_MODE"] = mode
+            env.update(extra_env or {})
+            if existing_sdkconfig:
+                (Path(directory) / "sdkconfig").write_text(existing_sdkconfig)
             # The production helper is sourceable. Redirect only its output paths.
             command = '''source "$1"
 BUILD_DIR="$2"
@@ -49,6 +53,19 @@ ensure_box3_sdkconfig
         metadata = json.loads((ROOT / "main/boards/esp-box-3/config.json").read_text())
         self.assertIn("CONFIG_EIDOLON_INTERACTION_MODE_HALF_DUPLEX=n", str(metadata))
         self.assertIn("CONFIG_EIDOLON_INTERACTION_MODE_PTT=n", str(metadata))
+
+    def test_audio_diagnostics_are_opt_in_and_always_written(self):
+        normal = self.configure(None)["sdkconfig"]
+        self.assertIn("# CONFIG_AV_RENDER_AUDIO_RX_DIAG is not set", normal)
+        diag = self.configure(None, {"EIDOLON_AUDIO_RX_DIAG": "y"},
+                              existing_sdkconfig="CONFIG_AV_RENDER_AUDIO_RX_DIAG=n\n")["sdkconfig"]
+        self.assertIn("CONFIG_AV_RENDER_AUDIO_RX_DIAG=y", diag)
+        # A later normal build must not inherit a diagnostic sdkconfig.
+        back = self.configure(None, existing_sdkconfig=diag)["sdkconfig"]
+        self.assertIn("# CONFIG_AV_RENDER_AUDIO_RX_DIAG is not set", back)
+        self.assertNotIn("CONFIG_AV_RENDER_AUDIO_RX_DIAG=y", back)
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.configure(None, {"EIDOLON_AUDIO_RX_DIAG": "maybe"})
 
     def test_invalid_mode_fails_before_writing(self):
         with self.assertRaises(subprocess.CalledProcessError):

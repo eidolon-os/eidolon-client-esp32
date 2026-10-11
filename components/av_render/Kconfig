@@ -1,0 +1,15 @@
+menu "AV render diagnostics"
+
+config AV_RENDER_AUDIO_RX_DIAG
+    bool "Log downlink audio arrival and output-gap statistics"
+    default n
+    help
+        Diagnostic only. For every five seconds of received audio, log how many
+        frames arrived, how often the gap between two arrivals exceeded 40 ms and
+        100 ms, the largest such gap, the spread of RTP timestamp steps (a step
+        larger than the smallest one means frames never arrived), and the same
+        gap statistics for writes to the audio output. The renderer here plays
+        frames as they come, with no playout buffer of its own, so an arrival gap
+        longer than the output's own buffering is an audible hole.
+
+endmenu
