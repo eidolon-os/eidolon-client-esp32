@@ -13,6 +13,10 @@ struct Entry {
     const char* chinese;
 };
 constexpr Entry kTexts[] = {
+    {"Host service is temporarily unavailable. Retrying automatically; no setup needed", "主机服务暂不可用，正在自动重试，无需重新配网"},
+    {"Host could not verify this device. Retrying; check device access in the management app", "主机暂未确认设备授权，正在重试；可在管理端检查设备权限"},
+    {"Cannot reach the Host. Retrying automatically; no setup needed", "暂时无法连接主机，正在自动重试，无需重新配网"},
+    {"Could not prepare the service. Retrying automatically", "服务暂未就绪，正在自动重试"},
     // Projected status lines (ui_state_mapper.cc, eidolon_ui_labels.cc).
     {"Finding service", "正在寻找主机"},
     {"Checking device", "正在核验设备"},

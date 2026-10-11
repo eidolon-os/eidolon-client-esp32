@@ -17,6 +17,11 @@ int main() {
     assert(no_response.find("Attempt 5 failed. Retry delay: 120s") != std::string::npos);
     // Preserve both an explicit code and the platform's symbolic error.
     assert(no_response.find("ESP_FAIL (0x") != std::string::npos);
+    assert(std::string(d.RecoveryDetail()).find("Cannot reach the Host") == 0);
+    d.http_status = 503;
+    assert(std::string(d.RecoveryDetail()).find("Host service is temporarily unavailable") == 0);
+    d.http_status = 403;
+    assert(std::string(d.RecoveryDetail()).find("Host could not verify") == 0);
     d = {};
     assert(d.error == 0 && d.http_status == 0);
     d.BeginStage("configuration-validate");

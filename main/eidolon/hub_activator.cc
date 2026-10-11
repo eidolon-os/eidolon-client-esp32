@@ -180,8 +180,7 @@ bool HubActivator::Run(Esp32HubConfig& activated) {
         // commissioning generation taking the radio, or a terminal Claim.
         const int retry_delay = retry.delay_seconds();
         const auto& diagnostic = client.diagnostic();
-        app.SetEidolonServiceUi(ServicePhase::DiscoveringAuthority,
-            diagnostic.RetryDetail(esp_err_to_name(err), retry.retryable_attempts(), retry_delay));
+        app.SetEidolonServiceUi(ServicePhase::Unreachable, diagnostic.RecoveryDetail());
 
         ESP_LOGW(TAG, "Hub activation failed stage=%s error=%s code=0x%x http=%d attempt=%d retry_s=%d",
                  diagnostic.stage, esp_err_to_name(err), static_cast<unsigned int>(err),
