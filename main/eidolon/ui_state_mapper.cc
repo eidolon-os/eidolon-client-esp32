@@ -198,6 +198,9 @@ void ResolveRecoveryPresentation(const EidolonRuntimeStatus& status,
     model.detail_text = status.service == ServicePhase::Unreachable
         ? "Check Host and Wi-Fi. Retrying automatically."
         : "Please wait. Reconnecting automatically.";
+    if (!status.service_detail.empty()) {
+        model.detail_text = status.service_detail.c_str();
+    }
 }
 
 void ResolveActions(const EidolonRuntimeStatus& status, EidolonUiModel& model)

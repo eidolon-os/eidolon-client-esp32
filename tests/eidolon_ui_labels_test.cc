@@ -139,6 +139,10 @@ void TestRecoverableServiceLossIsNotADeviceError()
     Expect(model.detail_text, "Check Host and Wi-Fi. Retrying automatically.");
     assert(!model.primary_enabled);
 
+    status.service_detail = "Host service is temporarily unavailable. Retrying automatically; no setup needed";
+    model = ProjectWithTouch(status);
+    Expect(model.detail_text, status.service_detail.c_str());
+
     status.conversation = ConversationPhase::Reconnecting;
     model = ProjectWithTouch(status);
     Expect(model.state_label, "REJOIN");
@@ -155,6 +159,9 @@ void TestRecoverableServiceLossIsNotADeviceError()
     status.conversation = ConversationPhase::Closed;
     status.end_reason = EndReason::None;
     status.service = ServicePhase::Fault;
+    model = ProjectWithTouch(status);
+    Expect(model.detail_text, status.service_detail.c_str());
+    status.service_detail.clear();
     model = ProjectWithTouch(status);
     assert(model.scene == UiScene::Error);
     assert(model.severity == UiSeverity::Error);
