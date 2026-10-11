@@ -12,8 +12,8 @@
 | --- | --- |
 | 同 Owner 换 Host、IP、网络、普通固件升级 | 保留 operational key、Claim、Enrollment 和伙伴状态；AuthorityLocator 校验并更新路由 |
 | 同 Owner 目录更新 | 校验签名、Owner generation 和 directory revision；拒绝回退及同版本不同内容 |
-| 已验证目录推进 Owner generation | 与普通部署分开识别；旧 Claim 不再用于新代际。没有恢复授权时进入现有配置入口；已授权配置会准备新身份 |
-| 已认证配置选择另一 Owner | 暂存新身份，获得目标 Owner 的 voucher，提交后执行旧归属范围清理，继续标准 Admission |
+| 已验证目录推进 Owner generation | 与普通部署分开识别；旧 Claim 不再用于新代际。没有恢复授权时进入现有配置入口；已授权配置会准备新授权，设备身份保持不变 |
+| 已认证配置选择另一 Owner | 保留设备身份，暂存目标 Owner 的新授权 voucher，提交后执行旧归属范围清理，继续标准 Admission |
 | 401、404、超时、发现其他 Owner 的 Host | 不据此清空 Claim、生成身份或转移归属 |
 
 `OwnerTrustCommissioner` 校验配置输入；`CommissioningRuntime` 是配置动作的唯一
@@ -58,16 +58,10 @@ AuthorityLocator 与通道恢复流程。Idle 只说明配置资源已释放；�
 
 1. 手机读取目标 Owner 的签名目录、证书和分页 Claim 状态；查询失败不进入设备网络。
 2. 第一次连接设备时，在现有 trust handover 中附带 `prepare_only: true`。
-   设备验证目标、比较当前身份归属；可续用时引用生效身份，否则准备候选 key。
-   若 Host 已将该 device instance 撤销，手机在两次 handover 中均发送
-   `replace_revoked_identity: true`，要求同 Owner 下也准备新身份及新 voucher。
-   这是物理配置窗口内的新生命周期请求，不是恢复旧 Claim 的权限；固件仍验证
-   Owner 目录、防回滚边界与 voucher 绑定，最终批准仍由 Host 决定。
-   普通网络恢复入口遇到撤销记录须返回重新添加，不能静默更换身份。
-   手机要求新 device id 和 `requires_voucher: true`；设备未满足则在写网络前停止。
-   提交复用现有 commissioning replacement 事务：清理旧 Owner 数据/Claim、保留
-   本次指定网络、切换候选身份。旧 erase 仍绑定旧 instance，不能作用到新生命周期。
-   准备阶段不清除生效状态，取消可回滚；不修改或豁免 Host 的旧删除指令。
+   设备验证目标和当前授权。设备密钥与 instance 始终保持不变；跨 Owner、管理域代际变化或授权已撤销时，只准备新的授权凭据，返回 `requires_voucher: true`。
+   wire 字段 `replace_revoked_identity` 兼容现有请求格式，表示替换已撤销的授权上下文，不再表示重新生成设备密钥。新 voucher 由目标 Host 签发；原 Host 按同一公钥找回基础记录。
+   提交复用现有 commissioning replacement 事务：清理旧 Owner 数据/Claim、保留本次网络、切换已验证的授权和信任材料。准备失败或取消不改变生效上下文。
+   旧指令由完整 DeviceRef（Owner、Owner generation、Claim generation、trust epoch）隔离；Host 重新签发 Claim 会提升代际，不靠更换设备身份规避旧指令。明确擦除设备身份的物理恢复仍属于独立操作。
 3. 返回 `prepared: true`、目标 `owner_domain_id`、候选 `device_id` 和
    `identity_fingerprint`（`sha256:`）及 `requires_voucher`。生效 trust 与身份此时不变。
    只有同 Owner、同 Owner generation、同 key 且有可续用 Claim/Enrollment 才返回 false。

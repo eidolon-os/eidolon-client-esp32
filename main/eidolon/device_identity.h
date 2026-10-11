@@ -45,8 +45,8 @@ public:
     // RAM copy prevents the pre-removal principal from surviving until reboot.
     void ForgetCachedKeyAfterPhysicalRecovery();
 
-    // Candidate generation never replaces the active singleton or its NVS key.
-    static bool PrepareKey(bool fresh, std::string& pem, std::string& fingerprint,
+    // Snapshot the stable device key for the authorization transaction.
+    static bool PrepareKey(std::string& pem, std::string& fingerprint,
                            std::string& instance_id);
     static bool DescribeKey(const std::string& pem, std::string& fingerprint,
                             std::string& instance_id);

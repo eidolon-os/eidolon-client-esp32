@@ -210,9 +210,8 @@ esp_err_t DeviceIdentity::EnsureKeypair() {
         return ESP_FAIL;
     return DescribeKey(private_key_pem_, fingerprint_, device_instance_id_) ? ESP_OK : ESP_FAIL;
 }
-bool DeviceIdentity::PrepareKey(bool fresh, std::string& pem, std::string& key,
+bool DeviceIdentity::PrepareKey( std::string& pem, std::string& key,
                                 std::string& instance) {
-    if (fresh) return false;
     return EspIdfCommissioningCredentialStore::LoadPrivateKey(pem) ==
                CommissioningIdentityLoad::Loaded &&
            DescribeKey(pem, key, instance);

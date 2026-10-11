@@ -314,7 +314,7 @@ bool EspIdfCommissioningCredentialStore::Load(CommissioningCredential& out) cons
 bool EspIdfCommissioningCredentialStore::Prepare(
     const std::string& owner, uint64_t owner_generation, uint32_t generation,
     bool replacement, PreparedCommissioningIdentity& out) {
-    replacement = replacement || CommissioningTransactionNeedsFreshIdentity();
+    replacement = replacement || CommissioningTransactionNeedsFreshAuthorization();
     std::lock_guard<std::recursive_mutex> lock(mutex);
     if (generation == 0 || owner.empty() || owner_generation == 0) return false;
     Identity pending;
@@ -374,7 +374,7 @@ bool EspIdfCommissioningCredentialStore::Prepare(
     pending.generation = generation;
     pending.replacement = replacement;
     out.requires_voucher = true;
-    if (!DeviceIdentity::PrepareKey(replacement, pending.pem, out.fingerprint, out.device_instance_id)) return false;
+    if (!DeviceIdentity::PrepareKey(pending.pem, out.fingerprint, out.device_instance_id)) return false;
     if (!replacement && has_credential) pending.credential = previous;
     pending.credential.owner_domain_id = owner;
     pending.credential.owner_domain_generation = owner_generation;

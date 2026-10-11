@@ -273,7 +273,7 @@ CommissioningTransactionResult CommitCommissioningTransaction(
             descriptor.owner_domain_generation, j.identity_digest, j.replacement))
         return CommissioningTransactionResult::SafeFailure;
     // Superseding a legacy interruption is an explicit authenticated setup,
-    // never boot-time inference. Its fresh identity must already have a voucher.
+    // never boot-time inference. Its fresh authorization must already have a voucher.
     if (loaded == Load::Legacy && !j.replacement) return CommissioningTransactionResult::SafeFailure;
     j.owner = staged.owner_domain_id; j.trust_digest = BundleHash(staged);
     j.network_digest = Hash(std::to_string(ssid.size()) + ":" + ssid + password);
@@ -302,7 +302,7 @@ bool CommissioningTransactionAllowsNewSetup() {
     return loaded == Load::Missing || loaded == Load::Legacy;
 }
 
-bool CommissioningTransactionNeedsFreshIdentity() {
+bool CommissioningTransactionNeedsFreshAuthorization() {
     std::lock_guard<std::mutex> lock(transaction_mutex);
     Journal j;
     return LoadJournal(j) == Load::Legacy;

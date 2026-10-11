@@ -227,17 +227,12 @@ bool DeviceIdentity::DescribeKey(const std::string& pem, std::string& fingerprin
     return true;
 }
 
-bool DeviceIdentity::PrepareKey(bool fresh, std::string& pem, std::string& fingerprint,
+bool DeviceIdentity::PrepareKey(std::string& pem, std::string& fingerprint,
                                 std::string& instance_id) {
-    if (fresh) {
-        DeviceIdentity candidate;
-        if (candidate.CreateKeypair(false) != ESP_OK) return false;
-        pem = candidate.private_key_pem_;
-    } else {
-        auto& current = GetInstance();
-        if (current.EnsureKeypair() != ESP_OK) return false;
-        pem = current.private_key_pem_;
-    }
+    // Commissioning replaces authorization, never the device principal.
+    auto& current = GetInstance();
+    if (current.EnsureKeypair() != ESP_OK) return false;
+    pem = current.private_key_pem_;
     return DescribeKey(pem, fingerprint, instance_id);
 }
 

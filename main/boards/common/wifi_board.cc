@@ -98,7 +98,7 @@ void WifiBoard::StartNetwork() {
         ESP_LOGE(TAG, "Commissioning recovery blocked; physical setup may retry it");
         Application::GetInstance().SetEidolonRuntimeUi(
             eidolon::RuntimePhase::RecoveryRequired,
-            eidolon::CommissioningTransactionNeedsFreshIdentity()
+            eidolon::CommissioningTransactionNeedsFreshAuthorization()
                 ? "Connection recovery needed. Press and hold the button to open setup"
                 : "Configuration recovery blocked. Hold BOOT to retry setup");
         // A failed durable write is not evidence that time can repair it.

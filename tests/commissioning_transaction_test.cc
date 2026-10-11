@@ -136,7 +136,7 @@ void SameOwnerReclaimReplacesStaleActiveClaimAtCommit() {
            CommissioningTransactionResult::Committed);
     AssertOwner("owner-a");
     assert(replaced && !has_claim && !has_enrollment);
-    assert(DeviceIdentity::GetInstance().DeviceInstanceId() != old_id);
+    assert(DeviceIdentity::GetInstance().DeviceInstanceId() == old_id);
     assert(SsidManager::GetInstance().GetSsidList().size() == 1);
 }
 void SelectedIdentityCannotFallBackToAnOldKey() {
@@ -154,7 +154,7 @@ void ExplicitReplacementCannotReuseAMaintenanceCandidate() {
     assert(!reuse.requires_voucher);
     assert(store.Prepare("owner-a", 1, 2, true, replacement));
     assert(replacement.requires_voucher);
-    assert(replacement.fingerprint != reuse.fingerprint);
+    assert(replacement.fingerprint == reuse.fingerprint);
     assert(RollbackPendingCommissioningTransaction(2));
     AssertOwner("owner-a");
 }
@@ -210,24 +210,36 @@ void PowerLossWhilePreparingNeverPublishesCredentials() {
         AssertOwner("owner-a");
     }
 }
-void OwnerChangesAndResetCreateNewLifecycles() {
+void OwnerChangesAndResetPreserveDeviceIdentity() {
     SeedOwnerA();
     const auto first = DeviceIdentity::GetInstance().DeviceInstanceId();
     Prepare(2, "owner-b", true);
     assert(CommitCommissioningTransaction(2, "network-b", "secret-b") == CommissioningTransactionResult::Committed);
     AssertOwner("owner-b");
     const auto second = DeviceIdentity::GetInstance().DeviceInstanceId();
-    assert(second != first && !has_claim);
+    assert(second == first && !has_claim);
     assert(SsidManager::GetInstance().GetSsidList().size() == 1);
     Prepare(3, "owner-a", true);
     assert(CommitCommissioningTransaction(3, "network-a", "new-secret-a") == CommissioningTransactionResult::Committed);
     AssertOwner("owner-a");
     const auto third = DeviceIdentity::GetInstance().DeviceInstanceId();
-    assert(third != first && third != second);
+    assert(third == first && third == second);
     Prepare(4, "owner-a", false, "reset-directory", 2);
     assert(CommitCommissioningTransaction(4, "network-a", "new-secret-a") == CommissioningTransactionResult::Committed);
     AssertOwner("owner-a");
-    assert(DeviceIdentity::GetInstance().DeviceInstanceId() != third);
+    assert(DeviceIdentity::GetInstance().DeviceInstanceId() == third);
+    // Arbitrarily many Host changes keep one principal and only current authority.
+    for (uint32_t i = 5; i < 55; ++i) {
+        const auto owner = "owner-" + std::to_string(i % 7);
+        Prepare(i, owner, true);
+        assert(CommitCommissioningTransaction(i, "network", "secret") == CommissioningTransactionResult::Committed);
+        AssertOwner(owner);
+        assert(DeviceIdentity::GetInstance().DeviceInstanceId() == first);
+        assert(!has_claim && !has_enrollment);
+        DeviceIdentity::GetInstance().ForgetCachedKeyAfterPhysicalRecovery();
+        assert(DeviceIdentity::GetInstance().EnsureKeypair() == ESP_OK);
+        assert(DeviceIdentity::GetInstance().DeviceInstanceId() == first);
+    }
 }
 void PowerLossAtEveryWriteResumesWithoutOldOwnerRevival() {
     SeedOwnerA(); Prepare(2, "owner-b", true);
@@ -283,7 +295,7 @@ void LegacyInterruptionNeedsAnAuthorizedFreshLifecycle() {
     Prepare(9, "owner-a", false);
     assert(CommitCommissioningTransaction(9, "network-a", "secret-a") == CommissioningTransactionResult::Committed);
     AssertOwner("owner-a");
-    assert(DeviceIdentity::GetInstance().DeviceInstanceId() != old_id);
+    assert(DeviceIdentity::GetInstance().DeviceInstanceId() == old_id);
     assert(!has_claim && disk["eidolon"].count("ctx_gen") == 0);
 }
 void CorruptionAndUnavailableStorageFailClosed() {
@@ -375,9 +387,8 @@ bool DeviceIdentity::DescribeKey(const std::string& pem, std::string& key, std::
         pem.find_first_not_of("0123456789", 4) != std::string::npos) return false;
     key=KeyId(pem); instance="device-instance-"+key.substr(7); return true;
 }
-bool DeviceIdentity::PrepareKey(bool fresh,std::string& pem,std::string& key,std::string& instance) {
-    if (fresh) pem="key-"+std::to_string(++keys_created);
-    else if (EspIdfCommissioningCredentialStore::LoadPrivateKey(pem) != CommissioningIdentityLoad::Loaded) return false;
+bool DeviceIdentity::PrepareKey(std::string& pem,std::string& key,std::string& instance) {
+    if (EspIdfCommissioningCredentialStore::LoadPrivateKey(pem) != CommissioningIdentityLoad::Loaded) return false;
     return DescribeKey(pem,key,instance);
 }
 OwnerTrustLoadResult OwnerTrustStore::ReadActive(OwnerTrustBundle& out) const {
@@ -429,7 +440,7 @@ int main() {
     LegacyInterruptionNeedsAnAuthorizedFreshLifecycle();
     SameOwnerUpdatesTheActualDirectoryAndPreservesIdentity();
     CancelRestoresTheWholeOldContext();
-    OwnerChangesAndResetCreateNewLifecycles();
+    OwnerChangesAndResetPreserveDeviceIdentity();
     PowerLossAtEveryWriteResumesWithoutOldOwnerRevival();
     CommitFailureCannotBeCancelledOrOverwritten();
     CorruptionAndUnavailableStorageFailClosed();

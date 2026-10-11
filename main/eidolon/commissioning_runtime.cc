@@ -347,7 +347,7 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
             esp_restart();
             break;
         }
-        const bool transaction_allows = recovered || CommissioningTransactionNeedsFreshIdentity();
+        const bool transaction_allows = recovered || CommissioningTransactionNeedsFreshAuthorization();
         const bool ready =
             transaction_allows && DeviceIdentity::GetInstance().EnsureKeypair() == ESP_OK;
         if (!ready) {

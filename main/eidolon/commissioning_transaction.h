@@ -24,10 +24,10 @@ CommissioningTransactionResult CommitCommissioningTransaction(
 bool RecoverPendingCommissioningTransaction(bool* identity_replaced = nullptr);
 
 // An interrupted legacy transaction has no identity snapshot. A physically
-// opened, authenticated setup may replace it using a freshly issued identity.
+// opened, authenticated setup may replace it using freshly issued authorization.
 // A current durable transaction must finish before another setup can start.
 bool CommissioningTransactionAllowsNewSetup();
-bool CommissioningTransactionNeedsFreshIdentity();
+bool CommissioningTransactionNeedsFreshAuthorization();
 
 // Rollback is permitted only before the durable commit decision.
 bool RollbackPendingCommissioningTransaction(uint32_t generation);
