@@ -1,0 +1,22 @@
+{
+  "status": "app_ready",
+  "checks": {
+    "backend_healthy": true,
+    "channel_worker_dispatch_identity": true,
+    "channel_worker_healthy": true,
+    "claim_window_honored": true,
+    "device_removal_available": true,
+    "host_identity_material": true,
+    "host_setup_completable": true,
+    "hub_lan_reachable": true,
+    "hub_settings_bound": true,
+    "hub_tls_identity": true,
+    "lan_address_observed": true,
+    "lan_name_resolves": true,
+    "livekit_client_origin": true,
+    "livekit_lan_reachable": true,
+    "livekit_network_current": true,
+    "local_api_reachable": true,
+    "local_api_targets_hub": true
+  }
+}

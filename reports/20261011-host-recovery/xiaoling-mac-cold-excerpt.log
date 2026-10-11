@@ -1,0 +1,32 @@
+2026-10-11T23:21:58.245521+08:00 W (81) Application: EIDOLON-BUILDSTAMP git=faa561924 sdk=d10c950a4b325c3af5b619f35ad72ff7677c8f87 idf=5.5.4 branch=main built=Oct 11 2026 23:15:19
+2026-10-11T23:21:59.259513+08:00 I (1331) EidolonUiPresenter: visible state=ASSETS scene=1
+2026-10-11T23:21:59.461666+08:00 I (1451) EidolonUiPresenter: visible state=BOOT scene=0
+2026-10-11T23:21:59.463028+08:00 I (1511) EidolonUiPresenter: visible state=NETWORK scene=2
+2026-10-11T23:22:04.152588+08:00 I (6151) EidolonUiPresenter: visible state=SERVICE scene=6
+2026-10-11T23:22:04.965742+08:00 I (6891) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.6 ms=223
+2026-10-11T23:22:28.817018+08:00 I (30891) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.6 ms=124
+2026-10-11T23:22:44.507747+08:00 W (46611) HubActivator: Hub activation failed stage=directory-fetch error=ESP_FAIL code=0xffffffff http=0 attempt=1 retry_s=10
+2026-10-11T23:22:44.507771+08:00 I (46611) EidolonUiPresenter: visible state=RETRY scene=10
+2026-10-11T23:22:54.507075+08:00 I (56611) EidolonUiPresenter: visible state=SERVICE scene=6
+2026-10-11T23:22:55.117653+08:00 I (57211) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.6 ms=105
+2026-10-11T23:23:19.135963+08:00 I (81231) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.6 ms=264
+2026-10-11T23:23:20.769002+08:00 I (82711) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.6 ms=105
+2026-10-11T23:23:21.784766+08:00 I (83791) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.6 ms=182
+2026-10-11T23:23:22.495315+08:00 I (84601) EidolonVoice: [lifecycle] SetState Idle -> ConfigReady reason=config_activated room_kind=none gen=0
+2026-10-11T23:23:24.336697+08:00 I (86391) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.6 ms=120
+2026-10-11T23:23:25.560034+08:00 I (87521) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.6 ms=96
+2026-10-11T23:23:26.376846+08:00 I (88381) EidolonUiPresenter: visible state=READY scene=7
+2026-10-11T23:23:27.186211+08:00 I (89261) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.6 ms=100
+2026-10-11T23:23:28.399628+08:00 I (90391) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.6 ms=92
+2026-10-11T23:25:22.105414+08:00 I (204131) Xiaoling: External wake word detected
+2026-10-11T23:25:22.105761+08:00 I (204131) EidolonVoice: [lifecycle] SetState ConfigReady -> Opening reason=join_requested room_kind=control gen=1
+2026-10-11T23:25:22.105834+08:00 I (204131) EidolonUiPresenter: visible state=OPENING scene=8
+2026-10-11T23:25:22.860797+08:00 I (204881) EidolonVoice: [lifecycle] SetState Opening -> InRoom reason=session_started room_kind=voice gen=1
+2026-10-11T23:25:22.860833+08:00 I (204881) EidolonUiPresenter: visible state=LISTEN scene=9
+2026-10-11T23:25:23.673973+08:00 I (205771) EidolonUiPresenter: visible state=SPEAK scene=9
+2026-10-11T23:25:24.285525+08:00 I (206201) EidolonUiPresenter: visible state=LISTEN scene=9
+2026-10-11T23:25:43.798195+08:00 I (225801) EidolonUiPresenter: visible state=THINK scene=9
+2026-10-11T23:25:45.022097+08:00 I (227081) EidolonUiPresenter: visible state=SPEAK scene=9
+2026-10-11T23:25:51.730752+08:00 I (233771) EidolonUiPresenter: visible state=LISTEN scene=9
+2026-10-11T23:25:54.779039+08:00 I (236901) EidolonVoice: [lifecycle] SetState InRoom -> ConfigReady reason=leave_room room_kind=control gen=1
+2026-10-11T23:25:54.779064+08:00 I (236901) EidolonUiPresenter: visible state=ENDED scene=11

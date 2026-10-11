@@ -1,0 +1,102 @@
+{
+  "date": "2026-10-11",
+  "timezone": "Asia/Shanghai",
+  "scope": "Hub unavailability and device recovery; not audio-stutter or RTC negotiation root cause",
+  "firmware": "faa561924",
+  "sdk": "d10c950a4b325c3af5b619f35ad72ff7677c8f87",
+  "hosts": {
+    "mac": {
+      "mode": "source",
+      "final_status": "app_ready"
+    },
+    "pi5": {
+      "release": "pi5-host-resilience-20261011-2",
+      "final_status": "app_ready"
+    }
+  },
+  "fixes_found_during_acceptance": [
+    {
+      "commit": "faa56192",
+      "repository": "eidolon-client-esp32",
+      "issue": "Recovery presentation overwrote supplied service detail; preserve contextual recovery copy."
+    },
+    {
+      "commit": "57ddf79",
+      "repository": "eidolon_ops",
+      "issue": "Independent TLS ingress retained its pre-deployment process; converge it on activation and rollback before health gates."
+    }
+  ],
+  "cases": [
+    {
+      "device": "xiaoling",
+      "host": "mac",
+      "fault": "Hub process suspended for 80 seconds; device boot during outage",
+      "fault_started": "23:21:57.854",
+      "hub_resumed": "23:23:17.860",
+      "device_ready": "23:23:26.377",
+      "retry_observed": true,
+      "fresh_provisioning_required": false,
+      "dialogue_after_recovery": "passed, confirmed by user; session_started and speech states also captured",
+      "result": "PASS",
+      "device_identity_matches_preflash": true,
+      "recovery_seconds_from_hub_resume_to_ready": 8.517
+    },
+    {
+      "device": "stackchan",
+      "host": "pi5",
+      "fault": "whole-host interruption during separate test window",
+      "device_ready": "23:33:16.941",
+      "note": "Not counted as isolated Hub/503 test. Device automatically recovered without provisioning.",
+      "result": "PASS_AUTO_RECOVERY"
+    },
+    {
+      "device": "stackchan",
+      "host": "pi5",
+      "fault": "Hub startup delayed 75 seconds; discovery and TLS ingress remain active",
+      "probe_time": "23:34:50",
+      "http_status": 503,
+      "retry_after_seconds": 10,
+      "cache_control": "no-store",
+      "device_retry_delays_seconds": [
+        10,
+        20,
+        40
+      ],
+      "hub_active": "23:35:38",
+      "device_ready": "23:36:23.258",
+      "fresh_provisioning_required": false,
+      "screen": "User observed English Host unavailable",
+      "dialogue_after_recovery": "PASS: user confirmed room entry, saying hello and hearing a reply; session_started/LISTEN/SPEAK also captured",
+      "result": "PASS",
+      "recovery_seconds_from_hub_active_to_ready": 45.258,
+      "device_identity_matches_preflash": true
+    }
+  ],
+  "excluded_attempt": {
+    "case": "first Mac warm-session test",
+    "reason": "Concurrent firmware build drove Worker capacity unavailable; two session dispatches had no serving agent. Discarded as a clean Hub-recovery result and rerun after build finished."
+  },
+  "validation": {
+    "ops_regressions": "201 passed",
+    "firmware_ui_tests": "run_eidolon_ui_labels_tests.sh and run_ui_presenter_tests.sh passed",
+    "both_firmware_builds": "ESP-IDF 5.5.4 passed; application-only flash and running build-stamp verified",
+    "pi_deployment": "activated; doctor healthy; app_ready passed",
+    "unexpected_device_reboots_or_panics": "none: one deliberate boot in each final capture, no panic/watchdog/heap-corruption signatures"
+  },
+  "limits": [
+    "Full fine-print recovery copy was verified by projection tests, not a photographed screen. User visually confirmed the StackChan Host unavailable title.",
+    "Cold-start/activation recovery and post-recovery dialogue tested; not an assertion that an interrupted conversation resumes its previous utterance."
+  ],
+  "temporary_faults": "Mac SIGCONT completed; Pi runtime startup-delay override removed; no BOX-3 firmware/configuration changes",
+  "evidence_sha256": {
+    "stackchan-pi-final-excerpt.log": "c39a7bb797ffbd6aeba7ba933ab4300adf4edab82ff7e02feda226da196155f1",
+    "xiaoling-mac-cold-excerpt.log": "e85f875e1349f938a312f0cbef4e834c49d383ad6bf61a353834027cc6c36c6e",
+    "pi-503-probe.log": "ed1a9ae56a177968459ddb8ec2532e008f6e5c43d49fbb2930869c6f47d8c755",
+    "mac-cold-fault.log": "9f9b2a3b4d47a032084a73add934f1d73beecd352b6f60a91dd35352e127db5c",
+    "pi-final-ready.json": "a7e6227b79153e5613ca1367461adadb05c5c172c7c70ac2162674fb4dac04fe",
+    "stackchan-pi-503-excerpt.log": "b2e6d8e7893c92710811e1520b5e9c31d948f2fb77fbdd5152d3af098c82d35c",
+    "pi-fault-cleanup.log": "6653241efb294e98b1f81ba7a5bf934a267493a8955d5783db74e94fe4fb83bb",
+    "mac-final-ready.json": "c88c853e5f57f7a3ac945dc0e7caa23b7a46e9e57864626e6949121fbcd9895a"
+  },
+  "overall_result": "PASS for Hub unavailability and automatic recovery scope"
+}
