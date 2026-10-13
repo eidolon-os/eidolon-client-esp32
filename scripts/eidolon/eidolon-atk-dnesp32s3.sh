@@ -312,7 +312,7 @@ Commands:
 
 Environment:
   EIDOLON_PORT=/dev/cu.usbmodemXXXX
-  EIDOLON_LIVEKIT_SDK=0.3.7   Pin the LiveKit SDK version (forces clean re-resolve)
+  LiveKit SDK source: ../vendor/client-sdk-esp32 (local checkout, no remote pin)
 EOF
 }
 

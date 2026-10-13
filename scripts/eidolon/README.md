@@ -6,6 +6,16 @@ readback → official OTA activation → runtime build-stamp verification. There
 no project `idf_ext.py` hook. Direct `idf.py`, raw esptool, Ninja flash targets and
 external flashers are outside this verified entry point.
 
+## Local LiveKit SDK
+
+Builds use the sibling checkout `../vendor/client-sdk-esp32` directly, including
+uncommitted changes. CMake verifies the resolved component directory for Hub
+builds; a missing checkout fails instead of falling back to `managed_components`.
+Select SDK revisions in that checkout. The former `EIDOLON_LIVEKIT_SDK` remote
+pin override is rejected. Board build stamps record `vendor:<commit>` and append
+`+dirty` when the SDK has local changes. SDK source validation does not delete
+dependency locks, managed components or build outputs.
+
 ## New board
 
 1. Declare the chip, flash capacity and pinned ESP-IDF version in the board
@@ -76,6 +86,7 @@ With the pinned ESP-IDF environment exported:
 python tests/partition_contract_test.py
 python tests/flash_lifecycle_test.py
 python tests/board_flash_entry_test.py
+python tests/local_livekit_sdk_test.py
 bash tests/run_fresh_owner_trust_tests.sh
 bash tests/run_owner_trust_storage_policy_tests.sh
 bash tests/run_owner_trust_commissioner_tests.sh

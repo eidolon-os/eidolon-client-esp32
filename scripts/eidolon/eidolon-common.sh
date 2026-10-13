@@ -4,13 +4,10 @@
 # Centralizes the build details that repeatedly bit us during box-3 / stackchan
 # debugging:
 #
-#   1. LiveKit SDK version pinning + FORCED dependency re-resolution.
-#      idf.py will NOT downgrade a component just because idf_component.yml
-#      changed — the cached dependencies.lock keeps the old (higher) version. So
-#      switching the SDK silently had no effect. eidolon_sdk_sync() makes the
-#      pin authoritative: it can rewrite the pin (EIDOLON_LIVEKIT_SDK=x.y.z) and,
-#      whenever the pin != the installed managed_component, wipes the lock and the
-#      livekit managed_component so the next build re-resolves cleanly.
+#   1. Local vendor SDK source and identity.
+#      Firmware compiles ../vendor/client-sdk-esp32 directly. Never rewrite a
+#      remote pin or delete dependency/build caches to select an SDK version.
+#      CMake verifies the resolved source directory, including direct builds.
 #
 #   2. Build fingerprint + post-flash verification.
 #      PROJECT_VER is hardcoded "1.0.0", so the device can't tell you which build
@@ -31,7 +28,7 @@ export IDF_COMPONENT_CHECK_NEW_VERSION="${IDF_COMPONENT_CHECK_NEW_VERSION:-0}"
 # ---- paths -----------------------------------------------------------------
 eidolon_idf_manifest() { printf '%s/main/idf_component.yml' "$1"; }
 eidolon_lock_file()     { printf '%s/dependencies.lock' "$1"; }
-eidolon_lk_component()  { printf '%s/managed_components/livekit__livekit' "$1"; }
+eidolon_lk_component()  { printf '%s/../vendor/client-sdk-esp32/components/livekit' "$1"; }
 eidolon_stamp_gen()     { printf '%s/main/eidolon/eidolon_build_stamp.gen.h' "$1"; }
 
 eidolon__info() { echo ">> [common] $*"; }
@@ -172,114 +169,37 @@ eidolon_require_idf() {
     eidolon__die "this board requires ESP-IDF v${want#v}; refusing to build against anything else. Install it, or set EIDOLON_IDF_VERSION to make the change explicit."
 }
 
-# Version currently pinned in main/idf_component.yml for livekit/livekit.
-eidolon_pinned_sdk() {
-  local manifest; manifest="$(eidolon_idf_manifest "$1")"
-  [[ -f "${manifest}" ]] || { echo ""; return 0; }
-  awk '
-    /^[[:space:]]*livekit\/livekit:[[:space:]]*$/ { in_lk=1; next }
-    in_lk && /version:/ {
-      v=$0; sub(/.*version:[[:space:]]*/, "", v); gsub(/["'"'"']/, "", v);
-      sub(/[[:space:]].*$/, "", v); print v; exit
-    }
-    in_lk && /^[^[:space:]]/ { in_lk=0 }
-  ' "${manifest}"
+# SDK identity comes from the checkout that CMake compiles, never a stale lock.
+eidolon_sdk_revision() {
+  local sdk_root revision dirty=""
+  sdk_root="$1/../vendor/client-sdk-esp32"
+  revision="$(git -C "${sdk_root}" rev-parse --short=12 HEAD)" || return 1
+  if [[ -n "$(git -C "${sdk_root}" status --porcelain)" ]]; then dirty="+dirty"; fi
+  printf 'vendor:%s%s\n' "${revision}" "${dirty}"
 }
 
-# Version actually resolved by the component manager (what gets compiled in).
-#
-# Git dependencies carry the pinned commit in dependencies.lock while their
-# own idf_component.yml still contains the library's semantic release version.
-# Comparing that semantic version to a commit pin makes every build look stale
-# and causes flash to destroy the build it is supposed to install.
-eidolon_installed_sdk() {
-  local lock comp resolved
-  lock="$(eidolon_lock_file "$1")"
-  if [[ -f "${lock}" ]]; then
-    resolved="$(awk '
-      /^  livekit\/livekit:[[:space:]]*$/ { in_lk=1; next }
-      in_lk && /^    version:[[:space:]]*/ {
-        v=$0; sub(/.*version:[[:space:]]*/, "", v); gsub(/["'"'"' ]/, "", v);
-        print v; exit
-      }
-      in_lk && /^  [^[:space:]]/ { in_lk=0 }
-    ' "${lock}")"
-    if [[ -n "${resolved}" ]]; then
-      printf '%s\n' "${resolved}"
-      return 0
-    fi
-  fi
-  comp="$(eidolon_lk_component "$1")/idf_component.yml"
-  [[ -f "${comp}" ]] || { echo ""; return 0; }
-  awk -F': *' '/^version:/ { gsub(/["'"'"' ]/, "", $2); print $2; exit }' "${comp}"
-}
-
-# Rewrite the livekit/livekit version pin in main/idf_component.yml in place.
-eidolon__rewrite_pin() {
-  local root="$1" want="$2" manifest tmp
-  manifest="$(eidolon_idf_manifest "${root}")"
-  tmp="${manifest}.tmp"
-  awk -v want="${want}" '
-    /^[[:space:]]*livekit\/livekit:[[:space:]]*$/ { in_lk=1; print; next }
-    in_lk && /version:/ {
-      ws=$0; sub(/version:.*/, "", ws);   # leading whitespace before "version:"
-      printf "%sversion: \"%s\"\n", ws, want;
-      in_lk=0; next
-    }
-    in_lk && /^[^[:space:]]/ { in_lk=0 }
-    { print }
-  ' "${manifest}" >"${tmp}" && mv "${tmp}" "${manifest}"
-}
-
-# Make the SDK pin authoritative and force a clean re-resolve when it drifts.
-#   EIDOLON_LIVEKIT_SDK=0.3.7  -> rewrite the pin to that, then re-resolve.
-#   (unset)                    -> leave the pin as-is, only re-resolve on drift.
+# Preserve the per-board entry point, but enforce local source selection.
 eidolon_sdk_sync() {
-  local root="$1"
-  local pinned installed
-
+  local root="$1" component
   if [[ -n "${EIDOLON_LIVEKIT_SDK:-}" ]]; then
-    pinned="$(eidolon_pinned_sdk "${root}")"
-    if [[ "${pinned}" != "${EIDOLON_LIVEKIT_SDK}" ]]; then
-      eidolon__info "Pinning livekit SDK ${pinned:-<none>} -> ${EIDOLON_LIVEKIT_SDK} (idf_component.yml)"
-      eidolon__rewrite_pin "${root}" "${EIDOLON_LIVEKIT_SDK}"
-    fi
+    eidolon__die "EIDOLON_LIVEKIT_SDK no longer selects a remote pin; select the desired revision in vendor/client-sdk-esp32."
   fi
-
-  pinned="$(eidolon_pinned_sdk "${root}")"
-  installed="$(eidolon_installed_sdk "${root}")"
-
-  if [[ -z "${pinned}" ]]; then
-    eidolon__warn "Could not read livekit pin from idf_component.yml; skipping SDK sync."
-    return 0
-  fi
-
-  if [[ "${installed}" != "${pinned}" ]]; then
-    eidolon__info "SDK drift: pinned=${pinned} installed=${installed:-<none>} -> forcing re-resolve"
-    rm -f "$(eidolon_lock_file "${root}")"
-    rm -rf "$(eidolon_lk_component "${root}")"
-    # A LiveKit SDK version change alters component ABIs (esp_websocket_client,
-    # av_render, esp_capture...). A stale incremental build dir then mixes old and
-    # new objects and crashes at runtime (e.g. LoadProhibited inside
-    # esp_websocket_client_init on control-room connect). Wipe the per-board build
-    # outputs so the next build is a clean full rebuild.
-    if [[ -d "${root}/build/eidolon" ]]; then
-      eidolon__info "SDK changed -> wiping ${root}/build/eidolon for a clean rebuild"
-      rm -rf "${root}/build/eidolon"
-    fi
-  else
-    eidolon__info "SDK resolved: livekit ${installed} (matches pin)"
-  fi
+  component="$(eidolon_lk_component "${root}")"
+  [[ -f "${component}/idf_component.yml" ]] ||
+    eidolon__die "Missing local LiveKit SDK at ${component}; restore vendor/client-sdk-esp32."
+  local revision
+  revision="$(eidolon_sdk_revision "${root}")" || return 1
+  eidolon__info "SDK source: ${component} (${revision})"
 }
 
-# Bake git commit / branch / pinned SDK into a gitignored header the app includes.
+# Bake git commit / branch / local SDK into a gitignored header the app includes.
 eidolon_write_build_stamp() {
   local root="$1" gen git_desc branch sdk dirty idf
   gen="$(eidolon_stamp_gen "${root}")"
   git_desc="$(git -C "${root}" rev-parse --short=9 HEAD 2>/dev/null || echo nogit)"
   branch="$(git -C "${root}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo nogit)"
   if [[ -n "$(git -C "${root}" status --porcelain 2>/dev/null)" ]]; then dirty="+dirty"; else dirty=""; fi
-  sdk="$(eidolon_pinned_sdk "${root}")"
+  sdk="$(eidolon_sdk_revision "${root}")" || return 1
   # The toolchain this image was actually compiled with. Verified by
   # eidolon_idf_ensure, not guessed from the environment.
   idf="${EIDOLON_RESOLVED_IDF:-$(eidolon_idf_current_version)}"

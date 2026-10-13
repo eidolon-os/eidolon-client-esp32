@@ -138,25 +138,11 @@ dependencies:
   # whole board matrix rather than a target-conditional one.
   espressif/network_provisioning: "^1.2"
 
-  # Our fork of livekit/client-sdk-esp32, pinned to a commit: managed_components/
-  # is not tracked, so the fork is the only place a fix to this SDK survives.
-  # An immutable fork commit, which carries our changes
-  # on top of upstream/main (v0.3.11 at the time of this pin):
-  #   - the engine releases a subscribed audio track when it goes away, so a
-  #     connection can carry more than one conversation;
-  #   - a data channel is only started on a connection that negotiates one, so
-  #     the subscriber can reach connected instead of retrying SCTP INIT forever.
-  #   - close/leave terminate reconnect backoff, and transitions run the old
-  #     state's exit hook before the new state's enter hook;
-  #   - receive-only and data-only rooms do not allocate/start a capture sink;
-  #   - disabled TCP ICE candidates cannot fail a UDP-only peer before UDP arrives.
-  #   - disabled IPv6 ICE candidates cannot fail an IPv4-only peer.
-  #   - receive-only peers advertise a receive codec without enabling publication.
-  # https over ssh so a build needs no SSH access to the fork.
+  # Compile our local SDK checkout, including uncommitted fixes. A remote Git
+  # pin is not equivalent: it silently ignores edits under vendor/. CMake checks
+  # the resolved component directory; the build stamp records this checkout.
   livekit/livekit:
-    git: https://github.com/eidolon-os/client-sdk-esp32.git
-    path: components/livekit
-    version: "d10c950a4b325c3af5b619f35ad72ff7677c8f87"
+    override_path: ../../vendor/client-sdk-esp32/components/livekit
     rules:
     - if: target in [esp32s3, esp32p4, esp32s31]
 

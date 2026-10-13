@@ -14,6 +14,16 @@ project(eidolon)
 
 # Enforce the storage contract for every Hub board, including direct idf.py builds.
 if(CONFIG_EIDOLON_HUB_MODE)
+    # Enforce the SDK source for board scripts AND direct idf.py builds. Keeping
+    # a matching remote commit in managed_components does not include local edits.
+    idf_component_get_property(EIDOLON_LIVEKIT_COMPONENT_DIR livekit COMPONENT_DIR)
+    get_filename_component(EIDOLON_LIVEKIT_EXPECTED_DIR
+        "${CMAKE_SOURCE_DIR}/../vendor/client-sdk-esp32/components/livekit" REALPATH)
+    get_filename_component(EIDOLON_LIVEKIT_ACTUAL_DIR
+        "${EIDOLON_LIVEKIT_COMPONENT_DIR}" REALPATH)
+    if(NOT EIDOLON_LIVEKIT_ACTUAL_DIR STREQUAL EIDOLON_LIVEKIT_EXPECTED_DIR)
+        message(FATAL_ERROR "LiveKit must compile from local vendor: ${EIDOLON_LIVEKIT_EXPECTED_DIR}; resolved: ${EIDOLON_LIVEKIT_ACTUAL_DIR}")
+    endif()
     idf_build_get_property(EIDOLON_PYTHON PYTHON)
     string(REPLACE "MB" "" EIDOLON_FLASH_MIB "${CONFIG_ESPTOOLPY_FLASHSIZE}")
     math(EXPR EIDOLON_FLASH_BYTES "${EIDOLON_FLASH_MIB} * 1024 * 1024")

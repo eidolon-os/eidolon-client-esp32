@@ -309,7 +309,7 @@ Environment:
   EIDOLON_IDF_VERSION=5.5.4    Override the ESP-IDF version this board requires.
                                The board pins BOARD_IDF_VERSION and the build is
                                refused if the exported toolchain is anything else.
-  EIDOLON_LIVEKIT_SDK=0.3.7   Pin the LiveKit SDK version (forces clean re-resolve)
+  LiveKit SDK source: ../vendor/client-sdk-esp32 (local checkout, no remote pin)
   EIDOLON_INTERACTION_MODE=full_duplex
                                Independent input mode: full_duplex, half_duplex, ptt
   EIDOLON_RUNTIME_DIAGNOSTICS=n
