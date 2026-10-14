@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
+#include "audio_prebuffer.h"
 
 enum { AV_RENDER_MSG_FLUSH = 1, FLUSH_SHIFT_BITS = 8 };
 typedef struct { int type; } av_render_msg_t;
@@ -12,7 +13,7 @@ typedef struct { int unused; } av_render_audio_frame_t;
 typedef struct { int unused; } av_render_video_frame_t;
 typedef struct { void *thread, *data_q; bool flushing; int wait_bits; } thread_res_t;
 typedef struct { thread_res_t thread_res; } decoder_t;
-typedef struct { thread_res_t thread_res; bool audio_rendered, video_rendered; int sent_frame_num; } output_t;
+typedef struct { thread_res_t thread_res; bool audio_rendered, video_rendered; int sent_frame_num; audio_prebuffer_t prebuffer; } output_t;
 typedef struct { decoder_t *adec_res, *vdec_res; output_t *a_render_res, *v_render_res; void *event_group; } av_render_t;
 static int pending, sent, waited;
 static void send_msg_to_thread(thread_res_t *thread, size_t size, av_render_msg_t *msg) {

@@ -14,5 +14,5 @@ end = source.index('\nint av_render_set_speed(', start)
 Path(sys.argv[1]).write_text(source[start:end])
 PY
 "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined \
-  -I "$output" tests/av_render_flush_test.c -o "$output/test"
+  -I "$output" -I components/av_render/src tests/av_render_flush_test.c -o "$output/test"
 "$output/test"

@@ -12,3 +12,11 @@ board, scene and output policy. No media pipeline or transport is added.
 Remove this override when an upstream release includes both corrections; run
 empty-renderer, audio, video and combined flush regression checks plus device
 start/end and PTT interruption checks when updating.
+
+The audio prebuffer also has a monotonic deadline equal to its target PCM
+duration. Only startup or a genuinely empty queue arms it; low water drains
+normally. This prevents short tails and sparse/DTX packets from waiting for
+future speech to fill the byte threshold. Flush bypasses prebuffer waiting and
+resets it, as does stream replacement. This corrects the existing renderer;
+there is no second queue, pacing task or media transport. Check
+`tests/audio_prebuffer_test.c` and the flush regression when updating upstream.

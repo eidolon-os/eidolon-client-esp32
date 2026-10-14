@@ -38,6 +38,7 @@
 #include "esp_log.h"
 
 #define TAG "AV_RENDER"
+#include "audio_prebuffer.h"
 
 #if CONFIG_AV_RENDER_AUDIO_RX_DIAG
 #include "esp_timer.h"
@@ -58,6 +59,8 @@ typedef struct {
     uint32_t max_step;
     uint32_t missing_steps;
     uint32_t backwards;
+    uint32_t max_queue_bytes;
+    uint32_t max_prebuffer_wait_ms;
 } rx_diag_window_t;
 
 static rx_diag_window_t s_rx_in;
@@ -68,10 +71,10 @@ static void rx_diag_report(rx_diag_window_t *w, const char *side, const char *wh
     if (w->frames) {
         ESP_LOGW(TAG, "[rx_diag] %s frames=%" PRIu32 " gap>40ms=%" PRIu32 " gap>100ms=%" PRIu32
                  " max_gap=%" PRIu32 "ms pts_step=%" PRIu32 "..%" PRIu32 " missing_steps=%" PRIu32
-                 " backwards=%" PRIu32 " (%s)",
+                 " backwards=%" PRIu32 " queue_max=%" PRIu32 "B prebuffer_wait_max=%" PRIu32 "ms (%s)",
                  side, w->frames, w->gap_40, w->gap_100, w->max_gap_ms,
                  w->min_step == UINT32_MAX ? 0 : w->min_step, w->max_step,
-                 w->missing_steps, w->backwards, why);
+                 w->missing_steps, w->backwards, w->max_queue_bytes, w->max_prebuffer_wait_ms, why);
     }
 }
 
@@ -206,6 +209,7 @@ typedef struct {
     av_render_thread_res_t       thread_res;
     bool                         audio_packet_reached;
     bool                         audio_rendered;
+    audio_prebuffer_t            prebuffer;
     av_render_audio_frame_info_t audio_frame_info;
     av_render_audio_frame_info_t out_frame_info;
     audio_resample_handle_t      resample_handle;
@@ -785,6 +789,12 @@ static int _render_write_video(av_render_thread_res_t *res, av_render_video_fram
 
 static int a_render_body(av_render_thread_res_t *res, bool drop)
 {
+    av_render_audio_res_t *audio = res->render->a_render_res;
+    // Only a genuinely empty queue starts a new prebuffer window. Low water
+    // must drain normally so silence/DTX cannot hold the last spoken syllable.
+    if (!data_queue_have_data(res->data_q)) {
+        audio_prebuffer_reset(&audio->prebuffer);
+    }
     av_render_audio_frame_t data;
     int ret = read_for_a_render(res->data_q, &data);
     RETURN_ON_FAIL(ret);
@@ -792,16 +802,20 @@ static int a_render_body(av_render_thread_res_t *res, bool drop)
     if (data.size) {
         int q_num = 0, q_size = 0;
         data_queue_query(res->data_q, &q_num, &q_size);
-        if (res->paused == false && res->render->audio_threshold) {
-            if (res->render->a_render_res->audio_rendered == false) {
-                if (q_size < res->render->audio_threshold) {
-                    data_queue_peek_unlock(res->data_q);
-                    // Wait for data reach threshold
-                    media_lib_thread_sleep(10);
-                    return 0;
-                }
-            } else if (q_num < 3) {
-                res->render->a_render_res->audio_rendered = false;
+#if CONFIG_AV_RENDER_AUDIO_RX_DIAG
+        if ((uint32_t)q_size > s_rx_out.max_queue_bytes) s_rx_out.max_queue_bytes = q_size;
+        if (audio->prebuffer.waiting) {
+            uint32_t waited_ms = get_cur_time() - audio->prebuffer.started_ms;
+            if (waited_ms > s_rx_out.max_prebuffer_wait_ms) s_rx_out.max_prebuffer_wait_ms = waited_ms;
+        }
+#endif
+        if (!drop && !res->flushing && !res->paused && !data.eos) {
+            const av_render_audio_frame_info_t *info = &audio->out_frame_info;
+            if (!info->sample_rate) info = &audio->audio_frame_info;
+            uint32_t bytes_per_second = info->sample_rate * info->channel *
+                                        (info->bits_per_sample / 8);
+            if (audio_prebuffer_wait(&audio->prebuffer, get_cur_time(), q_size,
+                                     res->render->audio_threshold, bytes_per_second)) {
                 data_queue_peek_unlock(res->data_q);
                 media_lib_thread_sleep(10);
                 return 0;
@@ -1396,6 +1410,7 @@ int av_render_add_audio_stream(av_render_handle_t h, av_render_audio_info_t *aud
         // Clear frame number
         a_render->audio_packet_reached = false;
         a_render->audio_rendered = false;
+        audio_prebuffer_reset(&a_render->prebuffer);
         // Create new decoder if needed
         a_render->audio_is_pcm = (audio_info->codec == AV_RENDER_AUDIO_CODEC_PCM);
 
@@ -1977,6 +1992,7 @@ static int render_flush(av_render_t *render)
     }
     if (render->a_render_res) {
         render->a_render_res->audio_rendered = false;
+        audio_prebuffer_reset(&render->a_render_res->prebuffer);
     }
     return 0;
 }
