@@ -45,6 +45,27 @@ int main() {
     presenter.OnTranscription({TranscriptionSource::User,"interim",false});
     assert(presenter.runtime_status().last_transcription.empty());
     presenter.OnTranscription({TranscriptionSource::Agent,"Next response",true});
+    // Rejected interruption resumes the existing speech, without a new SDK turn.
+    if (!IsPushToTalk(CurrentInteractionMode())) {
+        presenter.OnAgentPhase(AgentPhase::AgentSpeaking);
+        assert(std::string(UiStateProjector::Project(presenter.runtime_status()).status_text) == "Speaking");
+        presenter.OnAgentPhase(AgentPhase::UserSpeaking);
+        assert(std::string(UiStateProjector::Project(presenter.runtime_status()).status_text) == "Listening");
+        presenter.OnAgentPhase(AgentPhase::AgentSpeaking);
+        assert(presenter.tracker().GetPhase() == AgentPhase::AgentSpeaking);
+        assert(std::string(UiStateProjector::Project(presenter.runtime_status()).status_text) == "Speaking");
+        assert(UiStateProjector::ProjectLegacyDeviceState(
+            presenter.runtime_status(), kDeviceStateListening) == kDeviceStateSpeaking);
+        // A repeated projected speaking state is harmless (late user-end event).
+        presenter.OnAgentPhase(AgentPhase::AgentSpeaking);
+        assert(std::string(UiStateProjector::Project(presenter.runtime_status()).status_text) == "Speaking");
+        // Accepted cancellation ends playback presentation, then a new reply may start.
+        presenter.OnAgentPhase(AgentPhase::Silent);
+        assert(UiStateProjector::ProjectLegacyDeviceState(
+            presenter.runtime_status(), kDeviceStateSpeaking) == kDeviceStateListening);
+        presenter.OnAgentPhase(AgentPhase::AgentSpeaking);
+        assert(std::string(UiStateProjector::Project(presenter.runtime_status()).status_text) == "Speaking");
+    }
     // A silent semantic decision still terminates the committed PTT round.
     if (IsPushToTalk(CurrentInteractionMode())) {
     presenter.ApplyVoiceStatus(voice);
