@@ -1,0 +1,11 @@
+diff --git a/main/system_info.cc b/main/system_info.cc
+index cc589a9c..d4316a8e 100644
+--- a/main/system_info.cc
++++ b/main/system_info.cc
+@@ -153,2 +153,6 @@ void SystemInfo::PrintHeapStats() {
+     ESP_LOGI(TAG, "free sram: %u minimal sram: %u", free_sram, min_free_sram);
++    ESP_LOGI(TAG, "HIL_HEAP largest_internal=%u free_psram=%u largest_psram=%u",
++             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
++             (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
++             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
+ }
