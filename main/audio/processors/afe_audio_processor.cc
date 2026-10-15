@@ -1,4 +1,5 @@
 #include "afe_audio_processor.h"
+#include "eidolon/audio/box3_audio_schedule.h"
 #include <esp_log.h>
 
 #define PROCESSOR_RUNNING 0x01
@@ -76,11 +77,18 @@ void AfeAudioProcessor::Initialize(AudioCodec* codec, int frame_duration_ms, srm
     afe_iface_ = esp_afe_handle_from_config(afe_config);
     afe_data_ = afe_iface_->create_from_config(afe_config);
     
+    // Drain completed PCM before feeding more AFE input. Other boards retain
+    // the legacy scheduler; this policy belongs to BOX-3's full-duplex runtime.
+#if CONFIG_EIDOLON_HUB_MODE && CONFIG_BOARD_TYPE_ESP_BOX_3 && CONFIG_USE_DEVICE_AEC
+    constexpr UBaseType_t output_priority = eidolon::audio::kBox3AfeOutputPriority;
+#else
+    constexpr UBaseType_t output_priority = 3;
+#endif
     xTaskCreate([](void* arg) {
         auto this_ = (AfeAudioProcessor*)arg;
         this_->AudioProcessorTask();
         vTaskDelete(NULL);
-    }, "audio_communication", 4096, this, 3, NULL);
+    }, "audio_communication", 4096, this, output_priority, NULL);
 }
 
 AfeAudioProcessor::~AfeAudioProcessor() {

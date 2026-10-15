@@ -1143,6 +1143,7 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/internal_memory_report.cc"
         "eidolon/session_memory_admission_core.cc"
         "eidolon/livekit_board.cc"
+        "eidolon/audio/box3_audio_schedule.cc"
         "eidolon/livekit_session.cc"
         "eidolon/livekit_voice_transport.cc"
         "eidolon/voice_runtime_projector.cc"
@@ -1594,4 +1595,10 @@ endif()
 # Fail explicitly rather than silently reverting .local to lwIP's DNS parser.
 if(CONFIG_EIDOLON_HUB_MODE AND NOT CONFIG_LWIP_HOOK_NETCONN_EXT_RESOLVE_CUSTOM)
     message(FATAL_ERROR "Eidolon requires CONFIG_LWIP_HOOK_NETCONN_EXT_RESOLVE_CUSTOM=y; update the existing sdkconfig (new builds use sdkconfig.defaults)")
+endif()
+
+# BOX-3 owns its full-duplex CPU budget; chain the native public scheduler
+# rather than patching or duplicating the LiveKit task configuration.
+if(CONFIG_EIDOLON_HUB_MODE AND CONFIG_BOARD_TYPE_ESP_BOX_3 AND CONFIG_USE_DEVICE_AEC)
+    target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--wrap=media_lib_thread_set_schedule_cb")
 endif()

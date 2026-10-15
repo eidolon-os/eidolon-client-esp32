@@ -1,4 +1,5 @@
 #include "eidolon_mic_capture.h"
+#include "box3_audio_schedule.h"
 
 #include "audio_codec.h"
 #include "eidolon_audio_input.h"
@@ -76,11 +77,17 @@ esp_err_t EidolonMicCapture::Start(AudioCodec* codec) {
     running_ = true;
 #endif
 
-    // Pinned to core 0 at priority 8, matching xiaozhi's audio-input task.
+    // Reserve BOX-3 capture deadlines ahead of UI work. The corresponding
+    // decoder placement is owned by box3_audio_schedule.cc.
+#if CONFIG_EIDOLON_HUB_MODE && CONFIG_BOARD_TYPE_ESP_BOX_3 && CONFIG_USE_DEVICE_AEC
+    constexpr UBaseType_t capture_priority = audio::kBox3CapturePriority;
+#else
+    constexpr UBaseType_t capture_priority = 8;
+#endif
     BaseType_t created = xTaskCreatePinnedToCore([](void* arg) {
         static_cast<EidolonMicCapture*>(arg)->ReadLoop();
         vTaskDelete(nullptr);
-    }, "eidolon_mic_rd", kReadTaskStack, this, 8, &read_task_, 0);
+    }, "eidolon_mic_rd", kReadTaskStack, this, capture_priority, &read_task_, 0);
     if (created != pdPASS) {
         ESP_LOGE(TAG, "Failed to create mic read task");
         running_ = false;
