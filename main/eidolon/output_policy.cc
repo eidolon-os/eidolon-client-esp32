@@ -97,9 +97,9 @@ bool DeviceOutputGate::Bind(const DeviceOutputPolicy& policy) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (policy_.known && (!policy.known || policy.revision<policy_.revision ||
         (policy.revision==policy_.revision && !(policy==policy_)))) {
-        active_=false;selected_=0;return false;
+        active_=false;selected_=0;session_id_.clear();return false;
     }
-    if (!(policy==policy_)) { active_=false;selected_=0; }
+    if (!(policy==policy_)) { active_=false;selected_=0;session_id_.clear(); }
     policy_=policy;return true;
 }
 bool DeviceOutputGate::Start(const SessionOutputPlan& plan,const std::string& expected_session) {
@@ -109,25 +109,43 @@ bool DeviceOutputGate::Start(const SessionOutputPlan& plan,const std::string& ex
         (!plan.microphone && !(plan.selected&kResponseOutputs)) || (plan.selected&~policy_.allowed) ||
         (plan.selected&~supported_outputs_) ||
         plan.face_profile!=bool(plan.selected&OutputBit(presentation::Output::Expression))) {
-        active_=false;selected_=0;return false;
+        active_=false;selected_=0;session_id_.clear();return false;
     }
-    active_=true;selected_=plan.selected;microphone_=plan.microphone;return true;
+    active_=true;suspended_=false;session_id_=plan.session_id;
+    selected_=plan.selected;microphone_=plan.microphone;return true;
+}
+void DeviceOutputGate::Suspend() {
+    std::lock_guard<std::mutex> lock(mutex_);suspended_=true;
+}
+bool DeviceOutputGate::CanResumeLocked(const std::string& expected_session) const {
+    // Bind invalidates grants on every policy change/rejection. Legacy devices
+    // have no server plan; the controller owns their session confirmation.
+    return !expected_session.empty() &&
+        (policy_.known ? (active_ && session_id_==expected_session) : legacy_);
+}
+bool DeviceOutputGate::CanResume(const std::string& expected_session) const {
+    std::lock_guard<std::mutex> lock(mutex_);return CanResumeLocked(expected_session);
+}
+bool DeviceOutputGate::Resume(const std::string& expected_session) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    suspended_=!CanResumeLocked(expected_session);
+    return !suspended_;
 }
 void DeviceOutputGate::Close() {
-    std::lock_guard<std::mutex> lock(mutex_);active_=false;selected_=0;
+    std::lock_guard<std::mutex> lock(mutex_);active_=false;suspended_=true;selected_=0;session_id_.clear();
 }
 bool DeviceOutputGate::Allows(presentation::Output output) const {
     return AllowsAny(OutputBit(output));
 }
 bool DeviceOutputGate::AllowsMicrophone() const {
     std::lock_guard<std::mutex> lock(mutex_);
-    return policy_.known ? (active_ && microphone_ &&
-        (!policy_.inputs_known || policy_.microphone)) : legacy_;
+    return !suspended_ && (policy_.known ? (active_ && microphone_ &&
+        (!policy_.inputs_known || policy_.microphone)) : legacy_);
 }
 bool DeviceOutputGate::AllowsAny(uint32_t outputs) const {
     std::lock_guard<std::mutex> lock(mutex_);
     const auto mask=policy_.known ? (active_ ? selected_ : 0u) : (legacy_ ? kLegacyOutputs : 0u);
-    return mask & supported_outputs_ & outputs;
+    return !suspended_ && (mask & supported_outputs_ & outputs);
 }
 DeviceOutputGate& CurrentOutputGate() {
     static DeviceOutputGate gate(!kOutputPolicyRequired, CompiledDeviceCapabilities().OutputMask());

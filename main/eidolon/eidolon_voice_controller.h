@@ -234,7 +234,8 @@ private:
     void DoPanelRequest(const std::string& payload);
 #endif
     void DoAmbientPresenceTimer();
-    void OpenConversationAudio();
+    bool OpenConversationAudio();
+    void SuspendConversationAudio();
     void CloseConversationAudio();
     void ScheduleAmbientPresenceTimer(uint64_t delay_ms);
 #if CONFIG_EIDOLON_AMBIENT_PRESENCE_OWNER_AUTH

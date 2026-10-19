@@ -40,8 +40,30 @@ int main() {
     listening.microphone=true;
     assert(input_gate.Start(listening,"listen"));
     assert(input_gate.AllowsMicrophone());
+    for (int i=0;i<100;++i) {
+        input_gate.Suspend();
+        assert(!input_gate.AllowsMicrophone() && !input_gate.Allows(Output::Speech));
+        assert(input_gate.CanResume("listen"));
+        assert(!input_gate.Resume("other"));
+        assert(input_gate.Bind(enabled)); // equal snapshots retain suspended grant
+        assert(!input_gate.AllowsMicrophone());
+        assert(input_gate.Resume("listen"));
+        assert(input_gate.AllowsMicrophone() && input_gate.Allows(Output::Speech));
+    }
     input_gate.Close();
     assert(!input_gate.AllowsMicrophone());
+    assert(!input_gate.Resume("listen")); // terminal close cannot be resurrected
+    assert(input_gate.Start(listening,"listen"));
+    input_gate.Suspend();
+    enabled.revision=3;
+    assert(input_gate.Bind(enabled));
+    assert(!input_gate.CanResume("listen") && !input_gate.Resume("listen"));
+    listening.policy_revision=3;
+    assert(input_gate.Start(listening,"listen"));
+    input_gate.Suspend();
+    auto stale=enabled;stale.revision=2;
+    assert(!input_gate.Bind(stale));
+    assert(!input_gate.Resume("listen")); // rejected policy also invalidates grant
     for (const char* raw : {
         R"({"revision":1,"allowed":{},"inputs":{"microphone":1}})",
         R"({"revision":1,"allowed":{},"inputs":{"microphone":true,"microphone":false}})",
@@ -108,6 +130,11 @@ int main() {
     DeviceOutputGate legacy(true);
     assert(legacy.Allows(Output::Speech));
     assert(!legacy.Allows(Output::Expression));
+    legacy.Suspend();
+    assert(!legacy.AllowsMicrophone() && !legacy.Allows(Output::Speech));
+    assert(!legacy.Resume(""));
+    assert(legacy.Resume("legacy-session"));
+    assert(legacy.AllowsMicrophone() && legacy.Allows(Output::Speech));
     assert(legacy.Bind({true,1,0}));
     assert(!legacy.Allows(Output::Speech));
     assert(!legacy.Start({"s",1,0,false,false},"s"));

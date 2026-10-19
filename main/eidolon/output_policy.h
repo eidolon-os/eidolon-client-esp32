@@ -49,13 +49,19 @@ public:
         : legacy_(legacy_profile), supported_outputs_(supported_outputs) {}
     bool Bind(const DeviceOutputPolicy& policy);
     bool Start(const SessionOutputPlan& plan,const std::string& expected_session);
+    // A transport interruption suspends execution, not the accepted grant.
+    void Suspend();
+    bool CanResume(const std::string& expected_session) const;
+    bool Resume(const std::string& expected_session);
     void Close();
     bool Allows(presentation::Output output) const;
     bool AllowsAny(uint32_t outputs) const;
     bool AllowsMicrophone() const;
 private:
+    bool CanResumeLocked(const std::string& expected_session) const;
     mutable std::mutex mutex_;
-    bool legacy_=false, active_=false;
+    bool legacy_=false, active_=false, suspended_=false;
+    std::string session_id_;
     DeviceOutputPolicy policy_;
     uint32_t selected_=0;
     bool microphone_=false;

@@ -128,7 +128,7 @@ public:
     assert(c.op=="config.refresh"); ++receipts; calls.push_back("receipt");
     receipt_status=status; receipt_code=code; receipt_result=result ? result : "";
   }
-  void CloseConversationAudio() { audio_open=false; calls.push_back("audio-close"); }
+  void SuspendConversationAudio() { audio_open=false; calls.push_back("audio-close"); }
   void FinishSharedVisit(const char*) { ++shared_ends; }
   void SetState(VoiceSessionState, const char*) { calls.push_back("reconnecting"); }
   void DisarmConnectWatchdog() { calls.push_back("disarm"); }

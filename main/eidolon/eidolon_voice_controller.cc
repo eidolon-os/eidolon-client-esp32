@@ -1099,7 +1099,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
     }
 
     if (standby_) {
-        CloseConversationAudio();
+        SuspendConversationAudio();
         switch (lk_state) {
         case LiveKitConnectionState::Connecting:
             SetOperationalReady(false, "channel_connecting");
@@ -1129,6 +1129,14 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
                 // restore local media without waiting for a second start ack.
                 // An unconfirmed open may have reached a dispatch whose ack was
                 // lost with the old transport, so supersede it with a fresh id.
+                if (conversation_confirmed_ &&
+                    !CurrentOutputGate().CanResume(current_conversation_id_)) {
+                    // A changed policy invalidates the old plan. The Provider
+                    // cannot change an active same-ID plan; use the existing
+                    // fresh-open handshake rather than waiting for a replay.
+                    conversation_confirmed_ = false;
+                    CloseConversationAudio();
+                }
                 if (!conversation_confirmed_) {
                     current_conversation_id_ = NewConversationId();
                 }
@@ -1138,14 +1146,15 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
                     if (conversation_confirmed_) {
                         standby_ = false;
                         channel_recovery_.OnConversationStarted(esp_timer_get_time() / 1000);
+                        if (!OpenConversationAudio()) return;
                         SetState(VoiceSessionState::InRoom,
                                  "channel_reconnected_conversation_restored");
-                        OpenConversationAudio();
                     } else {
                         SetState(VoiceSessionState::Opening,
                                  "channel_connected_session_open_sent");
                     }
                 } else {
+                    CloseConversationAudio();
                     CompletePendingRoomJoinCommand("failed", "ROOM_JOIN_FAILED");
                     current_conversation_id_.clear();
                     conversation_control_request_id_.clear();
@@ -1206,9 +1215,13 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
     case LiveKitConnectionState::Connected:
         channel_recovery_.OnConversationStarted(esp_timer_get_time() / 1000);
         SetOperationalReady(true, "voice_connected");
+        if (!conversation_confirmed_) {
+            SetState(VoiceSessionState::Opening, "voice_connected_awaiting_session");
+            break;
+        }
+        if (!OpenConversationAudio()) return;
         SetState(VoiceSessionState::InRoom, "voice_connected");
         SetPresenceWakePhase(PresenceWakePhase::Idle);
-        StartAudioStatePublisher();
         if (pending_room_join_.Matches(event_generation)) {
             char result[192];
             snprintf(result, sizeof(result),
@@ -1219,6 +1232,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         }
         break;
     case LiveKitConnectionState::Reconnecting:
+        SuspendConversationAudio();
         channel_recovery_.OnReconnecting(esp_timer_get_time() / 1000);
         SetOperationalReady(false, "voice_reconnecting");
         SetState(VoiceSessionState::Reconnecting, "voice_reconnecting");
@@ -1227,7 +1241,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         channel_recovery_.OnDisconnected(esp_timer_get_time() / 1000);
         SetOperationalReady(false, "voice_failed");
         SetPresenceWakePhase(PresenceWakePhase::Idle);
-        CloseConversationAudio();
+        SuspendConversationAudio();
         agent_phase_ = AgentPhase::Silent;
         CompletePendingRoomJoinCommand(
             "failed", "ROOM_JOIN_FAILED",
@@ -1264,7 +1278,7 @@ void EidolonVoiceController::DoLiveKitState(LiveKitConnectionState lk_state,
         // A control-room teardown during a JOIN handoff is now dropped by the
         // generation gate above (it carries the pre-bump generation), so anything
         // reaching here under the current generation is a genuine voice-room drop.
-        CloseConversationAudio();
+        SuspendConversationAudio();
         agent_phase_ = AgentPhase::Silent;
         CompletePendingRoomJoinCommand("failed", "ROOM_JOIN_DISCONNECTED");
         standby_ = true;
@@ -1510,9 +1524,10 @@ void EidolonVoiceController::DoConnectTimeout()
              "[lifecycle] connect watchdog fired state=%s room_kind=%s gen=%lu; forcing recovery",
              VoiceStateName(state_), CurrentRoomKind(),
              static_cast<unsigned long>(session_generation_));
-    CloseConversationAudio();
+    SuspendConversationAudio();
     CompletePendingRoomJoinCommand("failed", "ROOM_JOIN_TIMEOUT");
     if (state_ == VoiceSessionState::Opening && session_.IsConnected()) {
+        CloseConversationAudio();
         const std::string expired_conversation_id = current_conversation_id_;
         current_conversation_id_.clear();
         conversation_control_request_id_.clear();
@@ -2191,6 +2206,11 @@ void EidolonVoiceController::DoSessionControl(const std::string& payload, uint32
     }
 
     if (strcmp(type, kSessionStartedType) == 0) {
+        // A queued acknowledgement must not reopen capture after transport loss.
+        if (!session_.IsConnected()) {
+            cJSON_Delete(root);
+            return;
+        }
         if (state_ != VoiceSessionState::Opening &&
             state_ != VoiceSessionState::Connecting &&
             state_ != VoiceSessionState::Reconnecting) {
@@ -2224,9 +2244,9 @@ void EidolonVoiceController::DoSessionControl(const std::string& payload, uint32
         conversation_confirmed_ = true;
         channel_recovery_.OnConversationStarted(esp_timer_get_time() / 1000);
         SetOperationalReady(true, "session_started");
+        if (!OpenConversationAudio()) return;
         SetState(VoiceSessionState::InRoom, "session_started");
         SetPresenceWakePhase(PresenceWakePhase::Idle);
-        OpenConversationAudio();
         if (pending_room_join_.active()) {
             char result[224];
             snprintf(result, sizeof(result),
@@ -3378,7 +3398,7 @@ void EidolonVoiceController::DoNetworkLost()
     if (ambient_presence_timer_ != nullptr) {
         esp_timer_stop(ambient_presence_timer_);
     }
-    CloseConversationAudio();
+    SuspendConversationAudio();
     channel_recovery_.OnNetworkLost();
     SetOperationalReady(false, "network_lost");
     if (reconnect_timer_ != nullptr) {
@@ -3415,6 +3435,7 @@ bool EidolonVoiceController::DoCommissioningQuiesce()
     conversation_control_request_id_.clear();
     conversation_confirmed_ = false;
     last_end_reason_ = EndReason::UserLeft;
+    CloseConversationAudio();
     DoNetworkLost();
     const bool quiesced = !session_.HasRoom() && !session_.IsConnected();
     ESP_LOGI(TAG, "[commissioning] operational runtime quiesced=%d",
@@ -3938,7 +3959,7 @@ esp_err_t EidolonVoiceController::DoConfigurationInvalidated(uint32_t generation
     }
     ESP_LOGI(TAG, "[lifecycle] Owner configuration invalidated gen=%lu",
              static_cast<unsigned long>(generation));
-    CloseConversationAudio();
+    SuspendConversationAudio();
     if (command_id) {
         // Receipt belongs to the old room. Flush it before retiring that room;
         // report fetch failures here too, while that room can still send.
@@ -3951,8 +3972,9 @@ esp_err_t EidolonVoiceController::DoConfigurationInvalidated(uint32_t generation
         return refreshed;
     }
     // A graph rebuild is a transport interruption, not a request to end the
-    // conversation. Keep desired state and the confirmed id; the existing
-    // Connected handler re-announces it and restores only fresh allowed media.
+    // conversation. Retain the accepted plan only if Bind kept it valid.
+    // Connected either resumes that exact grant or opens a fresh confirmed
+    // session under the new policy; it never widens the old plan locally.
     if (refreshed == ESP_OK && HasChannelConfig() && !current_conversation_id_.empty()) {
         SetState(VoiceSessionState::Reconnecting, "configuration_changed");
     }
@@ -4021,8 +4043,12 @@ esp_err_t EidolonVoiceController::DoLeaveRoom()
 
 // ============================ Audio state publisher ============================
 
-void EidolonVoiceController::OpenConversationAudio()
+bool EidolonVoiceController::OpenConversationAudio()
 {
+    if (!CurrentOutputGate().Resume(current_conversation_id_)) {
+        HandleSessionEnd(EndReason::Error);
+        return false;
+    }
     // A conversation is the only reason this device listens, so the microphone
     // opens here and nowhere else. How far it opens is the turn-taking profile's
     // business — push-to-talk, half duplex and full duplex disagree — which
@@ -4031,10 +4057,18 @@ void EidolonVoiceController::OpenConversationAudio()
     // because the conversation started, not because a timer fired.
     StartAudioStatePublisher();
     PublishClientAudioState(AgentOutputActiveRecently());
+    return true;
 }
 
 void EidolonVoiceController::CloseConversationAudio()
 {
+    CurrentOutputGate().Close();
+    SuspendConversationAudio();
+}
+
+void EidolonVoiceController::SuspendConversationAudio()
+{
+    CurrentOutputGate().Suspend();
     session_playback_.Reset();
 #if CONFIG_EIDOLON_COMPANION_FACE
     if (auto* view=GetEidolonView(); view && view->Expressions()) presentations_.Close(*view->Expressions());
@@ -4045,7 +4079,6 @@ void EidolonVoiceController::CloseConversationAudio()
         if (auto* view=GetEidolonView()) view->SetMotionDiagnostic(head_gesture_.c_str(),"cancelled","SESSION_CLOSED");
     }
     head_deadline_us_=0;++head_token_;head_command_={};
-    CurrentOutputGate().Close();
     // Unconditional, unlike the telemetry above it: the channel outlives the
     // conversation now, so a gate left open is a microphone running for as long
     // as the device sits in standby — which is most of its life. Whether anyone
