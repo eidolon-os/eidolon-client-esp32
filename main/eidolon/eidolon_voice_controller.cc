@@ -3,6 +3,7 @@
 
 #include "controller_worker_resources.h"
 
+#include "audio_codec.h"
 #include "board.h"
 #include "control_protocol.h"
 #include "device_event_builder.h"
@@ -2044,6 +2045,8 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload, uint32
         {kControlOpHeadGesture, 1, &EidolonVoiceController::HandleHeadGestureCommand},
         {kControlOpSafetyStop, 1, &EidolonVoiceController::HandleSafetyStopCommand},
         {kControlOpPresenceSet, 1, &EidolonVoiceController::HandlePresenceSetCommand},
+        {kControlOpVolumeSet, 1, &EidolonVoiceController::HandleVolumeSetCommand},
+        {kControlOpDisplayBrightness, 1, &EidolonVoiceController::HandleDisplayBrightnessCommand},
 #if CONFIG_EIDOLON_GUARD_SERVICE
         {kControlOpDeviceRollCall, 1, &EidolonVoiceController::HandleDeviceRollCallCommand},
         {kControlOpGuardRuntimeSync, 0, &EidolonVoiceController::HandleGuardRuntimeSyncCommand},
@@ -3156,6 +3159,76 @@ void EidolonVoiceController::HandlePresenceSetCommand(const std::string& command
     snprintf(result, sizeof(result),
              "{\"action_id\":\"%s\",\"state\":\"%s\",\"applied\":%s}",
              action_id.c_str(), state.c_str(), applied ? "true" : "false");
+    AckCommand(command, "completed", "OK", "", result);
+}
+
+void EidolonVoiceController::HandleVolumeSetCommand(const std::string& command_id,
+                                                    const std::string& payload)
+{
+    ControlCommand command;
+    command.id = command_id;
+    command.op = kControlOpVolumeSet;
+
+    cJSON* root = cJSON_Parse(payload.c_str());
+    if (!root) {
+        AckCommand(command, "failed", "INVALID_PAYLOAD");
+        return;
+    }
+    const cJSON* item = cJSON_GetObjectItem(root, "volume");
+    const bool numeric = cJSON_IsNumber(item);
+    const double value = numeric ? item->valuedouble : -1.0;
+    cJSON_Delete(root);
+    if (!numeric || value < 0.0 || value > 100.0) {
+        AckCommand(command, "failed", "INVALID_VOLUME");
+        return;
+    }
+
+    AudioCodec* codec = Board::GetInstance().GetAudioCodec();
+    if (codec == nullptr) {
+        AckCommand(command, "unsupported", "NO_AUDIO_CODEC");
+        return;
+    }
+    const int volume = static_cast<int>(value + 0.5);
+    codec->SetOutputVolume(volume);
+    ESP_LOGI(TAG, "Control command -> volume.set volume=%d", volume);
+
+    char result[32];
+    snprintf(result, sizeof(result), "{\"volume\":%d}", volume);
+    AckCommand(command, "completed", "OK", "", result);
+}
+
+void EidolonVoiceController::HandleDisplayBrightnessCommand(const std::string& command_id,
+                                                            const std::string& payload)
+{
+    ControlCommand command;
+    command.id = command_id;
+    command.op = kControlOpDisplayBrightness;
+
+    cJSON* root = cJSON_Parse(payload.c_str());
+    if (!root) {
+        AckCommand(command, "failed", "INVALID_PAYLOAD");
+        return;
+    }
+    const cJSON* item = cJSON_GetObjectItem(root, "brightness");
+    const bool numeric = cJSON_IsNumber(item);
+    const double value = numeric ? item->valuedouble : -1.0;
+    cJSON_Delete(root);
+    if (!numeric || value < 0.0 || value > 100.0) {
+        AckCommand(command, "failed", "INVALID_BRIGHTNESS");
+        return;
+    }
+
+    Backlight* backlight = Board::GetInstance().GetBacklight();
+    if (backlight == nullptr) {
+        AckCommand(command, "unsupported", "NO_BACKLIGHT");
+        return;
+    }
+    const int brightness = static_cast<int>(value + 0.5);
+    backlight->SetBrightness(static_cast<uint8_t>(brightness), true);
+    ESP_LOGI(TAG, "Control command -> display.brightness brightness=%d", brightness);
+
+    char result[40];
+    snprintf(result, sizeof(result), "{\"brightness\":%d}", brightness);
     AckCommand(command, "completed", "OK", "", result);
 }
 

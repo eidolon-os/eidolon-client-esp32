@@ -70,6 +70,10 @@ inline constexpr const char* kControlOpRoomLeave = "room.leave";
 inline constexpr const char* kControlOpPlaybackStop = "playback.stop";
 inline constexpr const char* kControlOpPttTurnStatus = "ptt.turn_status";
 inline constexpr const char* kControlOpConfigRefresh = "config.refresh";
+// Device-actuator capabilities. Source of record: eidolon_sdk.biz.body.capabilities.
+// Both carry a bounded 0..100 integer in the payload.
+inline constexpr const char* kControlOpVolumeSet = "volume.set";
+inline constexpr const char* kControlOpDisplayBrightness = "display.brightness";
 inline constexpr const char* kControlOpDeviceIdentify = "device.identify";
 // Body/head motion (StackChan servo body). Discrete, brain/hub-driven gestures — NOT a
 // coordinate stream; continuous gaze tracking is a separate device-local reflex.

@@ -6,6 +6,7 @@
 
 #include "eidolon_device_profile.h"
 #include "eidolon_topics.h"
+#include "board.h"
 #if CONFIG_BOARD_TYPE_KORVO_1
 #include "smarthome/smarthome_wire.h"
 #endif
@@ -377,6 +378,36 @@ std::string BuildDeviceManifestJson(const std::string& board_name, bool has_came
     return BuildDeviceManifestJson(board_name, capabilities);
 }
 
+namespace {
+
+// The two actuator actions this firmware can carry out on the control channel.
+// Schemas stay in the vocabulary the Host's capability contract accepts: a
+// bounded integer percentage, nothing else.
+std::string DeviceActuatorActions(const DeviceCapabilities& capabilities)
+{
+    std::string actions;
+    if (capabilities.speaker) {
+        actions +=
+            "{\"idempotent\":true,\"input_schema\":{\"additionalProperties\":false,"
+            "\"properties\":{\"volume\":{\"maximum\":100,\"minimum\":0,\"type\":\"integer\"}},"
+            "\"required\":[\"volume\"],\"type\":\"object\"},"
+            "\"name\":\"volume.set\",\"output_schema\":{\"type\":\"object\"},"
+            "\"version\":1}";
+    }
+    if (Board::GetInstance().GetBacklight() != nullptr) {
+        if (!actions.empty()) actions += ",";
+        actions +=
+            "{\"idempotent\":true,\"input_schema\":{\"additionalProperties\":false,"
+            "\"properties\":{\"brightness\":{\"maximum\":100,\"minimum\":0,\"type\":\"integer\"}},"
+            "\"required\":[\"brightness\"],\"type\":\"object\"},"
+            "\"name\":\"display.brightness\",\"output_schema\":{\"type\":\"object\"},"
+            "\"version\":1}";
+    }
+    return actions;
+}
+
+}  // namespace
+
 std::string BuildDeviceManifestJson(const std::string& board_name, const DeviceCapabilities& capabilities)
 {
     cJSON* title = cJSON_CreateString(board_name.c_str());
@@ -458,7 +489,18 @@ std::string BuildDeviceManifestJson(const std::string& board_name, const DeviceC
     // across boots that declare the same thing.
     if (capabilities.motion && capabilities.stackchan_head)
         properties += ",{\"name\":\"motion.profile\",\"observable\":false,\"schema\":{\"const\":\"stackchan.head.v1\",\"type\":\"string\"},\"writable\":false}";
-    const std::string actions = capabilities.expression ? expression::kManifestActions : "[]";
+    std::string actions = capabilities.expression ? expression::kManifestActions : "[]";
+    // Device actuators ride the same control channel and are declared here so
+    // the Host projects them into tools. Each is offered only when this build
+    // and this board can actually carry it out.
+    const std::string actuators = DeviceActuatorActions(capabilities);
+    if (!actuators.empty()) {
+        if (actions == "[]") {
+            actions = "[" + actuators + "]";
+        } else {
+            actions = actions.substr(0, actions.size() - 1) + "," + actuators + "]";
+        }
+    }
     return "{\"actions\":" + actions + ",\"events\":[],\"media\":[" + media +
            "],\"properties\":[" + properties +
            "],\"schema_version\":1,\"title\":" + escaped + "}";
