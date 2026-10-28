@@ -414,6 +414,12 @@ std::string BuildDeviceManifestJson(const std::string& board_name, const DeviceC
         std::string("{\"name\":\"interaction_mode\",\"observable\":false,\"schema\":{\"const\":\"") +
         interaction_mode + "\",\"type\":\"string\"},\"writable\":false}";
 
+    // Absence means unsupported. These facts grant no media or identity trust.
+    if (capabilities.voiceprint_recognition)
+        properties += ",{\"name\":\"recognition.voiceprint\",\"observable\":false,\"schema\":{\"const\":true,\"type\":\"boolean\"},\"writable\":false}";
+    if (capabilities.face_recognition)
+        properties += ",{\"name\":\"recognition.face\",\"observable\":false,\"schema\":{\"const\":true,\"type\":\"boolean\"},\"writable\":false}";
+
     if (capabilities.policy_required)
         properties += ",{\"name\":\"output.contract\",\"observable\":false,\"schema\":{\"const\":\"eidolon.outputs.v1\",\"type\":\"string\"},\"writable\":false}";
     if (capabilities.expression) properties += ",{\"name\":\"expression.profile\",\"observable\":false,\"schema\":{\"const\":\"eidolon.face.v1\",\"type\":\"string\"},\"writable\":false}";

@@ -7,6 +7,7 @@
 #include <string>
 
 #include "eidolon/hub_onboarding_protocol.h"
+#include "eidolon/device_capabilities.h"
 #include "eidolon/hub_txt_parser.h"
 
 namespace {
@@ -300,6 +301,34 @@ void TestCanonicalManifest()
     // which is the failure mode the inlined copy had.
     assert(matched == 2);
     cJSON_Delete(vector);
+
+    // Capture alone never asserts recognition. Enabling a future recognizer
+    // adds only its fact; it must not silently enable a microphone or camera.
+    for (int mask = 0; mask != 4; ++mask) {
+        eidolon::DeviceCapabilities caps;
+        caps.microphone = false;
+        caps.speaker = false;
+        caps.voiceprint_recognition = (mask & 1) != 0;
+        caps.face_recognition = (mask & 2) != 0;
+        const auto manifest = eidolon::BuildDeviceManifestJson("recognizer", caps);
+        cJSON* root = cJSON_Parse(manifest.c_str());
+        assert(cJSON_GetArraySize(cJSON_GetObjectItemCaseSensitive(root, "media")) == 0);
+        const cJSON* properties = cJSON_GetObjectItemCaseSensitive(root, "properties");
+        int found = 0;
+        const cJSON* prop = nullptr;
+        cJSON_ArrayForEach(prop, properties) {
+            const auto* name = cJSON_GetObjectItemCaseSensitive(prop, "name");
+            const std::string text = name->valuestring;
+            if (text != "recognition.voiceprint" && text != "recognition.face") continue;
+            found |= text == "recognition.voiceprint" ? 1 : 2;
+            assert(cJSON_IsFalse(cJSON_GetObjectItemCaseSensitive(prop, "writable")));
+            assert(cJSON_IsFalse(cJSON_GetObjectItemCaseSensitive(prop, "observable")));
+            const auto* schema = cJSON_GetObjectItemCaseSensitive(prop, "schema");
+            assert(cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(schema, "const")));
+        }
+        assert(found == mask);
+        cJSON_Delete(root);
+    }
 }
 
 // The configuration response vector. Distinct from the inline bodies in

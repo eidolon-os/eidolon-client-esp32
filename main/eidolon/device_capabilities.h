@@ -12,6 +12,10 @@ struct DeviceCapabilities {
     bool microphone = true;
     bool speaker = true;
     bool camera = false;
+    // Local identity recognition, not capture or host-side inference.
+    // Leave disabled until the device actually implements the recognizer.
+    bool voiceprint_recognition = false;
+    bool face_recognition = false;
     bool dialogue_text = false;
     bool expression = false;
     bool audio_cue = false;
@@ -38,6 +42,9 @@ inline DeviceCapabilities CompiledDeviceCapabilities() {
 #if !CONFIG_EIDOLON_CAP_SPEAKER
     capabilities.speaker = false;
 #endif
+#endif
+#if CONFIG_EIDOLON_OWNER_FACE_PROFILE
+    capabilities.face_recognition = true;
 #endif
 #if CONFIG_EIDOLON_CAP_DIALOGUE_TEXT
     capabilities.dialogue_text = true;
