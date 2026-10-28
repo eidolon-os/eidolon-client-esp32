@@ -321,7 +321,7 @@ struct AckClaimGrantResult { DeviceRef device_ref; ClaimState claim_state = Clai
 
 struct AdmissionListCursor { OwnerDomainId owner_domain_id; std::string sort_key; std::string resource_id; };
 struct GrantDeliveryRecord { std::string grant_id; std::string approval_decision_id; std::string state; std::string delivered_at; std::optional<std::string> acknowledged_at; };
-struct EnrollmentRecoveryProjection { EnrollmentProposal proposal; std::optional<ApprovalDecision> approval_decision; std::optional<GrantDeliveryRecord> grant_delivery; std::optional<ClaimRecord> claim; uint64_t source_revision = 0; std::string observed_at; };
+struct EnrollmentRecoveryProjection { std::optional<std::string> commissioning_proof_digest; EnrollmentProposal proposal; std::optional<ApprovalDecision> approval_decision; std::optional<GrantDeliveryRecord> grant_delivery; std::optional<ClaimRecord> claim; uint64_t source_revision = 0; std::string observed_at; };
 struct EnrollmentProposalQuery { OwnerDomainId owner_domain_id; std::vector<EnrollmentProposalState> states; std::optional<AdmissionListCursor> cursor; uint16_t limit = 0; };
 struct EnrollmentProposalPage { OwnerDomainId owner_domain_id; std::vector<EnrollmentRecoveryProjection> items; std::optional<AdmissionListCursor> next_cursor; std::string observed_at; };
 struct ClaimQuery { OwnerDomainId owner_domain_id; std::vector<ClaimState> states; std::optional<AdmissionListCursor> cursor; uint16_t limit = 0; };

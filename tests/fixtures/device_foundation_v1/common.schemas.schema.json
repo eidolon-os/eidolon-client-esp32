@@ -19,8 +19,14 @@
     "DeviceBaseId": {
       "description": "A Body's permanent base identity inside one Owner Domain, always issued by the Hub during commissioning and never asserted by the device. 'device-base-' carries 32 CSPRNG bytes minted for a hardware Body; 'software-body-' carries the Host's derivation from an authenticated controller_id. A device that reports a base id the Hub did not issue is refused rather than recorded: an unverifiable self-report used to become permanent history through hardware_identity_ref.",
       "oneOf": [
-        { "type": "string", "pattern": "^device-base-[0-9a-f]{64}$" },
-        { "type": "string", "pattern": "^software-body-[0-9a-f]{40}$" }
+        {
+          "type": "string",
+          "pattern": "^device-base-[0-9a-f]{64}$"
+        },
+        {
+          "type": "string",
+          "pattern": "^software-body-[0-9a-f]{40}$"
+        }
       ]
     },
     "OwnerDomainId": {
@@ -145,8 +151,78 @@
               "writable": {
                 "type": "boolean"
               }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "name": {
+                      "enum": [
+                        "recognition.voiceprint",
+                        "recognition.face"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "observable": {
+                      "const": false
+                    },
+                    "writable": {
+                      "const": false
+                    },
+                    "schema": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "const"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "type": {
+                          "const": "boolean"
+                        },
+                        "const": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "allOf": [
+            {
+              "contains": {
+                "properties": {
+                  "name": {
+                    "const": "recognition.voiceprint"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              },
+              "minContains": 0,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "properties": {
+                  "name": {
+                    "const": "recognition.face"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              },
+              "minContains": 0,
+              "maxContains": 1
             }
-          }
+          ]
         },
         "actions": {
           "type": "array",

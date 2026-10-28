@@ -48,11 +48,13 @@ std::string ConfigurationProofJson(
 
 std::string ManifestAssertionProofJson(
     const device_foundation::v1::DeviceRef& device_ref,
-    const std::string& manifest_digest,
+    const device_foundation::v1::ManifestRef& manifest_ref,
     const std::string& nonce) {
     return std::string("{\"device_ref\":") +
            DeviceClaimConsumerCore::DeviceRefJson(device_ref) +
-           ",\"manifest_digest\":" + Quote(manifest_digest) +
+           ",\"manifest_ref\":{\"digest\":" + Quote(manifest_ref.digest) +
+           ",\"manifest_id\":" + Quote(manifest_ref.manifest_id) +
+           ",\"revision\":" + std::to_string(manifest_ref.revision) + "}" +
            ",\"nonce\":" + Quote(nonce) +
            ",\"operation_type\":\"device-control.manifest-assert\"}";
 }

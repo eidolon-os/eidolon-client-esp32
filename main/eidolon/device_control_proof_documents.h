@@ -28,12 +28,11 @@ std::string ConfigurationProofJson(
     const device_foundation::v1::DeviceRef& device_ref,
     const std::string& nonce);
 
-// The Manifest is bound by its digest, which the Authority recomputes from the
-// document it receives, so this signature cannot carry from one set of
-// declared capabilities to another.
+// Assertion 1.1 binds the full reference: name, anti-replay revision and
+// content digest. The Authority recomputes the digest from the document.
 std::string ManifestAssertionProofJson(
     const device_foundation::v1::DeviceRef& device_ref,
-    const std::string& manifest_digest,
+    const device_foundation::v1::ManifestRef& manifest_ref,
     const std::string& nonce);
 
 }  // namespace device_control

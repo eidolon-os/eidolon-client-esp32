@@ -82,7 +82,10 @@ void TheManifestAssertionProofBytesAreTheGoldenVectorBytes()
     const std::string expected = VectorString(vector, "canonical_utf8");
 
     assert(eidolon::device_control::ManifestAssertionProofJson(
-               RefFrom(document), VectorString(document, "manifest_digest"),
+               RefFrom(document),
+               {VectorString(Required(document, "manifest_ref"), "manifest_id"),
+                static_cast<uint64_t>(Required(Required(document, "manifest_ref"), "revision")->valuedouble),
+                VectorString(Required(document, "manifest_ref"), "digest")},
                VectorString(document, "nonce")) == expected);
     cJSON_Delete(vector);
 }
@@ -106,7 +109,7 @@ void TheTwoDocumentsAreNotTheSameDocument()
     ref.claim_generation = 1;
     ref.trust_epoch = 1;
     assert(eidolon::device_control::ConfigurationProofJson(ref, "nonce") !=
-           eidolon::device_control::ManifestAssertionProofJson(ref, "sha256:aa", "nonce"));
+           eidolon::device_control::ManifestAssertionProofJson(ref, {"manifest_01", 1, "sha256:aa"}, "nonce"));
 
     // And a member that needs escaping gets it. The nonce is base64url on every
     // real path, so nothing on device would ever have shown this up.

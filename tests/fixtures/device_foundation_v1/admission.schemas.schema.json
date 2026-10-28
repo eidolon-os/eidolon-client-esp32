@@ -384,6 +384,7 @@
         "source_revision", "observed_at"
       ],
       "properties": {
+        "commissioning_proof_digest": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
         "proposal": { "$ref": "#/$defs/EnrollmentProposal" },
         "approval_decision": {
           "oneOf": [{ "$ref": "#/$defs/ApprovalDecision" }, { "type": "null" }]

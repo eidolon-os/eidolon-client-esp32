@@ -512,7 +512,8 @@ void HubOnboardingClient::ReconcileDeclaredManifest(
     std::string signature;
     if (identity.SignCanonical(
             device_control::ManifestAssertionProofJson(
-                claim.device_ref, manifest_digest, nonce),
+                claim.device_ref,
+                {BOARD_NAME, static_cast<uint64_t>(plan.revision), manifest_digest}, nonce),
             signature) != ESP_OK ||
         nonce.empty() || public_key.empty() || signature.size() != 86) {
         return;
@@ -520,7 +521,7 @@ void HubOnboardingClient::ReconcileDeclaredManifest(
 
     const std::string body =
         std::string("{\"contract\":\"eidolon.device-foundation.manifest-assertion\"") +
-        ",\"contract_version\":\"1.0\"" +
+        ",\"contract_version\":\"1.1\"" +
         ",\"device_ref\":" +
             DeviceClaimConsumerCore::DeviceRefJson(claim.device_ref) +
         ",\"manifest\":{\"manifest_id\":" + Quote(BOARD_NAME) +

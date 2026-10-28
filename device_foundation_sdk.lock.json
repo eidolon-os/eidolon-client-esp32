@@ -1,20 +1,20 @@
 {
-  "sdk_commit": "29553a3e4b8e727afe537880a703e2c844bffdbf",
+  "sdk_commit": "ff8a730c93ab1ad0ff7bdb8c9c5e99f0330eae28",
   "files": [
     {
       "source": "contracts/device_foundation/v1/generated/cpp/device_foundation_v1_generated.h",
       "target": "main/eidolon/device_foundation_v1_generated.h",
-      "sha256": "92884e38056e4889bc67afdca00961f49fae80ed1d9c161485a7f5c0cccb4c27"
+      "sha256": "e63ce6959d0f388d89b10d8fbbf72d285c480fee5418f18e3e89e6b66ed37196"
     },
     {
       "source": "contracts/device_foundation/v1/common/schemas.schema.json",
       "target": "tests/fixtures/device_foundation_v1/common.schemas.schema.json",
-      "sha256": "b56737aa2e28bca9946c60b8e446d0dd588f8b0390e533d6d80c951e1af5431e"
+      "sha256": "b26744468c93aab7072a67f87912d25a59d423594578303cea178fea14db7433"
     },
     {
       "source": "contracts/device_foundation/v1/admission/schemas.schema.json",
       "target": "tests/fixtures/device_foundation_v1/admission.schemas.schema.json",
-      "sha256": "f40799897a4f888f4c2f18099928086cc65e6c0209979ecfc1cd0a1a3a6a6125"
+      "sha256": "70bffc1271fa161f5dfa85d40806323298b382381bb966d8327a0b96e9d10912"
     },
     {
       "source": "contracts/device_foundation/v1/examples/valid/admission.json",
@@ -89,7 +89,7 @@
     {
       "source": "contracts/device_foundation/v1/golden/device-control-manifest-assertion-proof.json",
       "target": "tests/fixtures/device_foundation_v1/device-control-manifest-assertion-proof.json",
-      "sha256": "29e31d28b3ccbe5cbc077f7804f0c24cc62ff30fd30f56774e2baebfe1e54fd5"
+      "sha256": "6ce206c815a3c2a32d45fb708ec4d5aaa542dcd6b32650a3ef92a6ea26b7ae53"
     },
     {
       "source": "contracts/device_foundation/v1/golden/device-control-configuration-response.json",
