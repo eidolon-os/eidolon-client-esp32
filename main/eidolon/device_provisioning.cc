@@ -133,7 +133,17 @@ std::string ServiceName()
     if (tail.size() > 6) {
         tail = tail.substr(tail.size() - 6);
     }
-    return std::string("eidolon-") + tail;
+    // Keep the model visible before connecting; SSIDs have a 32-byte limit.
+    // The MAC suffix remains stable and names, like all discovery data, are hints.
+    std::string model = BOARD_TYPE;
+    for (const std::string prefix : {"esp32-s3-", "esp32-c6-"}) {
+        if (model.compare(0, prefix.size(), prefix) == 0) {
+            model.erase(0, prefix.size());
+            break;
+        }
+    }
+    if (model.size() > 18) model.resize(18);
+    return std::string("eidolon-") + model + "-" + tail;
 }
 
 // protocomm frees what a handler allocated, so answers are handed over as a
