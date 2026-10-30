@@ -962,10 +962,10 @@ esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist, bool* channel_c
                 err = store.SaveHubConfig(fresh);
                 if (err != ESP_OK) return err;
             }
-            // Initial ACTIVE and local track updates also reach the official
-            // participant callback. Refresh only the clock; retain the current
-            // conversation, output gate and connection when config is equal.
-            config_.clock = fresh.clock;
+            // A credential renewal is not a conversation/transport replacement.
+            // Cache the authenticated token and expiry for the next reconnect,
+            // retaining the active output grant, state and media connection.
+            config_ = std::move(fresh);
             config_refresh_required_ = false;
             return ESP_OK;
         }

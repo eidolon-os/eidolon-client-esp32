@@ -8,20 +8,19 @@
 
 namespace eidolon {
 
-// A clock anchor changes on every authenticated pull, but is not a new media
-// graph. Credentials, routes, policy and format are graph inputs.
+// Renewing authenticated join credentials does not replace an established
+// media graph. Only authority, routes, identity and media policy do. The new
+// token/deadline must still replace the cached credentials for the next join.
 inline bool ChannelConfigurationChanged(const Esp32HubConfig& current,
                                         const Esp32HubConfig& fresh)
 {
     return current.status != fresh.status ||
         !(current.output_policy == fresh.output_policy) ||
         current.sample_rate != fresh.sample_rate || current.channels != fresh.channels ||
-        current.expires_at_ms != fresh.expires_at_ms ||
         current.session.identity != fresh.session.identity ||
         current.session.room_name != fresh.session.room_name ||
         current.session.server_url != fresh.session.server_url ||
-        current.session.server_urls != fresh.session.server_urls ||
-        current.session.token != fresh.session.token;
+        current.session.server_urls != fresh.session.server_urls;
 }
 
 inline bool ChannelBindingExpired(const Esp32HubConfig& config, int64_t monotonic_ms)

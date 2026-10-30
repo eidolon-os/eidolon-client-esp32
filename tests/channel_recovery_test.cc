@@ -381,12 +381,22 @@ int main()
         changed([](auto& c) { c.output_policy.microphone = false; });
         changed([](auto& c) { c.output_policy.allowed = 1; });
         changed([](auto& c) { c.status = eidolon::HubConfigStatus::WaitingBinding; });
-        changed([](auto& c) { c.session.token = "rotated"; });
+        // An authenticated renewal on the same channel must not disconnect
+        // an active Team endpoint (which would terminate the whole scene).
+        auto renewed = current;
+        renewed.session.token = "rotated";
+        renewed.expires_at_ms += 1800000;
+        renewed.clock.Observe(1700000100000LL, 100, 105);
+        assert(!eidolon::ChannelConfigurationChanged(current, renewed));
+        current.clock = renewed.clock;
+        assert(eidolon::ChannelBindingExpired(current, 105));
+        current = renewed; // RefreshHubConfig retains the full new binding.
+        assert(!eidolon::ChannelBindingExpired(current, 105));
+        assert(current.session.token == "rotated");
         changed([](auto& c) { c.session.identity = "replacement"; });
         changed([](auto& c) { c.session.room_name = "replacement"; });
         changed([](auto& c) { c.session.server_url = "wss://other.test"; });
         changed([](auto& c) { c.session.server_urls.push_back("wss://other.test"); });
-        changed([](auto& c) { ++c.expires_at_ms; });
         changed([](auto& c) { c.sample_rate = 48000; });
         changed([](auto& c) { c.channels = 2; });
     }
