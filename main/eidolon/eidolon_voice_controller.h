@@ -230,6 +230,7 @@ private:
     void DoSessionControl(const std::string& payload, uint32_t generation, bool agent);
     void DoDeviceEvent(const std::string& payload, uint32_t event_generation);
     void DoPublishDeviceEvent(const std::string& payload);
+    void PublishBodyStateChanged(const char* key, int value);
 #if CONFIG_EIDOLON_SMARTHOME_PANEL
     void DoPanelRequest(const std::string& payload);
 #endif

@@ -513,7 +513,16 @@ std::string BuildDeviceManifestJson(const std::string& board_name, const DeviceC
             actions = actions.substr(0, actions.size() - 1) + "," + actuators + "]";
         }
     }
-    return "{\"actions\":" + actions + ",\"events\":[],\"media\":[" + media +
+    std::string events = "[]";
+    if (capabilities.speaker || Board::GetInstance().GetBacklight() != nullptr) {
+        events = std::string("{\"name\":\"") + kBodyStateChangedType +
+            "\",\"payload_schema\":{\"additionalProperties\":false,\"properties\":{"
+            "\"key\":{\"enum\":[\"brightness\",\"volume\"],\"type\":\"string\"},"
+            "\"value\":{\"maximum\":100,\"minimum\":0,\"type\":\"integer\"}},"
+            "\"required\":[\"key\",\"value\"],\"type\":\"object\"},\"version\":1}";
+        events = "[" + events + "]";
+    }
+    return "{\"actions\":" + actions + ",\"events\":" + events + ",\"media\":[" + media +
            "],\"properties\":[" + properties +
            "],\"schema_version\":1,\"title\":" + escaped + "}";
 }

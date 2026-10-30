@@ -31,6 +31,9 @@ inline constexpr const char* kIdentityOwnerPresenceConfirmedType =
 inline constexpr const char* kIdentityOwnerPresenceChangedType =
     "identity.owner_presence.changed";
 inline constexpr const char* kCompanionFlowNodeType = "companion.flow.node";
+// A settable value changed locally, with nobody having asked. Same envelope as
+// every other device event; the reader tells it apart by type, not by topic.
+inline constexpr const char* kBodyStateChangedType = "body.state.changed";
 
 // session_open / session_close — device → server, on kSessionControlTopic. The
 // device holds its channel open for as long as it is enrolled, so being

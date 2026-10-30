@@ -2329,6 +2329,41 @@ void EidolonVoiceController::DoPublishDeviceEvent(const std::string& payload)
     }
 }
 
+void EidolonVoiceController::PublishBodyStateChanged(const char* key, int value)
+{
+    if (key == nullptr || value < 0 || value > 100) {
+        return;
+    }
+    const auto epoch_now = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    if (epoch_now < 1'700'000'000'000LL) {
+        return;
+    }
+    char payload[96] = {};
+    const int written = std::snprintf(payload, sizeof(payload),
+                                      "{\"key\":\"%s\",\"value\":%d}", key, value);
+    if (written <= 0 || static_cast<size_t>(written) >= sizeof(payload)) {
+        return;
+    }
+    const uint64_t monotonic_ms =
+        static_cast<uint64_t>(esp_timer_get_time() / 1000);
+    const std::string event_json = BuildDeviceEventJson({
+        .event_id = MakeDeviceEventId("evt-state", monotonic_ms, esp_random()),
+        .flow_id = MakeDeviceEventId("flow-state", monotonic_ms, esp_random()),
+        .causation_id = "",
+        .type = kBodyStateChangedType,
+        .source_device_id = OperationalDeviceInstanceId(),
+        .source_component = "actuator",
+        .occurred_at_ms = static_cast<uint64_t>(epoch_now),
+        .expires_at_ms = static_cast<uint64_t>(epoch_now) +
+                         DeviceEventBus::kMaxTtlMs,
+        .payload_json = payload,
+    });
+    if (!event_json.empty()) {
+        DoPublishDeviceEvent(event_json);
+    }
+}
+
 void EidolonVoiceController::ScheduleAmbientPresenceTimer(uint64_t delay_ms)
 {
     if (ambient_presence_timer_ == nullptr) {
@@ -3197,6 +3232,7 @@ void EidolonVoiceController::HandleVolumeSetCommand(const std::string& command_i
     char result[32];
     snprintf(result, sizeof(result), "{\"volume\":%d}", volume);
     AckCommand(command, "completed", "OK", "", result);
+    PublishBodyStateChanged("volume", volume);
 }
 
 void EidolonVoiceController::HandleVolumeGetCommand(const std::string& command_id,
@@ -3252,6 +3288,7 @@ void EidolonVoiceController::HandleDisplayBrightnessCommand(const std::string& c
     char result[40];
     snprintf(result, sizeof(result), "{\"brightness\":%d}", brightness);
     AckCommand(command, "completed", "OK", "", result);
+    PublishBodyStateChanged("brightness", brightness);
 }
 
 void EidolonVoiceController::HandleDisplayBrightnessGetCommand(const std::string& command_id,
