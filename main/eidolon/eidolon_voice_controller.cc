@@ -2336,17 +2336,21 @@ void EidolonVoiceController::PublishBodyStateChanged(const char* key, int value)
     }
     const auto epoch_now = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()).count();
-    if (epoch_now < 1'700'000'000'000LL) {
-        return;
-    }
+    // A device that has not yet reached an NTP source still knows that its own
+    // volume just changed. The envelope needs a window, so an unset clock gets
+    // the wall-clock fields taken from monotonic uptime instead of the report
+    // being dropped: the reader treats these as ordering hints, not deadlines.
+    const uint64_t monotonic_ms =
+        static_cast<uint64_t>(esp_timer_get_time() / 1000);
+    const bool clock_set = epoch_now >= 1'700'000'000'000LL;
+    const uint64_t occurred_at_ms =
+        clock_set ? static_cast<uint64_t>(epoch_now) : monotonic_ms;
     char payload[96] = {};
     const int written = std::snprintf(payload, sizeof(payload),
                                       "{\"key\":\"%s\",\"value\":%d}", key, value);
     if (written <= 0 || static_cast<size_t>(written) >= sizeof(payload)) {
         return;
     }
-    const uint64_t monotonic_ms =
-        static_cast<uint64_t>(esp_timer_get_time() / 1000);
     const std::string event_json = BuildDeviceEventJson({
         .event_id = MakeDeviceEventId("evt-state", monotonic_ms, esp_random()),
         .flow_id = MakeDeviceEventId("flow-state", monotonic_ms, esp_random()),
@@ -2354,9 +2358,8 @@ void EidolonVoiceController::PublishBodyStateChanged(const char* key, int value)
         .type = kBodyStateChangedType,
         .source_device_id = OperationalDeviceInstanceId(),
         .source_component = "actuator",
-        .occurred_at_ms = static_cast<uint64_t>(epoch_now),
-        .expires_at_ms = static_cast<uint64_t>(epoch_now) +
-                         DeviceEventBus::kMaxTtlMs,
+        .occurred_at_ms = occurred_at_ms,
+        .expires_at_ms = occurred_at_ms + DeviceEventBus::kMaxTtlMs,
         .payload_json = payload,
     });
     if (!event_json.empty()) {

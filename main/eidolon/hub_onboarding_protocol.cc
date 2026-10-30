@@ -515,12 +515,11 @@ std::string BuildDeviceManifestJson(const std::string& board_name, const DeviceC
     }
     std::string events = "[]";
     if (capabilities.speaker || Board::GetInstance().GetBacklight() != nullptr) {
-        events = std::string("{\"name\":\"") + kBodyStateChangedType +
-            "\",\"payload_schema\":{\"additionalProperties\":false,\"properties\":{"
+        events = std::string("[{\"data_schema\":{\"additionalProperties\":false,\"properties\":{"
             "\"key\":{\"enum\":[\"brightness\",\"volume\"],\"type\":\"string\"},"
             "\"value\":{\"maximum\":100,\"minimum\":0,\"type\":\"integer\"}},"
-            "\"required\":[\"key\",\"value\"],\"type\":\"object\"},\"version\":1}";
-        events = "[" + events + "]";
+            "\"required\":[\"key\",\"value\"],\"type\":\"object\"},\"name\":\"") +
+            kBodyStateChangedType + "\"}]";
     }
     return "{\"actions\":" + actions + ",\"events\":" + events + ",\"media\":[" + media +
            "],\"properties\":[" + properties +
