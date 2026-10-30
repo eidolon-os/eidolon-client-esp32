@@ -2046,7 +2046,9 @@ void EidolonVoiceController::DoControlCommand(const std::string& payload, uint32
         {kControlOpSafetyStop, 1, &EidolonVoiceController::HandleSafetyStopCommand},
         {kControlOpPresenceSet, 1, &EidolonVoiceController::HandlePresenceSetCommand},
         {kControlOpVolumeSet, 1, &EidolonVoiceController::HandleVolumeSetCommand},
+        {kControlOpVolumeGet, 1, &EidolonVoiceController::HandleVolumeGetCommand},
         {kControlOpDisplayBrightness, 1, &EidolonVoiceController::HandleDisplayBrightnessCommand},
+        {kControlOpDisplayBrightnessGet, 1, &EidolonVoiceController::HandleDisplayBrightnessGetCommand},
 #if CONFIG_EIDOLON_GUARD_SERVICE
         {kControlOpDeviceRollCall, 1, &EidolonVoiceController::HandleDeviceRollCallCommand},
         {kControlOpGuardRuntimeSync, 0, &EidolonVoiceController::HandleGuardRuntimeSyncCommand},
@@ -3197,6 +3199,26 @@ void EidolonVoiceController::HandleVolumeSetCommand(const std::string& command_i
     AckCommand(command, "completed", "OK", "", result);
 }
 
+void EidolonVoiceController::HandleVolumeGetCommand(const std::string& command_id,
+                                                   const std::string& payload)
+{
+    ControlCommand command;
+    command.id = command_id;
+    command.op = "volume.get";
+
+    AudioCodec* codec = Board::GetInstance().GetAudioCodec();
+    if (codec == nullptr) {
+        AckCommand(command, "unsupported", "NO_AUDIO_CODEC");
+        return;
+    }
+    const int volume = codec->output_volume();
+    ESP_LOGI(TAG, "Control command -> volume.get volume=%d", volume);
+
+    char result[32];
+    snprintf(result, sizeof(result), "{\"volume\":%d}", volume);
+    AckCommand(command, "completed", "OK", "", result);
+}
+
 void EidolonVoiceController::HandleDisplayBrightnessCommand(const std::string& command_id,
                                                             const std::string& payload)
 {
@@ -3226,6 +3248,26 @@ void EidolonVoiceController::HandleDisplayBrightnessCommand(const std::string& c
     const int brightness = static_cast<int>(value + 0.5);
     backlight->SetBrightness(static_cast<uint8_t>(brightness), true);
     ESP_LOGI(TAG, "Control command -> display.brightness brightness=%d", brightness);
+
+    char result[40];
+    snprintf(result, sizeof(result), "{\"brightness\":%d}", brightness);
+    AckCommand(command, "completed", "OK", "", result);
+}
+
+void EidolonVoiceController::HandleDisplayBrightnessGetCommand(const std::string& command_id,
+                                                               const std::string& payload)
+{
+    ControlCommand command;
+    command.id = command_id;
+    command.op = "display.brightness.get";
+
+    Backlight* backlight = Board::GetInstance().GetBacklight();
+    if (backlight == nullptr) {
+        AckCommand(command, "unsupported", "NO_BACKLIGHT");
+        return;
+    }
+    const int brightness = backlight->brightness();
+    ESP_LOGI(TAG, "Control command -> display.brightness.get brightness=%d", brightness);
 
     char result[40];
     snprintf(result, sizeof(result), "{\"brightness\":%d}", brightness);

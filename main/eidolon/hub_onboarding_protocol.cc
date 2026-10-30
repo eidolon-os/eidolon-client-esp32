@@ -393,6 +393,12 @@ std::string DeviceActuatorActions(const DeviceCapabilities& capabilities)
             "\"required\":[\"volume\"],\"type\":\"object\"},"
             "\"name\":\"volume.set\",\"output_schema\":{\"type\":\"object\"},"
             "\"version\":1}";
+        actions +=
+            ",{\"idempotent\":true,\"input_schema\":{\"additionalProperties\":false,"
+            "\"properties\":{},\"required\":[],\"type\":\"object\"},"
+            "\"name\":\"volume.get\",\"output_schema\":{\"additionalProperties\":false,"
+            "\"properties\":{\"volume\":{\"maximum\":100,\"minimum\":0,\"type\":\"number\"}},"
+            "\"required\":[\"volume\"],\"type\":\"object\"},\"version\":1}";
     }
     if (Board::GetInstance().GetBacklight() != nullptr) {
         if (!actions.empty()) actions += ",";
@@ -402,6 +408,12 @@ std::string DeviceActuatorActions(const DeviceCapabilities& capabilities)
             "\"required\":[\"brightness\"],\"type\":\"object\"},"
             "\"name\":\"display.brightness\",\"output_schema\":{\"type\":\"object\"},"
             "\"version\":1}";
+        actions +=
+            ",{\"idempotent\":true,\"input_schema\":{\"additionalProperties\":false,"
+            "\"properties\":{},\"required\":[],\"type\":\"object\"},"
+            "\"name\":\"display.brightness.get\",\"output_schema\":{\"additionalProperties\":false,"
+            "\"properties\":{\"brightness\":{\"maximum\":100,\"minimum\":0,\"type\":\"integer\"}},"
+            "\"required\":[\"brightness\"],\"type\":\"object\"},\"version\":1}";
     }
     return actions;
 }
