@@ -571,6 +571,14 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
     return ESP_OK;
 }
 
+esp_err_t LiveKitSession::UpdateConnectionToken(const std::string& expected,
+                                               const std::string& token)
+{
+    if (room_handle_ == nullptr) return ESP_ERR_INVALID_STATE;
+    return livekit_room_update_token(room_handle_, expected.c_str(), token.c_str()) == LIVEKIT_ERR_NONE
+        ? ESP_OK : ESP_FAIL;
+}
+
 esp_err_t LiveKitSession::Disconnect()
 {
     connected_ = false;

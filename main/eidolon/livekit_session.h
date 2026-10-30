@@ -42,6 +42,9 @@ public:
 
     esp_err_t Disconnect();
 
+    // Same-channel credential renewal; the engine owns reconnect serialization.
+    esp_err_t UpdateConnectionToken(const std::string& expected, const std::string& token);
+
     // True once repeated Connect() attempts have been refused for internal RAM
     // with the shortfall not moving. Callers own retry policy, and this is the
     // fact that tells them a retry is not a retry — it is the same measurement

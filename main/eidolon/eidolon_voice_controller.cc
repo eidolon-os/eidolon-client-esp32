@@ -962,6 +962,12 @@ esp_err_t EidolonVoiceController::RefreshHubConfig(bool persist, bool* channel_c
                 err = store.SaveHubConfig(fresh);
                 if (err != ESP_OK) return err;
             }
+            if (session_.HasRoom() && config_.session.token != fresh.session.token) {
+                err = session_.UpdateConnectionToken(config_.session.token, fresh.session.token);
+                // Do not advance the controller cache alone. The existing caller
+                // closes/rebuilds on failure rather than leaving stale SDK retries.
+                if (err != ESP_OK) return err;
+            }
             // A credential renewal is not a conversation/transport replacement.
             // Cache the authenticated token and expiry for the next reconnect,
             // retaining the active output grant, state and media connection.
