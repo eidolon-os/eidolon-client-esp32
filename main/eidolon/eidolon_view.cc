@@ -12,6 +12,13 @@ UiInputHandler g_input_handler;
 std::function<void(UiInputSource, bool)> g_availability_handler;
 std::function<void()> g_setup_handler;
 std::atomic<uint8_t> g_available_inputs{0};
+std::atomic<const char*> g_input_keys[kUiInputSourceCount]{};
+
+void SetInputAvailable(UiInputSource source, bool available) {
+    const auto bit=InputBit(source);
+    const auto previous=available ? g_available_inputs.fetch_or(bit) : g_available_inputs.fetch_and(static_cast<uint8_t>(~bit));
+    if (bool(previous & bit)!=available && g_availability_handler) g_availability_handler(source,available);
+}
 }
 
 void SetEidolonView(EidolonView* view)
@@ -43,13 +50,16 @@ void DispatchEidolonUiInput(UiInputSource source, UiInputGesture gesture) {
 void SetEidolonInputAvailabilityHandler(std::function<void(UiInputSource, bool)> handler) {
     g_availability_handler=std::move(handler);
 }
-void SetEidolonInputAvailable(UiInputSource source, bool available) {
-    const auto bit=InputBit(source);
-    const auto previous=available ? g_available_inputs.fetch_or(bit) : g_available_inputs.fetch_and(static_cast<uint8_t>(~bit));
-    if (bool(previous & bit)!=available && g_availability_handler) g_availability_handler(source,available);
+void SetEidolonTouchAvailable(bool available) { SetInputAvailable(UiInputSource::Touch,available); }
+void SetEidolonButtonAvailable(UiInputSource button, bool available, const char* key) {
+    // The name is in place before the button is, so no hint lacks it.
+    g_input_keys[InputIndex(button)].store(key);
+    SetInputAvailable(button,available);
 }
 UiInputProfile CurrentUiInputProfile() {
     auto profile=CompiledUiInputProfile(g_available_inputs.load());
+    for (size_t i=0; i<kUiInputSourceCount; ++i)
+        if (const char* key=g_input_keys[i].load()) profile.keys[i]=key;
     profile.setup_available=bool(g_setup_handler);
     return profile;
 }

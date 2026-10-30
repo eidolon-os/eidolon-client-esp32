@@ -2,6 +2,10 @@
 #include <cstring>
 #include "eidolon/ui_state_mapper.h"
 using namespace eidolon;
+static bool HintIs(const EidolonUiModel& m,const char* action,const char* key,const char* effect) {
+    return !std::strcmp(m.input_hint.action,action) && !std::strcmp(m.input_hint.key,key) &&
+        !std::strcmp(m.input_hint.effect,effect);
+}
 static EidolonRuntimeStatus Ready(InteractionMode mode) {
     EidolonRuntimeStatus s;
     s.runtime=RuntimePhase::Normal;s.enrollment=EnrollmentPhase::ClaimActive;
@@ -75,17 +79,20 @@ int main() {
     input.automatic_start=false;
     input.enabled_inputs=InputBit(UiInputSource::Touch)|InputBit(UiInputSource::SessionButton);
     input.available_inputs=InputBit(UiInputSource::SessionButton);
+    // A hint names the key the board registered, never a generic "button".
+    input.keys[InputIndex(UiInputSource::SessionButton)]="BOOT";
+    input.keys[InputIndex(UiInputSource::TalkButton)]="TALK";
     auto s=Ready(InteractionMode::FullDuplex);
     auto m=UiStateProjector::Project(s,input);
     assert(m.primary_presentation==UiActionPresentation::InputHint);
-    assert(!std::strcmp(m.input_hint,"Press button to start"));
+    assert(HintIs(m,"Press","BOOT","to start"));
     assert(!m.show_end_action);
     assert(UiStateProjector::ResolveInput(s,input,UiInputSource::SessionButton,UiInputGesture::Click)==UiIntent::OpenConversation);
     assert(UiStateProjector::ResolveInput(s,input,UiInputSource::Touch,UiInputGesture::Click)==UiIntent::None);
     s.conversation=ConversationPhase::Active;
     m=UiStateProjector::Project(s,input);
     assert(!m.show_end_action && m.end_allowed);
-    assert(!std::strcmp(m.input_hint,"Press button to end"));
+    assert(HintIs(m,"Press","BOOT","to end"));
     assert(UiStateProjector::AllowsIntent(s,UiIntent::CloseConversation));
     assert(UiStateProjector::ResolveInput(s,input,UiInputSource::SessionButton,UiInputGesture::Click)==UiIntent::CloseConversation);
     assert(!UiStateProjector::AllowsIntent(s,UiIntent::BeginTalk));
@@ -100,10 +107,10 @@ int main() {
     input.enabled_inputs=input.available_inputs=InputBit(UiInputSource::SessionButton)|InputBit(UiInputSource::TalkButton);
     s.interaction_mode=InteractionMode::PushToTalk;
     m=UiStateProjector::Project(s,input);
-    assert(!std::strcmp(m.input_hint,"Hold button to talk"));
+    assert(HintIs(m,"Hold","TALK","to talk"));
     assert(UiStateProjector::ResolveInput(s,input,UiInputSource::TalkButton,UiInputGesture::Press)==UiIntent::BeginTalk);
     s.turn=TurnPhase::Recording;
-    assert(!std::strcmp(UiStateProjector::Project(s,input).input_hint,"Release button to send"));
+    assert(HintIs(UiStateProjector::Project(s,input),"Release","TALK","to send"));
     for (auto event:{UiInputGesture::Release,UiInputGesture::Cancel})
         assert(UiStateProjector::ResolveInput(s,input,UiInputSource::TalkButton,event)==UiIntent::CommitTalk);
     input.available_inputs=0;

@@ -244,7 +244,7 @@ private:
         // which left a removed ("recovery required") panel no way back in.
 #if CONFIG_EIDOLON_HUB_MODE
         eidolon::SetEidolonSetupHandler([this]() { EnterWifiConfigMode(); });
-        eidolon::SetEidolonInputAvailable(eidolon::UiInputSource::SessionButton, true);
+        eidolon::SetEidolonButtonAvailable(eidolon::UiInputSource::SessionButton, true, "SET");
 
         // SET, MODE and the panel's microphone are one session control and do
         // one thing on a click: before the panel is operational, open setup;
@@ -353,7 +353,7 @@ private:
         }
         ESP_LOGI(TAG, "[ui] LVGL touch ready");
 #if CONFIG_EIDOLON_HUB_MODE
-        eidolon::SetEidolonInputAvailable(eidolon::UiInputSource::Touch, true);
+        eidolon::SetEidolonTouchAvailable(true);
 #endif
     }
 

@@ -116,9 +116,11 @@ contain timing and byte counts without logging dialogue content.
 The canvas uses warm stone, with an evergreen expression stage, mint facial
 features and a paper caption surface. Status colors distinguish normal,
 attention and error states while preserving their text labels. Physical-button
-hints use a centered sage strip; touch actions use a filled green primary
-button and a muted terracotta end action. Recovery text uses an inset paper
-panel, and transient notices keep their separate high-contrast banner.
+hints are plain centered text that names the key the board registered, drawn
+as an outlined keycap ("Press [BOOT] to end"), so they never look like a
+control to touch; touch actions use a filled green primary button and a muted
+terracotta end action. Recovery text uses an inset paper panel, and transient
+notices keep their separate high-contrast banner.
 
 Palette constants live in `companion_palette.h`. Rounded flat fills and a
 shorter, rounded neutral mouth supply the visual treatment without images,

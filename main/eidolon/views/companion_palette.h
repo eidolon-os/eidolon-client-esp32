@@ -11,7 +11,6 @@ inline constexpr uint32_t Muted = 0x51665C;
 inline constexpr uint32_t Stage = 0x193F36;
 inline constexpr uint32_t StageEdge = 0x365A4E;
 inline constexpr uint32_t Expression = 0xC5ECCD;
-inline constexpr uint32_t Soft = 0xDBE5D9;
 inline constexpr uint32_t Accent = 0x32745C;
 inline constexpr uint32_t Pressed = 0x245541;
 inline constexpr uint32_t Attention = 0x996321;

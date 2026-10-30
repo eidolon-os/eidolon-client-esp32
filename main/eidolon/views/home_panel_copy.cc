@@ -63,10 +63,18 @@ constexpr Entry kTexts[] = {
     {"Update complete. Restarting...", "更新完成，正在重启"},
     {"Firmware update failed", "固件更新失败"},
     {"Restoring the operational channel...", "正在恢复与主机的连接"},
-    // Input hints (ui_input_profile.h).
-    {"Press button to start", "按 SET 键开始"},
-    {"Press button to end", "按 SET 键结束"},
 };
+// Input hint parts (ui_input_profile.h). The key keeps the name the board gave it.
+constexpr Entry kHintActions[] = {{"Press", "按"}};
+constexpr Entry kHintEffects[] = {{"to start", "开始"}, {"to end", "结束"}};
+
+template <size_t N>
+const char* Lookup(const Entry (&entries)[N], const char* english) {
+    for (const Entry& entry : entries) {
+        if (std::strcmp(entry.english, english) == 0) return entry.chinese;
+    }
+    return nullptr;
+}
 
 bool StartsWith(const char* text, const char* prefix) {
     return std::strncmp(text, prefix, std::strlen(prefix)) == 0;
@@ -103,9 +111,7 @@ std::string Title(UiScene scene, const char* status_text) {
 
 std::string Text(const char* english) {
     if (english == nullptr) return {};
-    for (const Entry& entry : kTexts) {
-        if (std::strcmp(entry.english, english) == 0) return entry.chinese;
-    }
+    if (const char* chinese = Lookup(kTexts, english)) return chinese;
     // Details that carry a value after a fixed lead-in.
     static constexpr const char* kWifi = "Connecting to Wi-Fi";
     if (StartsWith(english, kWifi)) {
@@ -121,6 +127,14 @@ std::string Text(const char* english) {
         return version.empty() ? "正在安装固件，请勿断电" : "正在安装固件 " + version + "，请勿断电";
     }
     return english;
+}
+
+std::string InputHint(const UiInputHint& hint) {
+    const char* action = Lookup(kHintActions, hint.action);
+    const char* effect = Lookup(kHintEffects, hint.effect);
+    if (action == nullptr || effect == nullptr)
+        return std::string(hint.action) + " " + hint.key + " " + hint.effect;
+    return std::string(action) + " " + hint.key + " 键" + effect;
 }
 
 int ProgressPercent(const char* detail) {

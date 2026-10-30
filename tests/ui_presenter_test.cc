@@ -1,5 +1,7 @@
 #include <cassert>
+#include <cstring>
 #include "application.h"
+#include "eidolon/eidolon_view.h"
 #include "eidolon/eidolon_ui_presenter.h"
 #include "eidolon/ui_state_mapper.h"
 #include "eidolon/voice_runtime_projector.h"
@@ -87,4 +89,9 @@ int main() {
     }
     voice.conversation=ConversationPhase::Closed;presenter.ApplyVoiceStatus(voice);
     assert(presenter.runtime_status().last_transcription.empty());
+    // The key a board registers reaches every profile the presenter projects with.
+    assert(!*CurrentUiInputProfile().Key(UiInputSource::SessionButton));
+    SetEidolonButtonAvailable(UiInputSource::SessionButton,true,"BOOT");
+    assert(!std::strcmp(CurrentUiInputProfile().Key(UiInputSource::SessionButton),"BOOT"));
+    assert(!*CurrentUiInputProfile().Key(UiInputSource::TalkButton));
 }

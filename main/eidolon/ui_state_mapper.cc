@@ -372,7 +372,7 @@ EidolonUiModel UiStateProjector::Project(const EidolonRuntimeStatus& status,
         }
         if (hint) {
             model.primary_presentation = UiActionPresentation::InputHint;
-            model.input_hint = hint->hint;
+            model.input_hint = {GestureAction(hint->gesture), inputs.Key(hint->source), hint->effect};
         }
     }
     if (model.primary_enabled && model.primary_intent==UiIntent::OpenConversation &&

@@ -75,6 +75,9 @@ private:
     lv_obj_t* state_dot_ = nullptr;
     lv_obj_t* mode_ = nullptr;
     lv_obj_t* input_hint_ = nullptr;
+    lv_obj_t* hint_action_ = nullptr;
+    lv_obj_t* hint_key_ = nullptr;
+    lv_obj_t* hint_effect_ = nullptr;
     bool has_actions_ = false;
     bool touch_navigation_ = false;
     uint64_t detail_scroll_start_ = 0;

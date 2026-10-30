@@ -129,14 +129,32 @@ void CompanionFaceView::Build(const BuildContext& ctx) {
     lv_obj_set_style_radius(notification_,8,0);
     lv_obj_set_style_text_color(notification_,lv_color_hex(palette::Paper),0);
     Visible(notification_,false);
-    input_hint_=Label(ctx.parent,ctx.font,LV_ALIGN_TOP_LEFT,12,layout.actions.y+2);
+    // A physical-key hint is an instruction, not a control: plain text in the
+    // action row with only the key outlined, so nothing on it invites a touch.
+    input_hint_=lv_obj_create(ctx.parent);
+    lv_obj_remove_style_all(input_hint_);
+    lv_obj_remove_flag(input_hint_,LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(input_hint_,LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_pos(input_hint_,layout.actions.x,layout.actions.y+2);
     lv_obj_set_size(input_hint_,layout.actions.w,28);
-    lv_label_set_long_mode(input_hint_,LV_LABEL_LONG_DOT);
-    lv_obj_set_style_text_color(input_hint_,lv_color_hex(palette::Muted),0);
-    lv_obj_set_style_bg_color(input_hint_,lv_color_hex(palette::Soft),0);
-    lv_obj_set_style_bg_opa(input_hint_,LV_OPA_COVER,0);
-    lv_obj_set_style_radius(input_hint_,10,0);
-    lv_obj_set_style_text_align(input_hint_,LV_TEXT_ALIGN_CENTER,0);
+    lv_obj_set_flex_flow(input_hint_,LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(input_hint_,LV_FLEX_ALIGN_CENTER,LV_FLEX_ALIGN_CENTER,LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(input_hint_,6,0);
+    auto hint_part=[&]() {
+        auto* label=lv_label_create(input_hint_);
+        lv_obj_set_style_text_font(label,ctx.font,0);
+        lv_obj_set_style_text_color(label,lv_color_hex(palette::Muted),0);
+        lv_label_set_text(label,"");
+        return label;
+    };
+    hint_action_=hint_part();
+    hint_key_=hint_part();
+    hint_effect_=hint_part();
+    lv_obj_set_style_text_color(hint_key_,lv_color_hex(palette::Ink),0);
+    lv_obj_set_style_border_width(hint_key_,1,0);
+    lv_obj_set_style_border_color(hint_key_,lv_color_hex(palette::Muted),0);
+    lv_obj_set_style_radius(hint_key_,4,0);
+    lv_obj_set_style_pad_hor(hint_key_,5,0);
     Visible(input_hint_,false);
     mode_=Label(ctx.parent,ctx.font,LV_ALIGN_TOP_LEFT,12,layout.actions.y+6);
     lv_obj_set_size(mode_,72,28);
@@ -461,7 +479,9 @@ void CompanionFaceView::Render(const EidolonUiModel& model) {
     const bool hint=model.primary_presentation==UiActionPresentation::InputHint;
     primary_intent_=touch && model.primary_enabled ? model.primary_intent : UiIntent::None;
     has_actions_=primary_intent_!=UiIntent::None || model.show_end_action || hint;
-    Text(input_hint_,hint ? model.input_hint : "");
+    Text(hint_action_,hint ? model.input_hint.action : "");
+    Text(hint_key_,hint ? model.input_hint.key : "");
+    Text(hint_effect_,hint ? model.input_hint.effect : "");
     Visible(input_hint_,hint);
     Visible(mode_,touch || model.show_end_action);
     Text(primary_label_,model.primary_label);

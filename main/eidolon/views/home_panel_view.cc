@@ -979,7 +979,7 @@ void HomePanelView::Render(const EidolonUiModel& model) {
     if (sys_intent_ != UiIntent::None) {
         Text(sys_action_, home_copy::Text(model.primary_label));
     } else if (model.primary_presentation == UiActionPresentation::InputHint) {
-        Text(sys_action_, home_copy::Text(model.input_hint));
+        Text(sys_action_, home_copy::InputHint(model.input_hint));
     } else {
         Text(sys_action_, "");
     }

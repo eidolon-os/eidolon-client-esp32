@@ -19,8 +19,11 @@ namespace eidolon::home_copy {
 // Title for the system page: the scene's own wording, refined by the projected
 // status where one scene has several (PreparingService, Reconnecting).
 std::string Title(UiScene scene, const char* status_text);
-// Detail line, button labels and input hints.
+// Detail line and button labels.
 std::string Text(const char* english);
+// A physical input's hint, "按 SET 键结束". A gesture or effect the table does
+// not know keeps the whole hint in English rather than mixing languages.
+std::string InputHint(const UiInputHint& hint);
 // Leading "NN%" of an update detail, or -1.
 int ProgressPercent(const char* detail);
 

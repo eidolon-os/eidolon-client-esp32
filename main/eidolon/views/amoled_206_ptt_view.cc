@@ -2,15 +2,19 @@
 
 #include "display.h"
 #include <esp_log.h>
+#include <string>
 
 namespace eidolon {
 
 namespace {
 static constexpr const char* kTag = "Amoled206Ptt";
 
-const char* RingLabelText(const EidolonUiModel& model)
+std::string RingLabelText(const EidolonUiModel& model)
 {
-    if (model.primary_presentation==UiActionPresentation::InputHint) return model.input_hint;
+    if (model.primary_presentation==UiActionPresentation::InputHint) {
+        const UiInputHint& hint = model.input_hint;
+        return std::string(hint.action) + " " + hint.key + " " + hint.effect;
+    }
     if (model.primary_presentation==UiActionPresentation::TouchControl && model.primary_label != nullptr && model.primary_label[0] != '\0') {
         return model.primary_label;
     }
@@ -256,7 +260,7 @@ void Amoled206PttView::RenderVoiceRing(const EidolonUiModel& model)
     lv_obj_set_size(ring_inner_, inner_size, inner_size);
     lv_obj_set_style_bg_color(ring_inner_, color, 0);
     lv_obj_set_style_border_color(ring_inner_, color, 0);
-    lv_label_set_text(ring_label_, RingLabelText(model));
+    lv_label_set_text(ring_label_, RingLabelText(model).c_str());
     lv_obj_center(ring_inner_);
     lv_obj_center(ring_label_);
 }

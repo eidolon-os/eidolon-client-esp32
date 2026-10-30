@@ -211,6 +211,7 @@ UiInputProfile KorvoInputs() {
     UiInputProfile inputs;
     inputs.enabled_inputs = InputBit(UiInputSource::Touch) | InputBit(UiInputSource::SessionButton);
     inputs.available_inputs = inputs.enabled_inputs;
+    inputs.keys[InputIndex(UiInputSource::SessionButton)] = "SET";  // korvo1_board.cc
     inputs.setup_available = true;
     inputs.microphone_mute = false;  // CONFIG_EIDOLON_UI_MICROPHONE_MUTE=n on korvo-1
     return inputs;
@@ -298,12 +299,19 @@ void TestCopy() {
              "Returning to saved Wi-Fi. Hold BOOT to change network", "Setup closed - long-press BOOT to reopen",
              "Wi-Fi disconnected", "Owner network unavailable", "Downloading UI assets...",
              "Update complete. Restarting...", "Firmware update failed", "Restoring the operational channel...",
-             "Connecting to Wi-Fi Eidolon-Home...", "Installing firmware 3.3.0", "Press button to start",
-             "Press button to end"}) {
+             "Connecting to Wi-Fi Eidolon-Home...", "Installing firmware 3.3.0"}) {
         const std::string text = home_copy::Text(detail);
         assert(HasChinese(text));
         assert(text.find("BOOT") == std::string::npos);
     }
+    // The key keeps the name the board registered; only its words are Chinese.
+    EidolonRuntimeStatus session = Ready();
+    session.conversation = ConversationPhase::Active;
+    const EidolonUiModel active = UiStateProjector::Project(session, inputs);
+    assert(active.primary_presentation == UiActionPresentation::InputHint);
+    assert(home_copy::InputHint(active.input_hint) == "按 SET 键结束");
+    assert(home_copy::InputHint({"Press", "SET", "to start"}) == "按 SET 键开始");
+    assert(home_copy::InputHint({"Hold", "SET", "to talk"}) == "Hold SET to talk");
     assert(home_copy::Text("Connecting to Wi-Fi Eidolon-Home...") == "正在连接 Wi-Fi「Eidolon-Home」");
     assert(home_copy::Text("A detail the Hub sent") == "A detail the Hub sent");
     assert(home_copy::ProgressPercent("37% 512KB/s") == 37);

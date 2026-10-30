@@ -84,7 +84,7 @@ private:
     void InitializeButtons() {
 #if CONFIG_EIDOLON_HUB_MODE
         eidolon::SetEidolonSetupHandler([this]() { EnterWifiConfigMode(); });
-        eidolon::SetEidolonInputAvailable(eidolon::UiInputSource::SessionButton,true);
+        eidolon::SetEidolonButtonAvailable(eidolon::UiInputSource::SessionButton,true,"BOOT");
 #endif
         boot_button_.OnClick([this]() {
             auto& app = Application::GetInstance();
@@ -209,7 +209,7 @@ private:
         } else {
             ESP_LOGI(TAG, "[ui] LVGL touch ready");
 #if CONFIG_EIDOLON_HUB_MODE
-            eidolon::SetEidolonInputAvailable(eidolon::UiInputSource::Touch,true);
+            eidolon::SetEidolonTouchAvailable(true);
 #endif
         }
     }

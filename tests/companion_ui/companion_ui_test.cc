@@ -122,23 +122,28 @@ int main(int argc,char** argv) {
         ClickAt(pointer, 160, 100);
         assert(events.size()==before_click+1); // touching the face is not a session toggle
         model.primary_presentation=UiActionPresentation::InputHint;
-        model.input_hint="Press button to end";model.show_end_action=false;
+        model.input_hint={"Press","BOOT","to end"};model.show_end_action=false;
         view.Render(model);
         assert(!lv_obj_is_visible(mic));
         assert(!lv_obj_is_visible(lv_obj_get_parent(Find(screen,"END"))));
-        assert(lv_obj_is_visible(Find(screen,model.input_hint)));
+        // The hint names its key and is an instruction, not something to touch.
+        auto* end_hint=lv_obj_get_parent(Find(screen,"BOOT"));
+        assert(lv_obj_is_visible(end_hint) && !lv_obj_has_flag(end_hint,LV_OBJ_FLAG_CLICKABLE));
+        assert(lv_obj_get_style_bg_opa(end_hint,LV_PART_MAIN)==LV_OPA_TRANSP);
+        assert(Find(end_hint,"Press") && Find(end_hint,"to end"));
         ClickAt(pointer, (mic_area.x1+mic_area.x2)/2, (mic_area.y1+mic_area.y2)/2);
         assert(events.size()==before_click+1);
         Screenshot(screen,prefix+"-physical-input.ppm");
         model.scene=UiScene::Ready;model.status_text="Ready";model.detail_text="Start a conversation";
-        model.input_hint="Press button to start";
+        model.input_hint={"Press","BOOT","to start"};
         // Real BOX-3 profile has no battery. Keep the touch-board fixture intact.
         if (font==&font_noto_basic_16_4) lv_label_set_text(view.indicators().battery,"");
         view.Render(model);
         assert(!Find(screen,model.detail_text));
-        auto* ready_hint=Find(screen,model.input_hint);
+        auto* ready_hint=lv_obj_get_parent(Find(screen,"to start"));
         assert(ready_hint && lv_obj_is_visible(ready_hint));
         Within(ready_hint,layout.actions);
+        for (const char* part:{"Press","BOOT","to start"}) Within(Find(ready_hint,part),layout.actions);
         lv_area_t hint_area;lv_obj_get_coords(ready_hint,&hint_area);
         assert(hint_area.y2<230); // at least ten pixels of bottom breathing room
         Screenshot(screen,prefix+"-ready-physical.ppm");
@@ -182,7 +187,7 @@ int main(int argc,char** argv) {
         Screenshot(screen,prefix+"-text.ppm");
         // BOX-3's shipped profile uses its physical button and has no battery.
         model.primary_presentation=UiActionPresentation::InputHint;
-        model.input_hint="Press button to end";model.show_end_action=false;
+        model.input_hint={"Press","BOOT","to end"};model.show_end_action=false;
         lv_label_set_text(view.indicators().battery,"");
         view.Render(model);
         Screenshot(screen,prefix+"-voice-physical.ppm");
@@ -244,7 +249,7 @@ int main(int argc,char** argv) {
         EidolonUiModel model;model.scene=UiScene::Conversation;model.status_text="Speaking";
         lv_label_set_text(view.indicators().network,FONT_AWESOME_WIFI);
         model.primary_presentation=UiActionPresentation::InputHint;
-        model.input_hint="Press button to end";
+        model.input_hint={"Press","BOOT","to end"};
         model.turn=TurnPhase::AgentSpeaking;model.subtitle="我叫小何。";
         view.Render(model);
         lv_font_glyph_dsc_t glyph;
@@ -324,6 +329,20 @@ int main(int argc,char** argv) {
         // The farthest safe-square corners must remain inside the physical disk.
         assert(126*126*2 <= 180*180);
         Screenshot(screen,std::string(argv[1])+"/xiaoling-round-conversation.ppm");
+        // Xiaoling has no touch: its BOOT key ends the conversation, and the
+        // whole hint stays inside the safe square at the 20px font.
+        model.primary_presentation=UiActionPresentation::InputHint;
+        model.input_hint={"Press","BOOT","to end"};
+        view.Render(model);lv_obj_update_layout(screen);
+        auto* hint=lv_obj_get_parent(Find(viewport,"BOOT"));
+        assert(lv_obj_is_visible(hint));
+        for (const char* part:{"Press","BOOT","to end"}) Within(Find(hint,part),safe);
+        Screenshot(screen,std::string(argv[1])+"/xiaoling-round-physical.ppm");
+        model.scene=UiScene::Ready;model.status_text="Ready";model.subtitle="";
+        model.input_hint={"Press","BOOT","to start"};
+        view.Render(model);lv_obj_update_layout(screen);
+        for (const char* part:{"Press","BOOT","to start"}) Within(Find(viewport,part),safe);
+        Screenshot(screen,std::string(argv[1])+"/xiaoling-round-ready.ppm");
     }
     lv_deinit();
     std::puts("Companion UI: both board fonts, layout bounds, scroll, notifications, silent modes and PTT events passed");

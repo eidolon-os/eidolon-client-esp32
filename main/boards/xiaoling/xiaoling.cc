@@ -168,7 +168,7 @@ public:
         InitializeBattery();
 #if CONFIG_EIDOLON_HUB_MODE
         eidolon::SetEidolonSetupHandler([this]() { EnterWifiConfigMode(); });
-        eidolon::SetEidolonInputAvailable(eidolon::UiInputSource::SessionButton, true);
+        eidolon::SetEidolonButtonAvailable(eidolon::UiInputSource::SessionButton, true, "BOOT");
         boot_.OnClick([this]() {
             auto& app = Application::GetInstance();
             if (eidolon::HubSetupButtonClickOpensSetup(app.GetDeviceState())) {

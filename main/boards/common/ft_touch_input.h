@@ -27,6 +27,6 @@ inline bool RegisterFtTouchInput(i2c_master_bus_handle_t bus,
     if (!lvgl_port_add_touch(&input)) {
         esp_lcd_touch_del(touch);esp_lcd_panel_io_del(io);return false;
     }
-    eidolon::SetEidolonInputAvailable(eidolon::UiInputSource::Touch,true);
+    eidolon::SetEidolonTouchAvailable(true);
     return true;
 }

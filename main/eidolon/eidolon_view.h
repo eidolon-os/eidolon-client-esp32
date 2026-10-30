@@ -40,7 +40,10 @@ using UiInputHandler = std::function<void(UiInputSource, UiInputGesture)>;
 void SetEidolonUiInputHandler(UiInputHandler handler);
 void DispatchEidolonUiInput(UiInputSource source, UiInputGesture gesture);
 void SetEidolonInputAvailabilityHandler(std::function<void(UiInputSource, bool)> handler);
-void SetEidolonInputAvailable(UiInputSource source, bool available);
+// Touch has nothing to name. A button is registered with the name of its
+// physical key as the device labels it, so every hint for it says which key.
+void SetEidolonTouchAvailable(bool available);
+void SetEidolonButtonAvailable(UiInputSource button, bool available, const char* key);
 UiInputProfile CurrentUiInputProfile();
 void SetEidolonSetupHandler(std::function<void()> handler);
 void OpenEidolonSetup();

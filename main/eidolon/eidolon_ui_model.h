@@ -35,6 +35,14 @@ enum class UiIntent {
 
 enum class UiActionPresentation { Hidden, TouchControl, InputHint };
 
+// A physical input's instruction in parts, so a view can draw the key as a key
+// and word the rest in its own language: "Press" [BOOT] "to end".
+struct UiInputHint {
+    const char* action = "";
+    const char* key = "";
+    const char* effect = "";
+};
+
 enum class UiSeverity {
     Normal,
     Attention,
@@ -69,7 +77,7 @@ struct EidolonUiModel {
     bool end_allowed = false;
     bool show_end_action = false;
     UiActionPresentation primary_presentation = UiActionPresentation::Hidden;
-    const char* input_hint = "";
+    UiInputHint input_hint;
     bool show_mute_icon = false;
     bool show_setup_action = false;
     bool touch_navigation = false;

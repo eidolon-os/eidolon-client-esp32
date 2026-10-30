@@ -270,7 +270,7 @@ private:
             eidolon::DispatchEidolonUiInput(eidolon::UiInputSource::AuxiliaryButton,eidolon::UiInputGesture::Click);
         });
 
-        eidolon::SetEidolonInputAvailable(eidolon::UiInputSource::AuxiliaryButton,true);
+        eidolon::SetEidolonButtonAvailable(eidolon::UiInputSource::AuxiliaryButton,true,"BOOT");
         boot_button_.OnDoubleClick([]() {
             eidolon::DispatchEidolonUiInput(eidolon::UiInputSource::AuxiliaryButton,eidolon::UiInputGesture::DoubleClick);
         });
@@ -353,7 +353,7 @@ private:
             .handle = tp,
         };
         if (lvgl_port_add_touch(&touch_cfg)) {
-            eidolon::SetEidolonInputAvailable(eidolon::UiInputSource::Touch,true);
+            eidolon::SetEidolonTouchAvailable(true);
             ESP_LOGI(TAG, "Touch panel initialized successfully");
         } else {
             ESP_LOGE(TAG, "Touch registration failed; controls unavailable");
