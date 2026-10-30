@@ -430,6 +430,10 @@ private:
     std::atomic<int64_t> join_requested_us_{0};
     uint32_t conversation_sequence_ = 0;
     GuardService* guard_service_ = nullptr;
+    // Set for the lifetime of the one controller the app builds, so the audio
+    // layer's observer callback has somewhere to send the change it saw.
+    inline static EidolonVoiceController* active_instance_ = nullptr;
+    static EidolonVoiceController* ActiveInstance() { return active_instance_; }
 #if CONFIG_EIDOLON_GUARD_SERVICE
     RoomConfig guard_control_config_;
     bool has_guard_control_config_ = false;

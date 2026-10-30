@@ -6,6 +6,14 @@
 
 #define TAG "Backlight"
 
+namespace {
+BacklightBrightnessObserver g_brightness_observer = nullptr;
+}
+
+void SetBacklightBrightnessObserver(BacklightBrightnessObserver observer) {
+    g_brightness_observer = observer;
+}
+
 
 Backlight::Backlight() {
     // 创建背光渐变定时器
@@ -65,6 +73,10 @@ void Backlight::SetBrightness(uint8_t brightness, bool permanent) {
         esp_timer_start_periodic(transition_timer_, 5 * 1000);
     }
     ESP_LOGI(TAG, "Set brightness to %d", brightness);
+
+    if (g_brightness_observer != nullptr) {
+        g_brightness_observer(brightness);
+    }
 }
 
 void Backlight::OnTransitionTimer() {

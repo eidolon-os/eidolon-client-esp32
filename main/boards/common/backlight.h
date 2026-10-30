@@ -7,6 +7,13 @@
 #include <esp_timer.h>
 
 
+// Told once per requested brightness, not once per animation step. The level
+// travels through up to a hundred 5ms steps, and a listener wants where the
+// display is going, not a hundred positions on the way there.
+using BacklightBrightnessObserver = void (*)(uint8_t brightness);
+void SetBacklightBrightnessObserver(BacklightBrightnessObserver observer);
+
+
 class Backlight {
 public:
     Backlight();

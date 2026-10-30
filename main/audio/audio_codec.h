@@ -15,6 +15,13 @@
 #define AUDIO_CODEC_DMA_DESC_NUM 6
 #define AUDIO_CODEC_DMA_FRAME_NUM 240
 
+// Told every time the output volume actually changes, whichever path changed it
+// — a board's own volume key, a remote `volume.set`, or a firmware policy. It
+// lives here rather than on the command handler so that a key press and a phone
+// slider are the same event to whoever is listening.
+using AudioCodecVolumeObserver = void (*)(int volume);
+void SetAudioCodecVolumeObserver(AudioCodecVolumeObserver observer);
+
 class AudioCodec {
 public:
     AudioCodec();

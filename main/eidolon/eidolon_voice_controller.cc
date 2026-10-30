@@ -234,6 +234,7 @@ namespace eidolon {
 EidolonVoiceController::EidolonVoiceController(GuardService* guard_service)
     : guard_service_(guard_service)
 {
+    active_instance_ = this;
     if (!inbox_.Valid()) {
         ESP_LOGE(TAG, "Failed to create controller event queue");
         return;
@@ -244,8 +245,7 @@ EidolonVoiceController::EidolonVoiceController(GuardService* guard_service)
         ESP_LOGE(TAG, "Failed to create controller task");
     }
 #if CONFIG_EIDOLON_AMBIENT_PRESENCE_OWNER_AUTH
-    esp_timer_create_args_t presence_timer_args = {};
-    presence_timer_args.callback =
+    esp_timer_create_args_t presence_timer_args = {};    presence_timer_args.callback =
         &EidolonVoiceController::AmbientPresenceTimerCb;
     presence_timer_args.arg = this;
     presence_timer_args.dispatch_method = ESP_TIMER_TASK;
@@ -265,10 +265,27 @@ EidolonVoiceController::EidolonVoiceController(GuardService* guard_service)
             });
     }
 #endif
+    // Registered after the worker queue exists: the callback only enqueues, so a
+    // board's volume key running on esp_timer never publishes from there.
+    SetAudioCodecVolumeObserver([](int volume) {
+        if (auto* self = ActiveInstance()) {
+            self->PublishBodyStateChanged("volume", volume);
+        }
+    });
+    SetBacklightBrightnessObserver([](uint8_t brightness) {
+        if (auto* self = ActiveInstance()) {
+            self->PublishBodyStateChanged("brightness", brightness);
+        }
+    });
 }
 
 EidolonVoiceController::~EidolonVoiceController()
 {
+    SetAudioCodecVolumeObserver(nullptr);
+    SetBacklightBrightnessObserver(nullptr);
+    if (active_instance_ == this) {
+        active_instance_ = nullptr;
+    }
 #if CONFIG_EIDOLON_SMARTHOME_PANEL
     if (auto* view = GetEidolonView(); view && view->SmartHomePanel()) {
         view->SmartHomePanel()->SetSink(nullptr);
@@ -3235,7 +3252,6 @@ void EidolonVoiceController::HandleVolumeSetCommand(const std::string& command_i
     char result[32];
     snprintf(result, sizeof(result), "{\"volume\":%d}", volume);
     AckCommand(command, "completed", "OK", "", result);
-    PublishBodyStateChanged("volume", volume);
 }
 
 void EidolonVoiceController::HandleVolumeGetCommand(const std::string& command_id,
@@ -3291,7 +3307,6 @@ void EidolonVoiceController::HandleDisplayBrightnessCommand(const std::string& c
     char result[40];
     snprintf(result, sizeof(result), "{\"brightness\":%d}", brightness);
     AckCommand(command, "completed", "OK", "", result);
-    PublishBodyStateChanged("brightness", brightness);
 }
 
 void EidolonVoiceController::HandleDisplayBrightnessGetCommand(const std::string& command_id,

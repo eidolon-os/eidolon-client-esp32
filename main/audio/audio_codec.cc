@@ -8,6 +8,14 @@
 
 #define TAG "AudioCodec"
 
+namespace {
+AudioCodecVolumeObserver g_volume_observer = nullptr;
+}
+
+void SetAudioCodecVolumeObserver(AudioCodecVolumeObserver observer) {
+    g_volume_observer = observer;
+}
+
 AudioCodec::AudioCodec() {
 }
 
@@ -43,6 +51,10 @@ void AudioCodec::SetOutputVolume(int volume) {
     
     Settings settings("audio", true);
     settings.SetInt("output_volume", output_volume_);
+
+    if (g_volume_observer != nullptr) {
+        g_volume_observer(output_volume_);
+    }
 }
 
 void AudioCodec::SetInputGain(float gain) {
