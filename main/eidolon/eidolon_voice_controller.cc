@@ -2201,12 +2201,16 @@ void EidolonVoiceController::DoSessionControl(const std::string& payload, uint32
              state_ == VoiceSessionState::Reconnecting);
         const bool conflict = cJSON_IsString(reason) &&
             strcmp(reason->valuestring, kSessionRejectionConflict) == 0;
+        const bool unavailable = cJSON_IsString(reason) &&
+            strcmp(reason->valuestring, kSessionRejectionUnavailable) == 0;
         cJSON_Delete(root);
         // The transport only passes non-Agent controls from the exact Provider.
         // Never close accepted work, including a same-ID retry refused later.
-        if (!agent && pending && conflict) {
-            CompletePendingRoomJoinCommand("failed", "ROOM_JOIN_CONFLICT");
-            HandleSessionEnd(EndReason::Busy);
+        // A reason this build does not know leaves the attempt to its own timeout.
+        if (!agent && pending && (conflict || unavailable)) {
+            CompletePendingRoomJoinCommand(
+                "failed", conflict ? "ROOM_JOIN_CONFLICT" : "ROOM_JOIN_UNAVAILABLE");
+            HandleSessionEnd(conflict ? EndReason::Busy : EndReason::Error);
         }
         return;
     }

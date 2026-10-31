@@ -40,6 +40,7 @@ inline constexpr const char* kSessionCloseType = "session_close";
 inline constexpr const char* kChannelProviderIdentityPrefix = "channel-provider-";
 inline constexpr const char* kSessionRejectedType = "session_rejected";
 inline constexpr const char* kSessionRejectionConflict = "conflict";
+inline constexpr const char* kSessionRejectionUnavailable = "unavailable";
 inline constexpr const char* kSessionStartedType = "session_started";
 inline constexpr const char* kSessionConversationIdField = "conversation_id";
 inline constexpr const char* kSessionControlRequestIdField = "control_request_id";

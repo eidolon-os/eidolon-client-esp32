@@ -46,6 +46,7 @@ namespace eidolon {
 constexpr auto kSessionOpenType="session_open", kSessionCloseType="session_close";
 constexpr auto kSessionStartedType="session_started", kSessionRejectedType="session_rejected";
 constexpr auto kSessionRejectionConflict="conflict", kSessionConversationIdField="conversation_id";
+constexpr auto kSessionRejectionUnavailable="unavailable";
 constexpr auto kSessionEndIdleNormal="idle", kSessionEndProactiveDone="done", kSessionEndUserLeft="left";
 constexpr auto kSessionEndSuperseded="superseded", kSessionEndError="error";
 constexpr int kWireSchemaVersion=1, ESP_OK=0;
@@ -200,6 +201,23 @@ int main() {
  c.request_error=-1;c.session_.connected=true;c.DoLiveKitState(LiveKitConnectionState::Connected,2);
  assert(c.state_==VoiceSessionState::Error && c.current_conversation_id_.empty());
  assert(!gate.CanResume("failure"));
+ // A refused start ends the pending attempt now; its reason picks what the screen says.
+ for (auto [reason, expected] : {std::pair{"conflict", EndReason::Busy},
+                                 std::pair{"unavailable", EndReason::Error}}) {
+   c.current_conversation_id_="refused";c.state_=VoiceSessionState::Opening;
+   c.last_end_reason_=EndReason::None;
+   const std::string refusal=std::string("{\"schema_v\":1,\"type\":\"session_rejected\","
+       "\"conversation_id\":\"refused\",\"reason\":\"")+reason+"\"}";
+   c.DoSessionControl(refusal,2,true);  // only the Provider refuses, never the Agent
+   assert(c.current_conversation_id_=="refused" && c.state_==VoiceSessionState::Opening);
+   c.DoSessionControl(refusal,2,false);
+   assert(c.last_end_reason_==expected && c.current_conversation_id_.empty() && !capture);
+ }
+ // A reason this build does not know leaves the attempt to its own timeout.
+ c.current_conversation_id_="unknown";c.state_=VoiceSessionState::Opening;
+ c.DoSessionControl("{\"schema_v\":1,\"type\":\"session_rejected\",\"conversation_id\":\"unknown\","
+     "\"reason\":\"later\"}",2,false);
+ assert(c.current_conversation_id_=="unknown" && c.state_==VoiceSessionState::Opening);
  // Wi-Fi loss suspends the grant too; actual transport startup is isolated.
  EidolonVoiceController network;
  network.config_.output_policy={true,3,speech,true,true};
@@ -210,7 +228,7 @@ int main() {
  network.standby_=true;network.session_.connected=true;
  network.DoLiveKitState(LiveKitConnectionState::Connected,2);
  assert(capture && network.current_conversation_id_=="same-session");
- puts("PASS: 100 reconnect cycles, watchdog, stale/offline/duplicate/untrusted controls, policy change, input-off, leave, open timeout and send failure");
+ puts("PASS: 100 reconnect cycles, watchdog, stale/offline/duplicate/untrusted controls, policy change, input-off, leave, open timeout, send failure and refused starts");
 }
 '''.replace('\nMETHODS\n', '\n'+methods+'\n')
 flags=shlex.split(subprocess.check_output(['pkg-config','--cflags','--libs','libcjson'],text=True))
