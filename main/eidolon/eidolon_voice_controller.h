@@ -419,6 +419,10 @@ private:
     // dispatch started. Transport reconnects preserve an active conversation;
     // an unconfirmed open is superseded instead of assuming that it started.
     bool conversation_confirmed_ = false;
+    // When the person last asked for a conversation (esp_timer µs, 0 = none),
+    // so the session_open it leads to can say how long the device took to send
+    // it. Written by the caller of JoinRoom, read on the controller task.
+    std::atomic<int64_t> join_requested_us_{0};
     uint32_t conversation_sequence_ = 0;
     GuardService* guard_service_ = nullptr;
 #if CONFIG_EIDOLON_GUARD_SERVICE

@@ -44,6 +44,8 @@ inline constexpr const char* kSessionRejectionUnavailable = "unavailable";
 inline constexpr const char* kSessionStartedType = "session_started";
 inline constexpr const char* kSessionConversationIdField = "conversation_id";
 inline constexpr const char* kSessionControlRequestIdField = "control_request_id";
+// Optional on session_open: ms from the person's action to the request being sent.
+inline constexpr const char* kSessionActionToSendMsField = "action_to_send_ms";
 
 // client.audio_state — body "type" label (NOT the routing topic above) + enums.
 inline constexpr const char* kClientAudioStateType = "client.audio_state";

@@ -617,6 +617,7 @@ void EidolonVoiceController::QuiesceForCommissioning(
 
 esp_err_t EidolonVoiceController::JoinRoom()
 {
+    join_requested_us_.store(esp_timer_get_time());
     ESP_LOGI(TAG, "[lifecycle] enqueue join state=%s room_kind=%s gen=%lu",
              VoiceStateName(state_), CurrentRoomKind(),
              static_cast<unsigned long>(session_generation_));
@@ -2144,6 +2145,17 @@ esp_err_t EidolonVoiceController::PublishSessionRequest(
     if (!control_request_id.empty()) {
         cJSON_AddStringToObject(root, kSessionControlRequestIdField, control_request_id.c_str());
     }
+    // The Host times everything after it hears this; the time from the press
+    // to here (a reconnect included) is only known on this side. Once per
+    // press: a retry of the same request must not report the press again.
+    const int64_t requested_us = std::strcmp(type, kSessionOpenType) == 0
+        ? join_requested_us_.exchange(0) : 0;
+    long long action_to_send_ms = -1;
+    if (requested_us > 0) {
+        action_to_send_ms = (esp_timer_get_time() - requested_us) / 1000;
+        cJSON_AddNumberToObject(root, kSessionActionToSendMsField,
+                                static_cast<double>(action_to_send_ms));
+    }
     char* printed = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
     if (!printed) {
@@ -2151,9 +2163,9 @@ esp_err_t EidolonVoiceController::PublishSessionRequest(
     }
     const esp_err_t err = session_.PublishData(kSessionControlTopic, printed, /*reliable=*/true);
     cJSON_free(printed);
-    ESP_LOGI(TAG, "[lifecycle] sent %s conversation_id=%s err=%s gen=%lu", type,
-             conversation_id.c_str(), esp_err_to_name(err),
-             static_cast<unsigned long>(session_generation_));
+    ESP_LOGI(TAG, "[lifecycle] sent %s conversation_id=%s err=%s gen=%lu action_to_send_ms=%lld",
+             type, conversation_id.c_str(), esp_err_to_name(err),
+             static_cast<unsigned long>(session_generation_), action_to_send_ms);
     return err;
 }
 
