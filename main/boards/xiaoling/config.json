@@ -23,6 +23,7 @@
                 "CONFIG_USE_ESP_WAKE_WORD=n",
                 "CONFIG_USE_AFE_WAKE_WORD=n",
                 "CONFIG_USE_CUSTOM_WAKE_WORD=n",
+                "CONFIG_EIDOLON_LIVEKIT_SPEAKER_VOLUME=20",
                 "CONFIG_PARTITION_TABLE_CUSTOM_FILENAME=\"partitions/v2/16m_eidolon.csv\"",
                 "CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y",
                 "CONFIG_LWIP_DNS_SUPPORT_MDNS_QUERIES=y",
