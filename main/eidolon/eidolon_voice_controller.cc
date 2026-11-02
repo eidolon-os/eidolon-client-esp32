@@ -2336,8 +2336,12 @@ void EidolonVoiceController::DoDeviceEvent(const std::string& payload,
 
 void EidolonVoiceController::DoPublishDeviceEvent(const std::string& payload)
 {
-    if (!standby_ || !session_.IsConnected()) {
-        ESP_LOGD(TAG, "Dropped volatile device event: channel unavailable");
+    // Only a live channel is required. Whether the device is idling or in a
+    // conversation is irrelevant to a fact about the device itself: gating on
+    // standby here silently dropped every state change made *during* a
+    // conversation, which is exactly when the user adjusts volume by voice.
+    if (!session_.IsConnected()) {
+        ESP_LOGD(TAG, "Dropped device event: channel unavailable");
         return;
     }
     const esp_err_t err = session_.PublishData(kEventTopic, payload, true);
@@ -2354,9 +2358,9 @@ void EidolonVoiceController::PublishBodyStateChanged(const char* key, int value)
     const auto epoch_now = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()).count();
     // A device that has not yet reached an NTP source still knows that its own
-    // volume just changed. The envelope needs a window, so an unset clock gets
-    // the wall-clock fields taken from monotonic uptime instead of the report
-    // being dropped: the reader treats these as ordering hints, not deadlines.
+    // volume just changed. The envelope requires a window, so an unset clock
+    // fills it from monotonic uptime; the reader treats these as ordering hints
+    // and does not compare them to its own clock, so the report still arrives.
     const uint64_t monotonic_ms =
         static_cast<uint64_t>(esp_timer_get_time() / 1000);
     const bool clock_set = epoch_now >= 1'700'000'000'000LL;
