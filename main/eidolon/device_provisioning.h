@@ -3,9 +3,11 @@
 
 #include "commissioning_transport_core.h"
 #include "provisioning_window_policy_core.h"
+#include "setup_code_card.h"
 
 #include <atomic>
 #include <functional>
+#include <mutex>
 #include <string>
 
 #include <esp_err.h>
@@ -60,6 +62,10 @@ public:
 
     bool IsRunning() const { return running_.load(std::memory_order_acquire); }
 
+    // The code drawn for this generation's window, for the screen to show. Empty
+    // for a build without a per-window code, or for another generation.
+    SetupCodeCard CurrentSetupCodeCard(uint32_t generation) const;
+
 private:
     DeviceProvisioningService() = default;
 
@@ -87,6 +93,8 @@ private:
     esp_err_t RegisterEventHandlers();
     esp_err_t StartOwnedHttpServer();
     esp_err_t StartTransport();
+    esp_err_t LoadSecurityParams(uint32_t generation);
+    std::string AdvertisedName() const;
     void MaybeReportReady();
     void CleanupTransport(uint32_t generation);
     void ReleaseNetifs();
@@ -113,6 +121,11 @@ private:
     std::vector<uint8_t> salt_;
     std::vector<uint8_t> verifier_;
     network_prov_security2_params_t security_params_ = {};
+    // The window's screen card. Guarded because the runtime reads it from its
+    // own task while this service writes it from the provisioning start path.
+    mutable std::mutex setup_code_mutex_;
+    SetupCodeCard setup_code_card_;
+    uint32_t setup_code_generation_ = 0;
     void* sta_netif_ = nullptr;
     void* ap_netif_ = nullptr;
     void* httpd_handle_ = nullptr;

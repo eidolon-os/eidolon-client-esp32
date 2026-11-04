@@ -290,3 +290,13 @@ bool LvglDisplay::SnapshotToJpeg(std::string& jpeg_data, int quality) {
     return false;
 #endif
 }
+
+void LvglDisplay::ShowSetupCode(const SetupCodeScreen& screen) {
+    DisplayLockGuard lock(this);
+    setup_code_overlay_.Show(display_, screen);
+}
+
+void LvglDisplay::HideSetupCode() {
+    DisplayLockGuard lock(this);
+    setup_code_overlay_.Hide();
+}

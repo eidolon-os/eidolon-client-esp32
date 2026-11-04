@@ -221,6 +221,13 @@ void PublishEvidence(RuntimeState& state)
         std::lock_guard<std::mutex> lock(state.observer_mutex);
         observer = state.observer;
     }
+    std::shared_ptr<const SetupCodeCard> setup_code;
+    if (state.core.state() == CommissioningRuntimeState::Advertising ||
+        state.core.state() == CommissioningRuntimeState::SessionActive) {
+        SetupCodeCard card =
+            DeviceProvisioningService::GetInstance().CurrentSetupCodeCard(state.core.generation());
+        if (!card.empty()) setup_code = std::make_shared<const SetupCodeCard>(std::move(card));
+    }
     const CommissioningRuntimeSnapshot snapshot{
         state.core.state(),
         state.core.generation(),
@@ -228,6 +235,7 @@ void PublishEvidence(RuntimeState& state)
         state.station_restore_requested,
         revision,
         state.failure_hint,
+        std::move(setup_code),
     };
     ESP_LOGI(TAG,
              "Confirmed state=%s generation=%lu committed=%d revision=%lu",

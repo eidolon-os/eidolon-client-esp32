@@ -3,6 +3,7 @@
 
 #include "display.h"
 #include "lvgl_image.h"
+#include "setup_code_overlay.h"
 
 #include <lvgl.h>
 #include <esp_timer.h>
@@ -24,6 +25,8 @@ public:
     virtual void UpdateStatusBar(bool update_all = false);
     virtual void SetPowerSaveMode(bool on);
     virtual bool SnapshotToJpeg(std::string& jpeg_data, int quality = 80);
+    void ShowSetupCode(const SetupCodeScreen& screen) override;
+    void HideSetupCode() override;
 
 protected:
     esp_pm_lock_handle_t pm_lock_ = nullptr;
@@ -40,6 +43,7 @@ protected:
     const char* battery_icon_ = nullptr;
     const char* network_icon_ = nullptr;
     bool muted_ = false;
+    SetupCodeOverlay setup_code_overlay_;
 
     std::chrono::system_clock::time_point last_status_update_time_;
     esp_timer_handle_t notification_timer_ = nullptr;

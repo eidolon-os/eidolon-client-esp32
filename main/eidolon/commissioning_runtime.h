@@ -2,9 +2,11 @@
 #define EIDOLON_COMMISSIONING_RUNTIME_H_
 
 #include "commissioning_orchestrator_core.h"
+#include "setup_code_card.h"
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 
 namespace eidolon {
 
@@ -15,6 +17,10 @@ struct CommissioningRuntimeSnapshot {
     bool station_mode_requested = false;
     uint32_t revision = 0;
     std::string failure_hint;
+    // The code drawn for this window, while one is open and advertising. Shared
+    // so the projection can be copied onto the UI task without copying the
+    // code each time; null outside Advertising/SessionActive.
+    std::shared_ptr<const SetupCodeCard> setup_code;
 };
 
 // ESP-IDF composition root for the platform-independent commissioning Core.

@@ -4,6 +4,8 @@
 #include "device_identity.h"
 #include "device_provisioning_protocol.h"
 #include "owner_trust_commissioning_worker.h"
+#include "esp_idf_setup_code_secret.h"
+#include "setup_code_secret.h"
 #include "esp_idf_commissioning_credential_store.h"
 #include "system_info.h"
 
@@ -24,6 +26,7 @@
 #include <network_provisioning/scheme_softap.h>
 #endif
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <utility>
@@ -41,6 +44,17 @@ constexpr const char* kDescriptorEndpoint = "eidolon-descriptor";
 constexpr const char* kTrustEndpoint = "eidolon-trust";
 constexpr const char* kStatusEndpoint = "eidolon-status";
 constexpr const char* kTerminalAckEndpoint = "eidolon-terminal-ack";
+
+#if CONFIG_EIDOLON_PROVISIONING_SETUP_CODE
+// Known answer for the device's own SRP derivation: the development pair ESP-IDF's
+// srp6a.py produced for eidolon-setup / eidolon-dev-setup (SDK
+// golden/setup-code-verifier.json, vector "firmware-development-pair"). Written
+// out rather than read from Kconfig, which a production build replaces.
+constexpr const char* kSelfTestPassword = "eidolon-dev-setup";
+constexpr const char* kSelfTestSaltHex = "2133af3845196306f61cb3bb2e18862c";
+constexpr const char* kSelfTestVerifierHex =
+    "8aada0073ed32e1b00edd09c3c3371c3411ee39456de8243f0b5268751608c6bc01bb301f0f5c5a6d42425a34c79d89d70145252944890ae75c4a744398cd0af8a2a151e9db6b6b6092272520040328371be8b663705c5a71eb586005fb5c88539afc7429ac475682aefd2106736799905ae896faf682ed565cbe3d8785f3271d35ad9230fd2b3536536dc2ba74b68a158a68a6b695a52b4502de2db65be5683bc3d158bb753a63b10ba4ccda5029788e8bd2e525902a2fc92c79e279fb03671c65c326cf884a81ba1f9ac5b1c78ca0354521e2daf34959bd3946cd839898dfb1da1ba78dfe5f57ab921f98fdd9c62c7c90c96db02d164ecd41e3706f306c3e24446fe7f882fc66610a4a119e05e60f0ef3dcfd34938d3870f6d276018b76c272dde8dc747cc912dd3c48807d12964d847656f16da90c9608a4278a96cf4d5f186eed531247e947892ac2e421b3d1d8fbe0684e445c00ecd218fc054c59855a50737b642c803d3f8e7f7a5a48735e9631de2356816cb86b2394ffac752002cf0";
+#endif
 
 // The leading bytes of the verifier that belongs to the shared development
 // passphrase. A build that claims a manufacturer-bound identity while carrying
@@ -453,11 +467,9 @@ void DeviceProvisioningService::MaybeReportReady()
 
 esp_err_t DeviceProvisioningService::StartTransport()
 {
-    if (!DecodeHex(CONFIG_EIDOLON_PROVISIONING_SALT_HEX, salt_) ||
-        !DecodeHex(CONFIG_EIDOLON_PROVISIONING_VERIFIER_HEX, verifier_)) {
-        ESP_LOGE(TAG, "Provisioning salt/verifier are not usable hex");
-        return ESP_ERR_INVALID_STATE;
-    }
+    const esp_err_t secured = LoadSecurityParams(
+        transport_generation_.load(std::memory_order_acquire));
+    if (secured != ESP_OK) return secured;
 
     security_params_ = {};
     security_params_.salt = reinterpret_cast<const char*>(salt_.data());
@@ -481,7 +493,17 @@ esp_err_t DeviceProvisioningService::StartTransport()
         return ESP_FAIL;
     }
 
-    const std::string service_name = ServiceName();
+#if CONFIG_EIDOLON_PROVISIONING_SETUP_CODE
+    // Read by a controller before it opens the session, so it can tell "this
+    // device wants the code on its screen" from "this code was wrong".
+    static const char* kCapabilities[] = {"setup-code"};
+    if (network_prov_mgr_set_app_info("eidolon", "1", kCapabilities, 1) != ESP_OK) {
+        ESP_LOGE(TAG, "Could not declare provisioning capabilities");
+        return ESP_FAIL;
+    }
+#endif
+
+    const std::string service_name = AdvertisedName();
     const esp_err_t err = network_prov_mgr_start_provisioning(
         NETWORK_PROV_SECURITY_2, &security_params_, service_name.c_str(), nullptr);
     if (err != ESP_OK) {
@@ -680,6 +702,80 @@ void DeviceProvisioningService::ReleaseNetifs()
     }
 }
 
+std::string DeviceProvisioningService::AdvertisedName() const
+{
+#if CONFIG_EIDOLON_PROVISIONING_TRANSPORT_BLE
+    return BleSetupName(BOARD_TYPE, SystemInfo::GetMacAddress());
+#else
+    return ServiceName();
+#endif
+}
+
+SetupCodeCard DeviceProvisioningService::CurrentSetupCodeCard(uint32_t generation) const
+{
+    std::lock_guard<std::mutex> lock(setup_code_mutex_);
+    if (generation == 0 || generation != setup_code_generation_) return {};
+    return setup_code_card_;
+}
+
+esp_err_t DeviceProvisioningService::LoadSecurityParams(uint32_t generation)
+{
+#if CONFIG_EIDOLON_PROVISIONING_SETUP_CODE
+    // esp_fill_random is only truly random while the radio is running. The
+    // provisioning manager starts Station mode itself a moment later; starting
+    // it first changes nothing about what follows and everything about the code.
+    esp_err_t err = esp_wifi_set_mode(WIFI_MODE_STA);
+    if (err == ESP_OK) err = esp_wifi_start();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Could not start the radio before drawing a setup code: %s",
+                 esp_err_to_name(err));
+        return err;
+    }
+    // Once per boot: a broken modular exponentiation would otherwise show a code
+    // no phone can complete a handshake with, and nothing would say why.
+    static bool self_tested = false;
+    if (!self_tested) {
+        if (!SetupCodeSecretSelfTest(EspIdfSetupCodeSecretPorts(), kSelfTestPassword,
+                                     kSelfTestSaltHex, kSelfTestVerifierHex)) {
+            ESP_LOGE(TAG, "Setup code self-test failed; refusing to open setup");
+            return ESP_ERR_INVALID_STATE;
+        }
+        self_tested = true;
+    }
+    SetupCodeSecret secret;
+    if (!DrawSetupCodeSecret(EspIdfSetupCodeSecretPorts(), secret)) {
+        ESP_LOGE(TAG, "Could not draw a setup code");
+        return ESP_FAIL;
+    }
+    salt_.assign(secret.salt.begin(), secret.salt.end());
+    verifier_.assign(secret.verifier.begin(), secret.verifier.end());
+#if CONFIG_EIDOLON_PROVISIONING_TRANSPORT_BLE
+    constexpr auto transport = device_foundation::v1::SetupQrTransport::Ble;
+#else
+    constexpr auto transport = device_foundation::v1::SetupQrTransport::SoftAp;
+#endif
+    SetupCodeCard card = MakeSetupCodeCard(secret.code, AdvertisedName(), transport);
+    secret.Clear();
+#if CONFIG_EIDOLON_PROVISIONING_LOG_SETUP_CODE
+    ESP_LOGW(TAG, "BENCH BUILD setup code=%s name=%s", card.code.c_str(),
+             card.advertised_name.c_str());
+#endif
+    std::lock_guard<std::mutex> lock(setup_code_mutex_);
+    setup_code_card_.Clear();
+    setup_code_card_ = std::move(card);
+    setup_code_generation_ = generation;
+    return ESP_OK;
+#else
+    (void)generation;
+    if (!DecodeHex(CONFIG_EIDOLON_PROVISIONING_SALT_HEX, salt_) ||
+        !DecodeHex(CONFIG_EIDOLON_PROVISIONING_VERIFIER_HEX, verifier_)) {
+        ESP_LOGE(TAG, "Provisioning salt/verifier are not usable hex");
+        return ESP_ERR_INVALID_STATE;
+    }
+    return ESP_OK;
+#endif
+}
+
 void DeviceProvisioningService::CleanupTransport(uint32_t generation)
 {
     if (!resources_.active() || resources_.generation() != generation ||
@@ -702,6 +798,17 @@ void DeviceProvisioningService::CleanupTransport(uint32_t generation)
     if (cleanup.provisioning_manager) {
         network_prov_mgr_deinit();
     }
+    // protocomm no longer reads the security parameters, and the code they came
+    // from belonged to this window only.
+    {
+        std::lock_guard<std::mutex> lock(setup_code_mutex_);
+        if (setup_code_generation_ == generation) {
+            setup_code_card_.Clear();
+            setup_code_generation_ = 0;
+        }
+    }
+    std::fill(salt_.begin(), salt_.end(), 0);
+    std::fill(verifier_.begin(), verifier_.end(), 0);
     if (cleanup.event_handlers) {
         if (http_event_instance_ != nullptr) {
             esp_event_handler_instance_unregister(ESP_HTTP_SERVER_EVENT, HTTP_SERVER_EVENT_SENT_DATA, http_event_instance_);

@@ -1351,6 +1351,28 @@ menu "Eidolon Hub"
             silently treat a development device as a production one. Leave off for
             development builds carrying the shared salt and verifier above.
 
+    config EIDOLON_PROVISIONING_SETUP_CODE
+        bool "Draw a setup code per window and show it on the screen"
+        default n
+        depends on EIDOLON_HUB_MODE
+        help
+            Instead of the shared salt and verifier above, the device draws an
+            eight-digit code each time it opens a setup window, derives the SRP
+            verifier from it on the device, and shows the code as digits and as
+            a QR code on its display (SDK DF-COMM-018/019). Reading the screen
+            is the physical-presence proof. A controller must scan or type the
+            code; the development passphrase no longer opens this device.
+
+            Requires a display. A board without one keeps the pair above.
+
+    config EIDOLON_PROVISIONING_LOG_SETUP_CODE
+        bool "Print the setup code on the serial console (bench only)"
+        default n
+        depends on EIDOLON_PROVISIONING_SETUP_CODE && !EIDOLON_PROVISIONING_MANUFACTURER_BOUND
+        help
+            For automated bench tests that cannot read the screen. Never in a
+            build that leaves the bench: the code is the setup credential.
+
     config EIDOLON_MDNS_SERVICE_TYPE
         string "mDNS service type (without ._tcp suffix)"
         default "_eidolon-owner"

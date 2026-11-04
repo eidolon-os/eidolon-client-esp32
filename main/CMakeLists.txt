@@ -23,6 +23,8 @@ set(SOURCES "eidolon/local_mdns_resolver.cc"
             "display/lvgl_display/lvgl_theme.cc"
             "display/lvgl_display/lvgl_font.cc"
             "display/lvgl_display/lvgl_image.cc"
+            "display/lvgl_display/setup_code_overlay.cc"
+            "eidolon/fonts/font_home_clock_34.c"
             "display/lvgl_display/gif/lvgl_gif.cc"
             "display/lvgl_display/gif/gifdec.c"
             "display/lvgl_display/jpg/image_to_jpeg.cpp"
@@ -1286,6 +1288,9 @@ endif()
 if(CONFIG_EIDOLON_AEC_QUALIFICATION)
     list(APPEND INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/.cache/aec_qualification/generated")
 endif()
+
+# A source listed by a board block and by the common list is compiled once.
+list(REMOVE_DUPLICATES SOURCES)
 
 idf_component_register(SRCS ${SOURCES}
                     EMBED_FILES ${EIDOLON_EMBED_FILES}

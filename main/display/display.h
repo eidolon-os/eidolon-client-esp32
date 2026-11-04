@@ -15,6 +15,8 @@
 #include <string>
 #include <chrono>
 
+#include "setup_code_screen.h"
+
 class Theme {
 public:
     Theme(const std::string& name) : name_(name) {}
@@ -56,6 +58,11 @@ public:
     virtual Theme* GetTheme() { return current_theme_; }
     virtual void UpdateStatusBar(bool update_all = false);
     virtual void SetPowerSaveMode(bool on);
+    // The setup code drawn for the open setup window, over whatever the board
+    // shows. A display that cannot draw one keeps the default no-ops, and the
+    // window still works for a device set up through the development entry.
+    virtual void ShowSetupCode(const SetupCodeScreen& screen) { (void)screen; }
+    virtual void HideSetupCode() {}
     virtual void SetupUI() { 
         setup_ui_called_ = true;
     }

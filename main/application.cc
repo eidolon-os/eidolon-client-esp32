@@ -394,6 +394,21 @@ void Application::Initialize() {
             Schedule([this, snapshot]() {
                 if (!eidolon::CommissioningRuntime::GetInstance().IsCurrent(snapshot)) return;
                 using State = eidolon::CommissioningRuntimeState;
+                // The code is shown only while the window it was drawn for is
+                // open, and taken down in every other state.
+                auto* display = Board::GetInstance().GetDisplay();
+                const bool offering = snapshot.state == State::Advertising ||
+                                      snapshot.state == State::SessionActive;
+                if (offering && snapshot.setup_code) {
+                    display->ShowSetupCode(SetupCodeScreen{
+                        snapshot.setup_code->qr_json,
+                        snapshot.setup_code->code,
+                        snapshot.setup_code->advertised_name,
+                        {},
+                    });
+                } else {
+                    display->HideSetupCode();
+                }
                 switch (snapshot.state) {
                 case State::PreparingIdentity:
                 case State::QuiescingOperationalRuntime:
