@@ -1,0 +1,127 @@
+{
+  "vector_id": "DF-SETUP-QR-PAYLOAD-001",
+  "schema": "https://contracts.eidolon.live/device-foundation/v1/common/schemas.schema.json#/$defs/SetupQrPayload",
+  "espressif_keys": [
+    "name",
+    "pop",
+    "security",
+    "transport",
+    "username",
+    "ver"
+  ],
+  "ble": {
+    "payload": {
+      "ver": "v1",
+      "name": "eidolon-box3-a1b2c3",
+      "username": "eidolon-setup",
+      "pop": "40718256",
+      "transport": "ble",
+      "security": 2
+    },
+    "canonical_utf8": "{\"name\":\"eidolon-box3-a1b2c3\",\"pop\":\"40718256\",\"security\":2,\"transport\":\"ble\",\"username\":\"eidolon-setup\",\"ver\":\"v1\"}",
+    "canonical_sha256": "sha256:a6ea1b629fe19c0ca3ad8b06950c59098f609767010ffdf33e7d0d23facc4cd0"
+  },
+  "softap": {
+    "payload": {
+      "ver": "v1",
+      "name": "eidolon-m5stack-stackchan-a1b2c3",
+      "username": "eidolon-setup",
+      "pop": "40718256",
+      "transport": "softap",
+      "security": 2
+    },
+    "canonical_utf8": "{\"name\":\"eidolon-m5stack-stackchan-a1b2c3\",\"pop\":\"40718256\",\"security\":2,\"transport\":\"softap\",\"username\":\"eidolon-setup\",\"ver\":\"v1\"}",
+    "canonical_sha256": "sha256:4b1337177eb6da1583b4745e760b4985059769fdfd5a6b43df9bfb5930aaa357"
+  },
+  "rejected": [
+    {
+      "case": "seven-digit-code",
+      "payload": {
+        "ver": "v1",
+        "name": "eidolon-box3-a1b2c3",
+        "username": "eidolon-setup",
+        "pop": "4071825",
+        "transport": "ble",
+        "security": 2
+      }
+    },
+    {
+      "case": "non-digit-code",
+      "payload": {
+        "ver": "v1",
+        "name": "eidolon-box3-a1b2c3",
+        "username": "eidolon-setup",
+        "pop": "4071825a",
+        "transport": "ble",
+        "security": 2
+      }
+    },
+    {
+      "case": "security-1",
+      "payload": {
+        "ver": "v1",
+        "name": "eidolon-box3-a1b2c3",
+        "username": "eidolon-setup",
+        "pop": "40718256",
+        "transport": "ble",
+        "security": 1
+      }
+    },
+    {
+      "case": "other-username",
+      "payload": {
+        "ver": "v1",
+        "name": "eidolon-box3-a1b2c3",
+        "username": "wifiprov",
+        "pop": "40718256",
+        "transport": "ble",
+        "security": 2
+      }
+    },
+    {
+      "case": "other-transport",
+      "payload": {
+        "ver": "v1",
+        "name": "eidolon-box3-a1b2c3",
+        "username": "eidolon-setup",
+        "pop": "40718256",
+        "transport": "usb",
+        "security": 2
+      }
+    },
+    {
+      "case": "ble-name-over-29-bytes",
+      "payload": {
+        "ver": "v1",
+        "name": "eidolon-m5stack-stackchan-a1b2c3",
+        "username": "eidolon-setup",
+        "pop": "40718256",
+        "transport": "ble",
+        "security": 2
+      }
+    },
+    {
+      "case": "unknown-key",
+      "payload": {
+        "ver": "v1",
+        "name": "eidolon-box3-a1b2c3",
+        "username": "eidolon-setup",
+        "pop": "40718256",
+        "transport": "ble",
+        "security": 2,
+        "password": "40718256"
+      }
+    },
+    {
+      "case": "not-an-eidolon-name",
+      "payload": {
+        "ver": "v1",
+        "name": "PROV_a1b2c3",
+        "username": "eidolon-setup",
+        "pop": "40718256",
+        "transport": "ble",
+        "security": 2
+      }
+    }
+  ]
+}

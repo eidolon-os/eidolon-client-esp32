@@ -1,0 +1,33 @@
+{
+  "vector_id": "DF-BLE-PROVISIONING-TRANSPORT-001",
+  "service_uuid": "3a660000-68be-4447-b745-aa003c85e4e4",
+  "service_uuid_little_endian_hex": "e4e4853c00aa45b74744be680000663a",
+  "characteristic_uuid_rule": "the service UUID with its second 16-bit group replaced by the endpoint id",
+  "endpoint_discovery": "characteristic-user-description-0x2901",
+  "endpoint_ids": {
+    "prov-ctrl": "ff4f",
+    "prov-scan": "ff50",
+    "prov-session": "ff51",
+    "prov-config": "ff52",
+    "proto-ver": "ff53",
+    "eidolon-descriptor": "ff54",
+    "eidolon-trust": "ff55",
+    "eidolon-status": "ff56",
+    "eidolon-terminal-ack": "ff57"
+  },
+  "example_characteristic_uuid": "3a66ff51-68be-4447-b745-aa003c85e4e4",
+  "device_name_max_bytes": 29,
+  "device_name_pattern": "^eidolon-[a-z0-9]+-[0-9a-f]{6}$",
+  "requested_mtu": 517,
+  "framing": "required",
+  "terminal_delivery": "disconnect-after-accepted-terminal-ack",
+  "proto_ver_app_info": {
+    "label": "eidolon",
+    "ver": "1",
+    "cap": [
+      "frame-v1",
+      "setup-code"
+    ]
+  },
+  "link_encryption": "none-security2-only"
+}

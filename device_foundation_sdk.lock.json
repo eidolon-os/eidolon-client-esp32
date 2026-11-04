@@ -1,15 +1,15 @@
 {
-  "sdk_commit": "ff8a730c93ab1ad0ff7bdb8c9c5e99f0330eae28",
+  "sdk_commit": "669938f996bba98e5972bcd89f94978a017e2f69",
   "files": [
     {
       "source": "contracts/device_foundation/v1/generated/cpp/device_foundation_v1_generated.h",
       "target": "main/eidolon/device_foundation_v1_generated.h",
-      "sha256": "e63ce6959d0f388d89b10d8fbbf72d285c480fee5418f18e3e89e6b66ed37196"
+      "sha256": "4e6b0cce46cf305fd5804ca6a24a0bffcbc1650ac32a8089a57babc99490a547"
     },
     {
       "source": "contracts/device_foundation/v1/common/schemas.schema.json",
       "target": "tests/fixtures/device_foundation_v1/common.schemas.schema.json",
-      "sha256": "b26744468c93aab7072a67f87912d25a59d423594578303cea178fea14db7433"
+      "sha256": "e5770cd2c12b288415c055a51cee2a4bd813f4bd7d9f0675f6a43c30e8f27b72"
     },
     {
       "source": "contracts/device_foundation/v1/admission/schemas.schema.json",
@@ -95,6 +95,26 @@
       "source": "contracts/device_foundation/v1/golden/device-control-configuration-response.json",
       "target": "tests/fixtures/device_foundation_v1/device-control-configuration-response.json",
       "sha256": "b2603b081e9eb91ff48bcafb865200479fc6490d71e8cb6ec9a8ca2795cbf8c3"
+    },
+    {
+      "source": "contracts/device_foundation/v1/golden/setup-qr-payload.json",
+      "target": "tests/fixtures/device_foundation_v1/setup-qr-payload.json",
+      "sha256": "9da0934602d36123ec9f6f44c22ba0d20cf1da3eeeac4b93a5bb138a92de8764"
+    },
+    {
+      "source": "contracts/device_foundation/v1/golden/setup-code-verifier.json",
+      "target": "tests/fixtures/device_foundation_v1/setup-code-verifier.json",
+      "sha256": "fe4cf7f6d7d13f365eb271f7afe7fc8ea7e97e52e83e3f233f8603cdfa8403dc"
+    },
+    {
+      "source": "contracts/device_foundation/v1/golden/protocomm-endpoint-chunking.json",
+      "target": "tests/fixtures/device_foundation_v1/protocomm-endpoint-chunking.json",
+      "sha256": "c77625044c7ac5b320797628206f15b3d919516b57992a4d262211180c80b029"
+    },
+    {
+      "source": "contracts/device_foundation/v1/golden/ble-provisioning-transport.json",
+      "target": "tests/fixtures/device_foundation_v1/ble-provisioning-transport.json",
+      "sha256": "0620e13bd1695443d92b0f6c5f208c2f162f69a00214169622b75dfd7d18c9c3"
     }
   ]
 }

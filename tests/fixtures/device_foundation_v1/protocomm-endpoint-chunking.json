@@ -1,0 +1,266 @@
+{
+  "vector_id": "DF-PROTOCOMM-ENDPOINT-CHUNKING-001",
+  "magic_hex": "e1d0",
+  "version": 1,
+  "header_bytes": 16,
+  "header_layout": ">2sBBHHII magic,version,op|status,transfer_id,length,total,offset",
+  "max_frame_bytes": 448,
+  "max_chunk_bytes": 432,
+  "security2_tag_bytes": 16,
+  "request_limits": {
+    "eidolon-descriptor": 64,
+    "eidolon-status": 64,
+    "eidolon-terminal-ack": 1024,
+    "eidolon-trust": 16384
+  },
+  "ops": {
+    "PUT": 1,
+    "GET": 2,
+    "ABORT": 3
+  },
+  "statuses": {
+    "CONTINUE": 0,
+    "READY": 1,
+    "PENDING": 2,
+    "DATA": 3,
+    "MALFORMED": 128,
+    "SEQUENCE": 129,
+    "TOO_LARGE": 130,
+    "BUSY": 131,
+    "UNKNOWN_TRANSFER": 132,
+    "UNSUPPORTED_VERSION": 133
+  },
+  "framed_endpoints": [
+    "eidolon-descriptor",
+    "eidolon-status",
+    "eidolon-terminal-ack",
+    "eidolon-trust"
+  ],
+  "never_framed_endpoints": [
+    "proto-ver",
+    "prov-config",
+    "prov-ctrl",
+    "prov-scan",
+    "prov-session"
+  ],
+  "exchanges": {
+    "descriptor": {
+      "endpoint": "eidolon-descriptor",
+      "request_utf8": "{}",
+      "response_utf8": "{\"descriptor\":{\"filler\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}",
+      "pending_polls": 0,
+      "steps": [
+        {
+          "request_hex": "e1d001010001000200000002000000007b7d",
+          "response_hex": "e1d00101000100000000038400000000"
+        },
+        {
+          "request_hex": "e1d00102000101b00000000000000000",
+          "response_hex": "e1d00103000101b000000384000000007b2264657363726970746f72223a7b2266696c6c6572223a202278787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878"
+        },
+        {
+          "request_hex": "e1d00102000101b000000000000001b0",
+          "response_hex": "e1d00103000101b000000384000001b0787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878"
+        },
+        {
+          "request_hex": "e1d00102000101b00000000000000360",
+          "response_hex": "e1d0010300010024000003840000036078787878787878787878787878787878787878787878787878787878787878787878787d"
+        }
+      ]
+    },
+    "trust": {
+      "endpoint": "eidolon-trust",
+      "request_utf8": "{\"owner_domain_descriptor\":{\"filler\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}",
+      "response_utf8": "{\"outcome\":\"staged\"}",
+      "pending_polls": 2,
+      "steps": [
+        {
+          "request_hex": "e1d00101000701b0000003e8000000007b226f776e65725f646f6d61696e5f64657363726970746f72223a7b2266696c6c6572223a2022787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878",
+          "response_hex": "e1d001000007000000000000000001b0"
+        },
+        {
+          "request_hex": "e1d00101000701b0000003e8000001b0787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878",
+          "response_hex": "e1d00100000700000000000000000360"
+        },
+        {
+          "request_hex": "e1d0010100070088000003e8000003607878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787d",
+          "response_hex": "e1d00102000700fa0000000000000000"
+        },
+        {
+          "request_hex": "e1d00102000701b00000000000000000",
+          "response_hex": "e1d00102000700fa0000000000000000"
+        },
+        {
+          "request_hex": "e1d00102000701b00000000000000000",
+          "response_hex": "e1d001030007001400000014000000007b226f7574636f6d65223a22737461676564227d"
+        },
+        {
+          "request_hex": "e1d00102000701b00000000000000000",
+          "response_hex": "e1d00184000700000000000000000000"
+        }
+      ]
+    },
+    "narrow_reader": {
+      "endpoint": "eidolon-status",
+      "request_utf8": "{}",
+      "response_utf8": "{\"state\":\"committed\"}",
+      "pending_polls": 0,
+      "steps": [
+        {
+          "request_hex": "e1d001010003000200000002000000007b7d",
+          "response_hex": "e1d00101000300000000001500000000"
+        },
+        {
+          "request_hex": "e1d00102000300080000000000000000",
+          "response_hex": "e1d001030003000800000015000000007b22737461746522"
+        },
+        {
+          "request_hex": "e1d00102000300080000000000000008",
+          "response_hex": "e1d001030003000800000015000000083a22636f6d6d6974"
+        },
+        {
+          "request_hex": "e1d00102000300080000000000000010",
+          "response_hex": "e1d00103000300050000001500000010746564227d"
+        }
+      ]
+    },
+    "abort": {
+      "endpoint": "eidolon-trust",
+      "request_utf8": "{\"a\":1}",
+      "response_utf8": "{\"ok\":true}",
+      "pending_polls": 0,
+      "steps": [
+        {
+          "request_hex": "e1d00101000900040000000d000000007b226122",
+          "response_hex": "e1d00100000900000000000000000004"
+        },
+        {
+          "request_hex": "e1d00103000900000000000000000000",
+          "response_hex": "e1d00100000900000000000000000000"
+        },
+        {
+          "request_hex": "e1d00101000a000700000007000000007b2261223a317d",
+          "response_hex": "e1d00101000a00000000000b00000000"
+        },
+        {
+          "request_hex": "e1d00102000a01b00000000000000000",
+          "response_hex": "e1d00103000a000b0000000b000000007b226f6b223a747275657d"
+        }
+      ]
+    }
+  },
+  "refused": [
+    {
+      "endpoint": "eidolon-status",
+      "request_utf8": "{}",
+      "response_utf8": "{}",
+      "pending_polls": 0,
+      "steps": [
+        {
+          "request_hex": "e1d002010002000200000002000000007b7d",
+          "response_hex": "e1d00185000000000000000000000000"
+        }
+      ],
+      "name": "unsupported-version"
+    },
+    {
+      "endpoint": "eidolon-status",
+      "request_utf8": "{}",
+      "response_utf8": "{}",
+      "pending_polls": 0,
+      "steps": [
+        {
+          "request_hex": "e1d001010000000200000002000000007b7d",
+          "response_hex": "e1d00180000000000000000000000000"
+        }
+      ],
+      "name": "transfer-id-zero"
+    },
+    {
+      "endpoint": "eidolon-status",
+      "request_utf8": "{}",
+      "response_utf8": "{}",
+      "pending_polls": 0,
+      "steps": [
+        {
+          "request_hex": "e1d001010002000300000002000000007b7d",
+          "response_hex": "e1d00180000200000000000000000000"
+        }
+      ],
+      "name": "length-mismatch"
+    },
+    {
+      "endpoint": "eidolon-status",
+      "request_utf8": "{}",
+      "response_utf8": "{}",
+      "pending_polls": 0,
+      "steps": [
+        {
+          "request_hex": "e1d001010002000200000041000000007b7d",
+          "response_hex": "e1d00182000200000000000000000000"
+        }
+      ],
+      "name": "request-over-limit"
+    },
+    {
+      "endpoint": "eidolon-trust",
+      "request_utf8": "{}",
+      "response_utf8": "{}",
+      "pending_polls": 0,
+      "steps": [
+        {
+          "request_hex": "e1d00101000200040000000c000000007b226162",
+          "response_hex": "e1d00100000200000000000000000004"
+        },
+        {
+          "request_hex": "e1d00101000200040000000c00000008223a317d",
+          "response_hex": "e1d00181000200000000000000000000"
+        }
+      ],
+      "name": "out-of-order-offset"
+    },
+    {
+      "endpoint": "eidolon-status",
+      "request_utf8": "{}",
+      "response_utf8": "{}",
+      "pending_polls": 0,
+      "steps": [
+        {
+          "request_hex": "e1d00102000501b00000000000000000",
+          "response_hex": "e1d00184000500000000000000000000"
+        }
+      ],
+      "name": "get-unknown-transfer"
+    },
+    {
+      "endpoint": "eidolon-trust",
+      "request_utf8": "{}",
+      "response_utf8": "{}",
+      "pending_polls": 0,
+      "steps": [
+        {
+          "request_hex": "e1d00101000200040000000c000000007b226162",
+          "response_hex": "e1d00100000200000000000000000004"
+        },
+        {
+          "request_hex": "e1d001010003000200000002000000007b7d",
+          "response_hex": "e1d00183000300000000000000000000"
+        }
+      ],
+      "name": "second-transfer-while-busy"
+    },
+    {
+      "endpoint": "eidolon-status",
+      "request_utf8": "{}",
+      "response_utf8": "{}",
+      "pending_polls": 0,
+      "steps": [
+        {
+          "request_hex": "e1d00101",
+          "response_hex": "e1d00180000000000000000000000000"
+        }
+      ],
+      "name": "frame-shorter-than-header"
+    }
+  ]
+}

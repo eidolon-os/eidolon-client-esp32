@@ -915,6 +915,65 @@
         }
       }
     },
+    "SetupQrPayload": {
+      "description": "What the QR code on a device's own screen says while a setup window is open. The keys are Espressif's, so vendor tools can read it; `pop` is the per-window SRP password the device drew and shows as eight digits. Reading the screen is the physical-presence proof, so nothing else carries this code.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ver",
+        "name",
+        "username",
+        "pop",
+        "transport",
+        "security"
+      ],
+      "properties": {
+        "ver": {
+          "const": "v1"
+        },
+        "name": {
+          "description": "The name the device advertises: its BLE device name or its SoftAP SSID.",
+          "type": "string",
+          "minLength": 9,
+          "maxLength": 32,
+          "pattern": "^eidolon-[a-z0-9][a-z0-9.-]*$"
+        },
+        "username": {
+          "const": "eidolon-setup"
+        },
+        "pop": {
+          "type": "string",
+          "pattern": "^[0-9]{8}$"
+        },
+        "transport": {
+          "enum": [
+            "ble",
+            "softap"
+          ]
+        },
+        "security": {
+          "const": 2
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "transport": {
+                "const": "ble"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "name": {
+                "maxLength": 29
+              }
+            }
+          }
+        }
+      ]
+    },
     "CommissioningProfile": {
       "type": "object",
       "additionalProperties": false,

@@ -3,6 +3,7 @@
 #ifndef EIDOLON_DEVICE_FOUNDATION_V1_GENERATED_H_
 #define EIDOLON_DEVICE_FOUNDATION_V1_GENERATED_H_
 
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <optional>
@@ -156,6 +157,102 @@ struct SetupDescriptor {
     // powered off, and so has no duration to name.
     std::optional<SetupWindowRemainingSeconds> expires_in;
     SetupDescriptorTrust trust = SetupDescriptorTrust::DevelopmentTofu;
+};
+
+// What the QR code on a device's own screen says while a setup window is open.
+// The keys are Espressif's; `pop` is the eight-digit SRP password the device drew
+// for this window. A producer writes the keys in this (sorted) order so its bytes
+// can be compared with the golden vector, which is what turns "a key the phone
+// does not know" into a red test rather than a code no phone can read.
+enum class SetupQrTransport {
+    Ble,
+    SoftAp,
+};
+
+inline constexpr const char* SetupQrTransportWireValue(SetupQrTransport transport) {
+    return transport == SetupQrTransport::Ble ? "ble" : "softap";
+}
+
+struct SetupQrPayloadKeys {
+    static constexpr const char* kName = "name";
+    static constexpr const char* kPop = "pop";
+    static constexpr const char* kSecurity = "security";
+    static constexpr const char* kTransport = "transport";
+    static constexpr const char* kUsername = "username";
+    static constexpr const char* kVer = "ver";
+};
+
+struct SetupQrPayload {
+    static constexpr const char* kVersion = "v1";
+    static constexpr const char* kUsername = "eidolon-setup";
+    static constexpr int kSecurity = 2;
+    static constexpr std::size_t kCodeDigits = 8;
+    static constexpr std::size_t kBleNameMaxBytes = 29;
+    std::string name;
+    std::string pop;
+    SetupQrTransport transport = SetupQrTransport::Ble;
+};
+
+// The SRP-6a rule behind a setup code (RFC 5054 3072-bit group, g = 5, SHA-512,
+// x = SHA-512(salt || SHA-512(username ":" password)), v = g^x mod N). A salt
+// whose first byte is zero is not a salt: Espressif's clients drop that byte when
+// they turn the salt into a number, so one handshake in 256 would fail for a
+// reason neither end could see.
+struct SetupCodeVerifierRule {
+    static constexpr std::size_t kSaltBytes = 16;
+    static constexpr std::size_t kVerifierBytes = 384;
+    static constexpr unsigned kGenerator = 5;
+};
+
+// The BLE setup transport, as a controller finds and trusts it.
+struct BleProvisioningTransport {
+    // Little-endian, as ESP-IDF takes a 128-bit UUID. Bytes 12 and 13 are left
+    // zero: the provisioning manager writes each endpoint's id there.
+    static constexpr std::uint8_t kServiceUuid[16] = {
+        0xe4, 0xe4, 0x85, 0x3c, 0x00, 0xaa, 0x45, 0xb7,
+        0x47, 0x44, 0xbe, 0x68, 0x00, 0x00, 0x66, 0x3a,
+    };
+    static constexpr std::size_t kDeviceNameMaxBytes = 29;
+    static constexpr const char* kAppInfoLabel = "eidolon";
+    static constexpr const char* kAppInfoVersion = "1";
+    static constexpr const char* kCapabilityFrames = "frame-v1";
+    static constexpr const char* kCapabilitySetupCode = "setup-code";
+};
+
+// Chunked frames for the Eidolon endpoints, carried in the plaintext of each
+// Security 2 message (golden/protocomm-endpoint-chunking.json). Header, 16 bytes,
+// big-endian: magic(2) version(1) op|status(1) transfer_id(2) length(2) total(4)
+// offset(4).
+struct EndpointFrame {
+    static constexpr std::uint8_t kMagic0 = 0xe1;
+    static constexpr std::uint8_t kMagic1 = 0xd0;
+    static constexpr std::uint8_t kVersion = 1;
+    static constexpr std::size_t kHeaderBytes = 16;
+    static constexpr std::size_t kMaxFrameBytes = 448;
+    static constexpr std::size_t kMaxChunkBytes = kMaxFrameBytes - kHeaderBytes;
+    static constexpr std::size_t kDescriptorRequestLimit = 64;
+    static constexpr std::size_t kStatusRequestLimit = 64;
+    static constexpr std::size_t kTerminalAckRequestLimit = 1024;
+    static constexpr std::size_t kTrustRequestLimit = 16 * 1024;
+};
+
+enum class EndpointFrameOp : std::uint8_t {
+    Put = 0x01,
+    Get = 0x02,
+    Abort = 0x03,
+};
+
+enum class EndpointFrameStatus : std::uint8_t {
+    Continue = 0x00,
+    Ready = 0x01,
+    Pending = 0x02,
+    Data = 0x03,
+    Malformed = 0x80,
+    Sequence = 0x81,
+    TooLarge = 0x82,
+    Busy = 0x83,
+    UnknownTransfer = 0x84,
+    UnsupportedVersion = 0x85,
 };
 
 enum class CommissioningStatusState {
