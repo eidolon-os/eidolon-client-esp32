@@ -23,7 +23,9 @@ readonly BOARD_PATH="esp-box-3"
 readonly BOARD_NAME="esp-box-3"
 readonly BOARD_TARGET="esp32s3"
 readonly BOARD_IDF_VERSION="5.5.4"
-readonly PUBLIC_BUILD_DIR="build/eidolon/esp-box-3"
+# EIDOLON_BUILD_SUFFIX keeps an experimental build out of the shared build
+# directory another checkout user may be flashing from.
+readonly PUBLIC_BUILD_DIR="build/eidolon/esp-box-3${EIDOLON_BUILD_SUFFIX:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"

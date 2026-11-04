@@ -31,7 +31,9 @@ readonly BOARD_IDF_VERSION="6.1"
 # The Korvo-1 console is a CP2102N bridge (schematic), unlike the native
 # USB-JTAG (303a:1001) of the ESP32-S3 boards that share this desk.
 readonly BOARD_USB_BRIDGE="10c4:ea60"
-readonly PUBLIC_BUILD_DIR="build/eidolon/korvo-1"
+# EIDOLON_BUILD_SUFFIX keeps an experimental build out of the shared build
+# directory another checkout user may be flashing from.
+readonly PUBLIC_BUILD_DIR="build/eidolon/korvo-1${EIDOLON_BUILD_SUFFIX:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"

@@ -28,7 +28,9 @@ readonly BOARD_TARGET="esp32s3"
 readonly BOARD_IDF_VERSION="5.5.4"
 # UART0 belongs to the wake chip; the console uses native USB Serial/JTAG.
 readonly BOARD_USB_BRIDGE="303a:1001"
-readonly PUBLIC_BUILD_DIR="build/eidolon/xiaoling"
+# EIDOLON_BUILD_SUFFIX keeps an experimental build out of the shared build
+# directory another checkout user may be flashing from.
+readonly PUBLIC_BUILD_DIR="build/eidolon/xiaoling${EIDOLON_BUILD_SUFFIX:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"

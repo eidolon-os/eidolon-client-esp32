@@ -39,6 +39,9 @@ jobs:
           bash tests/run_waveshare_pmic_tests.sh
           bash tests/run_device_local_erase_bsp_contract_tests.sh
           bash tests/run_device_provisioning_protocol_tests.sh
+          bash tests/run_setup_code_secret_tests.sh
+          bash tests/run_setup_code_card_tests.sh
+          bash tests/run_commissioning_frame_core_tests.sh
           python tests/partition_contract_test.py
 
   boot-and-inbox:
