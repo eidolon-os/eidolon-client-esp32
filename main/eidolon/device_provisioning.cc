@@ -599,6 +599,11 @@ esp_err_t DeviceProvisioningService::Start(
     config.scheme = network_prov_scheme_softap;
     config.scheme_event_handler = NETWORK_PROV_EVENT_HANDLER_NONE;
 #endif
+    // Zero means retry forever on any disconnect reason the manager does not
+    // recognise as a credential failure. A wrong password must end in a
+    // rollback the phone is still there to see.
+    config.network_prov_wifi_conn_cfg.wifi_conn_attempts =
+        CONFIG_EIDOLON_PROVISIONING_WIFI_CONNECT_ATTEMPTS;
     err = network_prov_mgr_init(config);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Provisioning manager did not initialize: %s", esp_err_to_name(err));

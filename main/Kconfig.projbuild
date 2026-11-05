@@ -1376,6 +1376,21 @@ menu "Eidolon Hub"
             For automated bench tests that cannot read the screen. Never in a
             build that leaves the bench: the code is the setup credential.
 
+    config EIDOLON_PROVISIONING_WIFI_CONNECT_ATTEMPTS
+        int "Disconnects before the provisioned Wi-Fi counts as rejected"
+        range 1 10
+        default 4
+        depends on EIDOLON_HUB_MODE
+        help
+            The provisioning manager gives up at once on an authentication
+            failure, a handshake timeout or a missing AP. Any other disconnect
+            reason it retries, forever when no limit is set: a router that
+            answers a wrong password with AUTH_EXPIRE kept the device trying for
+            nine minutes while the phone had long stopped listening. After this
+            many disconnects the attempt is rejected and rolled back like any
+            other, which the phone can still see. On the bench four disconnects
+            took about 27 seconds; the phone waits 60.
+
     config EIDOLON_MDNS_SERVICE_TYPE
         string "mDNS service type (without ._tcp suffix)"
         default "_eidolon-owner"
