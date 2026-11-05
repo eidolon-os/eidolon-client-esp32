@@ -414,6 +414,18 @@ std::string BuildDeviceManifestJson(const std::string& board_name, const DeviceC
         std::string("{\"name\":\"interaction_mode\",\"observable\":false,\"schema\":{\"const\":\"") +
         interaction_mode + "\",\"type\":\"string\"},\"writable\":false}";
 
+    // What this build already does to the microphone before publishing, so the
+    // Host adds only what is missing (eidolon_sdk.biz.audio_input). Echo
+    // cancellation follows the compile-time AFE path; the AFE never runs AGC
+    // (agc_init=false) and the raw path has none, so the Host keeps its own.
+    // Noise suppression depends on an optional model partition found at boot,
+    // so it is left undeclared rather than guessed.
+    if (capabilities.microphone) {
+        properties += std::string(",{\"name\":\"audio.input.aec\",\"observable\":false,\"schema\":{\"const\":\"") +
+            (kDeviceAec ? "device" : "none") + "\",\"type\":\"string\"},\"writable\":false}";
+        properties += ",{\"name\":\"audio.input.agc\",\"observable\":false,\"schema\":{\"const\":\"none\",\"type\":\"string\"},\"writable\":false}";
+    }
+
     // Absence means unsupported. These facts grant no media or identity trust.
     if (capabilities.voiceprint_recognition)
         properties += ",{\"name\":\"recognition.voiceprint\",\"observable\":false,\"schema\":{\"const\":true,\"type\":\"boolean\"},\"writable\":false}";

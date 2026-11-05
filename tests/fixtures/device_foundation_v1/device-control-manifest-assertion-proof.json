@@ -15,16 +15,16 @@
     "manifest_ref": {
       "manifest_id": "esp32-s3-touch-amoled-2.06",
       "revision": 2,
-      "digest": "sha256:31f7d2a97fd3f1980db53c81a0a724cf1451109d9600d99009966301bea64bcc"
+      "digest": "sha256:4c4bf15f95d5e08f6dc003b1fde7569a24465d6e531280959bd134cb56e10097"
     },
     "nonce": "bWFuaWZlc3QtYXNzZXJ0aW9uLW5vbmNl",
     "operation_type": "device-control.manifest-assert"
   },
-  "canonical_utf8": "{\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"manifest_ref\":{\"digest\":\"sha256:31f7d2a97fd3f1980db53c81a0a724cf1451109d9600d99009966301bea64bcc\",\"manifest_id\":\"esp32-s3-touch-amoled-2.06\",\"revision\":2},\"nonce\":\"bWFuaWZlc3QtYXNzZXJ0aW9uLW5vbmNl\",\"operation_type\":\"device-control.manifest-assert\"}",
-  "canonical_sha256": "sha256:28f46876569c5207c6e832280f6b1264c5e50d7d33e38a3a2102fe53a9525251",
+  "canonical_utf8": "{\"device_ref\":{\"claim_generation\":7,\"device_instance_id\":\"device-instance-591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc\",\"owner_domain_generation\":3,\"owner_domain_id\":\"owner-domain_01\",\"trust_epoch\":4},\"manifest_ref\":{\"digest\":\"sha256:4c4bf15f95d5e08f6dc003b1fde7569a24465d6e531280959bd134cb56e10097\",\"manifest_id\":\"esp32-s3-touch-amoled-2.06\",\"revision\":2},\"nonce\":\"bWFuaWZlc3QtYXNzZXJ0aW9uLW5vbmNl\",\"operation_type\":\"device-control.manifest-assert\"}",
+  "canonical_sha256": "sha256:9486bbbc2ca11c730fcb37648a18c4d7ef18f795c5a32fb8464a611bcf0c32a2",
   "public_key_spki": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEtnQCGRdqvyj-Y1o_EBErJSYZ4OmMXMBvHHsrdJXtgy_gDjPYMJ-J5VHTsSCcdKyH1xQb-nYni36ZYVJ-f_82xQ",
   "key_id": "sha256:591d7c62d0bc738376935f77ff2acd5472bbee64207a765df03af6d6240c07dc",
-  "signature": "sKM1HV3SwmoPzHofgV_C1YozghEi0k74EVPR6oA3J0uc7zKVvufT5MmZx4Uh6ofifBV7bqWuTayWQzxZ1uJ8bQ",
+  "signature": "t6JQVJggWa40n6_A9RBR09P4wWc04viHGRbO5J_F-ivyG4w8SWRzjkUSIczxXSJnYMVsNyDQm_wtFc0n1c4Hfw",
   "mutate_each_field_must_fail": [
     "device_ref.claim_generation",
     "device_ref.device_instance_id",
