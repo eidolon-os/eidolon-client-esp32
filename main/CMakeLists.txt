@@ -1109,7 +1109,6 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/commissioning_transaction.cc"
         "eidolon/device_provisioning.cc"
         "eidolon/device_provisioning_protocol.cc"
-        "eidolon/commissioning_frame_core.cc"
         "eidolon/esp_idf_setup_code_secret.cc"
         "eidolon/setup_code_card.cc"
         "eidolon/setup_code_secret.cc"
