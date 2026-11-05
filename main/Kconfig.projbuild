@@ -1353,7 +1353,7 @@ menu "Eidolon Hub"
 
     config EIDOLON_PROVISIONING_SETUP_CODE
         bool "Draw a setup code per window and show it on the screen"
-        default n
+        default y
         depends on EIDOLON_HUB_MODE
         help
             Instead of the shared salt and verifier above, the device draws an
@@ -1363,6 +1363,9 @@ menu "Eidolon Hub"
             is the physical-presence proof. A controller must scan or type the
             code; the development passphrase no longer opens this device.
 
+            On for every board: the pair above is public, so a window keyed
+            with it lets anyone in radio range finish the setup. Turning it
+            off is for isolating a fault on the bench, not a supported build.
             Requires a display. A board without one keeps the pair above.
 
     config EIDOLON_PROVISIONING_LOG_SETUP_CODE

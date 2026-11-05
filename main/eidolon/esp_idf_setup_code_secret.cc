@@ -8,7 +8,11 @@
 #  include <mbedtls/sha512.h>
 #else
 #  include <mbedtls/private/bignum.h>
-#  include <mbedtls/private/sha512.h>
+// Not mbedtls/private/sha512.h: with hardware SHA, ESP-IDF 6 serves SHA-512
+// through its PSA driver and builds no legacy one-shot, so mbedtls_sha512 is
+// declared there but defined nowhere (korvo-1 failed to link once the setup
+// code was on). PSA is the interface mbedtls 4 means to be called.
+#  include <psa/crypto.h>
 #endif
 
 #include <esp_random.h>
@@ -23,7 +27,15 @@ void RandomBytes(std::uint8_t* out, std::size_t length)
 
 bool Sha512(const std::uint8_t* data, std::size_t length, std::array<std::uint8_t, 64>& digest)
 {
+#if EIDOLON_MBEDTLS_LEGACY_PUBLIC
     return mbedtls_sha512(data, length, digest.data(), 0) == 0;
+#else
+    std::size_t written = 0;
+    return psa_crypto_init() == PSA_SUCCESS &&
+           psa_hash_compute(PSA_ALG_SHA_512, data, length, digest.data(), digest.size(),
+                            &written) == PSA_SUCCESS &&
+           written == digest.size();
+#endif
 }
 
 bool ModExp(std::uint32_t generator, const std::uint8_t* exponent, std::size_t exponent_length,

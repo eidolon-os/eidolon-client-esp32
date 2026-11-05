@@ -205,6 +205,8 @@ set_sdkconfig_value() {
 
 sync_existing_sdkconfig() {
   set_sdkconfig_value CONFIG_PARTITION_TABLE_CUSTOM_FILENAME '"partitions/v2/16m_atk_guard.csv"'
+  # The setup code drawn per window and shown on screen (SDK DF-COMM-018/019).
+  set_sdkconfig_value CONFIG_EIDOLON_PROVISIONING_SETUP_CODE y
   # Setup secret. Enforced on an existing sdkconfig too: ESP-IDF does not
   # re-apply changed Kconfig defaults, so a stale config would silently keep
   # an older verifier and the device would fail its first setup handshake.

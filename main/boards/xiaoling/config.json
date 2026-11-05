@@ -5,6 +5,7 @@
             "name": "xiaoling",
             "sdkconfig_append": [
                 "CONFIG_EIDOLON_HUB_MODE=y",
+                "CONFIG_EIDOLON_PROVISIONING_SETUP_CODE=y",
                 "CONFIG_USE_AUDIO_PROCESSOR=n",
                 "CONFIG_USE_SERVER_AEC=n",
                 "CONFIG_EIDOLON_UI_SESSION_BUTTON=y",

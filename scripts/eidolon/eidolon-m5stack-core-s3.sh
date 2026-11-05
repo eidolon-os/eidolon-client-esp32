@@ -381,6 +381,10 @@ ensure_eidolon_trim_sdkconfig() {
   # Full Mozilla bundle costs ~70KB of flash; switch back to FULL for private CA.
   set_sdkconfig_bool MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL n
   set_sdkconfig_bool MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_CMN y
+  # The setup code drawn per window and shown on screen (SDK DF-COMM-018/019);
+  # EIDOLON_SETUP_CODE=n is only for isolating a fault on the bench.
+  set_sdkconfig_bool EIDOLON_PROVISIONING_SETUP_CODE "${EIDOLON_SETUP_CODE:-y}"
+  set_sdkconfig_bool EIDOLON_PROVISIONING_LOG_SETUP_CODE "${EIDOLON_LOG_SETUP_CODE:-n}"
 
   # This toolkit is used mostly while the board is on USB for flash/monitor.
   # Keep product builds unchanged; only script-managed dev builds avoid PMIC
