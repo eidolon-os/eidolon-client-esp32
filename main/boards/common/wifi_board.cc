@@ -370,19 +370,24 @@ void WifiBoard::EnterWifiConfigModeOnApplicationTask() {
     auto state = app.GetDeviceState();
 
 #if CONFIG_EIDOLON_HUB_MODE
+    // In HUB_MODE every permitted state does the same thing — hand the act to
+    // the commissioning actor — so one rule decides it, and that rule is pinned
+    // by tests rather than spelled out again here.
+    //
+    // It is asked before the physical-presence step, so a press turned away has
+    // consumed nothing, and the refusal goes to the screen: a log line alone
+    // left the person holding a button that appeared to do nothing.
+    if (const char* refusal = eidolon::HubSetupRefusalNotice(state)) {
+        ESP_LOGW(TAG, "Setup refused in device state %d: %s", state, refusal);
+        GetDisplay()->ShowNotification(refusal, 5000);
+        return;
+    }
+
     // This entry point is the physical-presence boundary. Automated no-profile
     // setup and connect timeouts call StartWifiConfigMode directly and cannot
     // consume a signed removal terminal.
     if (!eidolon::DevicePhysicalRecovery::AuthorizeFromPhysicalPresence()) {
         ESP_LOGE(TAG, "Physical recovery transaction did not converge");
-        return;
-    }
-
-    // In HUB_MODE every permitted state does the same thing — hand the act to
-    // the commissioning actor — so one rule decides it, and that rule is pinned
-    // by tests rather than spelled out again here.
-    if (!eidolon::HubDeviceStateAllowsSetupOpen(state)) {
-        ESP_LOGE(TAG, "EnterWifiConfigMode called in device state %d, which cannot open setup", state);
         return;
     }
     StartWifiConfigMode();

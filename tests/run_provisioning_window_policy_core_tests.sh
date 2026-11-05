@@ -10,6 +10,8 @@ output="${TMPDIR:-/tmp}/eidolon_provisioning_window_policy_core_tests"
   -I main \
   tests/provisioning_window_policy_core_test.cc \
   main/eidolon/provisioning_window_policy_core.cc \
+  main/eidolon/eidolon_ui_labels.cc \
+  main/eidolon/ui_state_mapper.cc \
   -o "${output}"
 
 "${output}"

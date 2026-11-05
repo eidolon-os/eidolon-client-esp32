@@ -1,12 +1,20 @@
 #include <cassert>
+#include <cstring>
 #include <optional>
 #include <string>
 
 #include "eidolon/provisioning_window_policy_core.h"
+#include "eidolon/ui_state_mapper.h"
 
 namespace {
 
 using namespace eidolon;
+
+constexpr DeviceState kEveryDeviceState[] = {
+    kDeviceStateUnknown,     kDeviceStateStarting,  kDeviceStateWifiConfiguring,
+    kDeviceStateIdle,        kDeviceStateConnecting, kDeviceStateListening,
+    kDeviceStateSpeaking,    kDeviceStateUpgrading, kDeviceStateActivating,
+    kDeviceStateAudioTesting, kDeviceStateFatalError};
 
 void AnEmptyTrustStoreMeansThisDeviceBelongsToNobodyYet()
 {
@@ -96,6 +104,15 @@ void SetupOpensFromAWorkingDevice()
     assert(HubDeviceStateAllowsSetupOpen(kDeviceStateSpeaking));
 }
 
+// In HUB_MODE "connecting" is not the sub-second audio-channel open it was
+// upstream. The presenter projects every service phase short of Ready onto it,
+// so a device sits there for as long as its Host is gone, and that is exactly
+// when the person in front of it needs to hand it a different network or Host.
+void SetupOpensWhileTheServiceIsStillConnecting()
+{
+    assert(HubDeviceStateAllowsSetupOpen(kDeviceStateConnecting));
+}
+
 // An OTA that is half written is the one thing a setup window must not
 // interrupt, and a device that has not finished deciding what it is has nothing
 // to hand over yet.
@@ -103,9 +120,117 @@ void SetupStaysShutWhereOpeningItWouldBreakSomething()
 {
     assert(!HubDeviceStateAllowsSetupOpen(kDeviceStateUpgrading));
     assert(!HubDeviceStateAllowsSetupOpen(kDeviceStateUnknown));
-    assert(!HubDeviceStateAllowsSetupOpen(kDeviceStateConnecting));
     assert(!HubDeviceStateAllowsSetupOpen(kDeviceStateAudioTesting));
     assert(!HubDeviceStateAllowsSetupOpen(kDeviceStateFatalError));
+}
+
+// The press was the person asking. Turning it away with nothing on screen
+// leaves them holding a button that looks broken; the notice says what is in
+// the way and that trying again later will work.
+void ARefusedPressSaysWhyOnScreen()
+{
+    for (const auto state : kEveryDeviceState) {
+        const char* notice = HubSetupRefusalNotice(state);
+        if (HubDeviceStateAllowsSetupOpen(state)) {
+            assert(notice == nullptr);
+        } else {
+            assert(notice != nullptr && std::strlen(notice) > 0);
+        }
+    }
+    assert(std::strstr(HubSetupRefusalNotice(kDeviceStateUpgrading), "update") != nullptr);
+}
+
+EidolonRuntimeStatus OperationalStatus()
+{
+    EidolonRuntimeStatus status;
+    status.runtime = RuntimePhase::Normal;
+    status.enrollment = EnrollmentPhase::ClaimActive;
+    status.service = ServicePhase::Ready;
+    return status;
+}
+
+// What the presenter writes into DeviceState for a status, starting from a
+// device that was idle — the press arrives after the projection has settled.
+DeviceState SettledLegacyState(const EidolonRuntimeStatus& status)
+{
+    return UiStateProjector::ProjectLegacyDeviceState(status, kDeviceStateIdle);
+}
+
+// Each of these is a screen that offers setup — on BOX-3 by naming the long
+// press, on a touch panel as a setup button — and each one used to be drawn
+// over a DeviceState the gesture refused, so the offer did nothing at all.
+void EveryScreenThatOffersSetupCanOpenIt()
+{
+    // Wi-Fi went away under an idle device. The voice controller's network_lost
+    // projects service Reconnecting, and the screen says "Looking for saved
+    // Wi-Fi. Hold BOOT to change network".
+    auto wifi_lost = OperationalStatus();
+    wifi_lost.runtime = RuntimePhase::NetworkScanning;
+    wifi_lost.runtime_detail = "Looking for saved Wi-Fi. Hold BOOT to change network";
+    wifi_lost.service = ServicePhase::Reconnecting;
+    assert(UiStateProjector::AllowsIntent(wifi_lost, UiIntent::OpenSetup));
+    assert(SettledLegacyState(wifi_lost) == kDeviceStateConnecting);
+    assert(HubDeviceStateAllowsSetupOpen(SettledLegacyState(wifi_lost)));
+
+    // The Host restarted, moved or was reinstalled: Wi-Fi is fine, the
+    // operational channel is not, for as long as the Host stays away.
+    auto host_gone = OperationalStatus();
+    host_gone.service = ServicePhase::Reconnecting;
+    assert(UiStateProjector::AllowsIntent(host_gone, UiIntent::OpenSetup));
+    assert(HubDeviceStateAllowsSetupOpen(SettledLegacyState(host_gone)));
+
+    // The first control-room join after boot.
+    auto first_join = OperationalStatus();
+    first_join.service = ServicePhase::Connecting;
+    assert(HubDeviceStateAllowsSetupOpen(SettledLegacyState(first_join)));
+
+    // A conversation that failed is also projected as connecting.
+    auto failed = OperationalStatus();
+    failed.service = ServicePhase::Fault;
+    failed.conversation = ConversationPhase::Failed;
+    assert(UiStateProjector::AllowsIntent(failed, UiIntent::OpenSetup));
+    assert(HubDeviceStateAllowsSetupOpen(SettledLegacyState(failed)));
+}
+
+// The same rule over every combination the projector can be handed: wherever it
+// lets setup be asked for, whatever the presenter makes of DeviceState from a
+// resting state is one the gesture accepts.
+void NoProjectedStateOffersSetupThatTheGestureRefuses()
+{
+    const RuntimePhase runtimes[] = {
+        RuntimePhase::Booting, RuntimePhase::LoadingAssets,
+        RuntimePhase::NetworkScanning, RuntimePhase::NetworkConnecting,
+        RuntimePhase::Commissioning, RuntimePhase::Normal, RuntimePhase::Updating,
+        RuntimePhase::RecoveryRequired, RuntimePhase::Fault};
+    const ServicePhase services[] = {
+        ServicePhase::Unavailable, ServicePhase::DiscoveringAuthority,
+        ServicePhase::Registering, ServicePhase::Preparing, ServicePhase::Ready,
+        ServicePhase::Connecting, ServicePhase::Reconnecting,
+        ServicePhase::Unreachable, ServicePhase::Fault};
+    const ConversationPhase conversations[] = {
+        ConversationPhase::Closed, ConversationPhase::Opening,
+        ConversationPhase::Active, ConversationPhase::Reconnecting,
+        ConversationPhase::Ended, ConversationPhase::Failed};
+    // Upgrading is the Application's to enter and leave; nothing projects it.
+    const DeviceState resting[] = {
+        kDeviceStateStarting, kDeviceStateActivating, kDeviceStateWifiConfiguring,
+        kDeviceStateIdle, kDeviceStateConnecting, kDeviceStateListening,
+        kDeviceStateSpeaking};
+    for (const auto runtime : runtimes) {
+        for (const auto service : services) {
+            for (const auto conversation : conversations) {
+                EidolonRuntimeStatus status = OperationalStatus();
+                status.runtime = runtime;
+                status.service = service;
+                status.conversation = conversation;
+                if (!UiStateProjector::AllowsIntent(status, UiIntent::OpenSetup)) continue;
+                for (const auto current : resting) {
+                    assert(HubDeviceStateAllowsSetupOpen(
+                        UiStateProjector::ProjectLegacyDeviceState(status, current)));
+                }
+            }
+        }
+    }
 }
 
 }  // namespace
@@ -120,6 +245,10 @@ int main()
     SetupOpensFromEveryStateAFailedActivationCanLeaveTheDeviceIn();
     ShortClickKeepsItsSetupMeaningAsBootAdvances();
     SetupOpensFromAWorkingDevice();
+    SetupOpensWhileTheServiceIsStillConnecting();
     SetupStaysShutWhereOpeningItWouldBreakSomething();
+    ARefusedPressSaysWhyOnScreen();
+    EveryScreenThatOffersSetupCanOpenIt();
+    NoProjectedStateOffersSetupThatTheGestureRefuses();
     return 0;
 }

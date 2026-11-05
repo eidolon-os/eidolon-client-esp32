@@ -88,10 +88,24 @@ AdvertisedWindowSeconds(const ProvisioningWindowPolicy& policy);
 // but an NVS erase, and an NVS erase mints a new device identity, so the device
 // the Owner removed is gone rather than reclaimed.
 //
+// kDeviceStateConnecting does not mean a sub-second audio-channel open either,
+// which is what it meant upstream and why it was first refused here. The
+// presenter projects every service phase short of Ready onto it — the first
+// control-room join, a Host that restarted or moved, Wi-Fi that went away, a
+// conversation that failed — so a device can sit in it indefinitely, on a
+// screen that says "Hold BOOT to change network". Nothing in flight there is
+// durable: the commissioning actor quiesces the voice runtime and takes the
+// radio before it advertises, as it does from idle.
+//
 // Upgrading and the transient states stay refused: an OTA must not be
 // interrupted, and a device that has not finished deciding what it is has
 // nothing to hand over yet.
 bool HubDeviceStateAllowsSetupOpen(DeviceState state);
+
+// What the screen says when the gesture is turned away: why, and that the same
+// press will work once that has passed. Null exactly when setup may open, so a
+// refusal cannot be added without something to say.
+const char* HubSetupRefusalNotice(DeviceState state);
 
 // A short setup-button click stays useful after boot has advanced into
 // activation or recovery. Operational states retain their chat action.

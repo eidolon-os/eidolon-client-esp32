@@ -52,22 +52,32 @@ bool HubSetupButtonClickOpensSetup(DeviceState state)
 
 bool HubDeviceStateAllowsSetupOpen(DeviceState state)
 {
+    return HubSetupRefusalNotice(state) == nullptr;
+}
+
+const char* HubSetupRefusalNotice(DeviceState state)
+{
     switch (state) {
     case kDeviceStateIdle:
+    case kDeviceStateConnecting:
     case kDeviceStateListening:
     case kDeviceStateSpeaking:
     case kDeviceStateStarting:
     case kDeviceStateActivating:
     case kDeviceStateWifiConfiguring:
-        return true;
-    case kDeviceStateUnknown:
-    case kDeviceStateConnecting:
+        return nullptr;
     case kDeviceStateUpgrading:
+        return "Setup cannot open during an update. Try again when it finishes";
+    case kDeviceStateUnknown:
+        return "Still starting. Try again in a moment";
     case kDeviceStateAudioTesting:
+        return "Audio test running. Try again when it ends";
     case kDeviceStateFatalError:
-        return false;
+        break;
     }
-    return false;
+    // A fault, or a state this core does not name: refused, and a restart is
+    // the way back to one that is not.
+    return "This device stopped on a fault. Restart it, then try again";
 }
 
 }  // namespace eidolon

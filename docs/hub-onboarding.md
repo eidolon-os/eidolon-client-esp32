@@ -51,6 +51,14 @@ state_revision 拒绝迟到投影，连接恢复按 generation 与连接边沿�
 AuthorityLocator 与通道恢复流程。Idle 只说明配置资源已释放；已就绪仍要求网络、
 准入与业务 transport 的真实就绪证据。
 
+不断电、运行中失去 Wi-Fi 或主机时走同一个手势。此时 presenter 把服务 Connecting /
+Reconnecting、会话 Opening / Failed 都投影成 `DeviceState` connecting，屏幕同样提示
+长按 BOOT，所以 connecting 必须能开窗。它曾沿用上游的拒绝，那里 connecting 只是亚秒级的
+音频通道建立；在 HUB_MODE 里它可以无限持续。开窗时配置 actor 先静止语音运行时再取无线电，
+与从 idle 开窗相同。仍拒绝的状态（升级中等）在屏幕上说明原因与何时再试；状态判定先于
+物理恢复，被拒的长按不消耗任何东西。`run_provisioning_window_policy_core_tests.sh`
+核对投影器提供配网入口的每种状态组合，其投影出的 `DeviceState` 都能开窗。
+
 ## 身份准备与手机端配合
 
 继续使用现有 `eidolon-trust` 自定义配置 endpoint、已有物理开窗和认证会话。
