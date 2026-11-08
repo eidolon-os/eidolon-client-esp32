@@ -84,6 +84,7 @@ private:
     void InitializeButtons() {
 #if CONFIG_EIDOLON_HUB_MODE
         eidolon::SetEidolonSetupHandler([this]() { EnterWifiConfigMode(); });
+        eidolon::SetEidolonSetupGesture("Hold BOOT");
         eidolon::SetEidolonButtonAvailable(eidolon::UiInputSource::SessionButton,true,"BOOT");
 #endif
         boot_button_.OnClick([this]() {
@@ -105,14 +106,10 @@ private:
 #endif
         });
 
-        // Long-press also opens setup from an operational device.
-        // The board adapter owns the gesture; the common Wi-Fi/Owner
-        // provisioning service continues to own the bounded setup act itself.
-        boot_button_.OnLongPress([this]() {
-            Application::GetInstance().Schedule([this]() {
-                EnterWifiConfigMode();
-            });
-        });
+        // Long-press opens setup from an operational device, and closes the
+        // setup that is open. The board adapter owns the gesture; the common
+        // Wi-Fi/Owner provisioning service owns the setup act itself.
+        boot_button_.OnLongPress([this]() { ToggleWifiConfigMode(); });
     }
 
     esp_lcd_touch_config_t CreateTouchConfig(bool tt21100) {

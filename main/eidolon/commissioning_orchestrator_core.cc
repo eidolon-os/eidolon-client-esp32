@@ -227,7 +227,6 @@ std::vector<CommissioningAction> CommissioningOrchestratorCore::Handle(
         }
         break;
     case CommissioningEventType::TerminalDeliveryExpired:
-    case CommissioningEventType::WindowExpired:
     case CommissioningEventType::CancelRequested:
         report_failure_ = false;
         if (state_ == CommissioningRuntimeState::RestoringPreviousMode &&

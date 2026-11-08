@@ -20,6 +20,8 @@
 #include "eidolon/commissioning_runtime.h"
 #include "eidolon/eidolon_device_store.h"
 #include "eidolon/eidolon_ui_presenter.h"
+#include "eidolon/eidolon_view.h"
+#include "eidolon/provisioning_window_policy_core.h"
 #if CONFIG_EIDOLON_GUARD_SERVICE
 #include "eidolon/guard/guard_service.h"
 #endif
@@ -269,6 +271,22 @@ void Application::PttRelease()
     });
 }
 
+void Application::CancelSetupAtDevice()
+{
+    auto& runtime = eidolon::CommissioningRuntime::GetInstance();
+    // Only a window offered to a phone closes here. Starting, applying a
+    // network or already closing, the press does nothing, and says so.
+    if (!eidolon::SetupWindowIsOffered(runtime.VisibleState())) {
+        Board::GetInstance().GetDisplay()->ShowNotification(
+            "Setup is busy. Try again in a moment", 3000);
+        return;
+    }
+    ESP_LOGI(TAG, "Setup cancelled at the device");
+    if (!runtime.RequestCancel()) {
+        ESP_LOGE(TAG, "Commissioning runtime did not accept the cancel");
+    }
+}
+
 #if CONFIG_EIDOLON_WAKE_WORD_ENABLE
 void Application::StartEidolonWakeWord()
 {
@@ -397,14 +415,19 @@ void Application::Initialize() {
                 // The code is shown only while the window it was drawn for is
                 // open, and taken down in every other state.
                 auto* display = Board::GetInstance().GetDisplay();
-                const bool offering = snapshot.state == State::Advertising ||
-                                      snapshot.state == State::SessionActive;
-                if (offering && snapshot.setup_code) {
+                if (eidolon::SetupWindowIsOffered(snapshot.state) && snapshot.setup_code) {
+                    // A touch screen gets Cancel on the code itself: the tap
+                    // that opened setup lands on a view the code now covers.
+                    std::function<void()> cancel;
+                    if (eidolon::CurrentUiInputProfile().Has(eidolon::UiInputSource::Touch)) {
+                        cancel = [this]() { Schedule([this]() { CancelSetupAtDevice(); }); };
+                    }
                     display->ShowSetupCode(SetupCodeScreen{
                         snapshot.setup_code->qr_json,
                         snapshot.setup_code->code,
                         snapshot.setup_code->advertised_name,
                         {},
+                        std::move(cancel),
                     });
                 } else {
                     display->HideSetupCode();
@@ -427,7 +450,8 @@ void Application::Initialize() {
                     break;
                 case State::RecoveringConfiguration:
                     SetEidolonRuntimeUi(eidolon::RuntimePhase::RecoveryRequired,
-                        "Configuration recovery blocked. Hold BOOT to retry setup");
+                        "Configuration recovery blocked. " +
+                            eidolon::EidolonSetupHint("retry setup"));
                     break;
                 case State::ApplyingConfiguration:
                     SetEidolonRuntimeUi(
@@ -459,7 +483,8 @@ void Application::Initialize() {
                         HandleNetworkDisconnectedEvent();
                         SetEidolonRuntimeUi(
                             eidolon::RuntimePhase::NetworkScanning,
-                            "Returning to saved Wi-Fi. Hold BOOT to change network");
+                            "Returning to saved Wi-Fi. " +
+                                eidolon::EidolonSetupHint("change network"));
                     } else {
                         // The only screen an Owner has after a setup window
                         // closes. "Closed" alone made a device that was merely
@@ -468,7 +493,7 @@ void Application::Initialize() {
                         // the way out of it are said together.
                         SetEidolonRuntimeUi(
                             eidolon::RuntimePhase::Commissioning,
-                            "Setup closed - long-press BOOT to reopen");
+                            "Setup closed. " + eidolon::EidolonSetupHint("reopen it"));
                     }
                     break;
                 }
@@ -660,7 +685,8 @@ void Application::HandleNetworkEvent(NetworkEvent event, const std::string& data
 #if CONFIG_EIDOLON_HUB_MODE
             HandleNetworkDisconnectedEvent();
             SetEidolonRuntimeUi(eidolon::RuntimePhase::NetworkScanning,
-                                "Looking for saved Wi-Fi. Hold BOOT to change network");
+                                "Looking for saved Wi-Fi. " +
+                                    eidolon::EidolonSetupHint("change network"));
 #else
             display->ShowNotification(Lang::Strings::SCANNING_WIFI, 30000);
             xEventGroupSetBits(event_group_, MAIN_EVENT_NETWORK_DISCONNECTED);

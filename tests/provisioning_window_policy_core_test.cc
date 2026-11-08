@@ -1,6 +1,5 @@
 #include <cassert>
 #include <cstring>
-#include <optional>
 #include <string>
 
 #include "eidolon/provisioning_window_policy_core.h"
@@ -48,23 +47,23 @@ void ACommissionedDeviceMayNotOpenAWindowBecauseItsNetworkWentAway()
         ProvisioningWindowTrigger::OwnerPresenceReopen));
 }
 
-void AuthorizedWindowsRemainAvailableWithoutAnAdvertisedDeadline()
+// The code is shown, and the gesture that opened setup closes it, only while a
+// phone is being offered the window: closing one mid-apply would roll back what
+// the phone is about to be told is done, and a window still starting or
+// already closing has nothing to close.
+void OnlyAWindowOfferedToAPhoneShowsItsCodeOrCloses()
 {
-    for (const auto trigger : {ProvisioningWindowTrigger::NeverCommissioned,
-                               ProvisioningWindowTrigger::OwnerPresenceReopen}) {
-        const auto policy = DecideProvisioningWindow(trigger);
-        assert(!policy.bounded);
-        assert(policy.seconds == 0);
-        assert(!AdvertisedWindowSeconds(policy).has_value());
+    using State = CommissioningRuntimeState;
+    for (const auto state : {State::Advertising, State::SessionActive}) {
+        assert(SetupWindowIsOffered(state));
     }
-    // An indefinite manual window must not enable automatic reopening.
-    assert(AutomaticSetupOpenIsForbidden(ProvisioningWindowTrigger::OwnerPresenceReopen));
-}
-
-void ExplicitBoundedWireDurationsStillRequirePositiveSeconds()
-{
-    assert(AdvertisedWindowSeconds({true, 60})->seconds() == 60);
-    assert(!AdvertisedWindowSeconds({true, 0}).has_value());
+    for (const auto state :
+         {State::Idle, State::PreparingIdentity, State::QuiescingOperationalRuntime,
+          State::AcquiringRadio, State::StartingTransport,
+          State::ApplyingConfiguration, State::RecoveringConfiguration,
+          State::ReturningToPreviousMode, State::RestoringPreviousMode}) {
+        assert(!SetupWindowIsOffered(state));
+    }
 }
 
 // The state a removed device is parked in must be able to open setup, or the
@@ -240,8 +239,7 @@ int main()
     AnEmptyTrustStoreMeansThisDeviceBelongsToNobodyYet();
     ADeviceNobodyHasClaimedYetStillOpensItsOwnWindow();
     ACommissionedDeviceMayNotOpenAWindowBecauseItsNetworkWentAway();
-    AuthorizedWindowsRemainAvailableWithoutAnAdvertisedDeadline();
-    ExplicitBoundedWireDurationsStillRequirePositiveSeconds();
+    OnlyAWindowOfferedToAPhoneShowsItsCodeOrCloses();
     SetupOpensFromEveryStateAFailedActivationCanLeaveTheDeviceIn();
     ShortClickKeepsItsSetupMeaningAsBootAdvances();
     SetupOpensFromAWorkingDevice();

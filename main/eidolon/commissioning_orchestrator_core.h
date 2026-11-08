@@ -47,7 +47,6 @@ enum class CommissioningEventType {
     CommissioningTransactionRolledBack,
     ControllerObservedTerminal,
     TerminalDeliveryExpired,
-    WindowExpired,
     CancelRequested,
     TransportStopped,
     PreviousModeRestored,

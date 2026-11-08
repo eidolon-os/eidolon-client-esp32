@@ -7,6 +7,9 @@
 #include "i2c_device.h"
 #include "led/single_led.h"
 #include "esp32_camera.h"
+#if CONFIG_EIDOLON_HUB_MODE
+#include "eidolon/eidolon_view.h"
+#endif
 
 #include <esp_log.h>
 #include <esp_lcd_panel_vendor.h>
@@ -128,9 +131,12 @@ private:
         // click during startup made the window last only as long as the device
         // took to reach its Host — about fifteen seconds once the Host answers —
         // so the person who wanted to re-set-up a working device had no way in.
+#if CONFIG_EIDOLON_HUB_MODE
+        eidolon::SetEidolonSetupGesture("Hold BOOT");
+#endif
         boot_button_.OnLongPress([this]() {
-            ESP_LOGI(TAG, "Long press: opening device setup");
-            EnterWifiConfigMode();
+            ESP_LOGI(TAG, "Long press: opening or closing device setup");
+            ToggleWifiConfigMode();
         });
         boot_button_.OnClick([]() { Application::GetInstance().ToggleChatState(); });
         boot_button_.OnDoubleClick([this]() {

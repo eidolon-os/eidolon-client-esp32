@@ -1045,7 +1045,8 @@
               "button",
               "qr_secret",
               "nfc",
-              "trusted_display"
+              "trusted_display",
+              "spoken_code"
             ]
           },
           "uniqueItems": true
@@ -1107,6 +1108,119 @@
             ]
           },
           "uniqueItems": true
+        }
+      }
+    },
+    "SetupModel": {
+      "description": "How a person puts one device model into setup mode and gets its one-time setup code, as the Mobile app tells them. Every model that ships declares one; a model without a declaration has not finished its setup path. The text is the app's own words, in the app's language.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "device_kind",
+        "ssid_model",
+        "manifest_id",
+        "name",
+        "setup_code",
+        "enter",
+        "cancel",
+        "rehear"
+      ],
+      "properties": {
+        "device_kind": {
+          "description": "The model as its setup descriptor names it (`SetupDescriptor.device_kind`). The key of the catalog.",
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9.-]{0,63}$"
+        },
+        "ssid_model": {
+          "description": "The model as its SoftAP name carries it: `eidolon-<ssid_model>-<six hex digits>`. What a phone can read before it connects.",
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9.-]{0,17}$"
+        },
+        "manifest_id": {
+          "description": "The model as its Manifest names it (`ManifestRef.manifest_id`). What the Host's device list carries.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "name": {
+          "description": "The model's name as a person reads it.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "setup_code": {
+          "description": "How the device gives the person its one-time setup code: on its own screen, or spoken aloud.",
+          "enum": [
+            "trusted_display",
+            "spoken_code"
+          ]
+        },
+        "enter": {
+          "description": "The gesture that opens setup mode on a device that is already set up or was removed. A device out of the box opens setup mode at power-on by itself.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "cancel": {
+          "description": "The gesture that closes setup mode at the device.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "rehear": {
+          "description": "The gesture that has a device which speaks its code say it again; null for a device that shows it.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "setup_code": {
+                "const": "spoken_code"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "rehear": {
+                "type": "string"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "rehear": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "SetupModelCatalog": {
+      "description": "Every shipped device model's setup declaration (`models/setup.json`). Firmware refuses an Eidolon build for a board that is not here, and the Mobile app shows these words.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "catalog_version",
+        "models"
+      ],
+      "properties": {
+        "catalog_version": {
+          "const": "1"
+        },
+        "models": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/SetupModel"
+          }
         }
       }
     },

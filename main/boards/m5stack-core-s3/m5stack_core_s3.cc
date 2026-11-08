@@ -241,6 +241,7 @@ private:
     void InitializeFt6336TouchPad() {
 #if CONFIG_EIDOLON_HUB_MODE
         eidolon::SetEidolonSetupHandler([this]() { EnterWifiConfigMode(); });
+        eidolon::SetEidolonSetupGesture("Tap the gear");
         if (!RegisterFtTouchInput(i2c_bus_,DISPLAY_WIDTH,DISPLAY_HEIGHT))
             ESP_LOGE(TAG,"Touch registration failed; screen controls unavailable");
 #else

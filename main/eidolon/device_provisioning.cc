@@ -97,6 +97,10 @@ static_assert(HexLength(CONFIG_EIDOLON_PROVISIONING_VERIFIER_HEX) == 768,
 static_assert(HexLength(CONFIG_EIDOLON_PROVISIONING_SALT_HEX) == 32,
               "CONFIG_EIDOLON_PROVISIONING_SALT_HEX must be a 16-byte salt as hex.");
 
+#if !CONFIG_EIDOLON_PROVISIONING_SETUP_CODE && !CONFIG_EIDOLON_PROVISIONING_BENCH_PUBLIC_PAIR
+#error "Without a per-window setup code this device opens setup with the public development pair, which anyone in radio range can finish. Turn EIDOLON_PROVISIONING_SETUP_CODE back on; only to isolate a fault on the bench, also turn on EIDOLON_PROVISIONING_BENCH_PUBLIC_PAIR."
+#endif
+
 #ifdef CONFIG_EIDOLON_PROVISIONING_MANUFACTURER_BOUND
 static_assert(!StartsWith(CONFIG_EIDOLON_PROVISIONING_VERIFIER_HEX, kDevelopmentVerifierPrefix),
               "A manufacturer-bound build must carry its own SRP6a verifier, not the shared "
@@ -204,7 +208,6 @@ esp_err_t DeviceProvisioningService::HandleDescriptor(uint32_t, const uint8_t*, 
         descriptor.identity_fingerprint = "p256:" + prepared.fingerprint.substr(7);
     }
     descriptor.session_id = self.session_id_;
-    descriptor.expires_in = AdvertisedWindowSeconds(self.window_);
     // This build carries a shared development secret unless it was given a
     // per-device one, and says so rather than letting the controller assume.
 #ifdef CONFIG_EIDOLON_PROVISIONING_MANUFACTURER_BOUND
@@ -526,8 +529,7 @@ esp_err_t DeviceProvisioningService::StartTransport()
 }
 
 esp_err_t DeviceProvisioningService::Start(
-    uint32_t generation, std::string session_id,
-    ProvisioningWindowPolicy window, Events events)
+    uint32_t generation, std::string session_id, Events events)
 {
     if (generation == 0 || session_id.empty()) return ESP_ERR_INVALID_ARG;
     if (running_.load(std::memory_order_acquire) &&
@@ -537,7 +539,6 @@ esp_err_t DeviceProvisioningService::Start(
     if (!resources_.Begin(generation)) return ESP_ERR_INVALID_STATE;
     events_ = std::move(events);
     session_id_ = std::move(session_id);
-    window_ = window;
     transport_generation_.store(generation, std::memory_order_release);
     cleanup_in_progress_.store(false, std::memory_order_release);
     manager_started_.store(false, std::memory_order_release);
@@ -625,74 +626,8 @@ esp_err_t DeviceProvisioningService::Start(
 
     running_.store(true, std::memory_order_release);
 
-    if (!window_.bounded) {
-        ESP_LOGI(TAG, "Awaiting setup indefinitely until completion or cancellation");
-        return ESP_OK;
-    }
-
-    // Arm the window this device is about to advertise. Started only once the
-    // session is up, so a failed start does not leave a timer to fire into
-    // nothing.
-    const esp_timer_create_args_t timer_args = {
-        .callback = &OnWindowElapsed,
-        .arg = nullptr,
-        .dispatch_method = ESP_TIMER_TASK,
-        .name = "prov_window",
-        .skip_unhandled_events = true,
-    };
-    auto* timer = static_cast<esp_timer_handle_t>(window_timer_);
-    if (timer == nullptr) {
-        const esp_err_t created = esp_timer_create(&timer_args, &timer);
-        if (created != ESP_OK) {
-            ESP_LOGE(TAG, "Setup window timer could not be created: %s",
-                     esp_err_to_name(created));
-            timer = nullptr;
-        }
-        window_timer_ = timer;
-        if (timer != nullptr) {
-            resources_.Own(generation,
-                           CommissioningTransportResource::WindowTimer);
-        }
-    }
-    // Both results are checked and said out loud. An unreported failure here is
-    // what let the window stay open for as long as the board stayed powered: the
-    // service announced a bounded offer it was not in fact keeping, and nothing
-    // in the log contradicted it.
-    if (window_timer_ != nullptr) {
-        const esp_err_t armed = esp_timer_start_once(
-            static_cast<esp_timer_handle_t>(window_timer_),
-            static_cast<uint64_t>(window_.seconds) * 1000000ULL);
-        if (armed != ESP_OK) {
-            ESP_LOGE(TAG, "Setup window is not bounded: esp_timer_start_once said %s",
-                     esp_err_to_name(armed));
-            return armed;
-        } else {
-            ESP_LOGI(TAG, "Awaiting setup for %d seconds", window_.seconds);
-        }
-    } else {
-        ESP_LOGE(TAG, "Setup window cannot be bounded");
-        return ESP_ERR_NO_MEM;
-    }
+    ESP_LOGI(TAG, "Awaiting setup until completion or cancellation");
     return ESP_OK;
-}
-
-void DeviceProvisioningService::OnWindowElapsed(void*)
-{
-    auto& self = GetInstance();
-    if (!self.running_.load(std::memory_order_acquire)) {
-        return;
-    }
-    // Say what closed and how to get it back. The Owner is not reading this
-    // log — the projection published through window_expired reaches the panel
-    // they are looking at — but the two must agree, so the gesture is named in
-    // both places rather than left as tribal knowledge.
-    ESP_LOGW(TAG,
-             "Setup window elapsed with nobody claiming this device; "
-             "long-press BOOT to reopen it");
-    if (self.events_.window_expired) {
-        self.events_.window_expired(
-            self.transport_generation_.load(std::memory_order_acquire));
-    }
 }
 
 void DeviceProvisioningService::ReleaseNetifs()
@@ -795,11 +730,6 @@ void DeviceProvisioningService::CleanupTransport(uint32_t generation)
     // Reverse acquisition order. The manager owns all protocomm endpoints and
     // must be completely deinitialized before the external HTTP server or
     // netifs disappear underneath it.
-    if (cleanup.window_timer && window_timer_ != nullptr) {
-        esp_timer_stop(static_cast<esp_timer_handle_t>(window_timer_));
-        esp_timer_delete(static_cast<esp_timer_handle_t>(window_timer_));
-        window_timer_ = nullptr;
-    }
     if (cleanup.provisioning_manager) {
         network_prov_mgr_deinit();
     }

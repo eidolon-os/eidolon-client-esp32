@@ -1,0 +1,85 @@
+{
+  "catalog_version": "1",
+  "models": [
+    {
+      "device_kind": "esp-box-3",
+      "ssid_model": "esp-box-3",
+      "manifest_id": "esp-box-3",
+      "name": "ESP32-S3-BOX-3",
+      "setup_code": "trusted_display",
+      "enter": "按住 BOOT 键约 2 秒。",
+      "cancel": "配网模式中再按住 BOOT 键约 2 秒。",
+      "rehear": null
+    },
+    {
+      "device_kind": "m5stack-core-s3",
+      "ssid_model": "m5stack-core-s3",
+      "manifest_id": "m5stack-core-s3",
+      "name": "M5Stack CoreS3",
+      "setup_code": "trusted_display",
+      "enter": "点屏幕右上角的齿轮。",
+      "cancel": "点设置码画面上的“Cancel”。",
+      "rehear": null
+    },
+    {
+      "device_kind": "m5stack-stackchan",
+      "ssid_model": "m5stack-stackchan",
+      "manifest_id": "m5stack-stackchan",
+      "name": "StackChan",
+      "setup_code": "trusted_display",
+      "enter": "点屏幕右上角的齿轮。",
+      "cancel": "点设置码画面上的“Cancel”。",
+      "rehear": null
+    },
+    {
+      "device_kind": "korvo-1",
+      "ssid_model": "korvo-1",
+      "manifest_id": "korvo-1",
+      "name": "Korvo-1",
+      "setup_code": "trusted_display",
+      "enter": "按住 SET 键约 2 秒，或点屏幕右下角的“重新配网”。",
+      "cancel": "配网模式中再按住 SET 键约 2 秒，或点设置码画面上的“Cancel”。",
+      "rehear": null
+    },
+    {
+      "device_kind": "xiaoling",
+      "ssid_model": "xiaoling",
+      "manifest_id": "xiaoling",
+      "name": "xiaoling",
+      "setup_code": "trusted_display",
+      "enter": "按住 BOOT 键约 2 秒。",
+      "cancel": "配网模式中再按住 BOOT 键约 2 秒。",
+      "rehear": null
+    },
+    {
+      "device_kind": "atk-dnesp32s3",
+      "ssid_model": "atk-dnesp32s3",
+      "manifest_id": "atk-dnesp32s3",
+      "name": "ATK DNESP32S3",
+      "setup_code": "trusted_display",
+      "enter": "按住 BOOT 键约 2 秒。",
+      "cancel": "配网模式中再按住 BOOT 键约 2 秒。",
+      "rehear": null
+    },
+    {
+      "device_kind": "esp32-s3-touch-amoled-2.06",
+      "ssid_model": "touch-amoled-2.06",
+      "manifest_id": "esp32-s3-touch-amoled-2.06",
+      "name": "Waveshare AMOLED 2.06",
+      "setup_code": "trusted_display",
+      "enter": "按住 BOOT 键约 2 秒。",
+      "cancel": "配网模式中再按住 BOOT 键约 2 秒，或点设置码画面上的“Cancel”。",
+      "rehear": null
+    },
+    {
+      "device_kind": "reachy-mini",
+      "ssid_model": "reachy",
+      "manifest_id": "eidolon-reachy-mini",
+      "name": "Reachy Mini",
+      "setup_code": "spoken_code",
+      "enter": "把任意一根天线推开，保持 3 秒。",
+      "cancel": "手指往下按住一根天线，听到“滴”声后再按 3 秒。",
+      "rehear": "轻碰一下天线。"
+    }
+  ]
+}

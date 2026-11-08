@@ -27,6 +27,7 @@ constexpr int32_t kNameHeight = 18;
 // Wide enough for four 34 px digits.
 constexpr int32_t kCodeColumnWidth = 100;
 constexpr int32_t kCodeBlockHeight = 120;
+constexpr int32_t kCancelHeight = 40;
 // Beyond this the code is no easier to scan, only harder to fit beside text.
 constexpr int32_t kMaxQrSide = 320;
 // A setup payload is about 120 bytes: version 7 or 8 at medium error
@@ -113,7 +114,9 @@ lv_obj_t* Column(lv_obj_t* parent)
 
 void SetupCodeOverlay::Show(lv_display_t* display, const SetupCodeScreen& screen)
 {
-    if (root_ != nullptr && shown_qr_text_ == screen.qr_text && shown_notice_ == screen.notice) {
+    if (root_ != nullptr && shown_qr_text_ == screen.qr_text && shown_notice_ == screen.notice &&
+        shown_cancel_ == static_cast<bool>(screen.cancel)) {
+        cancel_ = screen.cancel;
         return;
     }
     Hide();
@@ -122,12 +125,13 @@ void SetupCodeOverlay::Show(lv_display_t* display, const SetupCodeScreen& screen
     const int32_t width = lv_display_get_horizontal_resolution(display);
     const int32_t height = lv_display_get_vertical_resolution(display);
     const bool landscape = width >= height;
+    const int32_t code_block = kCodeBlockHeight + (screen.cancel ? kCancelHeight : 0);
     const int32_t qr_side = std::min<int32_t>(
         kMaxQrSide,
         landscape ? std::min(height - 2 * kMargin - kNameHeight,
                              width - 3 * kMargin - kCodeColumnWidth)
                   : std::min(width - 2 * kMargin,
-                             height - 3 * kMargin - kNameHeight - kCodeBlockHeight));
+                             height - 3 * kMargin - kNameHeight - code_block));
     if (qr_side < 96) return;
 
     root_ = lv_obj_create(lv_display_get_layer_top(display));
@@ -147,6 +151,8 @@ void SetupCodeOverlay::Show(lv_display_t* display, const SetupCodeScreen& screen
 
     shown_qr_text_ = screen.qr_text;
     shown_notice_ = screen.notice;
+    shown_cancel_ = static_cast<bool>(screen.cancel);
+    cancel_ = screen.cancel;
     lv_obj_t* qr_column = Column(root_);
     DrawQrCode(qr_column, screen.qr_text, qr_side);
     Label(qr_column, screen.advertised_name.c_str(), &lv_font_montserrat_14);
@@ -163,6 +169,21 @@ void SetupCodeOverlay::Show(lv_display_t* display, const SetupCodeScreen& screen
         lv_label_set_long_mode(notice, LV_LABEL_LONG_WRAP);
         lv_obj_set_width(notice, landscape ? kCodeColumnWidth : width - 2 * kMargin);
     }
+    if (cancel_) {
+        lv_obj_t* cancel = lv_button_create(code_column);
+        lv_obj_set_size(cancel, kCodeColumnWidth, kCancelHeight - 8);
+        lv_obj_add_event_cb(cancel, &SetupCodeOverlay::OnCancel, LV_EVENT_CLICKED, this);
+        lv_obj_t* text = lv_label_create(cancel);
+        lv_label_set_text(text, "Cancel");
+        lv_obj_set_style_text_font(text, &lv_font_montserrat_14, 0);
+        lv_obj_center(text);
+    }
+}
+
+void SetupCodeOverlay::OnCancel(lv_event_t* event)
+{
+    auto* self = static_cast<SetupCodeOverlay*>(lv_event_get_user_data(event));
+    if (self->cancel_) self->cancel_();
 }
 
 void SetupCodeOverlay::Hide()
@@ -174,4 +195,6 @@ void SetupCodeOverlay::Hide()
     for (char& c : shown_qr_text_) c = '\0';
     shown_qr_text_.clear();
     shown_notice_.clear();
+    shown_cancel_ = false;
+    cancel_ = nullptr;
 }

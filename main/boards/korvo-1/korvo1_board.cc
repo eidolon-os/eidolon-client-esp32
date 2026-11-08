@@ -244,6 +244,7 @@ private:
         // which left a removed ("recovery required") panel no way back in.
 #if CONFIG_EIDOLON_HUB_MODE
         eidolon::SetEidolonSetupHandler([this]() { EnterWifiConfigMode(); });
+        eidolon::SetEidolonSetupGesture("Hold SET");
         eidolon::SetEidolonButtonAvailable(eidolon::UiInputSource::SessionButton, true, "SET");
 
         // SET, MODE and the panel's microphone are one session control and do
@@ -281,10 +282,9 @@ private:
         });
 #endif
 #endif
-        // Long press opens setup from an operational or removed device too.
-        set_button_->OnLongPress([this]() {
-            Application::GetInstance().Schedule([this]() { EnterWifiConfigMode(); });
-        });
+        // Long press opens setup from an operational or removed device too, and
+        // closes the setup that is open.
+        set_button_->OnLongPress([this]() { ToggleWifiConfigMode(); });
 
         volume_up_button_->OnClick([this]() { ChangeVolume(10); });
         volume_up_button_->OnLongPress([this]() {

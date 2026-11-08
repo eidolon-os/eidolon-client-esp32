@@ -168,6 +168,7 @@ public:
         InitializeBattery();
 #if CONFIG_EIDOLON_HUB_MODE
         eidolon::SetEidolonSetupHandler([this]() { EnterWifiConfigMode(); });
+        eidolon::SetEidolonSetupGesture("Hold BOOT");
         eidolon::SetEidolonButtonAvailable(eidolon::UiInputSource::SessionButton, true, "BOOT");
         boot_.OnClick([this]() {
             auto& app = Application::GetInstance();
@@ -177,7 +178,7 @@ public:
                 eidolon::DispatchEidolonUiInput(eidolon::UiInputSource::SessionButton, eidolon::UiInputGesture::Click);
             }
         });
-        boot_.OnLongPress([this]() { Application::GetInstance().Schedule([this]() { EnterWifiConfigMode(); }); });
+        boot_.OnLongPress([this]() { ToggleWifiConfigMode(); });
 #else
         boot_.OnClick([]() { Application::GetInstance().ToggleChatState(); });
 #endif

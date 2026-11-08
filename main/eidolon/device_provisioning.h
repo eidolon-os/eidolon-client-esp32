@@ -2,7 +2,6 @@
 #define EIDOLON_DEVICE_PROVISIONING_H_
 
 #include "commissioning_transport_core.h"
-#include "provisioning_window_policy_core.h"
 #include "setup_code_card.h"
 
 #include <atomic>
@@ -42,7 +41,6 @@ public:
             network_candidate_received;
         std::function<void(uint32_t)> wifi_connected;
         std::function<void(uint32_t)> wifi_connection_failed;
-        std::function<void(uint32_t)> window_expired;
         std::function<void(uint32_t)> transport_stopped;
         std::function<void(uint32_t)> transport_ended_unexpectedly;
         std::function<std::string(uint32_t)> commissioning_status;
@@ -52,12 +50,9 @@ public:
 
     static DeviceProvisioningService& GetInstance();
 
-    // Whether this offer is bounded is a lifecycle question — does this device
-    // already have an Owner to protect — and the answer lives above the
-    // transport. It is passed in rather than inferred here so that this adapter
-    // never guesses at the provenance of the act it is carrying.
-    esp_err_t Start(uint32_t generation, std::string session_id,
-                    ProvisioningWindowPolicy window, Events events);
+    // The offer stays open until completion, cancellation or power-off; nothing
+    // here closes it on a timer.
+    esp_err_t Start(uint32_t generation, std::string session_id, Events events);
     void Stop(uint32_t generation);
 
     bool IsRunning() const { return running_.load(std::memory_order_acquire); }
@@ -71,14 +66,6 @@ private:
 
     // protocomm hands endpoint payloads to plain function pointers, so these
     // reach the instance through the singleton rather than through a capture.
-    // A bounded window is enforced rather than merely advertised: without this
-    // an Owner's setup gesture would leave a commissioned device advertising to
-    // whoever is nearby until somebody power-cycled the board. It fires only
-    // for a bounded window, and it says how to get the offer back, because a
-    // window that closes without telling anyone leaves a device that looks
-    // broken from the only side that can fix it.
-    static void OnWindowElapsed(void* argument);
-
     static esp_err_t HandleDescriptor(uint32_t session_id, const uint8_t* inbuf, ssize_t inlen,
                                       uint8_t** outbuf, ssize_t* outlen, void* priv_data);
     static esp_err_t HandleTrust(uint32_t session_id, const uint8_t* inbuf, ssize_t inlen,
@@ -103,7 +90,6 @@ private:
     std::atomic<bool> cleanup_in_progress_{false};
     std::atomic<uint32_t> transport_generation_{0};
     std::string session_id_;
-    ProvisioningWindowPolicy window_;
     Events events_;
     std::atomic<bool> manager_started_{false};
     std::atomic<bool> endpoints_registered_{false};
@@ -129,7 +115,6 @@ private:
     void* sta_netif_ = nullptr;
     void* ap_netif_ = nullptr;
     void* httpd_handle_ = nullptr;
-    void* window_timer_ = nullptr;
 };
 
 }  // namespace eidolon

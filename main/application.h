@@ -148,6 +148,9 @@ public:
     void ToggleMicrophone();
     void PttPress();
     void PttRelease();
+    // A person closed setup mode at the device: the setup gesture again, or
+    // Cancel on the setup-code screen. Call on the application task.
+    void CancelSetupAtDevice();
 
     void SetEidolonRuntimeUi(eidolon::RuntimePhase phase,
                              const std::string& detail = "");

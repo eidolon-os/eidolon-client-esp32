@@ -201,12 +201,14 @@ ensure_box3_sdkconfig() {
   set_sdkconfig_bool BOARD_TYPE_ESP_BOX_3 y
   set_sdkconfig_bool EIDOLON_HUB_MODE y
   # The setup code drawn per window and shown on screen (SDK DF-COMM-018/019).
-  # EIDOLON_SETUP_CODE=n is only for isolating a fault on the bench.
+  # EIDOLON_SETUP_CODE=n is only for isolating a fault on the bench, and the
+  # build refuses it unless EIDOLON_BENCH_PUBLIC_PAIR=y says so too.
   # EIDOLON_LOG_SETUP_CODE=y also prints it on serial, for bench automation only.
   # Not LV_USE_QRCODE: its qrcodegen collides with the copy esp_emote_gfx
   # already links into every build, which the setup code overlay uses.
   set_sdkconfig_bool LV_USE_QRCODE n
   set_sdkconfig_bool EIDOLON_PROVISIONING_SETUP_CODE "${EIDOLON_SETUP_CODE:-y}"
+  set_sdkconfig_bool EIDOLON_PROVISIONING_BENCH_PUBLIC_PAIR "${EIDOLON_BENCH_PUBLIC_PAIR:-n}"
   set_sdkconfig_bool EIDOLON_PROVISIONING_LOG_SETUP_CODE "${EIDOLON_LOG_SETUP_CODE:-n}"
   # esp_emote_gfx logs int64_t timestamps before a string argument. The ROM
   # nano formatter lacks 64-bit support and reads that argument as a pointer.

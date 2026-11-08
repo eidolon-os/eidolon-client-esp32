@@ -7,20 +7,16 @@
 #include <string>
 
 #include "eidolon/device_provisioning_protocol.h"
-#include "eidolon/provisioning_window_policy_core.h"
 
 namespace {
 
-using eidolon::AdvertisedWindowSeconds;
 using eidolon::BuildEnrollmentReceiptJson;
 using eidolon::BuildSetupDescriptorJson;
 using eidolon::BuildTrustStagedJson;
 using eidolon::BuildTrustRefusedJson;
-using eidolon::DecideProvisioningWindow;
 using eidolon::IsCommissionableCertificate;
 using eidolon::IsCommissionedOwnerDomain;
 using eidolon::ParseTrustHandover;
-using eidolon::ProvisioningWindowTrigger;
 using eidolon::TrustHandover;
 using eidolon::device_foundation::v1::SetupDescriptor;
 using eidolon::device_foundation::v1::SetupDescriptorTrust;
@@ -172,24 +168,6 @@ void ADurationThatIsNotOneCannotBeBuiltAtAll()
     assert(!SetupWindowRemainingSeconds::FromPositiveSeconds(-1).has_value());
     const auto bounded = SetupWindowRemainingSeconds::FromPositiveSeconds(600);
     assert(bounded.has_value() && bounded->seconds() == 600);
-}
-
-void AFactoryDeviceAdvertisesAnOfferTheControllerCanAccept()
-{
-    // The seam this whole pair of types exists for: the window policy decides
-    // whether there is a deadline at all, and only a deadline that exists
-    // reaches the wire. A device that has never been commissioned keeps its
-    // offer open, so its descriptor names no duration; an Owner reopening setup
-    // on a commissioned device also keeps its authorized window open.
-    SetupDescriptor factory = SampleDescriptor();
-    factory.expires_in = AdvertisedWindowSeconds(DecideProvisioningWindow(
-        ProvisioningWindowTrigger::NeverCommissioned));
-    assert(!Contains(BuildSetupDescriptorJson(factory), "expires_in_seconds"));
-
-    SetupDescriptor reopened = SampleDescriptor();
-    reopened.expires_in = AdvertisedWindowSeconds(DecideProvisioningWindow(
-        ProvisioningWindowTrigger::OwnerPresenceReopen));
-    assert(!Contains(BuildSetupDescriptorJson(reopened), "expires_in_seconds"));
 }
 
 void DeclaresDevelopmentAndProductionTrustAsOneField()
@@ -350,7 +328,6 @@ int main()
     SaysHowLongTheWindowLastsRatherThanWhenItEnds();
     AnOfferWithNoDeadlineCarriesNoDurationField();
     ADurationThatIsNotOneCannotBeBuiltAtAll();
-    AFactoryDeviceAdvertisesAnOfferTheControllerCanAccept();
     DeclaresDevelopmentAndProductionTrustAsOneField();
     AcceptsTheOwnerDomainAControllerHandsOver();
     RefusesAHandoverThatNamesNoOwnerDomain();

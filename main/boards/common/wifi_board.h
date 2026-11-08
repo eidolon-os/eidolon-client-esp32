@@ -71,6 +71,13 @@ public:
      */
     void EnterWifiConfigMode();
 
+    /**
+     * The setup gesture, a board's long press: opens setup, or closes the setup
+     * that is open. A short press stays EnterWifiConfigMode, which never closes
+     * one, so brushing the key cannot end a setup a person is in the middle of.
+     */
+    void ToggleWifiConfigMode();
+
     
     /**
      * Check if in WiFi config mode

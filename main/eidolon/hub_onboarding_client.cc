@@ -11,6 +11,7 @@
 #include "claim_recovery_core.h"
 #include "commissioning_credential.h"
 #include "device_identity.h"
+#include "eidolon_view.h"
 #include "esp_idf_commissioning_credential_store.h"
 #include "device_manifest_assertion_core.h"
 #include "device_control_delivery_client.h"
@@ -897,7 +898,7 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
     DeviceClaimConsumerCore core(store, store, crypto, context_, [this] { return ContextCurrent(); });
     auto outcome = core.ResumePending();
     if (outcome.result == DeviceClaimConsumerResult::OwnerDomainMismatch) {
-        recovery_hint_ = "Connection recovery needed. Press and hold the button to open setup";
+        recovery_hint_ = "Connection recovery needed. " + EidolonSetupHint("open setup");
         return ESP_ERR_NOT_ALLOWED;
     }
     std::string admission;
@@ -929,7 +930,7 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
         if ((!credential.owner_domain_id.empty() && credential.owner_domain_id != descriptor.owner_domain_id) ||
             (credential.owner_domain_generation != 0 && credential.owner_domain_generation != descriptor.owner_domain_generation) ||
             (!credential.operational_key_id.empty() && credential.operational_key_id != crypto.OperationalKeyId())) {
-            recovery_hint_ = "Connection recovery needed. Press and hold the button to open setup";
+            recovery_hint_ = "Connection recovery needed. " + EidolonSetupHint("open setup");
             return ESP_ERR_NOT_ALLOWED;
         }
         const std::string handoff_public_key = crypto.HandoffPublicKey();

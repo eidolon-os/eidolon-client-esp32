@@ -10,6 +10,7 @@
 #include "eidolon/commissioning_transaction.h"
 #include "eidolon/device_physical_recovery.h"
 #include "eidolon/eidolon_runtime_status.h"
+#include "eidolon/eidolon_view.h"
 #include "eidolon/hub_trust_store.h"
 #include "eidolon/firmware_boot.h"
 #include "eidolon/provisioning_window_policy_core.h"
@@ -99,8 +100,8 @@ void WifiBoard::StartNetwork() {
         Application::GetInstance().SetEidolonRuntimeUi(
             eidolon::RuntimePhase::RecoveryRequired,
             eidolon::CommissioningTransactionNeedsFreshAuthorization()
-                ? "Connection recovery needed. Press and hold the button to open setup"
-                : "Configuration recovery blocked. Hold BOOT to retry setup");
+                ? "Connection recovery needed. " + eidolon::EidolonSetupHint("open setup")
+                : "Configuration recovery blocked. " + eidolon::EidolonSetupHint("retry setup"));
         // A failed durable write is not evidence that time can repair it.
         // Retry on an explicit setup request or the next boot, never repeatedly
         // compact flash while the required storage/snapshot is unchanged.
@@ -242,8 +243,8 @@ void WifiBoard::OpenSetupWithoutAnyonePresent() {
                  "retrying Wi-Fi; long-press to set up a different network");
         Application::GetInstance().SetEidolonRuntimeUi(
             eidolon::RuntimePhase::NetworkConnecting,
-            "Cannot reach your Wi-Fi. Still trying - press and hold the button "
-            "to set up a different network");
+            "Cannot reach your Wi-Fi. Still trying. " +
+                eidolon::EidolonSetupHint("set up a different network"));
         return;
     }
 #endif
@@ -289,7 +290,7 @@ void WifiBoard::StartWifiConfigMode() {
                  "Long-press BOOT to rejoin");
         Application::GetInstance().SetEidolonRuntimeUi(
             eidolon::RuntimePhase::RecoveryRequired,
-            "Removed from this Owner. Press and hold the button to claim it again");
+            "Removed from this Owner. " + eidolon::EidolonSetupHint("claim it again"));
         return;
     }
     // This is an intent boundary. Identity, radio, transport, persistence and
@@ -343,6 +344,20 @@ void WifiBoard::EnterWifiConfigMode() {
     Application::GetInstance().Schedule([this]() {
         EnterWifiConfigModeOnApplicationTask();
     });
+}
+
+void WifiBoard::ToggleWifiConfigMode() {
+#if CONFIG_EIDOLON_HUB_MODE
+    Application::GetInstance().Schedule([this]() {
+        if (eidolon::CommissioningRuntime::GetInstance().IsInProgress()) {
+            Application::GetInstance().CancelSetupAtDevice();
+        } else {
+            EnterWifiConfigModeOnApplicationTask();
+        }
+    });
+#else
+    EnterWifiConfigMode();
+#endif
 }
 
 void WifiBoard::EnterWifiConfigModeOnApplicationTask() {

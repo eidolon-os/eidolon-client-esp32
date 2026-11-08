@@ -20,6 +20,10 @@ dependency locks, managed components or build outputs.
 
 1. Declare the chip, flash capacity and pinned ESP-IDF version in the board
    configuration. Keep interaction mode and output capabilities independent.
+   Declare the board in the SDK setup models
+   (`eidolon_sdk/contracts/device_foundation/v1/models/setup.json`: how a
+   person opens and cancels setup mode, and that it shows its setup code), then
+   sync. An Eidolon build of an undeclared board fails at configure time.
 2. Select a compatible partition CSV. Prefer `partitions/v2/16m_eidolon.csv` for
    compatible 16 MB boards; BOX-3 uses its asset/application size variant.
    Do not copy offsets into shell scripts or board C++ code.

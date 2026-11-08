@@ -27,20 +27,10 @@ bool AutomaticSetupOpenIsForbidden(ProvisioningWindowTrigger trigger)
     return true;
 }
 
-ProvisioningWindowPolicy DecideProvisioningWindow(ProvisioningWindowTrigger)
+bool SetupWindowIsOffered(CommissioningRuntimeState state)
 {
-    return {false, 0};
-}
-
-std::optional<device_foundation::v1::SetupWindowRemainingSeconds>
-AdvertisedWindowSeconds(const ProvisioningWindowPolicy& policy)
-{
-    if (!policy.bounded) {
-        return std::nullopt;
-    }
-    // Retain support for positive bounded durations in the wire contract.
-    return device_foundation::v1::SetupWindowRemainingSeconds::FromPositiveSeconds(
-        policy.seconds);
+    return state == CommissioningRuntimeState::Advertising ||
+           state == CommissioningRuntimeState::SessionActive;
 }
 
 bool HubSetupButtonClickOpensSetup(DeviceState state)

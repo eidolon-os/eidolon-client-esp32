@@ -1605,6 +1605,29 @@ if(CONFIG_EIDOLON_HUB_MODE AND NOT CONFIG_LWIP_HOOK_NETCONN_EXT_RESOLVE_CUSTOM)
     message(FATAL_ERROR "Eidolon requires CONFIG_LWIP_HOOK_NETCONN_EXT_RESOLVE_CUSTOM=y; update the existing sdkconfig (new builds use sdkconfig.defaults)")
 endif()
 
+# Every Eidolon board declares, in the SDK setup models (DF-COMM-021), how a
+# person opens setup and gets its one-time setup code. This firmware can only
+# show the code on a screen, so a board not declared with one has no setup a
+# person can finish, and the public development pair is no fallback: refuse
+# the build rather than ship it.
+if(CONFIG_EIDOLON_HUB_MODE)
+    set(EIDOLON_SETUP_MODELS_FILE "${CMAKE_CURRENT_SOURCE_DIR}/eidolon/device_foundation_v1_setup_models.json")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${EIDOLON_SETUP_MODELS_FILE}")
+    file(READ "${EIDOLON_SETUP_MODELS_FILE}" EIDOLON_SETUP_MODELS)
+    string(JSON EIDOLON_SETUP_MODEL_COUNT LENGTH "${EIDOLON_SETUP_MODELS}" models)
+    math(EXPR EIDOLON_SETUP_MODEL_LAST "${EIDOLON_SETUP_MODEL_COUNT} - 1")
+    set(EIDOLON_BOARD_SETUP_CODE "")
+    foreach(EIDOLON_SETUP_MODEL RANGE ${EIDOLON_SETUP_MODEL_LAST})
+        string(JSON EIDOLON_SETUP_MODEL_KIND GET "${EIDOLON_SETUP_MODELS}" models ${EIDOLON_SETUP_MODEL} device_kind)
+        if(EIDOLON_SETUP_MODEL_KIND STREQUAL BOARD_TYPE)
+            string(JSON EIDOLON_BOARD_SETUP_CODE GET "${EIDOLON_SETUP_MODELS}" models ${EIDOLON_SETUP_MODEL} setup_code)
+        endif()
+    endforeach()
+    if(NOT EIDOLON_BOARD_SETUP_CODE STREQUAL "trusted_display")
+        message(FATAL_ERROR "Board ${BOARD_TYPE} cannot be built as an Eidolon device: the SDK setup models do not declare it with its setup code on its screen. Declare it in eidolon_sdk contracts/device_foundation/v1/models/setup.json and sync, or build it without EIDOLON_HUB_MODE.")
+    endif()
+endif()
+
 # BOX-3 owns its full-duplex CPU budget; chain the native public scheduler
 # rather than patching or duplicating the LiveKit task configuration.
 if(CONFIG_EIDOLON_HUB_MODE AND CONFIG_BOARD_TYPE_ESP_BOX_3 AND CONFIG_USE_DEVICE_AEC)

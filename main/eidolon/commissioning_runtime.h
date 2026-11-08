@@ -43,6 +43,9 @@ public:
     bool IsCurrent(const CommissioningRuntimeSnapshot& snapshot) const;
     void SetObserver(Observer observer);
     void SetOperationalRuntimeQuiescer(OperationalRuntimeQuiescer quiescer);
+    // The actor's state as of its last handled event, for a gesture deciding
+    // whether it opens setup or closes the one that is open.
+    CommissioningRuntimeState VisibleState() const;
     bool IsAdvertising() const;
     uint32_t Generation() const;
     // True for the whole physical commissioning lease, including identity

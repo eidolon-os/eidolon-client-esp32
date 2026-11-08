@@ -2,6 +2,7 @@
 #define EIDOLON_VIEW_H_
 
 #include <functional>
+#include <string>
 #include "expression/surface.h"
 
 #include "eidolon_ui_model.h"
@@ -47,6 +48,13 @@ void SetEidolonButtonAvailable(UiInputSource button, bool available, const char*
 UiInputProfile CurrentUiInputProfile();
 void SetEidolonSetupHandler(std::function<void()> handler);
 void OpenEidolonSetup();
+// How a person makes this board's setup gesture, as a hint opens with it:
+// "Hold BOOT", "Tap the gear". Declared by the board with its setup input, so
+// a screen that sends a person to the device names this board's gesture rather
+// than another board's key (SDK models/setup.json says the same to the app).
+void SetEidolonSetupGesture(const char* gesture);
+// "<gesture> to <purpose>", e.g. EidolonSetupHint("change network").
+std::string EidolonSetupHint(const char* purpose);
 
 }  // namespace eidolon
 

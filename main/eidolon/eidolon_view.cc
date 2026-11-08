@@ -13,6 +13,7 @@ std::function<void(UiInputSource, bool)> g_availability_handler;
 std::function<void()> g_setup_handler;
 std::atomic<uint8_t> g_available_inputs{0};
 std::atomic<const char*> g_input_keys[kUiInputSourceCount]{};
+std::atomic<const char*> g_setup_gesture{"Hold the setup button"};
 
 void SetInputAvailable(UiInputSource source, bool available) {
     const auto bit=InputBit(source);
@@ -65,5 +66,9 @@ UiInputProfile CurrentUiInputProfile() {
 }
 void SetEidolonSetupHandler(std::function<void()> handler) { g_setup_handler=std::move(handler); }
 void OpenEidolonSetup() { if (g_setup_handler) g_setup_handler(); }
+void SetEidolonSetupGesture(const char* gesture) { g_setup_gesture.store(gesture); }
+std::string EidolonSetupHint(const char* purpose) {
+    return std::string(g_setup_gesture.load()) + " to " + purpose;
+}
 
 }  // namespace eidolon

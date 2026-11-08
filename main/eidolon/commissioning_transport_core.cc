@@ -36,9 +36,6 @@ bool CommissioningTransportResourceCore::Own(
     case CommissioningTransportResource::WifiDriver:
         owned_.wifi_driver = true;
         break;
-    case CommissioningTransportResource::WindowTimer:
-        owned_.window_timer = true;
-        break;
     }
     return true;
 }

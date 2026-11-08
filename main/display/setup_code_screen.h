@@ -1,6 +1,7 @@
 #ifndef SETUP_CODE_SCREEN_H_
 #define SETUP_CODE_SCREEN_H_
 
+#include <functional>
 #include <string>
 
 // What the screen shows while a setup window is open and a code was drawn for
@@ -10,6 +11,7 @@ struct SetupCodeScreen {
     std::string code;           // eight digits
     std::string advertised_name;
     std::string notice;         // optional line, e.g. why a new code was drawn
+    std::function<void()> cancel;  // set: the screen offers Cancel and calls it
 };
 
 #endif  // SETUP_CODE_SCREEN_H_

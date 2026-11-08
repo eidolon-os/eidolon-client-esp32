@@ -1364,9 +1364,22 @@ menu "Eidolon Hub"
             code; the development passphrase no longer opens this device.
 
             On for every board: the pair above is public, so a window keyed
-            with it lets anyone in radio range finish the setup. Turning it
-            off is for isolating a fault on the bench, not a supported build.
-            Requires a display. A board without one keeps the pair above.
+            with it lets anyone in radio range finish the setup. A board that
+            cannot present a per-window code is not an Eidolon board at all:
+            the build refuses Eidolon mode for any board the SDK setup models
+            (main/eidolon/device_foundation_v1_setup_models.json) do not
+            declare with a code on its screen. Turning this off also needs
+            EIDOLON_PROVISIONING_BENCH_PUBLIC_PAIR.
+
+    config EIDOLON_PROVISIONING_BENCH_PUBLIC_PAIR
+        bool "Bench only: let the public development pair open setup"
+        default n
+        depends on EIDOLON_HUB_MODE && !EIDOLON_PROVISIONING_SETUP_CODE && !EIDOLON_PROVISIONING_MANUFACTURER_BOUND
+        help
+            For isolating a fault on the bench with Espressif's own tools,
+            which can only speak the public pair above. The Eidolon app never
+            uses it, so such a device cannot be added from the app. A build
+            without a per-window code and without this is refused.
 
     config EIDOLON_PROVISIONING_LOG_SETUP_CODE
         bool "Print the setup code on the serial console (bench only)"

@@ -294,9 +294,9 @@ void TestCopy() {
     }
     for (const char* detail : {
              "Preparing secure device setup...", "Ready for secure device setup",
-             "Configuration recovery blocked. Hold BOOT to retry setup", "Validating Wi-Fi and Host...",
+             "Configuration recovery blocked. Hold SET to retry setup", "Validating Wi-Fi and Host...",
              "Wi-Fi and Host confirmed", "Finishing device setup...",
-             "Returning to saved Wi-Fi. Hold BOOT to change network", "Setup closed - long-press BOOT to reopen",
+             "Returning to saved Wi-Fi. Hold SET to change network", "Setup closed. Hold SET to reopen it",
              "Wi-Fi disconnected", "Owner network unavailable", "Downloading UI assets...",
              "Update complete. Restarting...", "Firmware update failed", "Restoring the operational channel...",
              "Connecting to Wi-Fi Eidolon-Home...", "Installing firmware 3.3.0"}) {
@@ -413,7 +413,7 @@ int main(int argc, char** argv) {
         render(s);
         shot("sys-03-commissioning");
         assert(Find(screen, std::string(HOME_ICON_SETTINGS "  ") + home_copy::kSetupAction));
-        s.runtime_detail = "Setup closed - long-press BOOT to reopen";
+        s.runtime_detail = "Setup closed. Hold SET to reopen it";
         render(s);
         assert(Find(screen, "配网已关闭，长按 SET 键重新打开"));
         shot("sys-04-setup-closed");

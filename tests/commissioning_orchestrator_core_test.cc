@@ -196,12 +196,13 @@ void TestValidationFailureRollsBackBeforeTransportAndRadioRelease()
     assert(core.state() == CommissioningRuntimeState::Idle);
 }
 
+// A person cancelling at the device after the phone staged its trust.
 void TestStagedTrustRollsBackEvenBeforeNetworkArrives()
 {
     CommissioningOrchestratorCore core;
     const uint32_t generation = OpenToSession(core);
     StageTrust(core, generation);
-    auto actions = core.Handle(Event(CommissioningEventType::WindowExpired,
+    auto actions = core.Handle(Event(CommissioningEventType::CancelRequested,
                                      generation));
     assert(Has(actions,
                CommissioningActionType::RollbackCommissioningTransaction));
@@ -301,7 +302,6 @@ void TestDurableDecisionIgnoresCancelAndRetriesForward() {
     }
     assert(core.state() == CommissioningRuntimeState::RecoveringConfiguration);
     for (const auto type : {CommissioningEventType::CancelRequested,
-                           CommissioningEventType::WindowExpired,
                            CommissioningEventType::TransportEndedUnexpectedly}) {
         assert(core.Handle(Event(type, generation)).empty());
     }

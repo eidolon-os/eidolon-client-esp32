@@ -8,11 +8,11 @@
 #include <esp_system.h>
 #include "device_provisioning.h"
 #include "device_provisioning_protocol.h"
+#include "eidolon_view.h"
 #include "hub_onboarding_protocol.h"
 #include "hub_pinned_http.h"
 #include "hub_trust_store.h"
 #include "owner_trust_commissioning_worker.h"
-#include "provisioning_window_policy_core.h"
 
 #include "sdkconfig.h"
 
@@ -85,8 +85,8 @@ struct RuntimeState {
     QueueHandle_t queue = nullptr;
     TaskHandle_t task = nullptr;
     std::atomic<uint32_t> visible_generation{0};
-    std::atomic<bool> advertising{false};
-    std::atomic<bool> active{false};
+    std::atomic<CommissioningRuntimeState> visible_state{
+        CommissioningRuntimeState::Idle};
     std::mutex evidence_mutex;
     device_foundation::v1::CommissioningStatusEvidence evidence;
     std::mutex observer_mutex;
@@ -361,7 +361,7 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
         if (!ready) {
             state.failure_hint = transaction_allows
                 ? "Device identity needs recovery"
-                : "Configuration recovery blocked. Hold BOOT to retry setup";
+                : "Configuration recovery blocked. " + EidolonSetupHint("retry setup");
             ESP_LOGE(TAG, "cannot prepare an identity: %s",
                      transaction_allows
                          ? "no usable operational key"
@@ -438,9 +438,6 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
             Enqueue(CommissioningEventType::WifiConnectionFailed,
                     generation);
         };
-        events.window_expired = [](uint32_t generation) {
-            Enqueue(CommissioningEventType::WindowExpired, generation);
-        };
         events.transport_stopped = [](uint32_t generation) {
             Enqueue(CommissioningEventType::TransportStopped, generation);
         };
@@ -476,17 +473,8 @@ void Execute(RuntimeState& state, const CommissioningAction& action)
         events.terminal_ack_response_finished = [](uint32_t generation) {
             Enqueue(CommissioningEventType::ControllerObservedTerminal, generation);
         };
-        // The trust store, not the caller of RequestOpen, decides whether this
-        // act is a first claim or an Owner reopening setup on a device that is
-        // already theirs: both intents arrive through the same gesture, and
-        // only the store knows whether there is an Owner Domain to protect.
-        // Read once per generation so the answer cannot change underneath the
-        // window that was armed from it.
-        const ProvisioningWindowPolicy window = DecideProvisioningWindow(
-            ProvisioningWindowTriggerFor(
-                OwnerTrustStore().CommissionedOwnerDomainId()));
         const esp_err_t result = DeviceProvisioningService::GetInstance().Start(
-            action.generation, state.session_id, window, std::move(events));
+            action.generation, state.session_id, std::move(events));
         if (result != ESP_OK) {
             completion.type = CommissioningEventType::TransportStartFailed;
             Apply(state, completion);
@@ -661,11 +649,7 @@ void Apply(RuntimeState& state, const CommissioningEvent& event)
     }
     const auto actions = state.core.Handle(resolved);
     state.visible_generation.store(state.core.generation(), std::memory_order_release);
-    state.advertising.store(
-        state.core.state() == CommissioningRuntimeState::Advertising,
-        std::memory_order_release);
-    state.active.store(state.core.state() != CommissioningRuntimeState::Idle,
-                       std::memory_order_release);
+    state.visible_state.store(state.core.state(), std::memory_order_release);
     for (const auto& action : actions) Execute(state, action);
 }
 
@@ -847,14 +831,19 @@ uint32_t CommissioningRuntime::Generation() const {
     return State().visible_generation.load(std::memory_order_acquire);
 }
 
+CommissioningRuntimeState CommissioningRuntime::VisibleState() const
+{
+    return State().visible_state.load(std::memory_order_acquire);
+}
+
 bool CommissioningRuntime::IsAdvertising() const
 {
-    return State().advertising.load(std::memory_order_acquire);
+    return VisibleState() == CommissioningRuntimeState::Advertising;
 }
 
 bool CommissioningRuntime::IsInProgress() const
 {
-    return State().active.load(std::memory_order_acquire);
+    return VisibleState() != CommissioningRuntimeState::Idle;
 }
 
 }  // namespace eidolon

@@ -249,6 +249,7 @@ private:
     }
 
     void InitializeButtons() {
+        eidolon::SetEidolonSetupGesture("Hold BOOT");
 #if CONFIG_EIDOLON_INTERACTION_MODE_PTT
         // PTT is intentionally touch-first on this wearable board: the central
         // on-screen voice ring owns connect / hold-to-talk / release-to-send.
@@ -258,13 +259,13 @@ private:
         // Setup opens on a long press in any state; BOOT stays out of the
         // conversation flow on this wearable, where touch owns talking.
         boot_button_.OnLongPress([this]() {
-            ESP_LOGI(TAG, "Long press: opening device setup");
-            EnterWifiConfigMode();
+            ESP_LOGI(TAG, "Long press: opening or closing device setup");
+            ToggleWifiConfigMode();
         });
 #else
         boot_button_.OnLongPress([this]() {
-            ESP_LOGI(TAG, "Long press: opening device setup");
-            EnterWifiConfigMode();
+            ESP_LOGI(TAG, "Long press: opening or closing device setup");
+            ToggleWifiConfigMode();
         });
         boot_button_.OnClick([]() {
             eidolon::DispatchEidolonUiInput(eidolon::UiInputSource::AuxiliaryButton,eidolon::UiInputGesture::Click);
@@ -360,7 +361,9 @@ private:
         }
     }
 
-    // 初始化工具
+#if !CONFIG_EIDOLON_HUB_MODE
+    // 初始化工具. Not in an Eidolon build: its reconfigure_wifi tool opens
+    // setup with nobody at the device, which only a gesture may do.
     void InitializeTools() {
         auto &mcp_server = McpServer::GetInstance();
         mcp_server.AddTool("self.system.reconfigure_wifi",
@@ -371,6 +374,7 @@ private:
                 return true;
             });
     }
+#endif
 
 public:
     WaveshareEsp32s3TouchAMOLED2inch06() : boot_button_(BOOT_BUTTON_GPIO, false, 2000) {
@@ -381,7 +385,9 @@ public:
         InitializeSH8601Display();
         InitializeTouch();
         InitializeButtons();
+#if !CONFIG_EIDOLON_HUB_MODE
         InitializeTools();
+#endif
     }
 
     virtual i2c_master_bus_handle_t GetSharedI2cBus() override { return i2c_bus_; }

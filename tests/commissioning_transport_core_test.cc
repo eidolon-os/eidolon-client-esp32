@@ -33,11 +33,10 @@ void PartialStartFailureTransfersEveryOwnedResourceExactlyOnce()
     assert(cleanup.http_server);
     assert(cleanup.provisioning_manager);
     assert(cleanup.wifi_driver);
-    assert(!cleanup.window_timer);
 
     assert(!resources.ClaimCleanup(17).any());
     assert(!resources.ClaimCleanup(16).any());
-    assert(!resources.Own(17, CommissioningTransportResource::WindowTimer));
+    assert(!resources.Own(17, CommissioningTransportResource::HttpServer));
     assert(resources.CompleteCleanup(17));
     assert(!resources.active());
     assert(!resources.CompleteCleanup(17));

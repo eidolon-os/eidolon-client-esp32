@@ -3,6 +3,9 @@
 
 #include <lvgl.h>
 
+#include <functional>
+#include <string>
+
 #include "setup_code_screen.h"
 
 
@@ -21,11 +24,17 @@ public:
     bool visible() const { return root_ != nullptr; }
 
 private:
+    static void OnCancel(lv_event_t* event);
+
     lv_obj_t* root_ = nullptr;
+    // Cancel on a touch screen, where the gesture that opened setup (a tap on
+    // a view this overlay covers) cannot be made again to close it.
+    std::function<void()> cancel_;
     // What is on screen now, so an unchanged card is not rebuilt (and does not
     // flicker) when the window moves from advertising to a connected session.
     std::string shown_qr_text_;
     std::string shown_notice_;
+    bool shown_cancel_ = false;
 };
 
 #endif  // SETUP_CODE_OVERLAY_H_

@@ -1,5 +1,5 @@
 {
-  "sdk_commit": "669938f996bba98e5972bcd89f94978a017e2f69",
+  "sdk_commit": "517a9ccb611259674e444d10815488ae22078cd5",
   "files": [
     {
       "source": "contracts/device_foundation/v1/generated/cpp/device_foundation_v1_generated.h",
@@ -9,7 +9,7 @@
     {
       "source": "contracts/device_foundation/v1/common/schemas.schema.json",
       "target": "tests/fixtures/device_foundation_v1/common.schemas.schema.json",
-      "sha256": "e5770cd2c12b288415c055a51cee2a4bd813f4bd7d9f0675f6a43c30e8f27b72"
+      "sha256": "9b463fa9069f488fe36456f09b535d6967d712d1c4a4603864ea34c3536ba27f"
     },
     {
       "source": "contracts/device_foundation/v1/admission/schemas.schema.json",
@@ -59,7 +59,7 @@
     {
       "source": "contracts/device_foundation/v1/golden/device-manifest.json",
       "target": "tests/fixtures/device_foundation_v1/device-manifest.json",
-      "sha256": "b5b2a4fd23b64b21da3ca2331479d003a0cdc84c719846b86553d1770b65e2a1"
+      "sha256": "4335522b7de8785d9a08dd6ec4bc5017cf09cecbaf9a009fb5fd68b0e9db0643"
     },
     {
       "source": "contracts/device_foundation/v1/golden/commissioning-voucher.json",
@@ -89,7 +89,7 @@
     {
       "source": "contracts/device_foundation/v1/golden/device-control-manifest-assertion-proof.json",
       "target": "tests/fixtures/device_foundation_v1/device-control-manifest-assertion-proof.json",
-      "sha256": "6ce206c815a3c2a32d45fb708ec4d5aaa542dcd6b32650a3ef92a6ea26b7ae53"
+      "sha256": "54dc74760944bfef759372f1de95249eaaffe55af613e70d350022c0ba702414"
     },
     {
       "source": "contracts/device_foundation/v1/golden/device-control-configuration-response.json",
@@ -115,6 +115,11 @@
       "source": "contracts/device_foundation/v1/golden/ble-provisioning-transport.json",
       "target": "tests/fixtures/device_foundation_v1/ble-provisioning-transport.json",
       "sha256": "0620e13bd1695443d92b0f6c5f208c2f162f69a00214169622b75dfd7d18c9c3"
+    },
+    {
+      "source": "contracts/device_foundation/v1/models/setup.json",
+      "target": "main/eidolon/device_foundation_v1_setup_models.json",
+      "sha256": "ad96b25a34649f3436b2e0c323f5f8b7f692d33520bda3339e702c98920c7dbf"
     }
   ]
 }

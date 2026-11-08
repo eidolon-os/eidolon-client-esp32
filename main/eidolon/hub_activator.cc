@@ -5,6 +5,7 @@
 #include "device_boot_recovery.h"
 #include "device_identity.h"
 #include "eidolon_ui_types.h"
+#include "eidolon_view.h"
 #include "hub_activation_retry_core.h"
 #include "hub_config_store.h"
 #include "hub_onboarding_client.h"
@@ -87,7 +88,7 @@ bool HubActivator::Run(Esp32HubConfig& activated) {
         // is not a hint; it is the only way back.
         app.SetEidolonRuntimeUi(
             RuntimePhase::RecoveryRequired,
-            "Removed from this Owner. Press and hold the button to claim it again");
+            "Removed from this Owner. " + EidolonSetupHint("claim it again"));
         return false;
     }
 
@@ -146,7 +147,7 @@ bool HubActivator::Run(Esp32HubConfig& activated) {
                 app.SetEidolonServiceUi(ServicePhase::Unavailable);
                 app.SetEidolonRuntimeUi(RuntimePhase::RecoveryRequired,
                     config.recovery_hint.empty()
-                        ? "Connection recovery needed. Press and hold the button to open setup"
+                        ? "Connection recovery needed. " + EidolonSetupHint("open setup")
                         : config.recovery_hint);
                 return false;
             }
@@ -163,7 +164,7 @@ bool HubActivator::Run(Esp32HubConfig& activated) {
             app.SetEidolonServiceUi(ServicePhase::Unavailable);
             app.SetEidolonRuntimeUi(
                 RuntimePhase::RecoveryRequired,
-                "Removed from this Owner. Press and hold the button to claim it again");
+                "Removed from this Owner. " + EidolonSetupHint("claim it again"));
             return false;
 
         case ActivationStandDown::CommissioningOwnsRadio:

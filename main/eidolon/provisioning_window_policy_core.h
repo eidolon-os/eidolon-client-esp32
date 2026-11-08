@@ -1,11 +1,10 @@
 #ifndef EIDOLON_PROVISIONING_WINDOW_POLICY_CORE_H_
 #define EIDOLON_PROVISIONING_WINDOW_POLICY_CORE_H_
 
-#include <optional>
 #include <string>
 
+#include "commissioning_orchestrator_core.h"
 #include "device_state.h"
-#include "device_foundation_v1_generated.h"
 
 namespace eidolon {
 
@@ -37,14 +36,6 @@ enum class ProvisioningWindowTrigger {
     OwnerPresenceReopen,
 };
 
-struct ProvisioningWindowPolicy {
-    // False means the device keeps advertising until it is claimed, cancelled
-    // or powered off. True means it closes itself after `seconds`.
-    bool bounded = false;
-    // Only meaningful when bounded.
-    int seconds = 0;
-};
-
 // The trust store is the authority on whether this device has an Owner: an
 // empty commissioned Owner Domain id is the only evidence of a device that
 // belongs to nobody.
@@ -55,28 +46,16 @@ ProvisioningWindowTrigger ProvisioningWindowTriggerFor(
 // open and the lifetime of an explicitly opened window are independent.
 bool AutomaticSetupOpenIsForbidden(ProvisioningWindowTrigger trigger);
 
-// Once authorized, keep setup available until completion, cancellation or
-// shutdown. Request/transaction deadlines remain independent of this policy.
-ProvisioningWindowPolicy DecideProvisioningWindow(ProvisioningWindowTrigger trigger);
-
-// How long the descriptor may tell the controller this offer lasts — and
-// nothing at all when it does not end. "There is a deadline" and "there is no
-// deadline" are two different facts about the offer, so an unbounded window
-// cannot produce a number here to be mistaken for one: it returns no value, and
-// the descriptor then carries no duration.
+// Once open, setup stays available until it completes, a person cancels it at
+// the device, or the power goes; no window here ever closes on a timer.
 //
-// This used to hand back 0 for an unbounded window. The controller requires a
-// positive duration, so every device that had never been commissioned — every
-// device out of the box — advertised a duration the controller read as a broken
-// descriptor and refused to connect to. A sentinel is also indistinguishable
-// from a field nobody filled in, which is the other way this returns wrong.
-//
-// The canonical duration type is what keeps that fix from being reversible: it
-// has no representation for 0, so this is the only place where "bounded" is
-// turned into a number, and it looks at no number at all when the window is
-// unbounded.
-std::optional<device_foundation::v1::SetupWindowRemainingSeconds>
-AdvertisedWindowSeconds(const ProvisioningWindowPolicy& policy);
+// Whether the window is offered to a phone: advertising, or a phone connected
+// and not yet applying a network. Its code is on screen exactly then, and the
+// setup gesture made at the device closes it exactly then. Once a network is
+// being applied the person is turned away until that ends — a rollback in the
+// middle of it would undo what the phone is about to report as done — and a
+// window still starting or already closing has nothing open to close.
+bool SetupWindowIsOffered(CommissioningRuntimeState state);
 
 // Which device states the physical-presence gesture may open setup from, in
 // HUB_MODE, where the commissioning actor owns the setup window.
