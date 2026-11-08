@@ -94,4 +94,19 @@ int main() {
     SetEidolonButtonAvailable(UiInputSource::SessionButton,true,"BOOT");
     assert(!std::strcmp(CurrentUiInputProfile().Key(UiInputSource::SessionButton),"BOOT"));
     assert(!*CurrentUiInputProfile().Key(UiInputSource::TalkButton));
+    {
+        // Removed while running: the screen names the way back, not a reset.
+        EidolonUiPresenter removed(app);
+        removed.SetRuntimePhase(RuntimePhase::Normal);
+        auto revoked=VoiceRuntimeProjector::Project({.session=VoiceSessionState::Unauthorized,
+            .enrollment=EnrollmentPhase::Revoked});
+        revoked.enrollment_detail="Removed from this Owner. Hold BOOT to claim it again";
+        removed.ApplyVoiceStatus(revoked);
+        assert(removed.runtime_status().enrollment==EnrollmentPhase::Revoked);
+        assert(removed.runtime_status().enrollment_detail==revoked.enrollment_detail);
+        // A later status with nothing to say leaves it in place.
+        revoked.enrollment_detail.clear();
+        removed.ApplyVoiceStatus(revoked);
+        assert(removed.runtime_status().enrollment_detail=="Removed from this Owner. Hold BOOT to claim it again");
+    }
 }

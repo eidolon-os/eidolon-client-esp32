@@ -5,6 +5,8 @@
 #include <esp_log.h>
 #include <livekit.h>
 
+#include "eidolon_view.h"
+
 #define TAG "LiveKitVoiceTransport"
 
 namespace eidolon {
@@ -85,6 +87,11 @@ VoiceRuntimeStatus LiveKitVoiceTransport::BuildRuntimeStatus(VoiceSessionState s
         .service_was_ready = service_was_ready_.load(),
         .mic_enabled = mic_enabled_.load(),
     });
+    if (state == VoiceSessionState::Unauthorized) {
+        // Said as the boot path says it (HubActivator): this board's gesture is
+        // the way back, not a reset.
+        result.enrollment_detail = "Removed from this Owner. " + EidolonSetupHint("claim it again");
+    }
     if (state == VoiceSessionState::WaitingBinding) {
         const auto& problem = controller_->ChannelProblemCode();
         if (problem == "OUTPUT_POLICY_REQUIRED") {

@@ -82,6 +82,9 @@ struct VoiceRuntimeStatus {
     EndReason end_reason = EndReason::None;
     bool mic_enabled = true;
     std::string service_detail;
+    // Set only when the voice side has something to say about enrollment, e.g.
+    // how a removed device is claimed again; empty leaves the current one.
+    std::string enrollment_detail;
 };
 
 struct EidolonRuntimeStatus {

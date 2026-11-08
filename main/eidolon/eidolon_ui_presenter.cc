@@ -59,6 +59,7 @@ void EidolonUiPresenter::ApplyVoiceStatus(const VoiceRuntimeStatus& voice)
         status_.service_detail.clear();
     }
     status_.enrollment = voice.enrollment;
+    if (!voice.enrollment_detail.empty()) status_.enrollment_detail = voice.enrollment_detail;
     status_.service = voice.service;
     status_.service_detail = voice.service_detail;
     status_.conversation = voice.conversation;
