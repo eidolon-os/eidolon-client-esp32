@@ -1,12 +1,12 @@
 # StackChan 桌面宠物化：动作 / 表情 / 触摸反馈整体方案
 
-状态：方案草案（2026-09-21），未开始实现。
+状态：方案草案（2026-09-21），2026-10-31 按项目更新复核（变更见 §9），未开始实现。
 
 ## 0. 一句话结论
 
 现在的 StackChan 是「一台会转头的对话终端」，不是宠物：头部只有 6 个离散手势、脸只有 8 个手势 + 4 个基态、没有任何空闲自主行为、没有嘴型同步、机身上的三区触摸板 / IMU / 接近光传感器 / 12 颗 RGB 全部闲置或只在「唤醒」时亮一下。要变成宠物，缺的不是「再加几个手势」，而是三层东西：**一个常驻的活性层（idle liveness）、一个本地反射层（touch / IMU 反射）、一套多轨动画数据格式（头 + 脸 + 灯 + 声 同步）**，再加一条把这些接进 agent 语义层的契约通路。
 
-同时有一个硬约束：**半双工模式下 mic 一开舵机电源就被切断**。现有受控头部动作已有例外：运动 deadline 有效时控制器暂时关闭采集，为动作让出电源窗口。本方案的连续空闲动作和触摸反射尚未接入这个协调机制，实施前需要验证如何复用它以及对收音的影响。
+2026-10-31 复核后，约束重新定性。StackChan 关闭了唤醒词，靠屏幕点按开始对话，**待机时 mic 是关的**。待机是设备大部分时间，所以空闲活性和触摸反射在待机没有声学冲突，不需要先做声学实验。真正挡路的是一个现有缺陷和一个权限空白：对话结束后舵机电轨不恢复（§4.1）；输出门是会话作用域，待机时一律拒绝动作、表情和音效（§4.5.1）。语义层也已经变了：服务端在 10 月落地了 `stackchan.head.v1`，原方案的 `eidolon.body.v1` 设想作废，改为在它上面扩展（§1.5、§4.5）。
 
 ---
 
@@ -24,7 +24,7 @@
 
 - 渲染：LVGL + 移植的 M5 avatar 皮肤（`main/eidolon/avatar/skins/default/`），`CompanionFaceView` 驱动。
 - 表情词汇 = SDK 契约 `face-core-1` 的 8 个 gesture（`attend/affirm/ponder/question/soften/delight/hesitate/attention`，`expression/generated/presentation_catalog.h:16`）+ 4 个基态（`Idle/Listening/Thinking/Error`，`expression/core/runtime.h:10`）。每个 gesture 是一个静态 `FacePose`（`runtime.cc:15-28`），在 plan 的 step 上做包络。
-- 眨眼有（4.3 s 周期），**嘴不动**：`mouth_open` 只在 `Delight/Attention` 两个 pose 里是非零，`AgentSpeaking` 阶段没有任何东西驱动嘴（`companion_face_view.cc:461`）。
+- 眨眼有（4.3 s 周期），**嘴不动**：`mouth_open` 只在 `Delight/Attention` 两个 pose 里是非零，`AgentSpeaking` 阶段没有任何东西驱动嘴（`main/eidolon/views/companion_face_view.cc:471`）。
 - 已经移植但**一行都没被调用**的资产：`Emotion {Neutral, Happy, Angry, Sad, Doubt, Sleepy}`（`avatar/avatar/elements/emotion.h`）和 5 个 decorator（`angry / heart / shy / dizzy / sweat`，`avatar/decorators/`）。
 - 本地反射 `AvatarExpress()` 只认 3 个字串（happy/thinking/sad），且 `body.presence.set` 的 legacy 分支传 `"sleepy"` 会被静默丢掉（`companion_face_view.cc:428-431`）。
 
@@ -39,10 +39,12 @@
 - 本地音效只有 3 个合成音（identify 双音、startup chime、roll call），全部在 `eidolon_local_feedback.cc`，无 wav 资产。
 - RGB 只有一个效果 `RgbMarquee`（青色跑马灯），只在 `body.presence.set awake` 时触发一次；agent 说话 / 听 / 想的时候灯全黑。出厂固件是「绿=听、蓝=说、灭=闲」。
 
-### 1.5 语义层（服务端）
+### 1.5 语义层（服务端）：2026-10 已落地两条头部通路
 
-- agent 每轮通过 `eidolon_respond` 工具输出 `PresentationCandidate{intent, stance, intensity, pace}`（`eidolon_agent/domain/agent/presentation.py`），intent 9 种（`acknowledge/confirm/consider/clarify/comfort/celebrate/decline/notify/none`）。这个候选被编译成 `ExpressionPlan`（面部）下发。
-- **头部动作完全不在这条通路里**。`head.gesture` 目前只有两个调用方：`body.presence.set`（awake→wake_wobble / warm→droop）和 admin 手动。agent 说「太好了！」的时候脸会 delight，头一动不动。
+- **隐式通道**：channel 每轮回应时把 intent 映射成一个头部手势，与面部 plan 并行下发（`eidolon_channel/eidolon/livekit/agent/session/presentation.py` 的 `present_motion`）。映射是 acknowledge/notify→perk_up、confirm→nod、consider/clarify→glance、comfort→droop、celebrate→wake_wobble、decline→shake。参数固定为 `times=1, hold 350, return 350`，不看 stance、intensity、pace。
+- **显式通道**：agent 工具 `stackchan_head`（SDK `eidolon_sdk/biz/presentation/motion.py`，profile `stackchan.head.v1`）。动作有 nod、shake（1–3 次）、look_left/right/up/down、home、stop。用户明确说「点头」「往左看」时调用，回执区分 `software_sequence` 与物理到位。显式动作所在的那一轮会压掉隐式手势。
+- **门控**：设备 manifest 声明 `motion.profile=stackchan.head.v1`。会话计划带 `motion_profile`，设备只接受这一个精确值（`main/eidolon/output_policy.cc` 的 `ParseSessionOutputPlan`）。工具描述写明「没有灯光动作」。
+- **结论**：原方案设想的 `eidolon.body.v1`、`animation.play`、`perform` 已被这套落地的标准取代，后续扩展在它上面做（§4.5）。
 
 ---
 
@@ -75,7 +77,7 @@
 | Listening | 目前断电（见 §4.1）。目标：微微前倾抬头（pitch +5°）并保持 | 眼略大、随声源微动 | 绿色柔和常亮 |
 | Thinking | 歪头 + 视线上移 | ponder + 扫视 | 蓝色慢呼吸 |
 | Speaking | 随语句节奏小幅点头/摆头（用 TTS PCM 包络驱动） | **嘴型跟随播放 RMS**（现在完全不动） | 蓝色随音量脉动 |
-| 回应 intent | celebrate→蹦跳(pitch bounce)+摇头；comfort→缓慢低头靠近；decline→摇头；clarify→歪头；acknowledge→轻点头 | 现有 face plan | 与 stance 对应的色相 |
+| 回应 intent | 已落地：channel 每轮发一个固定手势（§1.5）。待改进：一 intent 一动作、不看 stance/intensity；目标是 celebrate×playful→bounce、comfort×warm→lean_in 这类参数化（§4.5.2） | 现有 face plan | 与 stance 对应的色相 |
 
 ### 3.3 触摸反应（Si12T 三区头顶触摸板）
 
@@ -103,24 +105,34 @@
 
 ### 3.5 指令 / 表演（充分利用舵机）
 
-供 agent 工具调用或 owner 直接说的命名动作：`dance`（yaw 大幅摆动 + pitch 弹跳 + 灯随节拍，可配本地合成节拍音）、`look_around`（左中右扫视）、`bow`（鞠躬）、`nuzzle`、`stretch`、`shiver`、`peek`（探头）、`sneeze`、`yes/no`（现有 nod/shake 加幅度和次数参数）、`follow_me`（打开视觉跟随：ATK/摄像头 bbox → yaw/pitch，M0 sense.attention 的下游）。
+已落地的 `stackchan_head` 显式工具覆盖 nod、shake、四向看、home、stop。下面的表演类在它上面扩 profile 版本（§4.5.3），不另开 op。候选动作：`dance`（yaw 大幅摆动 + pitch 弹跳 + 灯随节拍，可配本地合成节拍音）、`look_around`（左中右扫视）、`bow`（鞠躬）、`nuzzle`、`stretch`、`shiver`、`peek`（探头）、`sneeze`、`yes/no`（现有 nod/shake 加幅度和次数参数）、`follow_me`（打开视觉跟随：ATK/摄像头 bbox → yaw/pitch，M0 sense.attention 的下游）。
 
 ---
 
 ## 4. 架构方案
 
-### 4.1 先解决舵机断电（P0 前置，最高优先）
+### 4.1 舵机电源：先修现有缺陷，声学实验降为 P1 可选
 
-现状 `SetCaptureQuiet(capture_on)` 把「mic 开」和「舵机电源关」硬绑在一起（`eidolon_voice_controller.cc:3604`），根因是舵机电源轨的开关啸叫（~3 kHz）会把 ADC 打满（见 memory：StackChan uplink audio）。选项：
+2026-10-31 复核结论：电源冲突只存在于**对话中的聆听段**，不在待机。
 
-2026-09-30 代码复核：现有带 deadline 的受控动作已协调采集暂停。新增本地行为首先评估复用这个动作窗口；以下是尚未验证的声学实验选项，不能直接放宽当前门控。
+事实：
+- StackChan 构建脚本关闭了唤醒词，入口是屏幕点按（`scripts/eidolon/eidolon-m5stack-stackchan.sh:393-399`）。
+- 对话结束时 `SuspendConversationAudio` 无条件关闭采集（`main/eidolon/eidolon_voice_controller.cc:4092-4097`）。待机时 mic 关，电轨理论上可以常开。
+- 对话中每轮回应现在都带隐式头部手势。`head_deadline_us_` 有效期间采集被关、电轨打开（`eidolon_voice_controller.cc:4197-4202`），所以 agent 说话期间头能动，这部分已被现有协调覆盖。
 
-1. **按阶段而不是按 mic 门控**（推荐先试）：只在 `UserSpeaking / Recording`（STT 真正在吃音频）时断电；`Silent` 阶段 mic 虽开但只做 VAD/EOT，测一下啸叫是否触发服务端 VAD 误判。若不触发，空闲活性和触摸反应就都能动。
-2. **卸力而不断电**：验证「卸力 + 电轨常开」的啸叫是否真的比断电差（memory 说只有切电轨才能静音，但当时是全双工 AEC 场景；半双工 + 服务端 VAD 的容忍度不同）。
-3. **动作窗口调度**：在 `Silent` 阶段以「短暂通电 → 动 → 断电」为单位做动作（200 ms 上电稳定 + 动作 + 断电），呼噜/呼吸类连续动作不可行，但随机看、触摸反应可行。
-4. 硬件层：给 VM 轨加 LC 滤波 / 换开关频率（问 M5，非本仓库能解）。
+**缺陷 A**（代码阅读得出，未上机验证）：关闭采集的路径没有同步调用 `SetCaptureQuiet(false)`。半双工里 agent 说完后 mic 重新打开、电轨被切断；随后对话结束，电轨就一直断着，`capture_quiet_` 一直为真。待机期间任何 `HeadGesture` 都会以 `CAPTURING` 被拒（`main/boards/m5stack-stackchan/stackchan_body.cc:294`）。`body.presence.set` 调用时不带 observer，拒绝被吞掉，仍回报 `applied=1`。这正是 `PublishClientAudioState` 里「两个门由同一个 owner 推导」那句注释想防止的分叉。修法：关闭采集的路径与 `PublishClientAudioState` 共用同一个推导，capture 门和 servo 门一起设置。
 
-必须先量化再选：录 STT WAV 对比（memory 里有验证方法：期望有调制、无 32768 削顶、ZCR 0.05–0.15）。
+决策：
+1. P0 修缺陷 A。待机期间活性、触摸反射、presence 反射都在电轨常开下运行，没有声学风险。
+2. P0 对话聆听段头保持静止，活性只走脸和灯。宠物在听人说话时本来就该安静，这是合理的默认。
+3. P0 聆听段发生触摸，只做脸、灯反应，不出声、不动头、不关 mic，避免一次摸头吞掉用户半句话。
+4. P1 可选：如果想要聆听段的微动（前倾、呼吸），再做下面的声学实验，用 STT WAV 量化（期望有调制、无 32768 削顶、ZCR 0.05–0.15）。
+
+声学实验清单（仅用于第 4 条）：
+- **按阶段而不是按 mic 门控**：只在 `UserSpeaking / Recording` 时断电，测啸叫是否让服务端 VAD 误判。
+- **卸力而不断电**：验证「卸力 + 电轨常开」的啸叫在半双工 + 服务端 VAD 下是否可接受。
+- **动作窗口调度**：短暂通电、动、断电，适合离散动作，不适合呼吸这类连续动作。
+- 硬件层：VM 轨加 LC 滤波或换开关频率，需要问 M5。
 
 ### 4.2 分层：三个行为源 + 一个仲裁器
 
@@ -146,6 +158,10 @@
 - 高优先级启动即抢占低优先级的**离散**动作；liveness 的呼吸/漂移是连续层，永远叠加不抢占。
 - 每条通道有独立「可用性」：头（电源轨是否可动）、声（`UserSpeaking` 阶段禁播本地音效，否则进 mic）、脸 / 灯（永远可用）。动画在某通道不可用时**降级执行其余通道**，不是整条丢弃。这样即使 §4.1 没解决，摸头至少有脸 + 灯反应。
 - Session 层动作结束后 `on_finish=resume_current_base` 回到 liveness 决定的基态（现有 runtime 语义，不变）。
+- **与服务端动作的仲裁（2026-10-31 新增）**：`head.gesture` 现在有三个来源，channel 隐式手势、agent 显式工具、`body.presence.set`。当前 `gesture_busy_` 是先到先得，忙就回 `BUSY`。本地 clip 接入后如果沿用这个互斥，服务端命令会被呼吸或蹭头动作拒掉，agent 就会说「动作失败」。规则改为：服务端命令抢占本地 clip，本地 clip 记为取消且不上报；服务端动作在跑时本地 clip 直接让路。
+- 服务端动作执行期间暂停呼吸叠加，保证回执 `software_sequence` 对应的就是那段动作。
+- `safety.stop` 之后活性层保持挂起，直到会话结束或下一个显式动作。否则 stop 刚让头放松，呼吸层又把它拉起来。
+- 触摸采样和 clip 播放都不进控制器事件队列。该队列容量 24，2026-09 出过溢出（`docs/validation/controller-inbox-20260923.md`）。只有需要上行时，才把触摸开始、结束这类边沿事件交给控制器。
 
 ### 4.3 多轨动画格式（数据，不是代码）
 
@@ -176,15 +192,36 @@ clip nuzzle {
 
 情绪只做**调制**（选哪个变体、幅度多大、灯色偏暖偏冷、idle 间隔多长），不直接产生动作，保证行为可预测、可在 host 测试里断言。持久化只存 3 个数 + 最近交互时间戳到 NVS（注意 NVS 满时优雅降级，memory 有教训）。
 
-### 4.5 与 agent 语义层的契约（按「先找标准」原则）
+### 4.5 与语义层的契约：在已落地的 `stackchan.head.v1` 上扩展
 
-已有标准：agent 输出 `PresentationCandidate{intent, stance, intensity, pace}` → 编译成按 profile 的 plan（现在只有 `eidolon.face.v1`）。**正确扩展点是给编译器加一个身体 profile，而不是让 LLM 直接点舵机角度。**
+#### 4.5.1 待机本地输出的权限（新增，P0 必须先定）
 
-1. SDK 新增 `eidolon.body.v1` 目录（catalog `body-core-1`）：`nod / shake / tilt / perk_up / droop / bounce / lean_in / recoil / look_around / bow` 等，同样有 intensity / variant，同样受 `Motion` 输出策略门控（现有 `MOTION_NOT_SELECTED` 路径复用）。
-2. 编译规则 = intent × stance → face plan + body plan（例：celebrate/playful → face delight + body bounce；comfort/warm → soften + lean_in；decline → question + shake）。这样 agent 一行代码不改就让全部 9 种 intent 有头部动作。
-3. 命名表演（dance/look_around/peek）作为 agent 工具 `perform(clip, params)`，通过新 op `animation.play`（或复用 `head.gesture` 扩名单）下发，仍走 session 授权 + 5 s deadline（表演类需要放宽 deadline，改成 clip 自带 `max_duration_ms ≤ 30 s`，由设备侧强制）。
-4. 触摸事件上行：`sense.touch{gesture, zone, duration}` 发给 Hub → agent 可以对「被摸」说话（「嘿嘿，别挠我～」）。这是宠物感从「反射」升到「有意识」的一步，但要有节流（一次抚摸只上报一次 start/stop）。
-5. 契约改动顺序按 memory：SDK golden → `generate.py` 重生 `catalog.json` → esp32 lock；ESP32 侧 `presentation_catalog.h` 是生成物，不能手改。
+输出门 `DeviceOutputGate` 是会话作用域。对话结束后 `Close()`，之后 `Allows(...)` 一律返回 false（`main/eidolon/output_policy.cc:134-149`）。StackChan 默认要求输出策略（`EIDOLON_OUTPUT_POLICY_V1=y`），所以待机时 `body.presence.set` 的 motion、face、cue 三项都判为不允许，`applied=0`（`eidolon_voice_controller.cc:3125-3137`）。这是代码阅读结论，需要上机确认 presence 反射在输出策略上线后是否还在待机生效。
+
+宠物行为大多发生在待机，必须先定规则。建议：本地反射不含 Host 生成的内容，以 Owner 的常驻输出策略 `policy_.allowed` 为准，而不是会话选择 `selected_`。Owner 允许了 Motion、Expression、AudioCue，设备就可以在待机用它们做本地反射；会话中仍按会话计划。这不改契约，只是给 gate 加一个读取 Owner 常驻许可的方法。**这个语义需要 Owner 拍板。**
+
+#### 4.5.2 隐式通道：intent 手势参数化
+
+- channel 映射表使用 stance、intensity、pace：intensity 决定次数和幅度，pace 决定停留，stance 选变体（playful→bounce、warm→lean_in）。
+- 新手势名先进设备白名单和 clip 表，再进 channel 映射，不新开 op。
+- 映射表留在 channel，和面部 `_GESTURES` 放在一处，不在 SDK 另建第二个编译器。
+
+#### 4.5.3 显式通道：扩 profile 版本
+
+- 表演类（look_around、bow、tilt、dance）加到 `StackChanHeadAction`，升为 `stackchan.head.v2`。设备 manifest 声明 v2；`ParseSessionOutputPlan` 目前只接受 v1 这一个精确值，需要同时接受 v1 和 v2。
+- dance 的灯光是设备 clip 的装饰轨，不作为模型可寻址的动作，与工具描述「没有灯光动作」一致。
+- 超过 5 s 的表演需要把运动 deadline 改为 clip 自带上限，由设备侧强制。
+
+#### 4.5.4 触摸上行
+
+- 按现有标准建模：manifest 的 `events` 声明 `sense.touch`；Owner 权限比照 `InputSelection.microphone` 增加触摸输入许可。
+- 节流：一次抚摸只报 start 和 stop。
+- agent 对「被摸」开口，依赖主动发起回合。这与 co-presence M0 尚缺的「Hub presence→proactive 桥」是同一块，复用它，不另建。
+- 屏幕点按仍是开始对话的入口。头顶触摸只做宠物反应、不开对话，与出厂分工一致。
+
+#### 4.5.5 契约改动顺序
+
+SDK golden → `generate.py` 重生 `catalog.json` → esp32 lock。ESP32 侧 `presentation_catalog.h` 是生成物，不能手改。
 
 ### 4.6 owner 可配置项（手机端，后做）
 
@@ -192,43 +229,48 @@ clip nuzzle {
 
 ---
 
-## 5. 分阶段落地
+## 5. 分阶段落地（2026-10-31 修订）
 
-### P0 · 设备侧，无契约改动，一周量级，UX 提升最大
+### P0 · 设备侧，无契约改动
 
-1. §4.1 舵机电源门控实验 + 结论（决定 P0 其余项的上限）。
-2. Si12T 驱动移植（出厂 `hal_head_touch.cpp` 逻辑）+ 手势识别（tap/double/long/stroke/rapid/swipe/zone），host 单测覆盖识别器（`tests/` 已有 host 测试骨架）。
-3. `AnimationClip` 表 + 仲裁器；把现有 6 个手势迁入；新增 §3.3 反应表的第一批 clip（tap / stroke / rapid_taps / swipe）。
-4. Liveness 层：呼吸、gaze saccade、随机看、困倦→睡眠→被摸醒。
-5. 嘴型同步：`AgentSpeaking` 时用播放 PCM RMS 驱动 `mouth_open`（播放侧 RMS 已有 `eidolon_livekit_board_recent_playback_rms_ppm`）。
-6. 接上闲置资产：5 个 decorator、`Sleepy` 情绪；修掉 `"sleepy"` 被静默丢弃的 bug。
-7. 合成音效库：purr / chirp / huff / yawn / squeak（延续 `eidolon_local_feedback` 的合成路线，零资产）。
-8. RGB 阶段色（听绿 / 想蓝呼吸 / 说蓝脉动 / 闲暗），触摸色反应。
+0. 修 §4.1 缺陷 A，上机确认对话结束后待机能动头。
+1. 定 §4.5.1 待机本地输出规则（需 Owner 拍板），给 gate 加读取 Owner 常驻许可的方法；上机确认待机 presence 反射恢复。
+2. Si12T 驱动移植（出厂 `hal_head_touch.cpp`）+ 手势识别器（tap/double/long/stroke/rapid/swipe/zone），host 单测覆盖识别器。
+3. `AnimationClip` 表 + 仲裁器，服务端动作优先抢占、本地让路；迁入现有 7 个手势（含 10 月新增的 `home`）作回归基线。
+4. §3.3 触摸反应第一批 clip（tap / stroke / rapid_taps / swipe）。
+5. 待机活性：呼吸、gaze saccade、随机看、困倦→睡眠→被摸醒。对话聆听段只动脸和灯。
+6. 嘴型同步：取 `on_audio_render_reference` 在渲染侧算的播放 RMS。它排在 10 月新增的播放预缓冲之后，口型不会领先声音。
+7. 接上闲置资产：5 个 decorator、`Sleepy`；修 `"sleepy"` 被静默丢弃。
+8. 合成音效库：purr / chirp / huff / yawn / squeak，按 §4.5.1 的 AudioCue 规则门控，对话聆听段禁播。
+9. RGB 阶段色（听绿、想蓝呼吸、说蓝脉动、闲暗）和触摸色反应。
 
-### P1 · 情绪模型 + 更多传感器
+### P1 · 情绪模型、传感器、可选声学实验
 
-9. §4.4 三标量情绪 + NVS 持久化 + 调制 liveness/clip 选择。
-10. BMI270：摇晃眩晕、被举起惊吓、倾斜补偿。LTR-553：靠近先抬眼、暗光困倦。
+10. §4.4 三标量情绪 + NVS 持久化 + 调制活性和 clip 选择。
+11. BMI270：摇晃眩晕、被举起惊吓、倾斜补偿。LTR-553：靠近先抬眼、暗光困倦。
+12. 可选：聆听段微动的声学实验（§4.1 第 4 条）。
 
-### P2 · 语义层契约
+### P2 · 语义层（在 `stackchan.head.v1` 上扩展）
 
-11. SDK `eidolon.body.v1` + intent 编译规则 → 9 种 intent 全部带身体语言。
-12. `animation.play` + agent `perform` 工具 + 表演类 clip（dance/look_around/bow/peek）。
-13. `sense.touch` 上行 + agent 对触摸的口头反应。
+13. channel 隐式手势参数化（§4.5.2）。
+14. `stackchan.head.v2` 表演类动作（§4.5.3）。
+15. `sense.touch` 上行 + 复用 proactive 桥（§4.5.4）。
 
 ### P3 · 打磨
 
-14. 视觉跟随（M0 sense.attention → yaw/pitch，接 ATK 眼）。
-15. 手机端宠物设置；clip 作者工具（导入出厂舞蹈编排）。
+16. 视觉跟随（M0 sense.attention → yaw/pitch，接 ATK 眼）。
+17. 手机端宠物设置；clip 作者工具（导入出厂舞蹈编排）。
 
 ---
 
 ## 6. 风险与约束
 
-- **舵机电源 vs mic**（§4.1）是唯一可能让整个方案打折的点，必须第一个做实验。
+- **待机本地输出权限**（§4.5.1）是唯一需要产品决定的点。不定下来，待机期间所有宠物行为都会被输出门拒绝。
+- 舵机电源与 mic 的冲突已收窄到对话聆听段（§4.1），不再是整个方案的前置。
+- 本地 clip 若沿用 `BUSY` 互斥，会让服务端动作失败，agent 会对用户说错话（§4.2）。
 - 内部 DMA SRAM 极紧（memory 家族），新功能不开新任务：动画播放挂在现有 50 Hz `UpdateLoop`，触摸轮询挂在现有 LVGL 20 ms timer 或同一 tick，情绪模型无任务。
 - 空闲动作耗电与舵机寿命：默认幅度小、频率低，`idle_motion` 可关；电量低（INA226/AXP）自动降到只动脸。
-- 本地音效在半双工没有 AEC：`UserSpeaking` 期间静音本地 sfx，否则进 STT。
+- 本地音效在半双工没有 AEC：对话聆听段禁播本地 sfx，否则进 STT。
 - 触摸板在头顶，摸的时候可能连带碰到屏幕：FT6336 与 Si12T 事件要互斥（屏幕点按仍是 UI 操作，不触发宠物反应）。
 - 契约扩展要走 SDK 生成链，`presentation_catalog.h` 禁止手改。
 
@@ -281,3 +323,20 @@ purr（AM 低频，随抚摸渐强渐慢）/ chirp_up（疑问）/ chirp_down（
 
 ### 8.6 时间线
 开机精神 → 交互后兴奋 → 冷落 30 min 困倦 → 60 min 睡着（偶发小动）→ 被吵醒不情愿。靠 energy 标量 + Hub 时间，不加动画。
+
+---
+
+## 9. 复核记录
+
+### 2026-10-31（对照 9-21 之后的约 130 个提交和兄弟仓库）
+
+| 变化 | 来源 | 对方案的影响 |
+|---|---|---|
+| 服务端落地 `stackchan.head.v1`：channel 隐式 intent 手势 + agent 显式 `stackchan_head` 工具 | SDK b210617、agent 2457712、channel 4437e17 / 0b9b4d4、本仓 0d13718c | §1.5 和 §4.5 原设想作废，改为在其上扩展 |
+| 设备手势白名单新增 `home` | 0d13718c | clip 回归基线为 7 个手势 |
+| StackChan 关闭唤醒词、屏幕点按开对话；对话结束无条件关采集 | 构建脚本、`SuspendConversationAudio` | 待机无声学冲突，§4.1 声学实验降为 P1 可选 |
+| 对话结束不恢复舵机电轨（缺陷 A） | 代码阅读，未上机 | 新增 P0 第 0 项 |
+| 输出门为会话作用域，待机拒绝一切输出 | `output_policy.cc`，未上机 | 新增 §4.5.1，P0 第 1 项需 Owner 决定 |
+| 麦克风成为独立 Owner 输入许可 | c7ba1fc3、SDK `InputSelection` | 触摸上行比照建模 |
+| 控制器事件队列出过溢出 | `docs/validation/controller-inbox-20260923.md` | §4.2 规定触摸采样不进控制器队列 |
+| 播放预缓冲、渲染侧 RMS | fa381617、`livekit_board.cc` | 嘴型同步取渲染侧 RMS，口型不领先声音 |
