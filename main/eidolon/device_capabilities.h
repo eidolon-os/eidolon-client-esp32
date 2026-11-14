@@ -21,6 +21,11 @@ struct DeviceCapabilities {
     bool audio_cue = false;
     bool motion = false;
     bool stackchan_head = false;
+    // Settings the board can change and report (device_settings_core). Read
+    // from the board at runtime, not compiled in: whether a backlight exists is
+    // the board's to say.
+    bool volume_setting = false;
+    bool brightness_setting = false;
     uint32_t OutputMask() const {
         using presentation::Output;
         return (speaker ? static_cast<uint32_t>(Output::Speech) : 0u) |

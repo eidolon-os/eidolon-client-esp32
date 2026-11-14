@@ -38,11 +38,15 @@ void AudioCodec::Start() {
 }
 
 void AudioCodec::SetOutputVolume(int volume) {
+    const bool changed = output_volume_ != volume;
     output_volume_ = volume;
     ESP_LOGI(TAG, "Set output volume to %d", output_volume_);
     
     Settings settings("audio", true);
     settings.SetInt("output_volume", output_volume_);
+    if (changed && volume_observer_) {
+        volume_observer_(output_volume_);
+    }
 }
 
 void AudioCodec::SetInputGain(float gain) {

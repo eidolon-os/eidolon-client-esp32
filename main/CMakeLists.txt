@@ -1128,6 +1128,7 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/eidolon_ui_presenter.cc"
         "eidolon/eidolon_view.cc"
         "eidolon/output_policy.cc"
+        "eidolon/device_settings_core.cc"
         "eidolon/policy_audio_renderer.cc"
         "eidolon/claim_recovery_core.cc"
         "eidolon/hub_activation_retry_core.cc"

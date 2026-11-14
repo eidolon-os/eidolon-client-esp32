@@ -3,6 +3,7 @@
 #include "room_config_json.h"
 #include "hub_onboarding_protocol.h"
 #include "device_capabilities.h"
+#include "device_settings_core.h"
 
 #include "eidolon_device_profile.h"
 #include "eidolon_topics.h"
@@ -458,7 +459,19 @@ std::string BuildDeviceManifestJson(const std::string& board_name, const DeviceC
     // across boots that declare the same thing.
     if (capabilities.motion && capabilities.stackchan_head)
         properties += ",{\"name\":\"motion.profile\",\"observable\":false,\"schema\":{\"const\":\"stackchan.head.v1\",\"type\":\"string\"},\"writable\":false}";
-    const std::string actions = capabilities.expression ? expression::kManifestActions : "[]";
+    std::string actions = capabilities.expression ? expression::kManifestActions : "[]";
+    // Settings the board can change, declared exactly as the Host installed
+    // them so the Channel admits them; their values are observable properties.
+    const bool volume = capabilities.speaker && capabilities.volume_setting;
+    const std::string setting_actions =
+        device_settings::DeclaredActions(volume, capabilities.brightness_setting);
+    if (!setting_actions.empty()) {
+        actions = actions == "[]" ? "[" + setting_actions + "]"
+                                  : actions.substr(0, actions.size() - 1) + "," + setting_actions + "]";
+    }
+    const std::string setting_properties =
+        device_settings::DeclaredProperties(volume, capabilities.brightness_setting);
+    if (!setting_properties.empty()) properties += "," + setting_properties;
     return "{\"actions\":" + actions + ",\"events\":[],\"media\":[" + media +
            "],\"properties\":[" + properties +
            "],\"schema_version\":1,\"title\":" + escaped + "}";

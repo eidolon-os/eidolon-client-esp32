@@ -13,6 +13,7 @@ files = {
     "golden/companion-manifest.json": "tests/fixtures/presentation/companion-manifest.json",
     "embedded/output_catalog.h": "main/eidolon/expression/generated/output_catalog.h",
     "embedded/presentation_catalog.h": "main/eidolon/expression/generated/presentation_catalog.h",
+    "embedded/device_settings_catalog.h": "main/eidolon/generated/device_settings_catalog.h",
     "golden/expression-plan.json": "tests/fixtures/presentation/expression-plan.json",
     "golden/silent-session.json": "tests/fixtures/presentation/silent-session.json",
 }

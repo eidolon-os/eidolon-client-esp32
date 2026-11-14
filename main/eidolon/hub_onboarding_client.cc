@@ -6,6 +6,7 @@
 #include "device_control_proof_documents.h"
 
 #include "board.h"
+#include "device_capabilities.h"
 
 #include "authority_locator.h"
 #include "claim_recovery_core.h"
@@ -49,6 +50,18 @@ namespace {
 int64_t DeviceUnixTime() {
     const std::time_t now = std::time(nullptr);
     return now > 1600000000 ? static_cast<int64_t>(now) : 0;
+}
+
+// What this board declares, from the hardware it has. The voice controller
+// serves its settings from the same board queries, so a declared setting is
+// one the device can carry out.
+DeviceCapabilities DeclaredCapabilities() {
+    auto capabilities = CompiledDeviceCapabilities();
+    auto& board = Board::GetInstance();
+    capabilities.camera = board.GetCamera() != nullptr;
+    capabilities.volume_setting = board.GetAudioCodec() != nullptr;
+    capabilities.brightness_setting = board.GetBacklight() != nullptr;
+    return capabilities;
 }
 }  // namespace
 
@@ -498,9 +511,8 @@ void HubOnboardingClient::ReconcileDeclaredManifest(
     const ActiveClaimState& claim,
     const AcceptedManifestRef& accepted)
 {
-    const bool has_camera = Board::GetInstance().GetCamera() != nullptr;
     const std::string manifest_document =
-        BuildDeviceManifestJson(BOARD_NAME, has_camera);
+        BuildDeviceManifestJson(BOARD_NAME, DeclaredCapabilities());
     const std::string manifest_digest = Sha256Digest(manifest_document);
     const ManifestAssertionPlan plan =
         PlanManifestAssertion(accepted, manifest_digest);
@@ -992,9 +1004,8 @@ esp_err_t HubOnboardingClient::ContinueCanonicalClaim(
         // was admitted, mounted and bound to a Companion, and then the Channel
         // Provider had nothing to provision from: the device sat in
         // WaitingBinding forever, having told the Host it could carry nothing.
-        const bool has_camera = Board::GetInstance().GetCamera() != nullptr;
         const std::string manifest_document =
-            BuildDeviceManifestJson(BOARD_NAME, has_camera);
+            BuildDeviceManifestJson(BOARD_NAME, DeclaredCapabilities());
         const std::string manifest_digest = Sha256Digest(manifest_document);
         const std::string canonical_create =
             std::string("{\"profile_id\":\"eidolon-trust-p256-hpke-v1\"") +

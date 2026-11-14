@@ -3,6 +3,8 @@
 #include <cJSON.h>
 #include <fstream>
 #include <sstream>
+#include <string>
+#include <vector>
 using namespace eidolon;
 using presentation::Output;
 int main() {
@@ -175,4 +177,33 @@ int main() {
     assert(!ParseSessionOutputPlan(json,plan));
     cJSON_Delete(json);
     assert(plan.face_profile && plan.selected==expression && plan.session_id=="session-1");
+
+    // A plan lists the installed device capabilities this session may invoke;
+    // the gate keeps them for exactly as long as the session is active.
+    SessionOutputPlan with_settings;
+    auto* settings_json=cJSON_Parse(R"({"schema_version":1,"session_id":"talk","policy_revision":1,)"
+        R"("outputs":{"speech":true},"expression_profile":null,"motion_profile":null,)"
+        R"("device_capabilities":["audio.volume.set","audio.volume.adjust"]})");
+    assert(ParseSessionOutputPlan(settings_json,with_settings));
+    cJSON_Delete(settings_json);
+    assert((with_settings.device_capabilities==std::vector<std::string>{"audio.volume.set","audio.volume.adjust"}));
+    for (const char* raw : {
+            R"({"schema_version":1,"session_id":"talk","policy_revision":1,"outputs":{"speech":true},"device_capabilities":"audio.volume.set"})",
+            R"({"schema_version":1,"session_id":"talk","policy_revision":1,"outputs":{"speech":true},"device_capabilities":[1]})",
+            R"({"schema_version":1,"session_id":"talk","policy_revision":1,"outputs":{"speech":true},"device_capabilities":[""]})"}) {
+        auto* bad=cJSON_Parse(raw); SessionOutputPlan refused;
+        assert(!ParseSessionOutputPlan(bad,refused)); cJSON_Delete(bad);
+    }
+    DeviceOutputGate settings_gate(false);
+    assert(settings_gate.CapabilityBinding().session_id.empty());
+    assert(settings_gate.Bind(DeviceOutputPolicy{true,1,speech,false,true}));
+    with_settings.policy_revision=1;
+    assert(settings_gate.Start(with_settings,"talk"));
+    const auto binding=settings_gate.CapabilityBinding();
+    assert(binding.session_id=="talk" && binding.policy_revision==1 && binding.capabilities.size()==2);
+    settings_gate.Suspend();
+    assert(settings_gate.CapabilityBinding().session_id.empty());  // a suspended session acts on nothing
+    assert(settings_gate.Resume("talk"));
+    settings_gate.Close();
+    assert(settings_gate.CapabilityBinding().session_id.empty());
 }

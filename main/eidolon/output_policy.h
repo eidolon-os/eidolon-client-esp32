@@ -4,6 +4,7 @@
 #endif
 #include <cstdint>
 #include <string>
+#include <vector>
 #include <mutex>
 struct cJSON;
 #include "eidolon/expression/generated/output_catalog.h"
@@ -37,6 +38,17 @@ struct SessionOutputPlan {
     uint32_t policy_revision=0, selected=0;
     bool face_profile=false;
     bool microphone=true;
+    // Installed device capabilities this session may invoke, as the Host's
+    // plan lists them. Absent from the wire when there are none.
+    std::vector<std::string> device_capabilities{};
+};
+
+// What an agent's invocation in the current session is bound to; empty
+// `session_id` when no session is active.
+struct SessionCapabilityBinding {
+    std::string session_id;
+    uint32_t policy_revision=0;
+    std::vector<std::string> capabilities;
 };
 bool ParseOutputPolicy(const cJSON* json,DeviceOutputPolicy& output);
 bool ParseSessionOutputPlan(const cJSON* json,SessionOutputPlan& output);
@@ -57,6 +69,8 @@ public:
     bool Allows(presentation::Output output) const;
     bool AllowsAny(uint32_t outputs) const;
     bool AllowsMicrophone() const;
+    // The active, unsuspended session's binding for device capability calls.
+    SessionCapabilityBinding CapabilityBinding() const;
 private:
     bool CanResumeLocked(const std::string& expected_session) const;
     mutable std::mutex mutex_;
@@ -65,6 +79,7 @@ private:
     DeviceOutputPolicy policy_;
     uint32_t selected_=0;
     bool microphone_=false;
+    std::vector<std::string> device_capabilities_;
     const uint32_t supported_outputs_;
 };
 DeviceOutputGate& CurrentOutputGate();

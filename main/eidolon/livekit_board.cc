@@ -1,6 +1,7 @@
 // LiveKit media board bring-up for Waveshare ESP32-S3-Touch-AMOLED-2.06 (shared BoxAudioCodec).
 
 #include "livekit_board.h"
+#include "settings.h"
 #include "policy_audio_renderer.h"
 
 #include "audio_codec.h"
@@ -309,7 +310,12 @@ extern "C" esp_err_t eidolon_livekit_board_init(bool audio_input, bool audio_out
         if (codec->output_enabled()) {
             codec->EnableOutput(false);
         }
-        codec->SetOutputVolume(LIVEKIT_SPEAKER_VOLUME);
+        // The volume is the device's setting: its Owner, a voice request or its
+        // own buttons may have changed it, and rebuilding the media board must
+        // not put it back. The configured value is only a first boot's default.
+        Settings saved("audio", false);
+        const int volume = saved.GetInt("output_volume", -1);
+        codec->SetOutputVolume(volume >= 0 ? volume : LIVEKIT_SPEAKER_VOLUME);
     }
 
     ESP_RETURN_ON_ERROR(register_media_codecs(), TAG, "media codecs");

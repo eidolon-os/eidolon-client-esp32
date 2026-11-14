@@ -37,6 +37,19 @@ public:
     using SessionControlCallback = std::function<void(const std::string& payload, uint32_t generation, bool agent)>;
     using DeviceEventCallback =
         std::function<void(const std::string& payload, uint32_t generation)>;
+    // A call on one of the device's RPC methods (device_settings_core). The
+    // transport only classifies the caller the way it classifies control
+    // packets and hands the call over; the controller answers from its own task.
+    struct RpcCall {
+        std::string id;
+        std::string method;
+        std::string payload;
+        bool agent = false;
+        bool provider = false;
+        uint32_t generation = 0;
+    };
+    // Returns whether the call was taken; a refused one is answered here.
+    using RpcCallback = std::function<bool(RpcCall call)>;
 
     esp_err_t Connect(const Esp32HubConfig& config, uint32_t generation);
 
@@ -80,6 +93,12 @@ public:
     void SetOnControlCommand(ControlCommandCallback cb) { on_control_command_ = std::move(cb); }
     void SetOnSessionControl(SessionControlCallback cb) { on_session_control_ = std::move(cb); }
     void SetOnDeviceEvent(DeviceEventCallback cb) { on_device_event_ = std::move(cb); }
+    void SetOnRpc(RpcCallback cb) { on_rpc_ = std::move(cb); }
+    // Answer one call: `error_code` 0 sends `text` as the payload, anything
+    // else as the error. Dropped when the room the call arrived on is gone or
+    // replaced, because the SDK's sender belongs to that room.
+    void RespondRpc(uint32_t generation, const std::string& id, int error_code,
+                    const std::string& text);
 
 private:
     static void OnRoomStateChanged(livekit_connection_state_t state, void* ctx);
@@ -95,6 +114,14 @@ private:
     std::array<std::string, 4> agent_peers_;
     PendingSessionControl pending_session_control_;
     static void OnDataReceived(const livekit_data_received_t* data, void* ctx);
+    // The SDK passes RPC handlers no context, and this device holds one room.
+    static void OnRpcInvocation(const livekit_rpc_invocation_t* invocation, void* ctx);
+    static LiveKitSession* rpc_session_;
+    void RegisterRpcMethods();
+    RpcCallback on_rpc_;
+    std::mutex rpc_mutex_;
+    bool (*rpc_send_)(const livekit_rpc_result_t* result, void* ctx) = nullptr;
+    void* rpc_ctx_ = nullptr;
 
     void HandleStateChanged(livekit_connection_state_t state);
     void HandleUiStatePayload(const char* payload, size_t size);

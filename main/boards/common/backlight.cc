@@ -40,6 +40,7 @@ void Backlight::RestoreBrightness() {
         saved_brightness = 10;  // 设置一个较低的默认值
     }
     
+    setting_ = static_cast<uint8_t>(saved_brightness > 100 ? 100 : saved_brightness);
     SetBrightness(saved_brightness);
 }
 
@@ -48,13 +49,20 @@ void Backlight::SetBrightness(uint8_t brightness, bool permanent) {
         brightness = 100;
     }
 
-    if (brightness_ == brightness) {
-        return;
-    }
-
+    // A permanent level is a choice, recorded even when the screen already
+    // shows it; a transient one (power saving) changes only the screen.
     if (permanent) {
+        const bool changed = setting_ != brightness;
+        setting_ = brightness;
         Settings settings("display", true);
         settings.SetInt("brightness", brightness);
+        if (changed && setting_observer_) {
+            setting_observer_(setting_);
+        }
+    }
+
+    if (brightness_ == brightness) {
+        return;
     }
 
     target_brightness_ = brightness;

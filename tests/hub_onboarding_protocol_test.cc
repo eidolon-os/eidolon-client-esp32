@@ -4,6 +4,7 @@
 #include <fstream>
 #include <map>
 #include <sstream>
+#include <set>
 #include <string>
 
 #include "eidolon/hub_onboarding_protocol.h"
@@ -329,6 +330,47 @@ void TestCanonicalManifest()
         assert(found == mask);
         cJSON_Delete(root);
     }
+
+    // Settings a board can change are declared exactly as the Host installed
+    // them, and only when the board has the hardware.
+    for (int mask = 0; mask != 4; ++mask) {
+        eidolon::DeviceCapabilities caps;
+        caps.volume_setting = (mask & 1) != 0;
+        caps.brightness_setting = (mask & 2) != 0;
+        const auto manifest = eidolon::BuildDeviceManifestJson("settings", caps);
+        cJSON* root = cJSON_Parse(manifest.c_str());
+        assert(root != nullptr);
+        std::set<std::string> actions;
+        const cJSON* action = nullptr;
+        cJSON_ArrayForEach(action, cJSON_GetObjectItemCaseSensitive(root, "actions")) {
+            actions.insert(cJSON_GetObjectItemCaseSensitive(action, "name")->valuestring);
+        }
+        std::set<std::string> observable;
+        const cJSON* prop = nullptr;
+        cJSON_ArrayForEach(prop, cJSON_GetObjectItemCaseSensitive(root, "properties")) {
+            if (cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(prop, "observable"))) {
+                observable.insert(cJSON_GetObjectItemCaseSensitive(prop, "name")->valuestring);
+            }
+        }
+        std::set<std::string> expected_actions;
+        std::set<std::string> expected_properties;
+        if (mask & 1) {
+            expected_actions.insert({"audio.volume.set", "audio.volume.adjust"});
+            expected_properties.insert("audio.volume");
+        }
+        if (mask & 2) {
+            expected_actions.insert({"display.brightness.set", "display.brightness.adjust"});
+            expected_properties.insert("display.brightness");
+        }
+        assert(actions == expected_actions);
+        assert(observable == expected_properties);
+        cJSON_Delete(root);
+    }
+    // A board without a speaker has no volume to declare, whatever it was told.
+    eidolon::DeviceCapabilities mute;
+    mute.speaker = false;
+    mute.volume_setting = true;
+    assert(eidolon::BuildDeviceManifestJson("mute", mute).find("audio.volume") == std::string::npos);
 }
 
 // The configuration response vector. Distinct from the inline bodies in

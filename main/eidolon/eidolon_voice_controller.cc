@@ -4,6 +4,10 @@
 #include "controller_worker_resources.h"
 
 #include "board.h"
+#include "output_policy.h"
+#include "eidolon/generated/device_settings_catalog.h"
+#include "backlight.h"
+#include "audio_codec.h"
 #include "control_protocol.h"
 #include "device_event_builder.h"
 #include "device_identity.h"
@@ -44,6 +48,7 @@
 #include <cstring>
 #include <ctime>
 #include <new>
+#include <optional>
 #include <stdio.h>
 
 #ifndef CONFIG_EIDOLON_PTT_RELEASE_TAIL_MS
@@ -233,6 +238,45 @@ namespace eidolon {
 EidolonVoiceController::EidolonVoiceController(GuardService* guard_service)
     : guard_service_(guard_service)
 {
+    {
+        // The board's hardware is known now; a call can only arrive once this
+        // controller has joined a room. Declared and served from the same
+        // facts the Manifest reads (HubOnboardingClient), so a declared setting
+        // is one this device can carry out.
+        auto& board = Board::GetInstance();
+        AudioCodec* codec = CompiledDeviceCapabilities().speaker ? board.GetAudioCodec() : nullptr;
+        Backlight* backlight = board.GetBacklight();
+        device_settings::Actuators actuators;
+        if (codec != nullptr) {
+            actuators.read_volume = [codec] { return std::optional<int>(codec->output_volume()); };
+            actuators.apply_volume = [codec](int volume) {
+                codec->SetOutputVolume(volume);
+                return std::optional<int>(codec->output_volume());
+            };
+        }
+        if (backlight != nullptr) {
+            actuators.read_brightness = [backlight] {
+                return std::optional<int>(backlight->setting());
+            };
+            actuators.apply_brightness = [backlight](int brightness) {
+                backlight->SetBrightness(static_cast<uint8_t>(brightness), true);
+                return std::optional<int>(backlight->setting());
+            };
+        }
+        settings_ = std::make_unique<device_settings::Runtime>(std::move(actuators));
+        // Whatever changed the value — a command, a button, a restore — the
+        // observer only hands it to this task, which reports it.
+        if (codec != nullptr) {
+            codec->SetOutputVolumeObserver([this](int volume) {
+                ReportPropertyChange(device_settings::kVolumeProperty, volume);
+            });
+        }
+        if (backlight != nullptr) {
+            backlight->SetSettingObserver([this](uint8_t brightness) {
+                ReportPropertyChange(device_settings::kBrightnessProperty, brightness);
+            });
+        }
+    }
     if (!inbox_.Valid()) {
         ESP_LOGE(TAG, "Failed to create controller event queue");
         return;
@@ -377,12 +421,14 @@ void EidolonVoiceController::DispatchAndRelease(const Event& ev)
     delete ev.payload;
     delete ev.activation_config;
     delete ev.completion;
+    delete ev.rpc;
 }
 
 esp_err_t EidolonVoiceController::Enqueue(Event ev)
 {
     if (!inbox_.Valid() || task_ == nullptr) {
         delete ev.payload;
+        delete ev.rpc;
         delete ev.activation_config;
         if (ev.completion != nullptr) {
             (*ev.completion)(false);
@@ -420,6 +466,7 @@ esp_err_t EidolonVoiceController::Enqueue(Event ev)
             cJSON_Delete(json);
         }
         delete ev.payload;
+        delete ev.rpc;
         delete ev.activation_config;
         if (ev.completion != nullptr) {
             (*ev.completion)(false);
@@ -519,6 +566,16 @@ void EidolonVoiceController::Dispatch(const Event& ev)
     case EventType::PublishDeviceEvent:
         if (ev.payload != nullptr) {
             DoPublishDeviceEvent(*ev.payload);
+        }
+        break;
+    case EventType::DeviceRpc:
+        if (ev.rpc != nullptr) {
+            DoDeviceRpc(*ev.rpc);
+        }
+        break;
+    case EventType::PropertyChanged:
+        if (ev.payload != nullptr) {
+            DoPropertyChanged(*ev.payload);
         }
         break;
 #if CONFIG_EIDOLON_SMARTHOME_PANEL
@@ -2312,6 +2369,71 @@ void EidolonVoiceController::DoDeviceEvent(const std::string& payload,
     }
 }
 
+void EidolonVoiceController::ReportPropertyChange(const char* property, int value)
+{
+    if (!settings_) return;
+    const std::optional<std::string> payload = settings_->PropertyChangedPayload(property, value);
+    if (!payload.has_value()) return;
+    Event ev;
+    ev.type = EventType::PropertyChanged;
+    ev.payload = new (std::nothrow) std::string(*payload);
+    if (ev.payload != nullptr) Enqueue(ev);
+}
+
+void EidolonVoiceController::DoPropertyChanged(const std::string& payload)
+{
+    // A fact about the device itself, so it is reported whether the device is
+    // idle or in a conversation — the moment someone changes the volume by
+    // voice is exactly when it changes. With no channel there is nobody to
+    // tell; a reader that joins later asks (eidolon.properties.read.v1).
+    if (!session_.IsConnected()) return;
+    const auto epoch_now = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    const uint64_t monotonic_ms = static_cast<uint64_t>(esp_timer_get_time() / 1000);
+    const uint64_t occurred_at_ms = epoch_now >= 1'700'000'000'000LL
+        ? static_cast<uint64_t>(epoch_now) : monotonic_ms;
+    const std::string event = BuildDeviceEventJson({
+        .event_id = MakeDeviceEventId("evt-prop", monotonic_ms, esp_random()),
+        .flow_id = MakeDeviceEventId("flow-prop", monotonic_ms, esp_random()),
+        .causation_id = "",
+        .type = device_settings::kPropertyChangedType,
+        .source_device_id = OperationalDeviceInstanceId(),
+        .source_component = "settings",
+        .occurred_at_ms = occurred_at_ms,
+        .expires_at_ms = occurred_at_ms + DeviceEventBus::kMaxTtlMs,
+        .payload_json = payload,
+    });
+    if (event.empty()) return;
+    const esp_err_t err = session_.PublishData(kEventTopic, event, true);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "[settings] property change not sent: %s", esp_err_to_name(err));
+    }
+}
+
+void EidolonVoiceController::DoDeviceRpc(const LiveKitSession::RpcCall& call)
+{
+    using device_settings::Caller;
+    device_settings::Binding binding;
+    binding.room = config_.session.room_name;
+    binding.standing_policy_revision =
+        config_.output_policy.known ? config_.output_policy.revision : 0;
+    const SessionCapabilityBinding session = CurrentOutputGate().CapabilityBinding();
+    binding.session_id = session.session_id;
+    binding.session_policy_revision = session.policy_revision;
+    binding.session_capabilities = session.capabilities;
+    const Caller caller =
+        call.provider ? Caller::Provider : (call.agent ? Caller::Agent : Caller::Unknown);
+    const int64_t epoch_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    const auto answer = settings_->Handle(call.method, caller, call.payload, binding, epoch_ms,
+                                          epoch_ms >= 1'700'000'000'000LL);
+    ESP_LOGI(TAG, "[settings] rpc method=%s caller=%s ok=%d error=%s", call.method.c_str(),
+             caller == Caller::Provider ? "provider" : (caller == Caller::Agent ? "agent" : "unknown"),
+             answer.ok, answer.ok ? "" : answer.error_message.c_str());
+    session_.RespondRpc(call.generation, call.id, answer.ok ? 0 : answer.error_code,
+                        answer.ok ? answer.payload : answer.error_message);
+}
+
 void EidolonVoiceController::DoPublishDeviceEvent(const std::string& payload)
 {
     if (!standby_ || !session_.IsConnected()) {
@@ -3316,6 +3438,14 @@ void EidolonVoiceController::DoActivation(const Esp32HubConfig& config)
         ev.flag = speaking;
         ev.generation = generation;
         Enqueue(ev);
+    });
+    session_.SetOnRpc([this](LiveKitSession::RpcCall call) {
+        if (!device_settings::Runtime::IsMethod(call.method)) return false;
+        Event ev;
+        ev.type = EventType::DeviceRpc;
+        ev.generation = call.generation;
+        ev.rpc = new (std::nothrow) LiveKitSession::RpcCall(std::move(call));
+        return ev.rpc != nullptr && Enqueue(ev) == ESP_OK;
     });
     session_.SetOnDeviceEvent([this](const std::string& payload, uint32_t generation) {
         Event ev;

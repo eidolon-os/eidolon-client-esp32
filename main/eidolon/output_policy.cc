@@ -70,9 +70,19 @@ bool ParseOutputPolicy(const cJSON* json,DeviceOutputPolicy& output) {
     candidate.known=true;output=candidate;return true;
 }
 bool ParseSessionOutputPlan(const cJSON* json,SessionOutputPlan& output) {
-    if (!Keys(json,{"schema_version","session_id","policy_revision","outputs","expression_profile","motion_profile","inputs"}) ||
+    if (!Keys(json,{"schema_version","session_id","policy_revision","outputs","expression_profile","motion_profile","inputs","device_capabilities"}) ||
         !Version(json)) return false;
     SessionOutputPlan plan;
+    if (const auto* capabilities=cJSON_GetObjectItemCaseSensitive(json,"device_capabilities")) {
+        // The SDK bounds a session's set at 64 names; each is a registry name.
+        if (!cJSON_IsArray(capabilities) || cJSON_GetArraySize(capabilities)>64) return false;
+        const cJSON* name=nullptr;
+        cJSON_ArrayForEach(name,capabilities) {
+            if (!cJSON_IsString(name) || !name->valuestring || !*name->valuestring ||
+                std::strlen(name->valuestring)>128) return false;
+            plan.device_capabilities.emplace_back(name->valuestring);
+        }
+    }
     const auto* inputs=cJSON_GetObjectItemCaseSensitive(json,"inputs");
     if (inputs && !Input(inputs,plan.microphone)) return false;
     auto* session=cJSON_GetObjectItemCaseSensitive(json,"session_id");
@@ -97,9 +107,9 @@ bool DeviceOutputGate::Bind(const DeviceOutputPolicy& policy) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (policy_.known && (!policy.known || policy.revision<policy_.revision ||
         (policy.revision==policy_.revision && !(policy==policy_)))) {
-        active_=false;selected_=0;session_id_.clear();return false;
+        active_=false;selected_=0;session_id_.clear();device_capabilities_.clear();return false;
     }
-    if (!(policy==policy_)) { active_=false;selected_=0;session_id_.clear(); }
+    if (!(policy==policy_)) { active_=false;selected_=0;session_id_.clear();device_capabilities_.clear(); }
     policy_=policy;return true;
 }
 bool DeviceOutputGate::Start(const SessionOutputPlan& plan,const std::string& expected_session) {
@@ -109,10 +119,11 @@ bool DeviceOutputGate::Start(const SessionOutputPlan& plan,const std::string& ex
         (!plan.microphone && !(plan.selected&kResponseOutputs)) || (plan.selected&~policy_.allowed) ||
         (plan.selected&~supported_outputs_) ||
         plan.face_profile!=bool(plan.selected&OutputBit(presentation::Output::Expression))) {
-        active_=false;selected_=0;session_id_.clear();return false;
+        active_=false;selected_=0;session_id_.clear();device_capabilities_.clear();return false;
     }
     active_=true;suspended_=false;session_id_=plan.session_id;
-    selected_=plan.selected;microphone_=plan.microphone;return true;
+    selected_=plan.selected;microphone_=plan.microphone;
+    device_capabilities_=plan.device_capabilities;return true;
 }
 void DeviceOutputGate::Suspend() {
     std::lock_guard<std::mutex> lock(mutex_);suspended_=true;
@@ -133,6 +144,12 @@ bool DeviceOutputGate::Resume(const std::string& expected_session) {
 }
 void DeviceOutputGate::Close() {
     std::lock_guard<std::mutex> lock(mutex_);active_=false;suspended_=true;selected_=0;session_id_.clear();
+    device_capabilities_.clear();
+}
+SessionCapabilityBinding DeviceOutputGate::CapabilityBinding() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!policy_.known || !active_ || suspended_) return {};
+    return {session_id_, policy_.revision, device_capabilities_};
 }
 bool DeviceOutputGate::Allows(presentation::Output output) const {
     return AllowsAny(OutputBit(output));

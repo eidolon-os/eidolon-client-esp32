@@ -10,6 +10,7 @@
 #include <deque>
 #include <functional>
 #include <atomic>
+#include <memory>
 #include <string>
 #include <type_traits>
 
@@ -29,6 +30,7 @@
 #include "guard/owner_presence_adapter.h"
 #endif
 #include "hub_types.h"
+#include "device_settings_core.h"
 #include "livekit_session.h"
 #include "session_playback_state.h"
 #include "voice_session_state.h"
@@ -145,6 +147,8 @@ private:
         SessionControl,
         DeviceEvent,
         PublishDeviceEvent,
+        DeviceRpc,
+        PropertyChanged,
 #if CONFIG_EIDOLON_SMARTHOME_PANEL
         PanelRequest,
 #endif
@@ -187,6 +191,7 @@ private:
         std::string* payload = nullptr;  // owned; the loop deletes it after dispatch
         Esp32HubConfig* activation_config = nullptr;  // same ownership as payload
         std::function<void(bool)>* completion = nullptr;  // owned by the loop
+        LiveKitSession::RpcCall* rpc = nullptr;  // same ownership as payload
     };
     static_assert(std::is_trivially_copyable_v<Event>,
                   "FreeRTOS queue events must be safe for raw byte copies");
@@ -372,6 +377,14 @@ private:
     LiveKitSession session_;
     DeviceEventBus device_event_bus_;
     Esp32HubConfig config_;
+    // Volume and screen brightness as installed capabilities; built once from
+    // the board's hardware, used only on this task (and its pure
+    // PropertyChangedPayload from the observers that report a change).
+    std::unique_ptr<device_settings::Runtime> settings_;
+    void DoDeviceRpc(const LiveKitSession::RpcCall& call);
+    void DoPropertyChanged(const std::string& payload);
+    // Called by the hardware observers on whatever task changed the value.
+    void ReportPropertyChange(const char* property, int value);
     std::string device_control_uri_;
     VoiceSessionState state_ = VoiceSessionState::Idle;
     ControlCommand head_command_;

@@ -11,7 +11,7 @@ read -r -a cjson_flags <<<"$(pkg-config --cflags --libs libcjson)"
   -I tests/stubs \
   -I main \
   tests/hub_onboarding_protocol_test.cc \
-  main/eidolon/hub_onboarding_protocol.cc \
+  main/eidolon/hub_onboarding_protocol.cc main/eidolon/device_settings_core.cc \
   main/eidolon/output_policy.cc \
   main/eidolon/hub_txt_parser.cc \
   main/eidolon/device_manifest_assertion_core.cc \

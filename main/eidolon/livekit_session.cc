@@ -1,4 +1,6 @@
 #include "device_capabilities.h"
+#include "device_settings_core.h"
+#include "eidolon/generated/device_settings_catalog.h"
 #include "livekit_session.h"
 #include "session_playback_state.h"
 
@@ -556,6 +558,7 @@ esp_err_t LiveKitSession::Connect(const Esp32HubConfig& config, uint32_t generat
 
     RegisterTranscriptionHandler();
     RegisterAgentSessionDrainHandler();
+    RegisterRpcMethods();
     using_media_ = true;
 
     ESP_LOGI(TAG, "Connecting room=%s identity=%s server=%s", config.session.room_name.c_str(),
@@ -577,6 +580,84 @@ esp_err_t LiveKitSession::UpdateConnectionToken(const std::string& expected,
     if (room_handle_ == nullptr) return ESP_ERR_INVALID_STATE;
     return livekit_room_update_token(room_handle_, expected.c_str(), token.c_str()) == LIVEKIT_ERR_NONE
         ? ESP_OK : ESP_FAIL;
+}
+
+LiveKitSession* LiveKitSession::rpc_session_ = nullptr;
+
+void LiveKitSession::RegisterRpcMethods()
+{
+    rpc_session_ = this;
+    for (const char* method : {device_settings::kInvokeMethod, device_settings::kStatusMethod,
+                               device_settings::kCancelMethod,
+                               device_settings::kPropertiesReadMethod}) {
+        if (livekit_room_rpc_register(room_handle_, method, &LiveKitSession::OnRpcInvocation) !=
+            LIVEKIT_ERR_NONE) {
+            ESP_LOGW(TAG, "RPC method not registered: %s", method);
+        }
+    }
+}
+
+void LiveKitSession::OnRpcInvocation(const livekit_rpc_invocation_t* invocation, void* /*ctx*/)
+{
+    LiveKitSession* session = rpc_session_;
+    if (session == nullptr || invocation == nullptr || invocation->id == nullptr ||
+        invocation->method == nullptr || invocation->send_result == nullptr) {
+        return;
+    }
+    {
+        std::lock_guard<std::mutex> lock(session->rpc_mutex_);
+        session->rpc_send_ = invocation->send_result;
+        session->rpc_ctx_ = invocation->ctx;
+    }
+    const size_t size = invocation->payload ? std::strlen(invocation->payload) : 0;
+    if (!session->on_rpc_ || size > device_settings::kMaxRpcPayloadBytes) {
+        livekit_rpc_result_t refusal = {};
+        refusal.id = invocation->id;
+        refusal.code = static_cast<livekit_rpc_result_code_t>(device_settings::kRpcUnauthorized);
+        refusal.error_message = const_cast<char*>("unauthorized_or_oversized");
+        invocation->send_result(&refusal, invocation->ctx);
+        return;
+    }
+    RpcCall call;
+    call.id = invocation->id;
+    call.method = invocation->method;
+    call.payload = invocation->payload ? invocation->payload : "";
+    call.generation = session->generation_;
+    if (invocation->caller_identity != nullptr) {
+        {
+            std::lock_guard<std::mutex> lock(session->peers_mutex_);
+            call.provider = !session->provider_identity_.empty() &&
+                session->provider_identity_ == invocation->caller_identity;
+        }
+        call.agent = session->IsAgent(invocation->caller_identity);
+    }
+    if (!session->on_rpc_(std::move(call))) {
+        livekit_rpc_result_t busy = {};
+        busy.id = invocation->id;
+        busy.code = static_cast<livekit_rpc_result_code_t>(device_settings::kRpcInvalidOrInactive);
+        busy.error_message = const_cast<char*>("busy");
+        invocation->send_result(&busy, invocation->ctx);
+    }
+}
+
+void LiveKitSession::RespondRpc(uint32_t generation, const std::string& id, int error_code,
+                                const std::string& text)
+{
+    std::lock_guard<std::mutex> lock(rpc_mutex_);
+    if (rpc_send_ == nullptr || room_handle_ == nullptr || generation != generation_) {
+        ESP_LOGW(TAG, "RPC answer dropped: its room is gone");
+        return;
+    }
+    livekit_rpc_result_t result = {};
+    result.id = const_cast<char*>(id.c_str());
+    if (error_code == 0) {
+        result.code = LIVEKIT_RPC_RESULT_OK;
+        result.payload = const_cast<char*>(text.c_str());
+    } else {
+        result.code = static_cast<livekit_rpc_result_code_t>(error_code);
+        result.error_message = const_cast<char*>(text.c_str());
+    }
+    rpc_send_(&result, rpc_ctx_);
 }
 
 esp_err_t LiveKitSession::Disconnect()
@@ -601,6 +682,13 @@ esp_err_t LiveKitSession::Disconnect()
 
     livekit_room_handle_t handle = room_handle_;
     ESP_LOGI(TAG, "Disconnecting room");
+    {
+        // The sender belongs to the room about to be destroyed; an answer that
+        // arrives after this point has nowhere to go.
+        std::lock_guard<std::mutex> lock(rpc_mutex_);
+        rpc_send_ = nullptr;
+        rpc_ctx_ = nullptr;
+    }
 
     UnregisterStreamHandlers();
 
