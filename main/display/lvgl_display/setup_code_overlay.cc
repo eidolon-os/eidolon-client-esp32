@@ -23,13 +23,15 @@ bool qrcodegen_getModule(const uint8_t qrcode[], int x, int y);
 namespace {
 
 constexpr int32_t kMargin = 12;
-constexpr int32_t kNameHeight = 18;
-// Wide enough for four 34 px digits.
+// Between the parts of one column: the code and its name, the digits.
+constexpr int32_t kColumnGap = 6;
+// Wide enough for four 34 px digits; the column grows if they are wider.
 constexpr int32_t kCodeColumnWidth = 100;
-constexpr int32_t kCodeBlockHeight = 120;
-constexpr int32_t kCancelHeight = 40;
+constexpr int32_t kCancelHeight = 32;
 // Beyond this the code is no easier to scan, only harder to fit beside text.
 constexpr int32_t kMaxQrSide = 320;
+// A screen that leaves less than this beside readable text gets no card at all.
+constexpr int32_t kMinQrSide = 96;
 // A setup payload is about 120 bytes: version 7 or 8 at medium error
 // correction. Version 10 leaves room without letting a runaway string through.
 constexpr int kMaxQrVersion = 10;
@@ -105,7 +107,7 @@ lv_obj_t* Column(lv_obj_t* parent)
     lv_obj_set_flex_flow(column, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(column, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
                           LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_row(column, 6, 0);
+    lv_obj_set_style_pad_row(column, kColumnGap, 0);
     lv_obj_set_size(column, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     return column;
 }
@@ -125,14 +127,8 @@ void SetupCodeOverlay::Show(lv_display_t* display, const SetupCodeScreen& screen
     const int32_t width = lv_display_get_horizontal_resolution(display);
     const int32_t height = lv_display_get_vertical_resolution(display);
     const bool landscape = width >= height;
-    const int32_t code_block = kCodeBlockHeight + (screen.cancel ? kCancelHeight : 0);
-    const int32_t qr_side = std::min<int32_t>(
-        kMaxQrSide,
-        landscape ? std::min(height - 2 * kMargin - kNameHeight,
-                             width - 3 * kMargin - kCodeColumnWidth)
-                  : std::min(width - 2 * kMargin,
-                             height - 3 * kMargin - kNameHeight - code_block));
-    if (qr_side < 96) return;
+    const int32_t content_width = width - 2 * kMargin;
+    const int32_t content_height = height - 2 * kMargin;
 
     root_ = lv_obj_create(lv_display_get_layer_top(display));
     lv_obj_remove_style_all(root_);
@@ -149,35 +145,61 @@ void SetupCodeOverlay::Show(lv_display_t* display, const SetupCodeScreen& screen
     // Taps land on the overlay rather than on a view underneath it.
     lv_obj_add_flag(root_, LV_OBJ_FLAG_CLICKABLE);
 
-    shown_qr_text_ = screen.qr_text;
-    shown_notice_ = screen.notice;
-    shown_cancel_ = static_cast<bool>(screen.cancel);
-    cancel_ = screen.cancel;
+    // The text is laid out first, at the size it has to be read at. The QR
+    // code is the one part that scales, so it gets the room the text leaves,
+    // measured rather than assumed: the name differs per board and per MAC.
     lv_obj_t* qr_column = Column(root_);
-    DrawQrCode(qr_column, screen.qr_text, qr_side);
-    Label(qr_column, screen.advertised_name.c_str(), &lv_font_montserrat_14);
+    lv_obj_t* name = Label(qr_column, screen.advertised_name.c_str(), &lv_font_montserrat_14);
+    lv_label_set_long_mode(name, LV_LABEL_LONG_WRAP);
 
     lv_obj_t* code_column = Column(root_);
+    const int32_t text_width = landscape ? kCodeColumnWidth : content_width;
     lv_obj_t* hint = Label(code_column, "Scan with the Eidolon app, or enter",
                            &lv_font_montserrat_14);
     lv_label_set_long_mode(hint, LV_LABEL_LONG_WRAP);
-    lv_obj_set_width(hint, landscape ? kCodeColumnWidth : width - 2 * kMargin);
+    lv_obj_set_width(hint, text_width);
     Label(code_column, screen.code.substr(0, 4).c_str(), &font_home_clock_34);
     Label(code_column, screen.code.substr(4, 4).c_str(), &font_home_clock_34);
     if (!screen.notice.empty()) {
         lv_obj_t* notice = Label(code_column, screen.notice.c_str(), &lv_font_montserrat_14);
         lv_label_set_long_mode(notice, LV_LABEL_LONG_WRAP);
-        lv_obj_set_width(notice, landscape ? kCodeColumnWidth : width - 2 * kMargin);
+        lv_obj_set_width(notice, text_width);
     }
-    if (cancel_) {
+    if (screen.cancel) {
         lv_obj_t* cancel = lv_button_create(code_column);
-        lv_obj_set_size(cancel, kCodeColumnWidth, kCancelHeight - 8);
+        lv_obj_set_size(cancel, kCodeColumnWidth, kCancelHeight);
         lv_obj_add_event_cb(cancel, &SetupCodeOverlay::OnCancel, LV_EVENT_CLICKED, this);
         lv_obj_t* text = lv_label_create(cancel);
         lv_label_set_text(text, "Cancel");
         lv_obj_set_style_text_font(text, &lv_font_montserrat_14, 0);
         lv_obj_center(text);
     }
+    lv_obj_update_layout(root_);
+    const int32_t code_width = lv_obj_get_width(code_column);
+    const int32_t code_height = lv_obj_get_height(code_column);
+
+    // Beside the digits, the name may only be as wide as the room they leave;
+    // a longer one wraps under the code instead of pushing the digits (and
+    // itself) off the screen.
+    const int32_t qr_width = landscape ? content_width - kMargin - code_width : content_width;
+    lv_obj_set_style_max_width(name, qr_width, 0);
+    lv_obj_update_layout(root_);
+    const int32_t under_qr = kColumnGap + lv_obj_get_height(name);
+    const int32_t qr_height = landscape ? content_height - under_qr
+                                        : content_height - under_qr - kMargin - code_height;
+    const int32_t qr_side = std::min({kMaxQrSide, qr_width, qr_height});
+    if (qr_side < kMinQrSide || (landscape && code_height > content_height)) {
+        // Too small a screen for a card that can be both read and scanned.
+        Hide();
+        return;
+    }
+    lv_obj_t* qr = DrawQrCode(qr_column, screen.qr_text, qr_side);
+    if (qr != nullptr) lv_obj_move_to_index(qr, 0);
+
+    shown_qr_text_ = screen.qr_text;
+    shown_notice_ = screen.notice;
+    shown_cancel_ = static_cast<bool>(screen.cancel);
+    cancel_ = screen.cancel;
 }
 
 void SetupCodeOverlay::OnCancel(lv_event_t* event)
