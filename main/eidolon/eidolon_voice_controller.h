@@ -31,6 +31,8 @@
 #endif
 #include "hub_types.h"
 #include "device_settings_core.h"
+#include "camera_capture_core.h"
+#include "boards/common/still_camera.h"
 #include "livekit_session.h"
 #include "session_playback_state.h"
 #include "voice_session_state.h"
@@ -149,6 +151,7 @@ private:
         PublishDeviceEvent,
         DeviceRpc,
         PropertyChanged,
+        StillTaken,
 #if CONFIG_EIDOLON_SMARTHOME_PANEL
         PanelRequest,
 #endif
@@ -192,6 +195,7 @@ private:
         Esp32HubConfig* activation_config = nullptr;  // same ownership as payload
         std::function<void(bool)>* completion = nullptr;  // owned by the loop
         LiveKitSession::RpcCall* rpc = nullptr;  // same ownership as payload
+        struct StillShot* still = nullptr;       // same ownership as payload
     };
     static_assert(std::is_trivially_copyable_v<Event>,
                   "FreeRTOS queue events must be safe for raw byte copies");
@@ -386,6 +390,30 @@ private:
     std::unique_ptr<device_settings::Runtime> settings_;
     void DoDeviceRpc(const LiveKitSession::RpcCall& call);
     void DoPropertyChanged(const std::string& payload);
+    // camera.capture: what the execution means lives in stills_, the camera is
+    // the board's, and taking a still runs on a short-lived worker task so this
+    // task never waits on the sensor or the encoder. The still comes back here
+    // (StillTaken) and is sent from this task, the only one that touches the room.
+    std::unique_ptr<camera_capture::Runtime> stills_;
+    StillCamera* still_camera_ = nullptr;
+    // Where each still in flight goes back to: the room it was asked in and the
+    // participant that asked.
+    struct StillRoute {
+        std::string execution_id;
+        uint32_t generation = 0;
+        std::string peer;
+    };
+    std::deque<StillRoute> still_routes_;
+    // The worker that takes stills: made with the first one, stack in PSRAM,
+    // one job at a time through a one-slot queue.
+    QueueHandle_t still_jobs_ = nullptr;
+    TaskHandle_t still_task_ = nullptr;
+    bool EnsureStillWorker();
+    void StartStill(const camera_capture::Request& request);
+    void DoStillTaken(StillShot& shot);
+    // The conversation the stills served is over (or interrupted).
+    void CloseStills();
+    static void StillWorker(void* arg);
     // Called by the hardware observers on whatever task changed the value.
     void ReportPropertyChange(const char* property, int value);
     std::string device_control_uri_;
@@ -413,6 +441,9 @@ private:
     // the token fetch as X-Device-Session-Intent. Empty for a normal user JOIN.
     // Controller-task only.
     std::string pending_session_intent_;
+    // One automatic join after a session was refused for a stale Owner policy;
+    // cleared when a session starts.
+    bool stale_policy_rejoined_ = false;
     std::string conversation_control_request_id_;
     std::string pending_session_flow_id_;
     // Connected to the channel, but not in a conversation. It intentionally

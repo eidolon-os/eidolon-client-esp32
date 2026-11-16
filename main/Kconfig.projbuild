@@ -1204,6 +1204,27 @@ menu "Eidolon Hub"
             start and end from one place while debugging. Turn it off to leave only
             hang-up there (tapping the face still opens a conversation).
 
+    config EIDOLON_CAMERA_STILL_SELFTEST
+        int "Camera stills taken after boot for measurement (0 = off)"
+        depends on BOARD_TYPE_M5STACK_STACKCHAN
+        range 0 200
+        default 0
+        help
+            Diagnostic builds only. 30 s after boot the device takes this many
+            stills, one every 1.5 s, through the same worker and camera path as
+            camera.capture, sends none of them, and logs each one's timings and
+            the heap ("[camera] still taken"). Measures the camera gate's
+            repeat-capture and leak steps without anyone asking it to look.
+
+    config EIDOLON_CAMERA_STILL_DUMP
+        bool "Print self-test stills as base64 JPEG on the console"
+        depends on EIDOLON_CAMERA_STILL_SELFTEST > 0
+        default n
+        help
+            Diagnostic builds only. Each self-test still (never one taken for
+            the Host) is printed between EIDOLON-STILL-BEGIN and
+            EIDOLON-STILL-END lines so the image can be checked on a computer.
+
     config EIDOLON_STACKCHAN_CAPTURE_CUTS_SERVO_RAIL
         bool "Cut the servo rail while the microphone captures (legacy)"
         depends on BOARD_TYPE_M5STACK_STACKCHAN

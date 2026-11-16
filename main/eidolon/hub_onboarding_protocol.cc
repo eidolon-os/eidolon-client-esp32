@@ -4,6 +4,7 @@
 #include "hub_onboarding_protocol.h"
 #include "device_capabilities.h"
 #include "device_settings_core.h"
+#include "eidolon/generated/camera_catalog.h"
 
 #include "eidolon_device_profile.h"
 #include "eidolon_topics.h"
@@ -371,10 +372,10 @@ bool ParseOwnerDomainDescriptor(
     return !canonical_signing_bytes.empty();
 }
 
-std::string BuildDeviceManifestJson(const std::string& board_name, bool has_camera)
+std::string BuildDeviceManifestJson(const std::string& board_name, bool publishes_video)
 {
     auto capabilities = CompiledDeviceCapabilities();
-    capabilities.camera = has_camera;
+    capabilities.video_publish = publishes_video;
     return BuildDeviceManifestJson(board_name, capabilities);
 }
 
@@ -399,7 +400,10 @@ std::string BuildDeviceManifestJson(const std::string& board_name, const DeviceC
             (capabilities.speaker ? "bidirectional" : "publish") : "subscribe";
         media = std::string("{\"codecs\":[\"opus\"],\"direction\":\"") + direction + "\",\"kind\":\"audio\"}";
     }
-    if (capabilities.camera) {
+    // A camera is not a video track. A board that only takes stills declares
+    // the still action below; declaring video it never publishes would have
+    // the Host grant it a camera publication even at the "on device only" use.
+    if (capabilities.video_publish) {
         if (!media.empty()) media += ",";
         media += "{\"codecs\":[\"h264\"],\"direction\":\"publish\",\"kind\":\"video\"}";
     }
@@ -468,6 +472,13 @@ std::string BuildDeviceManifestJson(const std::string& board_name, const DeviceC
     if (!setting_actions.empty()) {
         actions = actions == "[]" ? "[" + setting_actions + "]"
                                   : actions.substr(0, actions.size() - 1) + "," + setting_actions + "]";
+    }
+    // One still on request, declared exactly as the Host installed it: the
+    // action is what gives the Owner a camera use to choose for this device.
+    if (capabilities.camera_still) {
+        actions = actions == "[]" ? std::string("[") + camera_capture::kAction + "]"
+                                  : actions.substr(0, actions.size() - 1) + "," +
+                                        camera_capture::kAction + "]";
     }
     const std::string setting_properties =
         device_settings::DeclaredProperties(volume, capabilities.brightness_setting);

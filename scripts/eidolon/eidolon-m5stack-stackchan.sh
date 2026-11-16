@@ -420,6 +420,23 @@ ensure_eidolon_trim_sdkconfig() {
   # instead, so no AEC is needed. Pairs with AUDIO_INPUT_REFERENCE=false
   # (single mic) in the board config.h.
   set_sdkconfig_bool USE_DEVICE_AEC n
+
+  # The camera streams only while a still is taken (camera.capture). Its
+  # frames reach PSRAM through the esp_cam_sensor DVP driver's internal DMA
+  # bounce buffer, allocated when the stream starts, during a conversation.
+  # Measured on the device 2026-11-16:
+  # - VGA needs the 32 KB default; a conversation has no 32 KB contiguous
+  #   internal block ("no mem for CAM DVP DMA receive buffer"), and 8-16 KB
+  #   overflow at VGA's data rate (D-ISR OVF, torn frames).
+  # - IDF's own DVP driver DMAs straight into quad PSRAM and drops bytes at VGA.
+  # - QVGA YUV422 (sent as UYVY) through an 8 KB bounce buffer: intact frames,
+  #   no overflow, 0.46 s per still.
+  # Enforced on an existing sdkconfig as well.
+  set_sdkconfig_bool CAMERA_GC0308_DVP_YUV422_YUYV_640X480_16FPS y
+  set_sdkconfig_bool CAMERA_GC0308_DVP_DEFAULT_FMT_YUV422_YUYV_640X480_16FPS n
+  set_sdkconfig_bool CAMERA_GC0308_DVP_DEFAULT_FMT_YUV422_320X240_20FPS y
+  set_sdkconfig_bool CAM_CTRL_DVP_ENABLE y
+  set_sdkconfig_value CAM_CTRL_DVP_DMA_BUFFER_SIZE 8192
 }
 
 ensure_board_sdkconfig() {
@@ -473,6 +490,10 @@ CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_CAMERA_GC0308=y
 CONFIG_CAMERA_GC0308_AUTO_DETECT_DVP_INTERFACE_SENSOR=y
 CONFIG_CAMERA_GC0308_DVP_YUV422_320X240_20FPS=y
+CONFIG_CAMERA_GC0308_DVP_YUV422_YUYV_640X480_16FPS=y
+CONFIG_CAMERA_GC0308_DVP_DEFAULT_FMT_YUV422_320X240_20FPS=y
+CONFIG_CAM_CTRL_DVP_ENABLE=y
+CONFIG_CAM_CTRL_DVP_DMA_BUFFER_SIZE=8192
 EOF
   ensure_eidolon_trim_sdkconfig
 }

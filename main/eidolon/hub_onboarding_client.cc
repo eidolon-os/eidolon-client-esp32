@@ -58,7 +58,9 @@ int64_t DeviceUnixTime() {
 DeviceCapabilities DeclaredCapabilities() {
     auto capabilities = CompiledDeviceCapabilities();
     auto& board = Board::GetInstance();
-    capabilities.camera = board.GetCamera() != nullptr;
+    // A camera counts as what this firmware does with it: one still on
+    // request. No board publishes a video track, whatever camera it has.
+    capabilities.camera_still = board.GetStillCamera() != nullptr;
     capabilities.volume_setting = board.GetAudioCodec() != nullptr;
     capabilities.brightness_setting = board.GetBacklight() != nullptr;
     return capabilities;

@@ -477,7 +477,7 @@ bool Runtime::TakeHeadClip(HeadClip& out) {
 }
 
 bool Runtime::animating() const {
-    return reaction_.index >= 0 || act_.index >= 0 || glyph_cur_ != glyph_target_;
+    return reaction_.index >= 0 || act_.index >= 0 || glyph_cur_ != glyph_target_ || shutter_;
 }
 
 namespace {
@@ -490,6 +490,16 @@ constexpr uint32_t kTipError = 0xFF6B6B;
 void Runtime::OnHostAction(HostAction action, uint64_t now_ms) {
     action_ = action;
     action_t0_ = now_ms;
+}
+
+void Runtime::OnCameraShutter(uint64_t now_ms) {
+    shutter_ = true;
+    shutter_t0_ = now_ms;
+}
+
+float Runtime::ShutterLevel(uint64_t now_ms) const {
+    if (!shutter_ || now_ms < shutter_t0_ || now_ms - shutter_t0_ >= kShutterMs) return 0;
+    return std::sin(kPi * static_cast<float>(now_ms - shutter_t0_) / static_cast<float>(kShutterMs));
 }
 
 // Session state on the two antenna tips; it replaces every status icon on the pet.
@@ -530,6 +540,8 @@ void Runtime::ComposeTips(const RuntimeInputs& in, uint64_t now) {
         break;
     default: break;
     }
+    // Over everything else the tips say: a still is being taken.
+    if (shutter_ && now - shutter_t0_ < kShutterMs) { l = r = 1.f; rgb = 0xFFFFFF; }
     frame_.tip_l = l; frame_.tip_r = r; frame_.tip_rgb = rgb;
 }
 
@@ -851,6 +863,13 @@ const Frame& Runtime::Tick(const RuntimeInputs& in) {
     const bool blink_ok = show == Glyph::None && !in.host_active && mood_ != Mood::Asleep && in.phase != Phase::System;
     frame_.blink = Blink(now, blink_ok, mood_ == Mood::Bored || mood_ == Mood::Drowsy);
     frame_.pose = pose_;
+    if (const float shutter = ShutterLevel(now); shutter > 0) {
+        frame_.pose.open_l *= 1 - .45f * shutter;
+        frame_.pose.open_r *= 1 - .45f * shutter;
+        frame_.pose.scale += .06f * shutter;
+    } else if (shutter_ && now - shutter_t0_ >= kShutterMs) {
+        shutter_ = false;
+    }
     // Stepped breathing: eight levels, one step per 600 ms, so a resting face is not redrawn every frame.
     // Not during a conversation: each step redraws both eyes, a periodic stall while audio is busy,
     // and the antennae and the speaking face carry the life there.

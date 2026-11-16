@@ -12,7 +12,7 @@ for face in 0 1; do
   -I tests/stubs \
   -I main \
   tests/companion_manifest_test.cc \
-  main/eidolon/hub_onboarding_protocol.cc main/eidolon/device_settings_core.cc \
+  main/eidolon/hub_onboarding_protocol.cc main/eidolon/device_settings_core.cc main/eidolon/capability_rpc_core.cc \
   main/eidolon/output_policy.cc \
   main/eidolon/hub_txt_parser.cc \
   main/eidolon/device_manifest_assertion_core.cc \

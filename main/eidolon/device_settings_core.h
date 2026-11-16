@@ -25,6 +25,8 @@
 #include <string>
 #include <vector>
 
+#include "capability_rpc_core.h"
+
 namespace eidolon::device_settings {
 
 // A value the device keeps, read and applied through the board. An unset
@@ -37,33 +39,15 @@ struct Actuators {
     std::function<std::optional<int>(int)> apply_brightness;
 };
 
-// Who sent an invocation, classified by the transport the same way it
-// classifies control packets.
-enum class Caller { Unknown, Agent, Provider };
-
-// What an invocation may be bound to right now. Gathered by the controller on
-// its own task, so this module never reads controller state.
-struct Binding {
-    std::string room;                      // the standing channel's room
-    uint32_t standing_policy_revision = 0; // 0: no Owner policy known
-    std::string session_id;                // empty: no conversation
-    uint32_t session_policy_revision = 0;
-    std::vector<std::string> session_capabilities;
-};
-
-// An RPC answer. A refusal of the request itself (unauthorized, inactive
-// binding, malformed) is an RPC error, as the Reachy runtime answers; a
-// refusal of what was asked (unsupported, invalid arguments) is a snapshot.
-struct RpcAnswer {
-    bool ok = false;
-    std::string payload;
-    int error_code = 0;
-    std::string error_message;
-};
-
-inline constexpr int kRpcUnauthorized = 2001;
-inline constexpr int kRpcInvalidOrInactive = 2002;
-inline constexpr size_t kMaxRpcPayloadBytes = 4096;
+// The invoke.v1 protocol pieces this module shares with every other device
+// capability (capability_rpc_core): who called, what a call is bound to, how
+// it is answered.
+using capability_rpc::Binding;
+using capability_rpc::Caller;
+using capability_rpc::RpcAnswer;
+using capability_rpc::kMaxRpcPayloadBytes;
+using capability_rpc::kRpcInvalidOrInactive;
+using capability_rpc::kRpcUnauthorized;
 
 class Runtime {
 public:

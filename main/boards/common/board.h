@@ -15,6 +15,7 @@
 #include "led/led.h"
 #include "backlight.h"
 #include "camera.h"
+#include "still_camera.h"
 #include "assets.h"
 #include "head_motion.h"
 
@@ -78,6 +79,9 @@ public:
     virtual bool GetTemperature(float& esp32temp);
     virtual Display* GetDisplay();
     virtual Camera* GetCamera();
+    // One still on request for camera.capture; none unless the board has a
+    // camera set up for it (StillCamera).
+    virtual StillCamera* GetStillCamera() { return nullptr; }
     virtual NetworkInterface* GetNetwork() = 0;
     virtual void StartNetwork() = 0;
     // Current link evidence for reconciling queued events and radio handoffs.

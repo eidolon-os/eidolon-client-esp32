@@ -1069,6 +1069,7 @@ endif()
 # Include EspVideo if target is ESP32S3 or ESP32P4
 if(CONFIG_IDF_TARGET_ESP32S3 OR CONFIG_IDF_TARGET_ESP32P4)
     list(APPEND SOURCES "boards/common/esp_video.cc"
+                        "boards/common/dvp_still_camera.cc"
                         "boards/common/rndis_board.cc"
                         )
 endif()
@@ -1128,7 +1129,9 @@ if(CONFIG_EIDOLON_HUB_MODE)
         "eidolon/eidolon_ui_presenter.cc"
         "eidolon/eidolon_view.cc"
         "eidolon/output_policy.cc"
+        "eidolon/capability_rpc_core.cc"
         "eidolon/device_settings_core.cc"
+        "eidolon/camera_capture_core.cc"
         "eidolon/policy_audio_renderer.cc"
         "eidolon/claim_recovery_core.cc"
         "eidolon/hub_activation_retry_core.cc"

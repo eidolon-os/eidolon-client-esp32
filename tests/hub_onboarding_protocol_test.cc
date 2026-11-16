@@ -9,6 +9,8 @@
 
 #include "eidolon/hub_onboarding_protocol.h"
 #include "eidolon/device_capabilities.h"
+#include "eidolon/generated/camera_catalog.h"
+#include <cstring>
 #include "eidolon/hub_txt_parser.h"
 
 namespace {
@@ -278,7 +280,7 @@ void TestCanonicalManifest()
     // reads a fact rather than guessing one. Half duplex here, pinned by
     // tests/stubs/sdkconfig.h.
     const std::string mode =
-        CompiledInteractionMode(eidolon::BuildDeviceManifestJson("probe", /*has_camera=*/false));
+        CompiledInteractionMode(eidolon::BuildDeviceManifestJson("probe", /*publishes_video=*/false));
     assert(mode == "half_duplex");
 
     int matched = 0;
@@ -405,6 +407,31 @@ eidolon::ActiveClaimState ClaimFrom(const cJSON* device_ref)
     claim.device_ref.trust_epoch = static_cast<uint64_t>(
         cJSON_GetObjectItemCaseSensitive(device_ref, "trust_epoch")->valuedouble);
     return claim;
+}
+
+void TestStillCameraIsAnActionNotAVideoTrack()
+{
+    // A camera that takes stills is the still action, never a video track:
+    // the action alone is what gives the Owner a camera use to choose.
+    auto still=eidolon::CompiledDeviceCapabilities();
+    still.camera_still=true;still.volume_setting=true;still.brightness_setting=true;
+    const auto declared_still=eidolon::BuildDeviceManifestJson("stackchan-fixture",still);
+    auto* root=cJSON_Parse(declared_still.c_str());assert(root);
+    const cJSON* media=nullptr;
+    cJSON_ArrayForEach(media,cJSON_GetObjectItemCaseSensitive(root,"media"))
+        assert(std::strcmp(cJSON_GetObjectItemCaseSensitive(media,"kind")->valuestring,"video"));
+    auto* expected=cJSON_Parse(eidolon::camera_capture::kAction);
+    int stills=0,settings=0;
+    const cJSON* action=nullptr;
+    cJSON_ArrayForEach(action,cJSON_GetObjectItemCaseSensitive(root,"actions")) {
+        const char* name=cJSON_GetObjectItemCaseSensitive(action,"name")->valuestring;
+        if (!std::strcmp(name,"camera.capture")) { ++stills;assert(cJSON_Compare(action,expected,true)); }
+        if (!std::strncmp(name,"audio.volume.",13) || !std::strncmp(name,"display.brightness.",19)) ++settings;
+    }
+    assert(stills==1 && settings==4);   // spliced in beside the settings, not over them
+    cJSON_Delete(expected);cJSON_Delete(root);
+    still.camera_still=false;
+    assert(eidolon::BuildDeviceManifestJson("stackchan-fixture",still).find("camera.capture")==std::string::npos);
 }
 
 void TestSharedInvitationIsTemporaryAndLifecycleFenced()
@@ -874,6 +901,7 @@ int main()
     TestDescriptorCanonicalisationMatchesTheGoldenVector();
     TestDescriptorWithoutItsOwnRouteIsRejected();
     TestCanonicalManifest();
+    TestStillCameraIsAnActionNotAVideoTrack();
     TestLiveKitBindingMatchesTheGoldenVector();
     TestConfigurationResponseMatchesTheGoldenVector();
     TestConfigurationDeviceRefCorrectionsMatchTheGoldenVector();

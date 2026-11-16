@@ -147,6 +147,25 @@ void TestAntennaeCarrySessionState() {
     CHECK(max_diff > .5f && s.last->emote == Emote::None);         // the Host's Ponder uses the tips too
 }
 
+void TestShutterShowsTheStillBeingTaken() {
+    // The phase a still is taken in: the model is thinking, the tips ping-pong.
+    Sim s; s.in.phase = Phase::Thinking; s.Run(2000);
+    const float open = s.last->pose.open_l;
+    const uint32_t think_rgb = s.last->tip_rgb;
+    s.rt.OnCameraShutter(s.now);
+    CHECK(s.rt.animating());                             // redrawn while it shows
+    s.Run(Runtime::kShutterMs / 2);
+    CHECK(s.last->tip_rgb == 0xFFFFFF && s.last->tip_l == 1.f && s.last->tip_r == 1.f);
+    CHECK(s.last->pose.open_l < open * .7f);             // eyes narrowed, focusing
+    // Muted or not, sleeping or not: the moment a picture leaves is always shown.
+    s.in.muted = true; s.rt.OnCameraShutter(s.now); s.Run(60);
+    CHECK(s.last->tip_rgb == 0xFFFFFF);
+    s.Run(Runtime::kShutterMs + 100);
+    CHECK(s.last->tip_rgb != 0xFFFFFF && !s.rt.animating());
+    s.in.muted = false; s.Run(200);
+    CHECK(s.last->tip_rgb == think_rgb);                 // back to what the phase shows
+}
+
 void TestCardAndBubble() {
     Sim s; s.Run(100);
     s.Sense(SenseKind::TouchDoubleTap);
@@ -345,6 +364,7 @@ int main() {
     TestSleepAndWake();
     TestConversationKeepsCompany();
     TestAntennaeCarrySessionState();
+    TestShutterShowsTheStillBeingTaken();
     TestCardAndBubble();
     TestFaceStrokeLive();
     TestPowerAtBootIsNotAnEvent();

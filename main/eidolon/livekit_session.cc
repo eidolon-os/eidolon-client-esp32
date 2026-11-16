@@ -15,6 +15,7 @@
 #include <freertos/task.h>
 #include <livekit.h>
 
+#include <algorithm>
 #include <cstring>
 
 #define TAG "LiveKitSession"
@@ -624,6 +625,7 @@ void LiveKitSession::OnRpcInvocation(const livekit_rpc_invocation_t* invocation,
     call.payload = invocation->payload ? invocation->payload : "";
     call.generation = session->generation_;
     if (invocation->caller_identity != nullptr) {
+        call.caller_identity = invocation->caller_identity;
         {
             std::lock_guard<std::mutex> lock(session->peers_mutex_);
             call.provider = !session->provider_identity_.empty() &&
@@ -766,6 +768,58 @@ esp_err_t LiveKitSession::PublishData(const std::string& topic, const std::strin
         return ESP_FAIL;
     }
     return ESP_OK;
+}
+
+esp_err_t LiveKitSession::SendByteStream(uint32_t generation, const char* topic,
+                                         const std::string& destination,
+                                         const std::vector<StreamAttribute>& attributes,
+                                         const uint8_t* data, size_t size)
+{
+    if (!room_handle_ || !connected_ || generation != generation_ || topic == nullptr ||
+        destination.empty() || (data == nullptr && size > 0)) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    std::vector<livekit_data_stream_attribute_t> pairs;
+    pairs.reserve(attributes.size());
+    for (const auto& attribute : attributes) pairs.push_back({attribute.key, attribute.value.c_str()});
+    const char* destinations[] = {destination.c_str()};
+    livekit_data_stream_options_t options = {};
+    options.topic = topic;
+    options.is_text = false;
+    options.total_length = size;
+    options.has_total_length = true;
+    options.attributes = pairs.data();
+    options.attributes_count = pairs.size();
+    options.destination_identities = destinations;
+    options.destination_identities_count = 1;
+    livekit_data_stream_handle_t stream = nullptr;
+    const int64_t started_us = esp_timer_get_time();
+    if (livekit_room_data_stream_open(room_handle_, &options, &stream) != LIVEKIT_ERR_NONE) {
+        ESP_LOGW(TAG, "[stream] topic=%s open failed", topic);
+        return ESP_FAIL;
+    }
+    esp_err_t result = ESP_OK;
+    for (size_t offset = 0; offset < size; offset += LIVEKIT_DATA_STREAM_CHUNK_SIZE) {
+        const size_t length = std::min<size_t>(LIVEKIT_DATA_STREAM_CHUNK_SIZE, size - offset);
+        if (livekit_room_data_stream_write(room_handle_, stream, data + offset, length) !=
+            LIVEKIT_ERR_NONE) {
+            ESP_LOGW(TAG, "[stream] topic=%s write failed at %u/%u", topic,
+                     static_cast<unsigned>(offset), static_cast<unsigned>(size));
+            result = ESP_FAIL;
+            break;
+        }
+        // One chunk at a time into the data channel, so a still does not fill
+        // the send buffer the conversation's own messages share.
+        vTaskDelay(pdMS_TO_TICKS(2));
+    }
+    // The trailer is sent even after a failed write: the receiver then knows
+    // the stream ended instead of waiting for the rest of it.
+    if (livekit_room_data_stream_close(room_handle_, stream) != LIVEKIT_ERR_NONE) result = ESP_FAIL;
+    // %ld: the firmware's printf has no long long.
+    ESP_LOGI(TAG, "[stream] topic=%s bytes=%u elapsed_ms=%ld ok=%d", topic,
+             static_cast<unsigned>(size), static_cast<long>((esp_timer_get_time() - started_us) / 1000),
+             result == ESP_OK);
+    return result;
 }
 
 }  // namespace eidolon
