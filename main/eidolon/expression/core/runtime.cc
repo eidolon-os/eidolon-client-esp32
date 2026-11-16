@@ -93,6 +93,20 @@ FacePose Runtime::Tick(uint64_t now_ms) {
     }
     return base;
 }
+bool Runtime::Current(uint64_t now_ms, Gesture& gesture, float& amount) const {
+    if (!active_) return false;
+    const auto elapsed=now_ms>=started_ms_ ? now_ms-started_ms_ : 0;
+    for (size_t i=0;i<plan_.count;++i) {
+        const auto& s=plan_.steps[i];
+        if (elapsed<s.at_ms || elapsed>=s.at_ms+s.duration_ms) continue;
+        const float progress=static_cast<float>(elapsed-s.at_ms)/s.duration_ms;
+        const float ramp=std::min({1.f,progress*5,(1-progress)*5});
+        gesture=s.gesture;
+        amount=ramp*ramp*(3-2*ramp)*(.5f+.5f*s.intensity)*(s.subtle?.7f:1.f);
+        return true;
+    }
+    return false;
+}
 Event Runtime::Presented() {
     if (!active_ || !visible_ || !frame_prepared_) return {};
     frame_prepared_=false;

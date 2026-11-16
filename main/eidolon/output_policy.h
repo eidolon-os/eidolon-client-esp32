@@ -69,6 +69,10 @@ public:
     bool Allows(presentation::Output output) const;
     bool AllowsAny(uint32_t outputs) const;
     bool AllowsMicrophone() const;
+    // Local life outside a conversation (a pet glancing around). Inside an active
+    // session the session plan decides, exactly like Allows(); an interrupted
+    // session allows nothing; with no session the Owner's standing policy decides.
+    bool AllowsAmbient(presentation::Output output) const;
     // The active, unsuspended session's binding for device capability calls.
     SessionCapabilityBinding CapabilityBinding() const;
 private:

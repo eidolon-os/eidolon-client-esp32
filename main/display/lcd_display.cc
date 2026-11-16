@@ -150,7 +150,14 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
     lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
     port_cfg.task_priority = 1;
 #if CONFIG_SOC_CPU_CORES_NUM > 1
+#if CONFIG_EIDOLON_PET_FACE
+    // The desk pet animates continuously: at the lowest priority the LVGL task can
+    // only take idle time, so let it take it on either core (pinned to core 1 it
+    // starved behind the network and audio tasks during a conversation).
+    port_cfg.task_affinity = -1;
+#else
     port_cfg.task_affinity = 1;
+#endif
 #endif
     lvgl_port_init(&port_cfg);
 

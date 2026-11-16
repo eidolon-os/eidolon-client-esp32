@@ -164,6 +164,14 @@ bool DeviceOutputGate::AllowsAny(uint32_t outputs) const {
     const auto mask=policy_.known ? (active_ ? selected_ : 0u) : (legacy_ ? kLegacyOutputs : 0u);
     return !suspended_ && (mask & supported_outputs_ & outputs);
 }
+bool DeviceOutputGate::AllowsAmbient(presentation::Output output) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    uint32_t mask=0;
+    if (!policy_.known) mask=(legacy_ && !suspended_) ? kLegacyOutputs : 0u;   // same as Allows()
+    else if (active_) mask=suspended_ ? 0u : selected_;   // Close() clears active_, so suspended here = interrupted
+    else mask=policy_.allowed;
+    return (mask & supported_outputs_ & OutputBit(output)) != 0;
+}
 DeviceOutputGate& CurrentOutputGate() {
     static DeviceOutputGate gate(!kOutputPolicyRequired, CompiledDeviceCapabilities().OutputMask());
     return gate;
