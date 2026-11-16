@@ -37,12 +37,15 @@
 #include "system_info.h"
 
 #include <cJSON.h>
+#include <esp_heap_caps.h>
 #include <esp_log.h>
 #include <esp_random.h>
+#include <mbedtls/sha256.h>
 #include <esp_timer.h>
 #include "commissioning_runtime.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <freertos/idf_additions.h>
 #include <chrono>
 #include <algorithm>
 #include <cmath>
@@ -234,6 +237,55 @@ bool ProviderBindingExpired(const eidolon::Esp32HubConfig& config)
 
 namespace eidolon {
 
+// One still on its way: the controller fills the request, the worker the
+// result, and the controller sends it. Owned by whichever side holds it.
+struct StillShot {
+    std::string execution_id;
+    std::string session_id;
+    uint32_t policy_revision = 0;
+    int max_edge = 0;
+    int quality = 0;
+    int64_t queued_us = 0;
+    StillCamera::Error error = StillCamera::Error::Unavailable;
+    StillCamera::Image image;
+    std::string sha256;              // lowercase hex of image.data
+    uint32_t worker_stack_unused = 0;
+};
+
+namespace {
+// The worker spends its time in the sensor driver and the JPEG encoder and
+// never touches flash, so its stack can live in PSRAM and a camera board's
+// internal SRAM pays nothing for it.
+constexpr uint32_t kStillWorkerStackBytes = 8 * 1024;
+constexpr UBaseType_t kStillWorkerPriority = 3;
+
+const char* StillErrorCode(StillCamera::Error error)
+{
+    switch (error) {
+    case StillCamera::Error::NoFrame: return "no_frame";
+    case StillCamera::Error::None: return "";
+    default: return "camera_unavailable";
+    }
+}
+
+std::string Sha256Hex(const uint8_t* data, size_t size)
+{
+    unsigned char digest[32];
+    if (mbedtls_sha256(data, size, digest, 0) != 0) return {};
+    static constexpr char kHex[] = "0123456789abcdef";
+    std::string hex(64, '0');
+    for (size_t i = 0; i < sizeof(digest); ++i) {
+        hex[i * 2] = kHex[digest[i] >> 4];
+        hex[i * 2 + 1] = kHex[digest[i] & 0x0F];
+    }
+    return hex;
+}
+}  // namespace
+
+#if defined(CONFIG_EIDOLON_CAMERA_STILL_SELFTEST) && CONFIG_EIDOLON_CAMERA_STILL_SELFTEST > 0
+static void StillSelfTest(void* arg);
+#endif
+
 // ============================ Event loop plumbing ============================
 
 EidolonVoiceController::EidolonVoiceController(GuardService* guard_service)
@@ -265,6 +317,15 @@ EidolonVoiceController::EidolonVoiceController(GuardService* guard_service)
             };
         }
         settings_ = std::make_unique<device_settings::Runtime>(std::move(actuators));
+        // A still on request, declared and served from the same board fact.
+        still_camera_ = board.GetStillCamera();
+        stills_ = std::make_unique<camera_capture::Runtime>(still_camera_ != nullptr);
+#if defined(CONFIG_EIDOLON_CAMERA_STILL_SELFTEST) && CONFIG_EIDOLON_CAMERA_STILL_SELFTEST > 0
+        if (still_camera_ != nullptr && EnsureStillWorker()) {
+            xTaskCreateWithCaps(&StillSelfTest, "still_selftest", 4096, still_jobs_, 2, nullptr,
+                                MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        }
+#endif
         // Whatever changed the value — a command, a button, a restore — the
         // observer only hands it to this task, which reports it.
         if (codec != nullptr) {
@@ -423,6 +484,7 @@ void EidolonVoiceController::DispatchAndRelease(const Event& ev)
     delete ev.activation_config;
     delete ev.completion;
     delete ev.rpc;
+    delete ev.still;
 }
 
 esp_err_t EidolonVoiceController::Enqueue(Event ev)
@@ -430,6 +492,7 @@ esp_err_t EidolonVoiceController::Enqueue(Event ev)
     if (!inbox_.Valid() || task_ == nullptr) {
         delete ev.payload;
         delete ev.rpc;
+        delete ev.still;
         delete ev.activation_config;
         if (ev.completion != nullptr) {
             (*ev.completion)(false);
@@ -468,6 +531,7 @@ esp_err_t EidolonVoiceController::Enqueue(Event ev)
         }
         delete ev.payload;
         delete ev.rpc;
+        delete ev.still;
         delete ev.activation_config;
         if (ev.completion != nullptr) {
             (*ev.completion)(false);
@@ -577,6 +641,11 @@ void EidolonVoiceController::Dispatch(const Event& ev)
     case EventType::PropertyChanged:
         if (ev.payload != nullptr) {
             DoPropertyChanged(*ev.payload);
+        }
+        break;
+    case EventType::StillTaken:
+        if (ev.still != nullptr) {
+            DoStillTaken(*ev.still);
         }
         break;
 #if CONFIG_EIDOLON_SMARTHOME_PANEL
@@ -2424,15 +2493,200 @@ void EidolonVoiceController::DoDeviceRpc(const LiveKitSession::RpcCall& call)
     binding.session_capabilities = session.capabilities;
     const Caller caller =
         call.provider ? Caller::Provider : (call.agent ? Caller::Agent : Caller::Unknown);
+    const char* caller_name =
+        caller == Caller::Provider ? "provider" : (caller == Caller::Agent ? "agent" : "unknown");
     const int64_t epoch_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()).count();
+    const bool clock_set = epoch_ms >= 1'700'000'000'000LL;
+
+    // One protocol, one method name for every capability: a call goes to the
+    // runtime whose execution it is.
+    if (stills_ && stills_->Handles(call.method, call.payload)) {
+        const auto outcome = stills_->Handle(
+            call.method, caller, call.payload, binding, CurrentOutputGate().AllowsCameraCapture(),
+            epoch_ms, clock_set, static_cast<uint64_t>(esp_timer_get_time() / 1000));
+        ESP_LOGI(TAG, "[camera] rpc method=%s caller=%s ok=%d start=%d abort=%d error=%s",
+                 call.method.c_str(), caller_name, outcome.answer.ok, outcome.start.has_value(),
+                 outcome.abort.has_value(),
+                 outcome.answer.ok ? "" : outcome.answer.error_message.c_str());
+        session_.RespondRpc(call.generation, call.id,
+                            outcome.answer.ok ? 0 : outcome.answer.error_code,
+                            outcome.answer.ok ? outcome.answer.payload
+                                              : outcome.answer.error_message);
+        if (outcome.abort && still_camera_ != nullptr) still_camera_->Abort();
+        capability_rpc::Invocation invocation;
+        if (call.method == capability_rpc::kInvokeMethod && outcome.answer.ok &&
+            capability_rpc::ParseInvocation(call.payload, invocation) &&
+            stills_->InFlight(invocation.execution_id) &&
+            std::none_of(still_routes_.begin(), still_routes_.end(),
+                         [&](const StillRoute& route) { return route.execution_id == invocation.execution_id; })) {
+            // A still goes back to the room and the participant that asked for
+            // it, even when it waited behind another.
+            if (still_routes_.size() >= 4) still_routes_.pop_front();
+            still_routes_.push_back({invocation.execution_id, call.generation, call.caller_identity});
+        }
+        if (outcome.start) StartStill(*outcome.start);
+        return;
+    }
+
     const auto answer = settings_->Handle(call.method, caller, call.payload, binding, epoch_ms,
-                                          epoch_ms >= 1'700'000'000'000LL);
+                                          clock_set);
     ESP_LOGI(TAG, "[settings] rpc method=%s caller=%s ok=%d error=%s", call.method.c_str(),
-             caller == Caller::Provider ? "provider" : (caller == Caller::Agent ? "agent" : "unknown"),
-             answer.ok, answer.ok ? "" : answer.error_message.c_str());
+             caller_name, answer.ok, answer.ok ? "" : answer.error_message.c_str());
     session_.RespondRpc(call.generation, call.id, answer.ok ? 0 : answer.error_code,
                         answer.ok ? answer.payload : answer.error_message);
+}
+
+bool EidolonVoiceController::EnsureStillWorker()
+{
+    if (still_task_ != nullptr) return true;
+    if (still_jobs_ == nullptr) still_jobs_ = xQueueCreate(1, sizeof(StillShot*));
+    if (still_jobs_ == nullptr) return false;
+    const BaseType_t created = xTaskCreateWithCaps(
+        &EidolonVoiceController::StillWorker, "camera_still", kStillWorkerStackBytes, this,
+        kStillWorkerPriority, &still_task_, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    ESP_LOGI(TAG, "[camera] still worker created=%d stack=%u memory=psram free_internal=%u",
+             created == pdPASS, static_cast<unsigned>(kStillWorkerStackBytes),
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)));
+    if (created != pdPASS) still_task_ = nullptr;
+    return still_task_ != nullptr;
+}
+
+void EidolonVoiceController::StillWorker(void* arg)
+{
+    auto* self = static_cast<EidolonVoiceController*>(arg);
+    for (;;) {
+        StillShot* shot = nullptr;
+        if (xQueueReceive(self->still_jobs_, &shot, portMAX_DELAY) != pdTRUE || shot == nullptr) {
+            continue;
+        }
+        shot->error = self->still_camera_->Capture(shot->max_edge, shot->quality, shot->image);
+        if (shot->error == StillCamera::Error::None) {
+            shot->sha256 = Sha256Hex(shot->image.data.get(), shot->image.size);
+            if (shot->sha256.empty()) shot->error = StillCamera::Error::NoMemory;
+        }
+        shot->worker_stack_unused = uxTaskGetStackHighWaterMark(nullptr);
+        Event ev;
+        ev.type = EventType::StillTaken;
+        ev.still = shot;
+        self->Enqueue(ev);   // frees the still if the controller cannot take it
+    }
+}
+
+void EidolonVoiceController::StartStill(const camera_capture::Request& request)
+{
+    const auto unavailable = [&](const char* why) {
+        ESP_LOGW(TAG, "[camera] still not started execution=%s: %s", request.execution_id.c_str(), why);
+        if (auto next = stills_->Failed(request.execution_id, "camera_unavailable")) StartStill(*next);
+    };
+    if (still_camera_ == nullptr) return unavailable("no camera");
+    if (!EnsureStillWorker()) return unavailable("no worker");
+    auto* shot = new (std::nothrow) StillShot();
+    if (shot == nullptr) return unavailable("no memory");
+    shot->execution_id = request.execution_id;
+    shot->session_id = request.session_id;
+    shot->policy_revision = request.policy_revision;
+    shot->max_edge = request.max_edge;
+    shot->quality = request.quality;
+    shot->queued_us = esp_timer_get_time();
+    if (xQueueSend(still_jobs_, &shot, 0) != pdTRUE) {
+        delete shot;
+        return unavailable("worker busy");
+    }
+    // The camera runs now, and only now: say so on the face.
+    if (auto* view = GetEidolonView()) view->ShowCameraCapture();
+    ESP_LOGI(TAG, "[camera] still started execution=%s max_edge=%d quality=%d",
+             request.execution_id.c_str(), request.max_edge, request.quality);
+}
+
+void EidolonVoiceController::DoStillTaken(StillShot& shot)
+{
+    const auto route = std::find_if(still_routes_.begin(), still_routes_.end(),
+        [&](const StillRoute& kept) { return kept.execution_id == shot.execution_id; });
+    const int64_t worker_ms = (esp_timer_get_time() - shot.queued_us) / 1000;
+    ESP_LOGI(TAG, "[camera] still taken execution=%s error=%s size=%dx%d bytes=%u open_ms=%lu "
+             "frames_ms=%lu dropped=%u encode_ms=%lu total_ms=%lld stack_unused=%lu "
+             "internal_free=%u internal_min=%u psram_free=%u",
+             shot.execution_id.c_str(), StillErrorCode(shot.error), shot.image.width,
+             shot.image.height, static_cast<unsigned>(shot.image.size),
+             static_cast<unsigned long>(shot.image.open_ms),
+             static_cast<unsigned long>(shot.image.frames_ms),
+             static_cast<unsigned>(shot.image.frames_dropped),
+             static_cast<unsigned long>(shot.image.encode_ms), worker_ms,
+             static_cast<unsigned long>(shot.worker_stack_unused),
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
+             static_cast<unsigned>(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL)),
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
+    if (!stills_->Wants(shot.execution_id)) {
+        // Cancelled, timed out, or the conversation ended while the camera ran.
+        ESP_LOGI(TAG, "[camera] still dropped execution=%s: no longer wanted", shot.execution_id.c_str());
+        if (route != still_routes_.end()) still_routes_.erase(route);
+        return;
+    }
+    std::optional<camera_capture::Request> next;
+    if (shot.error != StillCamera::Error::None) {
+        next = stills_->Failed(shot.execution_id, StillErrorCode(shot.error));
+    } else if (shot.image.size > static_cast<size_t>(camera_capture::kMaxFrameBytes)) {
+        next = stills_->Failed(shot.execution_id, "no_frame");
+    } else if (route == still_routes_.end() || route->peer.empty()) {
+        next = stills_->Failed(shot.execution_id, "transfer_failed");
+    } else {
+        // The still first, then the receipt that describes it: the Channel
+        // matches the frame to this execution by these attributes and checks
+        // it against the bytes and digest in the result.
+        const esp_err_t sent = session_.SendByteStream(
+            route->generation, camera_capture::kFrameTopic, route->peer,
+            {{camera_capture::kAttributeExecution, shot.execution_id},
+             {camera_capture::kAttributeSession, shot.session_id},
+             {camera_capture::kAttributePolicyRevision, std::to_string(shot.policy_revision)},
+             {camera_capture::kAttributeSha256, shot.sha256}},
+            shot.image.data.get(), shot.image.size);
+        if (sent == ESP_OK) {
+            camera_capture::Still still;
+            still.width = shot.image.width;
+            still.height = shot.image.height;
+            still.bytes = shot.image.size;
+            still.sha256 = shot.sha256;
+            still.captured_at_ms =
+                shot.image.read_epoch_ms >= 1'700'000'000'000LL ? shot.image.read_epoch_ms : 0;
+            next = stills_->Completed(shot.execution_id, still);
+        } else {
+            next = stills_->Failed(shot.execution_id, "transfer_failed");
+        }
+        ESP_LOGI(TAG, "[camera] still sent execution=%s ok=%d", shot.execution_id.c_str(), sent == ESP_OK);
+    }
+    if (route != still_routes_.end()) still_routes_.erase(route);
+    if (next) StartStill(*next);
+}
+
+#if defined(CONFIG_EIDOLON_CAMERA_STILL_SELFTEST) && CONFIG_EIDOLON_CAMERA_STILL_SELFTEST > 0
+// Diagnostic builds: stills through the production worker with no execution
+// behind them, so DoStillTaken logs and drops each one.
+static void StillSelfTest(void* arg)
+{
+    auto* jobs = static_cast<QueueHandle_t>(arg);
+    vTaskDelay(pdMS_TO_TICKS(30000));
+    ESP_LOGI(TAG, "[camera] self-test: %d stills", CONFIG_EIDOLON_CAMERA_STILL_SELFTEST);
+    for (int i = 0; i < CONFIG_EIDOLON_CAMERA_STILL_SELFTEST; ++i) {
+        auto* shot = new (std::nothrow) StillShot();
+        if (shot != nullptr) {
+            shot->execution_id = "selftest-" + std::to_string(i);
+            shot->max_edge = camera_capture::kMaxEdgeMaximum;
+            shot->quality = camera_capture::kQualityDefault;
+            shot->queued_us = esp_timer_get_time();
+            if (xQueueSend(jobs, &shot, pdMS_TO_TICKS(10000)) != pdTRUE) delete shot;
+        }
+        vTaskDelay(pdMS_TO_TICKS(1500));
+    }
+    ESP_LOGI(TAG, "[camera] self-test done");
+    vTaskDeleteWithCaps(nullptr);
+}
+#endif
+
+void EidolonVoiceController::CloseStills()
+{
+    if (stills_ && stills_->Close() && still_camera_ != nullptr) still_camera_->Abort();
+    still_routes_.clear();
 }
 
 void EidolonVoiceController::DoPublishDeviceEvent(const std::string& payload)
@@ -4222,6 +4476,8 @@ void EidolonVoiceController::CloseConversationAudio()
 void EidolonVoiceController::SuspendConversationAudio()
 {
     CurrentOutputGate().Suspend();
+    // A still asked for in this conversation is not taken or sent after it.
+    CloseStills();
     session_playback_.Reset();
 #if CONFIG_EIDOLON_COMPANION_FACE
     if (auto* view=GetEidolonView(); view && view->Expressions()) presentations_.Close(*view->Expressions());

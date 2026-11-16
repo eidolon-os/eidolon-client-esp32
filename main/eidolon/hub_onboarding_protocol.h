@@ -16,7 +16,9 @@ bool ParseOwnerDomainDescriptor(
 
 struct DeviceCapabilities;
 std::string BuildDeviceManifestJson(const std::string& board_name, const DeviceCapabilities& capabilities);
-std::string BuildDeviceManifestJson(const std::string& board_name, bool has_camera);
+// The compiled build's Manifest, with or without a published video track: the
+// two build profiles the SDK device-manifest vector pins (its `has_camera`).
+std::string BuildDeviceManifestJson(const std::string& board_name, bool publishes_video);
 
 // What the DeviceRef in a configuration answer means for the one this device
 // holds. The Authority finds the Claim by device identity and answers with the

@@ -313,6 +313,15 @@ void CompanionFaceView::ShowNotification(const char* text,int duration_ms) {
     Text(notification_,text);
     Visible(notification_,text && *text);
 }
+void CompanionFaceView::ShowCameraCapture() {
+#if CONFIG_EIDOLON_PET_FACE
+    if (!display_) return;
+    DisplayLockGuard lock(display_);
+    pet_.OnCameraShutter(NowMs());
+#endif
+    // Only the pet takes stills today (the boards that declare camera.capture);
+    // a companion face that gains a camera gets its shutter with it.
+}
 void CompanionFaceView::SetMotionDiagnostic(const char* name,const char* status,const char* reason) {
 #if CONFIG_EIDOLON_PET_FACE
     if (!display_) return;

@@ -126,18 +126,8 @@ esp_err_t HubConfigStore::SaveHubConfig(const Esp32HubConfig& config) {
     cJSON_AddStringToObject(root, "room_name", config.session.room_name.c_str());
     cJSON_AddNumberToObject(root, "expires_at_ms",
                            static_cast<double>(config.expires_at_ms));
-    if (config.output_policy.known) {
-        auto* policy=cJSON_AddObjectToObject(root,"output_policy");
-        cJSON_AddNumberToObject(policy,"schema_version",1);
-        cJSON_AddNumberToObject(policy,"revision",config.output_policy.revision);
-        if (config.output_policy.inputs_known) {
-            auto* inputs=cJSON_AddObjectToObject(policy,"inputs");
-            cJSON_AddBoolToObject(inputs,"microphone",config.output_policy.microphone);
-        }
-        auto* allowed=cJSON_AddObjectToObject(policy,"allowed");
-        for (size_t i=0;i<presentation::kOutputNames.size();++i)
-            cJSON_AddBoolToObject(allowed,presentation::kOutputNames[i].data(),config.output_policy.allowed&(1u<<i));
-    }
+    // The Owner's whole policy, inputs included, exactly as it is read back.
+    AddOutputPolicyJson(root,"output_policy",config.output_policy);
     cJSON_AddNumberToObject(root, "sample_rate", config.sample_rate);
     cJSON_AddNumberToObject(root, "channels", config.channels);
 

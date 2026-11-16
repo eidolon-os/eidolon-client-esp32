@@ -26,6 +26,9 @@ public:
     virtual smarthome::PanelSurface* SmartHomePanel() { return nullptr; }
     virtual void Render(const EidolonUiModel& model) = 0;
     virtual void SetMotionDiagnostic(const char*, const char*, const char*) {}
+    // A still is being taken for the Host right now (camera.capture). A view
+    // that draws a face shows it; the camera runs for nothing else.
+    virtual void ShowCameraCapture() {}
 
 };
 

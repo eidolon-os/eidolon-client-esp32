@@ -111,6 +111,7 @@ public:
  int PublishSessionRequest(const char*,const std::string&) { ++requests;return request_error; }
  void StartAudioStatePublisher() { publisher=true;++opens; }
  void StopAudioStatePublisher() { publisher=false; }
+ void CloseStills() {}
  void PublishClientAudioState(bool) { capture=CurrentOutputGate().AllowsMicrophone(); }
  bool AgentOutputActiveRecently() { return false; }
  const char* VoiceStateName(VoiceSessionState) { return "test"; }

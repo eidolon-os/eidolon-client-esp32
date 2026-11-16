@@ -420,6 +420,13 @@ ensure_eidolon_trim_sdkconfig() {
   # instead, so no AEC is needed. Pairs with AUDIO_INPUT_REFERENCE=false
   # (single mic) in the board config.h.
   set_sdkconfig_bool USE_DEVICE_AEC n
+
+  # The camera streams only while a still is taken (camera.capture), so its
+  # default format is the one stills use: VGA YUV422, enough face pixels at
+  # a desk for vision.who. Enforced on an existing sdkconfig as well.
+  set_sdkconfig_bool CAMERA_GC0308_DVP_YUV422_YUYV_640X480_16FPS y
+  set_sdkconfig_bool CAMERA_GC0308_DVP_DEFAULT_FMT_YUV422_320X240_20FPS n
+  set_sdkconfig_bool CAMERA_GC0308_DVP_DEFAULT_FMT_YUV422_YUYV_640X480_16FPS y
 }
 
 ensure_board_sdkconfig() {
@@ -473,6 +480,8 @@ CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_CAMERA_GC0308=y
 CONFIG_CAMERA_GC0308_AUTO_DETECT_DVP_INTERFACE_SENSOR=y
 CONFIG_CAMERA_GC0308_DVP_YUV422_320X240_20FPS=y
+CONFIG_CAMERA_GC0308_DVP_YUV422_YUYV_640X480_16FPS=y
+CONFIG_CAMERA_GC0308_DVP_DEFAULT_FMT_YUV422_YUYV_640X480_16FPS=y
 EOF
   ensure_eidolon_trim_sdkconfig
 }

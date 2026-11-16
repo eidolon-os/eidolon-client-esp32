@@ -51,6 +51,12 @@ public:
     void OnPower(bool charging, int battery_pct, uint64_t now_ms);
     void ForceMood(Mood mood, uint64_t now_ms);
     void OnHostAction(HostAction action, uint64_t now_ms);
+    // A still is being taken for the Host (camera.capture): the eyes narrow as
+    // if focusing and the antenna tips flash white. The camera only runs for a
+    // still, so this is the moment a picture leaves the device, and no mood,
+    // phase or quiet hour hides it.
+    void OnCameraShutter(uint64_t now_ms);
+    static constexpr uint64_t kShutterMs = 450;
 
     const Frame& Tick(const RuntimeInputs& in);
     // A local head clip that wants to play now. The caller decides whether motion
@@ -140,6 +146,10 @@ private:
     uint64_t host_t0_ = 0;
     HostAction action_ = HostAction::None;
     uint64_t action_t0_ = 0;
+    bool shutter_ = false;
+    uint64_t shutter_t0_ = 0;
+    // 0..1..0 over the shutter, 0 outside it.
+    float ShutterLevel(uint64_t now_ms) const;
     void ComposeTips(const RuntimeInputs& in, uint64_t now);
     // Conversation: a calm, speech-led face. The head stays still while it listens, thinks and speaks.
     uint64_t phase_t0_ = 0;

@@ -13,7 +13,7 @@
 #include <esp_lcd_ili9341.h>
 #include <esp_timer.h>
 #include <cstring>
-#include "esp_video.h"
+#include "dvp_still_camera.h"
 #include "stackchan_body.h"
 #if CONFIG_EIDOLON_PET_FACE
 #include "eidolon/pet/pet_sense.h"
@@ -30,14 +30,13 @@
 
 #define TAG "M5StackChanBoard"
 
-// The DVP camera's internal/DMA SRAM starves the full_duplex AFE voice
-// capturer: on room.join the mic-path AFE read task (8 KB internal stack)
-// fails to allocate (internal-SRAM low-water ~9 KB), the conversation never
-// forms, and the channel can't be rebuilt either → device goes offline.
-// esp-box-3 (the full_duplex reference) has no camera. Disabled here until
-// internal-SRAM optimization (buffers→PSRAM, standby→conversation teardown
-// sync) lets the camera coexist. Flip to 1 to re-enable.
-#define EIDOLON_STACKCHAN_ENABLE_CAMERA 0
+// The camera takes one still on request (camera.capture) and streams only
+// while it does (DvpStillCamera). It used to be compiled out because the
+// always-streaming DVP camera starved the full-duplex AFE of internal SRAM;
+// this board captures half duplex without the AFE, and a camera that is not
+// streaming holds no DVP controller or DMA. Frames dropped while exposure
+// settles after the stream starts (GC0308, VGA at 16 fps: ~0.4 s).
+static constexpr int kStillSettleFrames = 6;
 
 class Pmic : public Axp2101 {
 public:
@@ -154,7 +153,7 @@ private:
     Aw9523* aw9523_;
     Ft6336* ft6336_;
     LcdDisplay* display_;
-    EspVideo* camera_ = nullptr;
+    DvpStillCamera* still_camera_ = nullptr;
     esp_timer_handle_t touchpad_timer_;
     StackChanBody* body_ = nullptr;
     bool battery_known_ = false, battery_charging_ = false, battery_discharging_ = false;
@@ -362,8 +361,10 @@ private:
             .dvp = &dvp_config,
         };
 
-        camera_ = new EspVideo(video_config);
-        camera_->SetHMirror(false);
+        still_camera_ = new DvpStillCamera(video_config, kStillSettleFrames);
+        if (!still_camera_->ready()) {
+            ESP_LOGW(TAG, "Camera unavailable; no stills on request");
+        }
     }
 
     // Bring up the StackChan servo body (yaw/pitch). If the servo base is absent or the
@@ -410,9 +411,7 @@ public:
         I2cDetect();
         InitializeSpi();
         InitializeIli9342Display();
-#if EIDOLON_STACKCHAN_ENABLE_CAMERA
         InitializeCamera();
-#endif
         InitializeFt6336TouchPad();
         InitializeServoBody();
 #if CONFIG_EIDOLON_PET_FACE
@@ -440,8 +439,9 @@ public:
         return display_;
     }
 
-    virtual Camera* GetCamera() override {
-        return camera_;
+    // No xiaozhi photo path: the camera only answers camera.capture.
+    virtual StillCamera* GetStillCamera() override {
+        return still_camera_ != nullptr && still_camera_->ready() ? still_camera_ : nullptr;
     }
 
     // Polled every second by the status bar. The PMIC shares the bus with the codec,

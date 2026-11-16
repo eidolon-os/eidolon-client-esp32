@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 using namespace eidolon;
 using presentation::Output;
@@ -106,6 +107,66 @@ int main() {
         auto* json=cJSON_Parse(raw);SessionOutputPlan parsed;
         assert(ParseSessionOutputPlan(json,parsed));cJSON_Delete(json);
         assert(!parsed.microphone);
+    }
+    {
+        // The Owner's camera use (SDK CameraUse) rides in the same inputs. Before
+        // the firmware read it, a policy carrying it was refused whole — the
+        // microphone and every output with it.
+        const std::pair<const char*,CameraUse> uses[]={
+            {R"({"revision":4,"allowed":{"speech":true},"inputs":{"microphone":true,"camera":"capture"}})",CameraUse::Capture},
+            {R"({"revision":4,"allowed":{"speech":true},"inputs":{"microphone":true,"camera":"local"}})",CameraUse::Local},
+            {R"({"revision":4,"allowed":{"speech":true},"inputs":{"camera":"off","microphone":false}})",CameraUse::Off},
+            {R"({"revision":4,"allowed":{"speech":true},"inputs":{"microphone":true,"camera":null}})",CameraUse::Unset},
+            {R"({"revision":4,"allowed":{"speech":true},"inputs":{"microphone":true}})",CameraUse::Unset},
+        };
+        for (const auto& [raw,use] : uses) {
+            auto* json=cJSON_Parse(raw);DeviceOutputPolicy policy;
+            assert(ParseOutputPolicy(json,policy));cJSON_Delete(json);
+            assert(policy.known && policy.inputs_known && policy.camera==use);
+            DeviceOutputGate camera_gate(false);
+            assert(!camera_gate.AllowsCameraCapture());   // no policy bound yet
+            assert(camera_gate.Bind(policy));
+            assert(camera_gate.AllowsCameraCapture()==(use==CameraUse::Capture));
+        }
+        for (const char* raw : {
+            R"({"revision":1,"allowed":{},"inputs":{"camera":"video"}})",
+            R"({"revision":1,"allowed":{},"inputs":{"camera":"Capture"}})",
+            R"({"revision":1,"allowed":{},"inputs":{"camera":"capture","camera":"off"}})",
+            R"({"revision":1,"allowed":{},"inputs":{"camera":1}})"
+        }) {
+            auto* json=cJSON_Parse(raw);DeviceOutputPolicy policy;
+            assert(!ParseOutputPolicy(json,policy));cJSON_Delete(json);
+        }
+        // What the device keeps across a reboot reads back as the same policy,
+        // camera use included: a restored policy that lost it would refuse
+        // every still until the next configuration refresh.
+        for (CameraUse use : {CameraUse::Unset,CameraUse::Off,CameraUse::Local,CameraUse::Capture}) {
+            DeviceOutputPolicy kept{true,9,speech|OutputBit(Output::Expression),true,true,use};
+            auto* root=cJSON_CreateObject();
+            assert(AddOutputPolicyJson(root,"output_policy",kept));
+            DeviceOutputPolicy restored;
+            assert(ParseOutputPolicy(cJSON_GetObjectItemCaseSensitive(root,"output_policy"),restored));
+            assert(restored==kept);
+            cJSON_Delete(root);
+        }
+        {
+            auto* root=cJSON_CreateObject();
+            assert(AddOutputPolicyJson(root,"output_policy",DeviceOutputPolicy{}));
+            assert(cJSON_GetObjectItemCaseSensitive(root,"output_policy")==nullptr);
+            cJSON_Delete(root);
+        }
+        // Narrowing the camera is a new revision, and the next still is refused.
+        DeviceOutputGate camera_gate(false);
+        DeviceOutputPolicy capture{true,5,speech,true,true,CameraUse::Capture};
+        assert(camera_gate.Bind(capture) && camera_gate.AllowsCameraCapture());
+        auto narrowed=capture;narrowed.camera=CameraUse::Local;
+        assert(!camera_gate.Bind(narrowed));               // same revision, different inputs
+        narrowed.revision=6;
+        assert(camera_gate.Bind(narrowed) && !camera_gate.AllowsCameraCapture());
+        auto* plan_json=cJSON_Parse(R"({"schema_version":1,"session_id":"look","policy_revision":6,"outputs":{"speech":true},"inputs":{"microphone":true,"camera":"capture"},"device_capabilities":["camera.capture"]})");
+        SessionOutputPlan look;
+        assert(ParseSessionOutputPlan(plan_json,look));cJSON_Delete(plan_json);
+        assert(look.camera==CameraUse::Capture && look.device_capabilities.size()==1);
     }
     auto* invalid_inputs=cJSON_Parse(R"({"session_id":"listen","policy_revision":2,"outputs":{"speech":true},"inputs":null})");
     assert(!ParseSessionOutputPlan(invalid_inputs,listening));cJSON_Delete(invalid_inputs);

@@ -6,6 +6,7 @@
 #include <string>
 #include <array>
 #include <mutex>
+#include <vector>
 
 #include <livekit.h>
 #include <livekit_data_stream.h>
@@ -47,6 +48,8 @@ public:
         bool agent = false;
         bool provider = false;
         uint32_t generation = 0;
+        // The participant that called: whoever a still is sent back to.
+        std::string caller_identity;
     };
     // Returns whether the call was taken; a refused one is answered here.
     using RpcCallback = std::function<bool(RpcCall call)>;
@@ -84,6 +87,16 @@ public:
     livekit_failure_reason_t LastFailureReason() const { return last_failure_reason_; }
     esp_err_t PublishData(const std::string& topic, const std::string& payload,
                           bool reliable = true);
+    // One byte stream to one participant of the room `generation` names:
+    // header with these attributes, the bytes, trailer. Refused when that room
+    // is gone or replaced. Call from the controller task, like PublishData.
+    struct StreamAttribute {
+        const char* key;
+        std::string value;
+    };
+    esp_err_t SendByteStream(uint32_t generation, const char* topic, const std::string& destination,
+                             const std::vector<StreamAttribute>& attributes, const uint8_t* data,
+                             size_t size);
 
     void SetOnStateChanged(StateCallback cb) { on_state_changed_ = std::move(cb); }
     void SetOnConfigurationInvalidated(ConfigurationCallback cb) { on_configuration_invalidated_ = std::move(cb); }

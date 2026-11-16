@@ -11,7 +11,13 @@ struct DeviceCapabilities {
     bool policy_required = false;
     bool microphone = true;
     bool speaker = true;
-    bool camera = false;
+    // Publishes a video track (Manifest media: video/publish). No board in this
+    // firmware does; it is the SDK device-manifest vector's `has_camera` case.
+    bool video_publish = false;
+    // Takes one still on request and sends it to the Host (camera.capture v1),
+    // which is what lets the Owner choose a camera use for this device. Read
+    // from the board at runtime, like the settings below.
+    bool camera_still = false;
     // Local identity recognition, not capture or host-side inference.
     // Leave disabled until the device actually implements the recognizer.
     bool voiceprint_recognition = false;

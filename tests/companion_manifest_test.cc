@@ -35,13 +35,13 @@ int main() {
     assert(manifest.find("expression.profile")==std::string::npos);
     assert(manifest.find("eidolon.outputs.v1")!=std::string::npos);
     cJSON_Delete(json);
-    text.microphone=false;text.camera=true;
+    text.microphone=false;text.video_publish=true;
     manifest=eidolon::BuildDeviceManifestJson("camera-fixture",text);
     json=cJSON_Parse(manifest.c_str());assert(json);
     assert(cJSON_GetArraySize(cJSON_GetObjectItemCaseSensitive(json,"media"))==1);
     assert(manifest.find("opus")==std::string::npos);
     cJSON_Delete(json);
-    text.camera=false;text.speaker=true;text.audio_cue=true;
+    text.video_publish=false;text.speaker=true;text.audio_cue=true;
     manifest=eidolon::BuildDeviceManifestJson("playback-fixture",text);
     assert(manifest.find("subscribe")!=std::string::npos);
     assert(manifest.find("output.audio_cue")!=std::string::npos);

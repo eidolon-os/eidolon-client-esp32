@@ -29,6 +29,7 @@ public:
     void SetContentFont(const lv_font_t* font);
     void SetSystemStatus(const char* text);
     void SetMotionDiagnostic(const char* name, const char* status, const char* reason) override;
+    void ShowCameraCapture() override;
     void ShowNotification(const char* text, int duration_ms);
     void PulseEmotion(const char* emotion, int ttl_ms);
     expression::Event Submit(const expression::Plan& plan) override;
