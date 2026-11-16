@@ -1216,6 +1216,15 @@ menu "Eidolon Hub"
             the heap ("[camera] still taken"). Measures the camera gate's
             repeat-capture and leak steps without anyone asking it to look.
 
+    config EIDOLON_CAMERA_STILL_DUMP
+        bool "Print self-test stills as base64 JPEG on the console"
+        depends on EIDOLON_CAMERA_STILL_SELFTEST > 0
+        default n
+        help
+            Diagnostic builds only. Each self-test still (never one taken for
+            the Host) is printed between EIDOLON-STILL-BEGIN and
+            EIDOLON-STILL-END lines so the image can be checked on a computer.
+
     config EIDOLON_STACKCHAN_CAPTURE_CUTS_SERVO_RAIL
         bool "Cut the servo rail while the microphone captures (legacy)"
         depends on BOARD_TYPE_M5STACK_STACKCHAN

@@ -41,6 +41,8 @@
 #include <esp_log.h>
 #include <esp_random.h>
 #include <mbedtls/sha256.h>
+#include <mbedtls/base64.h>
+#include <cstdio>
 #include <esp_timer.h>
 #include "commissioning_runtime.h"
 #include <freertos/FreeRTOS.h>
@@ -2595,8 +2597,11 @@ void EidolonVoiceController::StartStill(const camera_capture::Request& request)
     }
     // The camera runs now, and only now: say so on the face.
     if (auto* view = GetEidolonView()) view->ShowCameraCapture();
-    ESP_LOGI(TAG, "[camera] still started execution=%s max_edge=%d quality=%d",
-             request.execution_id.c_str(), request.max_edge, request.quality);
+    // The sensor driver needs one contiguous internal DMA block when the stream
+    // starts; this is the headroom it will find.
+    ESP_LOGI(TAG, "[camera] still started execution=%s max_edge=%d quality=%d internal_dma_largest=%u",
+             request.execution_id.c_str(), request.max_edge, request.quality,
+             static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA)));
 }
 
 void EidolonVoiceController::DoStillTaken(StillShot& shot)
@@ -2617,6 +2622,23 @@ void EidolonVoiceController::DoStillTaken(StillShot& shot)
              static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
              static_cast<unsigned>(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL)),
              static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
+#if defined(CONFIG_EIDOLON_CAMERA_STILL_DUMP) && CONFIG_EIDOLON_CAMERA_STILL_DUMP
+    // Diagnostic builds: only the self-test's own stills, never one for the Host.
+    if (shot.error == StillCamera::Error::None && shot.execution_id.rfind("selftest-", 0) == 0) {
+        std::printf("EIDOLON-STILL-BEGIN %s %u\n", shot.execution_id.c_str(),
+                    static_cast<unsigned>(shot.image.size));
+        static constexpr size_t kRaw = 57;   // 76 base64 characters per line
+        unsigned char line[80];
+        for (size_t offset = 0; offset < shot.image.size; offset += kRaw) {
+            size_t written = 0;
+            const size_t length = std::min(kRaw, shot.image.size - offset);
+            if (mbedtls_base64_encode(line, sizeof(line), &written, shot.image.data.get() + offset, length) != 0) break;
+            std::printf("%.*s\n", static_cast<int>(written), reinterpret_cast<const char*>(line));
+            if ((offset / kRaw) % 64 == 63) vTaskDelay(pdMS_TO_TICKS(5));
+        }
+        std::printf("EIDOLON-STILL-END\n");
+    }
+#endif
     if (!stills_->Wants(shot.execution_id)) {
         // Cancelled, timed out, or the conversation ended while the camera ran.
         ESP_LOGI(TAG, "[camera] still dropped execution=%s: no longer wanted", shot.execution_id.c_str());

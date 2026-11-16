@@ -35,7 +35,7 @@
 // always-streaming DVP camera starved the full-duplex AFE of internal SRAM;
 // this board captures half duplex without the AFE, and a camera that is not
 // streaming holds no DVP controller or DMA. Frames dropped while exposure
-// settles after the stream starts (GC0308, VGA at 16 fps: ~0.4 s).
+// settles after the stream starts (GC0308, QVGA at 20 fps: ~0.3 s).
 static constexpr int kStillSettleFrames = 6;
 
 class Pmic : public Axp2101 {

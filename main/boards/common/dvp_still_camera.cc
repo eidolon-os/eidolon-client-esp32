@@ -80,7 +80,8 @@ void SetFlip(int fd, uint32_t control, bool enabled)
 }
 
 // The capture format: YUV422 first (this esp_video's "YUV422P" is packed
-// YUYV, the JPEG encoder's native input), RGB565 if that is all there is.
+// YUYV, the JPEG encoder's native input; GC0308 sends its smaller formats as
+// UYVY), RGB565 if that is all there is.
 uint32_t PickFormat(int fd)
 {
     uint32_t best = 0;
@@ -92,7 +93,8 @@ uint32_t PickFormat(int fd)
         switch (description.pixelformat) {
         case V4L2_PIX_FMT_YUV422P: rank = 0; break;
         case V4L2_PIX_FMT_YUYV: rank = 1; break;
-        case V4L2_PIX_FMT_RGB565: rank = 2; break;
+        case V4L2_PIX_FMT_UYVY: rank = 2; break;
+        case V4L2_PIX_FMT_RGB565: rank = 3; break;
         default: break;
         }
         if (rank < best_rank) {
@@ -129,14 +131,27 @@ StillCamera::Error DvpStillCamera::Capture(int max_edge, int quality, Image& out
     }
     v4l2_format format = {};
     format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    if (ioctl(device.fd, VIDIOC_G_FMT, &format) != 0) return Error::Unavailable;
+    if (ioctl(device.fd, VIDIOC_G_FMT, &format) != 0) {
+        ESP_LOGE(TAG, "get format failed errno=%d", errno);
+        return Error::Unavailable;
+    }
     const uint32_t pixel_format = PickFormat(device.fd);
-    if (pixel_format == 0) return Error::Unavailable;
+    if (pixel_format == 0) {
+        ESP_LOGE(TAG, "no YUV422 or RGB565 format offered");
+        return Error::Unavailable;
+    }
     format.fmt.pix.pixelformat = pixel_format;
-    if (ioctl(device.fd, VIDIOC_S_FMT, &format) != 0) return Error::Unavailable;
+    if (ioctl(device.fd, VIDIOC_S_FMT, &format) != 0) {
+        ESP_LOGE(TAG, "set format %.4s %lux%lu failed errno=%d", reinterpret_cast<const char*>(&pixel_format),
+                 static_cast<unsigned long>(format.fmt.pix.width),
+                 static_cast<unsigned long>(format.fmt.pix.height), errno);
+        return Error::Unavailable;
+    }
     int width = static_cast<int>(format.fmt.pix.width);
     int height = static_cast<int>(format.fmt.pix.height);
-    const bool yuyv = pixel_format != V4L2_PIX_FMT_RGB565;
+    // What the encoder is told the bytes are. Only YUYV is scaled here.
+    const uint32_t encoded_format = pixel_format == V4L2_PIX_FMT_YUV422P ? V4L2_PIX_FMT_YUYV : pixel_format;
+    const bool yuyv = encoded_format == V4L2_PIX_FMT_YUYV;
     SetFlip(device.fd, V4L2_CID_HFLIP, hmirror_);
     SetFlip(device.fd, V4L2_CID_VFLIP, vflip_);
 
@@ -159,7 +174,10 @@ StillCamera::Error DvpStillCamera::Capture(int max_edge, int quality, Image& out
         if (ioctl(device.fd, VIDIOC_QBUF, &buffer) != 0) return Error::NoMemory;
     }
     int type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    if (ioctl(device.fd, VIDIOC_STREAMON, &type) != 0) return Error::Unavailable;
+    if (ioctl(device.fd, VIDIOC_STREAMON, &type) != 0) {
+        ESP_LOGE(TAG, "stream on failed errno=%d", errno);
+        return Error::Unavailable;
+    }
     device.streaming = true;
     out.open_ms = MsSince(started_us);
 
@@ -192,6 +210,10 @@ StillCamera::Error DvpStillCamera::Capture(int max_edge, int quality, Image& out
 
     uint8_t* frame = static_cast<uint8_t*>(device.mappings[kept.index].start);
     size_t frame_size = kept.bytesused;
+    ESP_LOGI(TAG, "frame %.4s %dx%d bytes=%u head=%02x %02x %02x %02x %02x %02x %02x %02x",
+             reinterpret_cast<const char*>(&pixel_format), width, height,
+             static_cast<unsigned>(frame_size), frame[0], frame[1], frame[2], frame[3], frame[4],
+             frame[5], frame[6], frame[7]);
     if (frame_size < static_cast<size_t>(width) * height * 2) {
         ESP_LOGE(TAG, "short frame %u bytes for %dx%d", static_cast<unsigned>(frame_size), width, height);
         return Error::NoFrame;
@@ -219,7 +241,7 @@ StillCamera::Error DvpStillCamera::Capture(int max_edge, int quality, Image& out
     size_t jpeg_size = 0;
     const bool encoded = image_to_jpeg(frame, frame_size, static_cast<uint16_t>(width),
                                        static_cast<uint16_t>(height),
-                                       yuyv ? V4L2_PIX_FMT_YUYV : V4L2_PIX_FMT_RGB565,
+                                       encoded_format,
                                        static_cast<uint8_t>(quality), &jpeg, &jpeg_size);
     out.encode_ms = MsSince(encode_us);
     if (!encoded || jpeg == nullptr || jpeg_size == 0) {
