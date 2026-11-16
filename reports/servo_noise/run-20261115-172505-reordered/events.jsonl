@@ -1,0 +1,78 @@
+{"type": "ready", "ts_us": 2697835, "board": "m5stack-stackchan", "sample_rate": 24000, "channels": 1, "head_motion": true, "free_psram": 6498656, "free_internal": 217951}
+{"type": "droop", "ts_us": 10032788, "yaw_before": 463, "pitch_before": 747, "yaw_after": 461, "pitch_after": 745, "rail_off_ms": 4000, "answered_after_ms": 750, "raw_per_deg": 3.2}
+{"type": "cond_start", "ts_us": 12231380, "cond": "D1"}
+{"type": "readback", "ts_us": 12238100, "cond": "D1", "readtorque_yaw": 0, "readtorque_pitch": 0, "readload_yaw": 0, "readload_pitch": 0, "readcur_yaw": 0, "readcur_pitch": 0, "readvolt_yaw": 51, "readvolt_pitch": 52, "readtemp_yaw": 25, "readtemp_pitch": 28, "readpos_yaw": 463, "readpos_pitch": 747}
+{"type": "segment", "ts_us": 18507374, "seg": "D1_silence", "samples": 144000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -57.103294, "capture_us": 6143057}
+{"type": "segment_end", "ts_us": 18939168, "seg": "D1_silence", "chunks": 60}
+{"type": "host_segment_saved", "seg": "D1_silence", "missing_chunks": [], "bytes": 288000}
+{"type": "speech_lead", "ts_us": 18939298, "cond": "D1", "lead_ms": 1200}
+{"type": "segment", "ts_us": 27428361, "seg": "D1_speech", "samples": 168000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -45.92458, "capture_us": 7149874}
+{"type": "segment_end", "ts_us": 27932924, "seg": "D1_speech", "chunks": 70}
+{"type": "host_segment_saved", "seg": "D1_speech", "missing_chunks": [], "bytes": 336000}
+{"type": "readback", "ts_us": 27940333, "cond": "D1", "readtorque_yaw": 0, "readtorque_pitch": 0, "readload_yaw": 0, "readload_pitch": 0, "readcur_yaw": 0, "readcur_pitch": 0, "readvolt_yaw": 51, "readvolt_pitch": 52, "readtemp_yaw": 25, "readtemp_pitch": 27, "readpos_yaw": 463, "readpos_pitch": 746}
+{"type": "cond_end", "ts_us": 27940470, "cond": "D1"}
+{"type": "cond_start", "ts_us": 29731382, "cond": "A1"}
+{"type": "segment", "ts_us": 36006426, "seg": "A1_silence", "samples": 144000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -58.694705, "capture_us": 6149819}
+{"type": "segment_end", "ts_us": 36438265, "seg": "A1_silence", "chunks": 60}
+{"type": "host_segment_saved", "seg": "A1_silence", "missing_chunks": [], "bytes": 288000}
+{"type": "speech_lead", "ts_us": 36438391, "cond": "A1", "lead_ms": 1200}
+{"type": "segment", "ts_us": 44927493, "seg": "A1_speech", "samples": 168000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -44.631261, "capture_us": 7149872}
+{"type": "segment_end", "ts_us": 45431809, "seg": "A1_speech", "chunks": 70}
+{"type": "host_segment_saved", "seg": "A1_speech", "missing_chunks": [], "bytes": 336000}
+{"type": "cond_end", "ts_us": 45431928, "cond": "A1"}
+{"type": "cond_start", "ts_us": 49251388, "cond": "C1"}
+{"type": "readback", "ts_us": 49258302, "cond": "C1", "readtorque_yaw": 256, "readtorque_pitch": 256, "readload_yaw": -90, "readload_pitch": -390, "readcur_yaw": 0, "readcur_pitch": 0, "readvolt_yaw": 50, "readvolt_pitch": 50, "readtemp_yaw": 25, "readtemp_pitch": 28, "readpos_yaw": 455, "readpos_pitch": 739}
+{"type": "segment", "ts_us": 55526590, "seg": "C1_silence", "samples": 144000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -46.572745, "capture_us": 6142855}
+{"type": "segment_end", "ts_us": 55958236, "seg": "C1_silence", "chunks": 60}
+{"type": "host_segment_saved", "seg": "C1_silence", "missing_chunks": [], "bytes": 288000}
+{"type": "speech_lead", "ts_us": 55958359, "cond": "C1", "lead_ms": 1200}
+{"type": "segment", "ts_us": 64447492, "seg": "C1_speech", "samples": 168000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -44.287882, "capture_us": 7149874}
+{"type": "segment_end", "ts_us": 64951750, "seg": "C1_speech", "chunks": 70}
+{"type": "host_segment_saved", "seg": "C1_speech", "missing_chunks": [], "bytes": 336000}
+{"type": "readback", "ts_us": 64958970, "cond": "C1", "readtorque_yaw": 256, "readtorque_pitch": 256, "readload_yaw": -90, "readload_pitch": -390, "readcur_yaw": 0, "readcur_pitch": 0, "readvolt_yaw": 51, "readvolt_pitch": 50, "readtemp_yaw": 26, "readtemp_pitch": 31, "readpos_yaw": 455, "readpos_pitch": 739}
+{"type": "cond_end", "ts_us": 64959089, "cond": "C1"}
+{"type": "cond_start", "ts_us": 67151376, "cond": "B1"}
+{"type": "readback", "ts_us": 67158408, "cond": "B1", "readtorque_yaw": 0, "readtorque_pitch": 0, "readload_yaw": 0, "readload_pitch": 0, "readcur_yaw": 0, "readcur_pitch": 0, "readvolt_yaw": 51, "readvolt_pitch": 52, "readtemp_yaw": 26, "readtemp_pitch": 31, "readpos_yaw": 455, "readpos_pitch": 738}
+{"type": "segment", "ts_us": 73426530, "seg": "B1_silence", "samples": 144000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -52.695971, "capture_us": 6142773}
+{"type": "segment_end", "ts_us": 73858073, "seg": "B1_silence", "chunks": 60}
+{"type": "host_segment_saved", "seg": "B1_silence", "missing_chunks": [], "bytes": 288000}
+{"type": "speech_lead", "ts_us": 73858182, "cond": "B1", "lead_ms": 1200}
+{"type": "segment", "ts_us": 82347508, "seg": "B1_speech", "samples": 168000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -44.465639, "capture_us": 7149871}
+{"type": "segment_end", "ts_us": 82851964, "seg": "B1_speech", "chunks": 70}
+{"type": "host_segment_saved", "seg": "B1_speech", "missing_chunks": [], "bytes": 336000}
+{"type": "readback", "ts_us": 82859194, "cond": "B1", "readtorque_yaw": 0, "readtorque_pitch": 0, "readload_yaw": 0, "readload_pitch": 0, "readcur_yaw": 0, "readcur_pitch": 0, "readvolt_yaw": 51, "readvolt_pitch": 52, "readtemp_yaw": 25, "readtemp_pitch": 29, "readpos_yaw": 455, "readpos_pitch": 738}
+{"type": "cond_end", "ts_us": 82859319, "cond": "B1"}
+{"type": "cond_start", "ts_us": 85051384, "cond": "D2"}
+{"type": "readback", "ts_us": 85058095, "cond": "D2", "readtorque_yaw": 0, "readtorque_pitch": 0, "readload_yaw": 0, "readload_pitch": 0, "readcur_yaw": 0, "readcur_pitch": 0, "readvolt_yaw": 51, "readvolt_pitch": 52, "readtemp_yaw": 26, "readtemp_pitch": 30, "readpos_yaw": 455, "readpos_pitch": 739}
+{"type": "segment", "ts_us": 91327372, "seg": "D2_silence", "samples": 144000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -47.773417, "capture_us": 6143078}
+{"type": "segment_end", "ts_us": 91759325, "seg": "D2_silence", "chunks": 60}
+{"type": "host_segment_saved", "seg": "D2_silence", "missing_chunks": [], "bytes": 288000}
+{"type": "speech_lead", "ts_us": 91759434, "cond": "D2", "lead_ms": 1200}
+{"type": "segment", "ts_us": 100248371, "seg": "D2_speech", "samples": 168000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -44.160239, "capture_us": 7149876}
+{"type": "segment_end", "ts_us": 100752781, "seg": "D2_speech", "chunks": 70}
+{"type": "host_segment_saved", "seg": "D2_speech", "missing_chunks": [], "bytes": 336000}
+{"type": "readback", "ts_us": 100759950, "cond": "D2", "readtorque_yaw": 0, "readtorque_pitch": 0, "readload_yaw": 0, "readload_pitch": 0, "readcur_yaw": 0, "readcur_pitch": 0, "readvolt_yaw": 51, "readvolt_pitch": 52, "readtemp_yaw": 25, "readtemp_pitch": 29, "readpos_yaw": 455, "readpos_pitch": 738}
+{"type": "cond_end", "ts_us": 100760084, "cond": "D2"}
+{"type": "cond_start", "ts_us": 102551381, "cond": "A2"}
+{"type": "segment", "ts_us": 108826514, "seg": "A2_silence", "samples": 144000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -55.601309, "capture_us": 6149820}
+{"type": "segment_end", "ts_us": 109258559, "seg": "A2_silence", "chunks": 60}
+{"type": "host_segment_saved", "seg": "A2_silence", "missing_chunks": [], "bytes": 288000}
+{"type": "speech_lead", "ts_us": 109258671, "cond": "A2", "lead_ms": 1200}
+{"type": "segment", "ts_us": 117747524, "seg": "A2_speech", "samples": 168000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -44.412964, "capture_us": 7149871}
+{"type": "segment_end", "ts_us": 118251936, "seg": "A2_speech", "chunks": 70}
+{"type": "host_segment_saved", "seg": "A2_speech", "missing_chunks": [], "bytes": 336000}
+{"type": "cond_end", "ts_us": 118252045, "cond": "A2"}
+{"type": "cond_start", "ts_us": 122071389, "cond": "E1"}
+{"type": "readback", "ts_us": 122078224, "cond": "E1", "readtorque_yaw": 256, "readtorque_pitch": 256, "readload_yaw": -90, "readload_pitch": -315, "readcur_yaw": 0, "readcur_pitch": 0, "readvolt_yaw": 51, "readvolt_pitch": 50, "readtemp_yaw": 25, "readtemp_pitch": 30, "readpos_yaw": 455, "readpos_pitch": 744}
+{"type": "segment", "ts_us": 128346496, "seg": "E1_silence", "samples": 144000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -55.288382, "capture_us": 6142928}
+{"type": "segment_end", "ts_us": 128778615, "seg": "E1_silence", "chunks": 60}
+{"type": "host_segment_saved", "seg": "E1_silence", "missing_chunks": [], "bytes": 288000}
+{"type": "speech_lead", "ts_us": 128778741, "cond": "E1", "lead_ms": 1200}
+{"type": "segment", "ts_us": 137267489, "seg": "E1_speech", "samples": 168000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -44.527045, "capture_us": 7149874}
+{"type": "segment_end", "ts_us": 137772240, "seg": "E1_speech", "chunks": 70}
+{"type": "host_segment_saved", "seg": "E1_speech", "missing_chunks": [], "bytes": 336000}
+{"type": "readback", "ts_us": 137779945, "cond": "E1", "readtorque_yaw": 256, "readtorque_pitch": 256, "readload_yaw": -90, "readload_pitch": -315, "readcur_yaw": 0, "readcur_pitch": 0, "readvolt_yaw": 50, "readvolt_pitch": 51, "readtemp_yaw": 27, "readtemp_pitch": 32, "readpos_yaw": 455, "readpos_pitch": 744}
+{"type": "cond_end", "ts_us": 137780053, "cond": "E1"}
+{"type": "droop", "ts_us": 145112733, "yaw_before": 455, "pitch_before": 744, "yaw_after": 453, "pitch_after": 742, "rail_off_ms": 4000, "answered_after_ms": 750, "raw_per_deg": 3.2}
+{"type": "done", "ts_us": 147312586, "free_internal": 217927}
+{"type": "host_summary", "bad_lines": 0, "completed": true}

@@ -1,0 +1,815 @@
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x28 (SPI_FAST_FLASH_BOOT)
+Saved PC:0x40041a79
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x548
+load:0x403c8700,len:0xc3c
+load:0x403cb700,len:0x2d9c
+entry 0x403c8908
+I (34) esp_psram: Found 8MB PSRAM device
+I (34) esp_psram: Speed: 80MHz
+I (269) mmu_psram: Instructions copied and mapped to SPIRAM
+I (269) cpu_start: Multicore app
+I (278) cpu_start: GPIO 44 and 43 are used as console UART I/O pins
+I (278) cpu_start: Pro cpu start user code
+I (278) cpu_start: cpu freq: 240000000 Hz
+I (280) app_init: Application information:
+I (284) app_init: Project name:     eidolon
+I (288) app_init: App version:      1.0.0
+I (292) app_init: Compile time:     Nov 15 2026 22:51:09
+I (297) app_init: ELF file SHA256:  81e0515eb...
+I (301) app_init: ESP-IDF:          v5.5.4
+I (305) efuse_init: Min chip rev:     v0.0
+I (309) efuse_init: Max chip rev:     v0.99 
+I (313) efuse_init: Chip rev:         v0.2
+I (317) heap_init: Initializing. RAM available for dynamic allocation:
+I (323) heap_init: At 3FCACBF0 len 0003CB20 (242 KiB): RAM
+I (328) heap_init: At 3FCE9710 len 00005724 (21 KiB): RAM
+I (333) heap_init: At 600FE000 len 00001FD8 (7 KiB): RTCRAM
+I (338) esp_psram: Adding pool of 6016K of PSRAM memory to heap allocator
+I (346) spi_flash: detected chip: generic
+I (349) spi_flash: flash io: qio
+I (352) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+I (358) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+I (365) main_task: Started on CPU0
+I (375) esp_psram: Reserving pool of 8K of internal memory for DMA/internal allocations
+I (375) main_task: Calling app_main()
+I (405) main: EIDOLON-STORAGE owner_trust=ready bytes=65536
+W (405) Application: EIDOLON-BUILDSTAMP git=unstamped sdk=unknown idf=unknown branch=unknown built=Nov 15 2026 22:52:25
+W (415) Application: EIDOLON-PROFILE mode=half_duplex device_aec=0 capture=raw
+I (415) Board: UUID=dde33fc1-d522-4b86-9d1a-289552f306d5 SKU=m5stack-stackchan
+I (425) M5StackChanBoard: Init AXP2101
+I (425) M5StackChanBoard: Init AW9523
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00: 00 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+20: -- 21 -- 23 -- -- -- -- -- -- -- -- -- -- -- -- 
+30: -- -- -- -- 34 -- 36 -- 38 -- -- -- -- -- -- -- 
+40: 40 41 -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+50: 50 51 -- -- -- -- -- -- 58 -- -- -- -- -- -- -- 
+60: -- -- -- -- -- -- -- -- 68 69 -- -- -- -- -- 6f 
+70: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+I (515) M5StackChanBoard: Init IlI9342
+I (515) ili9341: LCD panel create success, version: 1.2.0
+I (545) M5StackChanBoard: Reset IlI9342
+I (675) Display: Power management not supported
+I (735) LcdDisplay: Turning display on
+I (735) LcdDisplay: Initialize LVGL library
+I (735) LcdDisplay: Use 2MB of PSRAM for image cache
+I (735) LcdDisplay: Initialize LVGL port
+I (745) LVGL: Starting LVGL task
+I (745) LcdDisplay: Adding LCD display
+W (745) lcd_panel.io.spi: Callback on_color_trans_done was already set and now it was overwritten!
+I (785) M5StackChanBoard: Init StackChan servo body
+I (985) PY32IOExpander: Version: 0x41
+I (1435) uart: ESP_INTR_FLAG_IRAM flag not set while CONFIG_UART_ISR_IN_IRAM is enabled, flag updated
+I (1435) ScsServo: id: 1 get zero pos: 460 from settings
+I (1445) ScsServo: id: 2 get zero pos: 620 from settings
+I (1445) StackChanBody: servo body ready
+I (1455) PetSensors: Si12T ready at 0x68
+I (1455) PetSensors: LTR-553 ready at 0x23
+I (1715) PetSensors: BMI270 ready at 0x69
+I (1715) Backlight: Set brightness to 60
+I (1715) StateMachine: State: unknown -> starting
+I (1735) EidolonUiPresenter: visible state=ASSETS scene=1
+I (1785) pet: phase 0 -> 6
+I (1795) Assets: The storage free size is 23616 KB
+I (1795) Assets: The partition size is 7424 KB
+I (1795) pet: power external=1 battery=100%
+I (1865) Assets: The checksum calculation time is 77 ms
+I (1875) CompanionLcdDisplay: Asset text font applied line_height=25
+I (1875) Application: [EIDOLON_UI] local assets applied=1
+I (1875) EidolonUiPresenter: visible state=BOOT scene=0
+I (1885) Application: Hub activation actor created=1 stack=16384 memory=internal free_internal=180339
+I (1885) CoreS3AudioCodec: Audio IOs: mclk: 0, bclk: 34, ws: 33, dout: 13, din: 14
+I (1895) CoreS3AudioCodec: Duplex channels created
+I (1905) ES7210: Work in Slave mode
+I (1915) ES7210: Enable ES7210_INPUT_MIC1
+I (1915) ES7210: Enable ES7210_INPUT_MIC2
+I (1925) ES7210: Enable ES7210_INPUT_MIC3
+I (1925) ES7210: Enable TDM mode
+I (1925) CoreS3AudioCodec: CoreS3AudioCodec initialized
+I (1925) EidolonVoice: Mic enabled=1
+I (1925) MCP: Add tool: self.get_device_status
+I (1935) MCP: Add tool: self.audio_speaker.set_volume
+I (1935) MCP: Add tool: self.screen.set_brightness
+I (1935) MCP: Add tool: self.screen.set_theme
+I (1945) MCP: Add tool: self.get_system_info [user]
+I (1945) MCP: Add tool: self.reboot [user]
+I (1955) MCP: Add tool: self.upgrade_firmware [user]
+I (1955) MCP: Add tool: self.screen.get_info [user]
+I (1965) MCP: Add tool: self.screen.snapshot [user]
+I (1965) MCP: Add tool: self.screen.preview_image [user]
+I (1975) MCP: Add tool: self.assets.set_download_url [user]
+I (1975) WifiManager: Initializing...
+I (1985) pp: pp rom version: e7ae62f
+I (1985) net80211: net80211 rom version: e7ae62f
+I (1995) wifi:wifi driver task: 3fccfd64, prio:23, stack:6144, core=0
+I (1995) wifi:wifi firmware version: 0947e8b
+I (1995) wifi:wifi certification version: v7.0
+I (2005) wifi:config NVS flash: disabled
+I (2005) wifi:config nano formatting: enabled
+I (2005) wifi:Init data frame dynamic rx buffer num: 6
+I (2015) wifi:Init dynamic rx mgmt buffer num: 5
+I (2015) wifi:Init management short buffer num: 32
+I (2025) wifi:Init static tx buffer num: 16
+I (2025) wifi:Init tx cache buffer num: 32
+I (2035) wifi:Init static tx FG buffer num: 2
+I (2035) wifi:Init static rx buffer size: 1600
+I (2035) wifi:Init static rx buffer num: 3
+I (2045) wifi:Init dynamic rx buffer num: 6
+I (2045) wifi_init: rx ba win: 3
+I (2045) wifi_init: accept mbox: 6
+I (2055) wifi_init: tcpip mbox: 16
+I (2055) wifi_init: udp mbox: 6
+I (2055) wifi_init: tcp mbox: 6
+I (2065) wifi_init: tcp tx win: 5760
+I (2065) wifi_init: tcp rx win: 5760
+I (2065) wifi_init: tcp mss: 1440
+I (2075) wifi_init: WiFi/LWIP prefer SPIRAM
+I (2075) WifiManager: Initialized
+I (2075) WifiBoard: Starting WiFi connection attempt
+I (2085) WifiManager: Starting station
+I (2085) phy_init: phy_version 711,97bcf0a2,Aug 25 2025,19:04:10
+I (2125) wifi:mode : sta (68:ee:8f:d8:4a:04)
+I (2125) wifi:enable tsf
+I (2135) WifiBoard: WiFi scanning
+I (2135) EidolonUiPresenter: visible state=NETWORK scene=2
+I (3065) StackChanBody: settled: readback yaw=-21 pitch=256 (tenths; rest pitch 220)
+I (4545) WifiStation: Found AP: <ssid>, BSSID: <bssid>, RSSI: -54, Channel: 6, Authmode: 4
+I (4545) WifiBoard: WiFi connecting to <ssid>
+W (4545) wifi:Password length matches WPA2 standards, authmode threshold changes from OPEN to WPA2
+I (5225) wifi:new:<6,0>, old:<1,0>, ap:<255,255>, sta:<6,0>, prof:1, snd_ch_cfg:0x0
+I (5225) wifi:state: init -> auth (0xb0)
+I (5225) wifi:state: auth -> assoc (0x0)
+I (5245) wifi:state: assoc -> run (0x10)
+I (5265) wifi:connected with <ssid>, aid = 10, channel 6, BW20, bssid = <bssid>
+I (5265) wifi:security: WPA2-PSK, phy: bgn, rssi: -54, cipher(pairwise:0x3, group:0x3), pmf:0
+I (5275) wifi:pm start, type: 1
+
+I (5275) wifi:dp: 1, bi: 102400, li: 10, scale listen interval from 1024000 us to 1024000 us
+I (5285) wifi:set rx beacon pti, rx_bcn_pti: 0, bcn_timeout: 25000, mt_pti: 0, mt_time: 10000
+I (5295) wifi:<ba-add>idx:0 (ifx:0, <bssid>), tid:0, ssn:1, winSize:64
+I (5305) wifi:AP's beacon interval = 102400 us, DTIM period = 1
+I (6305) esp_netif_handlers: sta ip: 192.168.100.8, mask: 255.255.255.0, gw: 192.168.100.1
+I (6305) WifiStation: Got IP: 192.168.100.8
+I (6305) WifiBoard: Connected to WiFi: <ssid>
+I (6305) Application: Network connected
+I (6305) EidolonUiPresenter: visible state=SERVICE scene=6
+I (6335) StateMachine: State: starting -> activating
+I (6345) HubOnboarding: Hub attempt begin mode=activate generation=0
+I (6355) HubOnboarding: Hub step=trust-load elapsed_ms=0
+I (6875) HubOnboarding: Hub step=trust-bundle elapsed_ms=520
+I (6875) HubOnboarding: Hub step=directory-restore elapsed_ms=520
+I (6875) HubOnboarding: Hub step=generation-check elapsed_ms=521
+I (6875) HubOnboarding: Hub step=directory-fetch elapsed_ms=526
+I (6885) mdns_mem: mDNS task will be created from internal RAM
+I (7155) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.12 ms=269
+I (8385) HubOnboarding: Accepted Owner directory owner=owner-0342958c2e259f177f43 revision=2
+I (8385) HubOnboarding: Hub step=claim-restore elapsed_ms=2037
+I (8625) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.12 ms=69
+I (9365) HubOnboarding: Hub step=claim-cleanup elapsed_ms=3019
+I (9365) HubOnboarding: Hub step=configuration-proof elapsed_ms=3019
+I (9525) HubOnboarding: Hub step=configuration-fetch elapsed_ms=3173
+I (9715) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.12 ms=189
+E (10535) Settings: nvs_set_str(eidolon/config) failed: ESP_ERR_NVS_NOT_ENOUGH_SPACE
+W (10535) HubActivator: Hub activation could not be cached; using it for this session
+W (10535) StateMachine: Invalid state transition: activating -> connecting
+I (10545) Application: Hub activation actor stack high-water=8916 bytes
+I (10555) Application: Activation done succeeded=1
+I (10555) SystemInfo: free sram: 74999 minimal sram: 69455
+I (10555) StateMachine: State: activating -> idle
+W (10565) EidolonMem: [mem] activation_done internal free=75359 largest_block=55296 free_blocks=18 allocated=206084 min_free=69455
+W (10575) EidolonMem: [mem] activation_done internal-dma free=67587 largest_block=55296 allocated=206084
+W (10585) EidolonMem: [mem] activation_done psram free=6060804 largest_block=6029312
+W (10595) EidolonMem: [mem] activation_done stack task=main prio=10 unused=5428 bytes
+W (10595) EidolonMem: [mem] activation_done stack task=stackchan_motio prio=9 unused=2624 bytes
+W (10605) EidolonMem: [mem] activation_done stack task=taskLVGL prio=1 unused=3016 bytes
+W (10615) EidolonMem: [mem] activation_done stack task=IDLE1 prio=0 unused=724 bytes
+W (10625) EidolonMem: [mem] activation_done stack task=IDLE0 prio=0 unused=732 bytes
+W (10635) EidolonMem: [mem] activation_done stack task=tiT prio=18 unused=1384 bytes
+W (10635) EidolonMem: [mem] activation_done stack task=mdns prio=1 unused=2808 bytes
+W (10645) EidolonMem: [mem] activation_done stack task=pet_sensors prio=10 unused=2700 bytes
+W (10655) EidolonMem: [mem] activation_done stack task=eidolon_ctrl prio=5 unused=14768 bytes
+W (10665) EidolonMem: [mem] activation_done stack task=sys_evt prio=20 unused=1388 bytes
+W (10675) EidolonMem: [mem] activation_done stack task=ipc0 prio=24 unused=548 bytes
+W (10675) EidolonMem: [mem] activation_done stack task=ipc1 prio=24 unused=556 bytes
+W (10685) EidolonMem: [mem] activation_done stack task=wifi prio=23 unused=3520 bytes
+W (10695) EidolonMem: [mem] activation_done stack task=hub_activation prio=2 unused=8916 bytes
+W (10705) EidolonMem: [mem] activation_done stack task=esp_timer prio=22 unused=2308 bytes
+W (10705) EidolonMem: [mem] activation_done stack task=Tmr Svc prio=1 unused=1404 bytes
+W (10715) EidolonMem: [mem] activation_done stacks internal=16 psram=0 total_tasks=16
+I (10725) Application: [EIDOLON_UI] firmware ready version=1.0.0
+I (10725) WifiStation: Setting WiFi power save level: PERFORMANCE (NONE)
+I (10735) wifi:Set ps type: 0, coexist: 0
+
+I (10745) EidolonVoice: [lifecycle] SetState Idle -> ConfigReady reason=config_activated room_kind=none gen=0
+I (10745) Application: [EIDOLON_UI] queue session_state=ConfigReady
+I (10755) EidolonVoice: [lifecycle] begin gen=1 room_kind=control (state=ConfigReady)
+I (10755) StateMachine: State: idle -> connecting
+I (10765) AudioCodec: Audio codec started
+I (10775) I2S_IF: Paired data: 0x3fcc63e8, current mode: record, paired in_enable: 0, paired out_enable: 0
+I (10785) I2S_IF: TDM: RX, data_bit: 16, slot_bit: 16, ws_width: 16, total_slot: 2, slot_mask: 0x1
+I (10785) I2S_IF: TDM: RX, sample_rate_hz: 24000, mclk_multiple: 256, clk_src: 6
+I (10795) I2S_IF: STD: TX, data_bit: 16, slot_bit: 16, ws_width: 16, slot_mode: MONO, slot_mask: 0x1
+I (10805) I2S_IF: STD: TX, sample_rate_hz: 24000, mclk_multiple: 256, clk_src: 6
+I (10815) ES7210: Bits 16
+I (10825) ES7210: Enable ES7210_INPUT_MIC1
+I (10825) ES7210: Enable ES7210_INPUT_MIC2
+I (10825) ES7210: Enable ES7210_INPUT_MIC3
+I (10835) ES7210: Enable TDM mode
+I (10835) ES7210: Unmuted
+I (10835) Adev_Codec: Open codec device OK
+I (10835) AudioCodec: Set input enable to true
+I (10845) EidolonAudioIn: Input resampler 24000 -> 16000 Hz
+I (10845) EidolonAudioIn: audio platform ready
+I (10855) AudioCodec: Set output volume to 79
+I (10855) AudioCodec: Audio codec started
+I (10855) EidolonMicCap: Mic capture started topology=raw (codec=24000 Hz, out=16000 Hz, channels=1)
+E (10865) AV_RENDER: Set audio threshold 7200
+I (10865) EidolonLKBoard: LiveKit board media ready (input=24000 Hz, output=24000 Hz)
+I (10875) LiveKitSession: [mem] room_create verdict=sufficient internal free=80063 largest_block=55296 free_blocks=5 need_contiguous=9472 need_total=19712
+I (10895) LiveKitSession: Connecting room=eidolon-device-a978803e4695462a3f6f69f2 identity=device-instance-77abed88aa03ab7963cef8695b562c712c57f90e7c921e4fbab2211e96ea2de7 server=ws://192.168.100.12:7880
+W (10905) EidolonVoice: [dispatch] type=0 wait_ms=0 run_ms=168 pending=0
+I (10905) livekit_signaling: Connecting to server: ws://192.168.100.12:7880/rtc?sdk=esp32&version=0.3.11~1&os=idf&os_version=v5.5.4&device_model=9&auto_subscribe=false&protocol=1
+I (10935) websocket_client: Started
+I (10935) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-77abed88aa03ab7963cef8695b562c712c57f90e7c921e4fbab2211e96ea2de7 gen=1
+I (10945) EidolonVoice: [lifecycle] lk_event=Connecting room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=None room=eidolon-device-a978803e4695462a3f6f69f2
+I (10965) DTLS: Init SRTP OK
+I (11055) StackChanBody: settled: readback yaw=-21 pitch=256 (tenths; rest pitch 220)
+I (11225) DTLS: DTLS cipher pref: auto (mbedtls default order)
+I (11225) AGENT: Start agent as Controlling
+I (11225) AGENT: Send STUN binding request
+I (11225) AGENT: Send allocate now
+I (11235) DTLS: DTLS cipher pref: auto (mbedtls default order)
+I (11235) AGENT: Send allocate now
+I (11245) AGENT: 0 Get candidate success user:yk3YXJkWip1UnNTUfKIo4jGqwKqaWrtnqRLicyM1wDNtOzOzMzu7eF psw:3bfpXGEDMI4aIMmtqkxXWM3WZka4AhISS91JWrMiJyA
+I (11245) livekit_peer.pub: Generated offer:
+v=0
+o=- 7801614086411001801 2 IN IP4 0.0.0.0
+s=-
+t=0 0
+a=msid-semantic: esp-webrtc
+a=group:BUNDLE 0 1
+m=audio 9 UDP/TLS/RTP/SAVPF 111
+c=IN IP4 0.0.0.0
+a=mid:0
+a=msid:esp_stream a0
+a=rtcp-mux
+a=rtpmap:111 opus/48000/2
+a=rtcp-fb:111 goog-remb
+a=ssrc:6 cname:EspSSpbA0
+a=ssrc:6 msid:esp_stream a0
+a=sendonly
+a=fingerprint:sha-256 75:BF:5B:28:52:E5:AA:F0:47:3B:84:83:99:B3:F9:A3:78:C5:17:88:EC:79:F3:16:60:1C:B0:BD:94:49:47:2F
+a=setup:actpass
+a=ice-ufrag:bRaU
+a=ice-pwd:MYbIeBf4Z8CsBurdydDPVweT
+a=candidate:0 1 UDP 2127673855 192.168.100.8 53689 typ host
+a=candidate:1 1 UDP 1691466239 192.168.100.8 53689 typ srflx raddr 0.0.0.0 rport 0
+m=application 50712 UDP/DTLS/SCTP webrtc-datachannel
+a=mid:1
+a=sctp-port:5000
+c=IN IP4 0.0.0.0
+a=max-message-size:262144
+a=fingerprint:sha-256 75:BF:5B:28:52:E5:AA:F0:47:3B:84:83:99:B3:F9:A3:78:C5:17:88:EC:79:F3:16:60:1C:B0:BD:94:49:47:2F
+a=setup:actpass
+a=ice-ufrag:bRaU
+a=ice-pwd:MYbIeBf4Z8CsBurdydDPVweT
+a=candidate:0 1 UDP 2127673855 192.168.100.8 53689 typ host
+a=candidate:1 1 UDP 1691466239 192.168.100.8 53689 typ srflx raddr 0.0.0.0 rport 0
+
+I (11365) AGENT: 0 Add remote prflx 192.168.100.12:55457
+I (11365) AGENT: 0 0 PeerBinding recv local0:192.168.100.8:53689 remote0:192.168.100.12:55457
+I (11375) AGENT: 0 0 Send binding response local0:192.168.100.8:53689 remote1:192.168.100.12:55457
+I (11375) PEER_DEF: Get peer role 0
+I (11385) AGENT: 0 0 PeerBinding recv local0:192.168.100.8:53689 remote1:192.168.100.12:55457
+I (11385) PEER_DEF: Get peer role 0
+I (11395) AGENT: 0 0 Send binding response local0:192.168.100.8:53689 remote1:192.168.100.12:55457
+I (11395) PEER_DEF: Extract SDP: stream_count=2, audio_mid=255 (dir=2), video_mid=255 (dir=3), data_mid=255, assrc=0, vssrc=0, vrtx_ssrc=0, vfmt=0, vrtx_fmt=0
+I (11405) AGENT: 0 0 PeerBinding recv local0:192.168.100.8:53689 remote1:192.168.100.12:55457
+I (11425) AGENT: 0 0 Send binding response local0:192.168.100.8:53689 remote1:192.168.100.12:55457
+I (11435) AGENT: 0 0 PeerBinding recv local0:192.168.100.8:53689 remote1:192.168.100.12:55457
+I (11445) AGENT: 0 0 Send binding response local0:192.168.100.8:53689 remote1:192.168.100.12:55457
+I (11455) AGENT: 0 0 PeerBinding recv local0:192.168.100.8:53689 remote1:192.168.100.12:55457
+I (11465) AGENT: 0 0 Send binding response local0:192.168.100.8:53689 remote1:192.168.100.12:55457
+I (11465) AGENT: 0 0 PeerBinding recv local0:192.168.100.8:53689 remote1:192.168.100.12:55457
+I (11475) AGENT: 0 0 Send binding response local0:192.168.100.8:53689 remote1:192.168.100.12:55457
+I (11485) AGENT: 0 0 PeerBinding recv local0:192.168.100.8:53689 remote1:192.168.100.12:55457
+I (11495) AGENT: 0 0 Send binding response local0:192.168.100.8:53689 remote1:192.168.100.12:55457
+I (11505) livekit_peer.pub: State changed: 0 -> 1
+I (11515) AGENT: 0 0 Send binding request (cand:0) local0:192.168.100.8:53689 remote1:192.168.100.12:55457 id:3a761a8b36a8a05010143eaa
+I (11565) AGENT: 0 0 LocalBinding resp 3a761a8b36a8a05010143eaa local1
+I (11565) AGENT: 0 Select pair192.168.100.12:55457
+I (11565) AGENT: 0 0 Send binding request (cand:1) local0:192.168.100.8:53689 remote1:192.168.100.12:55457 id:c66cbcb8e9d72fd6490ae3a2
+I (11575) AGENT: 0 0 PeerBinding recv local0:192.168.100.8:53689 remote1:192.168.100.12:55457
+I (11585) AGENT: 0 0 Send binding response local0:192.168.100.8:53689 remote1:192.168.100.12:55457
+I (11595) AGENT: 0 Add remote prflx 192.168.100.12:57286
+I (11595) AGENT: 0 1 PeerBinding recv local0:192.168.100.8:53689 remote0:192.168.100.12:57286
+I (11605) AGENT: 0 1 Send binding response local0:192.168.100.8:53689 remote1:192.168.100.12:57286
+I (11615) AGENT: 0 1 Send binding request (cand:0) local0:192.168.100.8:53689 remote1:192.168.100.12:57286 id:6d9f0243ca7ef548d07f6d3c
+I (11625) AGENT: 0 1 PeerBinding recv local0:192.168.100.8:53689 remote1:192.168.100.12:57286
+I (11635) AGENT: 0 1 Send binding response local0:192.168.100.8:53689 remote1:192.168.100.12:57286
+I (11645) AGENT: 0 1 PeerBinding recv local0:192.168.100.8:53689 remote1:192.168.100.12:57286
+I (11645) AGENT: 0 1 Send binding response local0:192.168.100.8:53689 remote1:192.168.100.12:57286
+I (11655) AGENT: 0 1 PeerBinding recv local0:192.168.100.8:53689 remote1:192.168.100.12:57286
+I (11665) AGENT: 0 1 Send binding response local0:192.168.100.8:53689 remote1:192.168.100.12:57286
+I (11675) AGENT: 0 Add remote prflx 192.168.100.12:50853
+I (11685) AGENT: 0 2 PeerBinding recv local0:192.168.100.8:53689 remote0:192.168.100.12:50853
+I (11685) AGENT: 0 2 Send binding response local0:192.168.100.8:53689 remote1:192.168.100.12:50853
+I (11695) AGENT: 0 2 Send binding request (cand:0) local0:192.168.100.8:53689 remote1:192.168.100.12:50853 id:e9ae5bde335cc7267d8141b1
+I (11715) AGENT: 0 2 PeerBinding recv local0:192.168.100.8:53689 remote1:192.168.100.12:50853
+I (11715) AGENT: 0 2 Send binding response local0:192.168.100.8:53689 remote1:192.168.100.12:50853
+I (11725) AGENT: 0 1 LocalBinding resp 6d9f0243ca7ef548d07f6d3c local1
+I (11735) AGENT: 0 1 PeerBinding recv local1:192.168.100.8:53689 remote1:192.168.100.12:57286
+I (11745) AGENT: 0 Hold DTLS handshake datagram (139) until DTLS starts
+I (11745) AGENT: 0 2 LocalBinding resp e9ae5bde335cc7267d8141b1 local1
+I (11755) AGENT: 0 2 PeerBinding recv local1:192.168.100.8:53689 remote1:192.168.100.12:50853
+I (11765) AGENT: 0 Update remote prflx type:1 192.168.100.12:55457
+I (11765) livekit_peer.pub: Ignoring TCP ICE candidate: TCP transport disabled
+I (11805) pet: stats 30s: fps=0.1 frame_ms avg=51 max=51 draws=24 avg_task_us=14 max_task_us=57 mood=calm phase=6 dark=0 led_owner=1 heap_int=54291
+W (11885) AGENT: 0 Drop extra DTLS handshake datagram during pairing
+I (12055) AGENT: 0 Add remote type:2 117.63.16.92:10674
+I (12055) AGENT: 0 Add remote type:2 117.63.16.92:10673
+I (12065) AGENT: 0 0 Send binding request (cand:1) local0:192.168.100.8:53689 remote1:192.168.100.12:55457 id:b86a47c93240815620a77a51
+I (12075) AGENT: 0 0 LocalBinding resp b86a47c93240815620a77a51 local1
+I (12075) AGENT: 0 Candidate responded
+I (12075) AGENT: 0 Connection OK 192.168.100.12:55457
+I (12085) PEER_DEF: Start DTLS role as 1
+I (12095) DTLS: Start to do server handshake
+I (12425) DTLS: SRTP connected OK
+I (12425) DTLS: Server handshake success
+I (12425) DTLS: Negotiated DTLS ciphersuite: TLS-ECDHE-ECDSA-WITH-AES-256-GCM-SHA384
+I (12425) PEER_DEF: DTLS handshake success
+I (12425) PEER_DEF: Sctp role as 0
+I (12435) HubOnboarding: Hub attempt begin mode=resume generation=0
+I (12435) HubOnboarding: Hub step=trust-load elapsed_ms=2
+I (12445) SCTP: 0 Receive chunk 1 SCTP_INIT
+I (12445) SCTP: 0 state 2
+I (12445) SCTP: Support ext 82
+I (12455) SCTP: Support ext c0
+I (12455) SCTP: Send INIT_ACK chunk
+I (12465) SCTP: 0 Receive chunk 10 SCTP_COOKIE_ECHO
+I (12465) SCTP: Send ECHO_ACK chunk
+I (12475) SCTP: 0 state 5
+I (12475) SCTP: Send DCEP _reliable event:3 type:0 si:1
+I (12475) SCTP: Send DCEP _lossy event:3 type:81 si:3
+I (12475) livekit_peer.pub: Channel open: label=_reliable, stream_id=1
+I (12485) livekit_peer.pub: Channel open: label=_lossy, stream_id=3
+I (12495) livekit_peer.pub: State changed: 1 -> 2
+I (12495) AUD_PIPE_NEGO: Negotiate return 0 src_format:541934416 sample_rate:16000
+
+I (12505) AUD_PIPE_NEGO: Path mask 1 select sink:0 format 1398100047
+I (12505) AUD_SRC: Get rate:16000, ch:1, bits:16
+I (12515) ESP_GMF_TASK: Waiting to run... [tsk:aenc_0-0x3fcda130, wk:0, run:0]
+I (12525) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-77abed88aa03ab7963cef8695b562c712c57f90e7c921e4fbab2211e96ea2de7 gen=1
+I (12525) AUD_SRC: Start to fetch audio src data now
+I (12525) ESP_GMF_TASK: One times job is complete, del[wk:0x3c3a6b14, ctx:0x3c338d10, label:aud_src_open]
+I (12545) ESP_GMF_PORT: ACQ IN, new self payload:0x3c3a6b14, port:0x3c3abcfc, el:0x3c338d10-aud_src
+I (12555) ESP_GMF_AENC: Open, type:OPUS, acquire in frame: 640, out frame: 260
+I (12565) ESP_GMF_TASK: One times job is complete, del[wk:0x3c3a7ca0, ctx:0x3c32a2f0, label:aud_enc_open]
+I (13335) HubOnboarding: Hub step=trust-bundle elapsed_ms=895
+I (13335) HubOnboarding: Hub step=directory-restore elapsed_ms=896
+I (13335) HubOnboarding: Hub step=claim-restore elapsed_ms=896
+I (13695) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.12 ms=69
+I (14895) HubOnboarding: Hub step=claim-cleanup elapsed_ms=2463
+I (14895) HubOnboarding: Hub step=configuration-proof elapsed_ms=2463
+I (15155) HubOnboarding: Hub step=configuration-fetch elapsed_ms=2716
+I (15285) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.12 ms=129
+I (16405) AGENT: 0 Add remote type:2 117.63.16.92:10672
+I (16525) EidolonVoice: [lifecycle] Owner configuration current gen=1 revision=1
+W (16525) EidolonVoice: [dispatch] type=30 wait_ms=-1 run_ms=4085 pending=2
+I (16525) EidolonVoice: [lifecycle] lk_event=Connected room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=None room=eidolon-device-a978803e4695462a3f6f69f2
+I (16545) EidolonVoice: [lifecycle] operational_ready=1 reason=channel_connected room_kind=control gen=1
+I (16545) Application: [EIDOLON_UI] queue operational_ready=1
+I (16545) StateMachine: State: connecting -> idle
+W (16555) EidolonVoice: [dispatch] type=10 wait_ms=3988 run_ms=30 pending=1
+I (16555) EidolonUiPresenter: visible state=READY scene=7
+I (16565) HubOnboarding: Hub attempt begin mode=resume generation=0
+I (16575) pet: phase 6 -> 0
+I (16575) HubOnboarding: Hub step=trust-load elapsed_ms=12
+I (16615) StackChanBody: settled: readback yaw=-21 pitch=256 (tenths; rest pitch 220)
+I (17405) HubOnboarding: Hub step=trust-bundle elapsed_ms=840
+I (17405) HubOnboarding: Hub step=directory-restore elapsed_ms=841
+I (17405) HubOnboarding: Hub step=claim-restore elapsed_ms=841
+I (17845) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.12 ms=146
+I (19045) HubOnboarding: Hub step=claim-cleanup elapsed_ms=2483
+I (19055) HubOnboarding: Hub step=configuration-proof elapsed_ms=2483
+I (19295) HubOnboarding: Hub step=configuration-fetch elapsed_ms=2732
+I (19485) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.12 ms=185
+I (20735) EidolonVoice: [lifecycle] Owner configuration current gen=1 revision=1
+W (20735) EidolonVoice: [dispatch] type=30 wait_ms=-1 run_ms=4164 pending=2
+I (20735) EidolonVoice: [settings] rpc method=eidolon.properties.read.v1 caller=provider ok=1 error=
+W (20745) EidolonVoice: [dispatch] type=17 wait_ms=6157 run_ms=5 pending=1
+I (20745) EidolonVoice: [settings] rpc method=eidolon.properties.read.v1 caller=provider ok=1 error=
+W (20755) EidolonVoice: [dispatch] type=17 wait_ms=857 run_ms=10 pending=0
+I (21815) pet: stats 30s: fps=1.6 frame_ms avg=59 max=324 draws=123 avg_task_us=6151 max_task_us=291298 mood=calm phase=0 dark=0 led_owner=1 heap_int=49279
+I (25925) SystemInfo: free sram: 49267 minimal sram: 41927
+W (31585) pet: TEMP autojoin: OpenConversation
+I (31585) Application: [voice_request] RequestVoiceJoin transport=1 state=ConfigReady
+I (31585) LiveKitVoiceTransport: [voice_request] JoinSession state=ConfigReady
+I (31585) EidolonVoice: [lifecycle] enqueue join state=ConfigReady room_kind=control gen=1
+I (31595) EidolonVoice: [lifecycle] join executing state=ConfigReady room_kind=control gen=1 standby=1 connected=1 room=eidolon-device-a978803e4695462a3f6f69f2 intent=user
+I (31615) EidolonVoice: [lifecycle] SetState ConfigReady -> Opening reason=join_requested room_kind=control gen=1
+I (31625) Application: [EIDOLON_UI] queue session_state=Opening
+I (31625) EidolonVoice: [lifecycle] join prepared reuse_channel=1 elapsed_ms=ld
+I (31625) StateMachine: State: idle -> connecting
+I (31635) EidolonUiPresenter: visible state=OPENING scene=8
+I (31645) EidolonVoice: [lifecycle] sent session_open conversation_id=esp32-e2ee68af-f45b82c1-00000001 err=ESP_OK gen=1 action_to_send_ms=ld
+I (31645) pet: phase 0 -> 1
+I (31815) pet: stats 30s: fps=10.2 frame_ms avg=21 max=74 draws=582 avg_task_us=2177 max_task_us=11239 mood=calm phase=1 dark=0 led_owner=1 heap_int=49183
+I (31835) PetSensors: touch f/m/b=0/0/0 prox=3 lux=0 |a|=989mg g=-49/788/597 held=0 tilted=0 recal=0 err touch/imu/light=0/0/0 fifo_ovf=2
+I (32385) livekit_engine: Subscribing to audio track: sid=TR_AMmcfoW6TgDNQy
+I (32415) LiveKitSession: [lifecycle] session_control received topic=eidolon.session_control bytes=514
+I (32445) PEER_DEF: Get peer role 1
+I (32445) PEER_DEF: Extract SDP: stream_count=1, audio_mid=0 (dir=3), video_mid=255 (dir=3), data_mid=255, assrc=1906052301, vssrc=0, vrtx_ssrc=0, vfmt=0, vrtx_fmt=0
+I (32455) AGENT: 1 Add remote type:1 192.168.100.12:58701
+I (32455) AGENT: Start agent as Controlled
+I (32465) AGENT: Send STUN binding request
+I (32465) AGENT: Send allocate now
+I (32475) AGENT: Send allocate now
+I (32475) AGENT: 1 Get candidate success user:yk3YXJkWip1UnNTUfKIo4jGqwKqaWrtnqRLicyM1wDNtOzOzMzu7eF psw:3bfpXGEDMI4aIMmtqkxXWM3WZka4AhISS91JWrMiJyA
+I (32485) PEER_DEF: Audio direction: offer=3, local=2, answer=2
+I (32495) livekit_peer.sub: Generated answer:
+v=0
+o=- 7801614086411001801 2 IN IP4 0.0.0.0
+s=-
+t=0 0
+a=msid-semantic: esp-webrtc
+a=group:BUNDLE 0
+m=audio 9 UDP/TLS/RTP/SAVPF 111
+c=IN IP4 0.0.0.0
+a=mid:0
+a=msid:esp_stream a0
+a=rtcp-mux
+a=rtpmap:111 opus/48000/2
+a=rtcp-fb:111 goog-remb
+a=ssrc:6 cname:EspSSpbA0
+a=ssrc:6 msid:esp_stream a0
+a=recvonly
+a=fingerprint:sha-256 75:BF:5B:28:52:E5:AA:F0:47:3B:84:83:99:B3:F9:A3:78:C5:17:88:EC:79:F3:16:60:1C:B0:BD:94:49:47:2F
+a=setup:active
+a=ice-ufrag:fDEC
+a=ice-pwd:Z9KwkqHq9nFwuGHpxCf1aaky
+a=candidate:0 1 UDP 2127674111 192.168.100.8 53690 typ host
+a=candidate:1 1 UDP 1691466495 192.168.100.8 53690 typ srflx raddr 0.0.0.0 rport 0
+
+I (32555) livekit_peer.sub: State changed: 0 -> 1
+I (32565) AGENT: 1 0 Send binding request (cand:0) local0:192.168.100.8:53690 remote0:192.168.100.12:58701 id:0a4678074a79f3c3f1b0aa5a
+I (32575) AGENT: 1 0 PeerBinding recv local0:192.168.100.8:53690 remote0:192.168.100.12:58701
+I (32575) livekit_peer.sub: Ignoring TCP ICE candidate: TCP transport disabled
+I (32575) AGENT: 1 0 Send binding response local0:192.168.100.8:53690 remote0:192.168.100.12:58701
+I (32595) AGENT: 1 0 PeerBinding recv local0:192.168.100.8:53690 remote0:192.168.100.12:58701
+I (32605) AGENT: 1 0 Send binding response local0:192.168.100.8:53690 remote0:192.168.100.12:58701
+I (32615) AGENT: 1 0 PeerBinding recv local0:192.168.100.8:53690 remote0:192.168.100.12:58701
+I (32615) AGENT: 1 0 Send binding response local0:192.168.100.8:53690 remote0:192.168.100.12:58701
+I (32625) AGENT: 1 0 PeerBinding recv local0:192.168.100.8:53690 remote0:192.168.100.12:58701
+I (32635) AGENT: 1 0 Send binding response local0:192.168.100.8:53690 remote0:192.168.100.12:58701
+I (32645) AGENT: 1 Add remote prflx 192.168.100.12:55100
+I (32645) AGENT: 1 1 PeerBinding recv local0:192.168.100.8:53690 remote0:192.168.100.12:55100
+I (32655) AGENT: 1 1 Send binding response local0:192.168.100.8:53690 remote0:192.168.100.12:55100
+I (32665) AGENT: 1 1 Send binding request (cand:0) local0:192.168.100.8:53690 remote0:192.168.100.12:55100 id:7c3e4188ce6adc008d708ba9
+I (32675) AGENT: 1 0 LocalBinding resp 0a4678074a79f3c3f1b0aa5a local1
+I (32685) AGENT: 1 1 PeerBinding recv local0:192.168.100.8:53690 remote0:192.168.100.12:55100
+I (32695) AGENT: 1 1 Send binding response local0:192.168.100.8:53690 remote0:192.168.100.12:55100
+I (32705) AGENT: 1 1 LocalBinding resp 7c3e4188ce6adc008d708ba9 local1
+I (32715) AGENT: 1 1 Send binding request (cand:0) local1:192.168.100.8:53690 remote0:192.168.100.12:55100 id:263ca38d18da1bbea5eb9780
+I (32785) EidolonLKBoard: LiveKit capture gate open
+I (32785) StackChanBody: capture hold: motion paused, servo rail kept
+I (32795) EidolonVoice: Audio state seq=1 mode=auto playback=idle mic_muted=0 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (32795) AGENT: 1 0 PeerBinding recv local1:192.168.100.8:53690 remote0:192.168.100.12:58701
+I (32805) AGENT: 1 Select pair192.168.100.12:58701
+I (32815) AGENT: 1 Connection OK 192.168.100.12:58701
+I (32815) PEER_DEF: Start DTLS role as 0
+I (32825) DTLS: DTLS cipher pref: auto (mbedtls default order)
+I (33155) AGENT: 1 Add remote type:2 117.63.16.92:10690
+I (33155) AGENT: 1 Add remote type:2 117.63.16.92:10689
+I (33305) DTLS: SRTP connected OK
+W (33395) PcmPushSrc: PCM ring full, dropped 2 bytes
+I (33435) DTLS: Client handshake success
+I (33435) DTLS: Negotiated DTLS ciphersuite: TLS-ECDHE-ECDSA-WITH-AES-256-GCM-SHA384
+I (33435) PEER_DEF: DTLS handshake success
+I (33445) livekit_peer.sub: State changed: 1 -> 2
+Get samplerate 48000 chanel 2
+I (33495) AV_RENDER: Get need resample 1 in:48000 out:24000
+I (33495) I2S_RENDER: open channel:1 sample_rate:24000 bits:16
+I (33495) I2S_IF: Current mode(playback) and peer mode have same sample_rate 24000, channel 2, bits_per_sample 16
+I (33505) I2S_IF: STD: TX, data_bit: 16, slot_bit: 16, ws_width: 16, slot_mode: MONO, slot_mask: 0x1
+I (33515) I2S_IF: STD: TX, sample_rate_hz: 24000, mclk_multiple: 256, clk_src: 6
+I (33535) Adev_Codec: Open codec device OK
+I (33615) AV_RENDER: ARender Auto pause audio first frame at 67389140
+I (34525) EidolonVoice: [lifecycle] SetState Opening -> InRoom reason=session_started room_kind=voice gen=1
+I (34545) Application: [EIDOLON_UI] queue session_state=InRoom
+W (34545) EidolonVoice: [dispatch] type=14 wait_ms=26 run_ms=2104 pending=6
+I (34545) StateMachine: State: connecting -> listening
+I (34555) EidolonUiPresenter: visible state=LISTEN scene=9
+W (34545) EidolonVoice: [dispatch] type=20 wait_ms=1848 run_ms=0 pending=5
+I (34595) pet: phase 1 -> 2
+I (34605) EidolonLKBoard: LiveKit capture gate muted
+I (34605) StackChanBody: capture released: motion allowed
+I (34625) EidolonVoice: Audio state seq=2 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+W (34625) EidolonVoice: [dispatch] type=21 wait_ms=1169 run_ms=0 pending=4
+I (34635) StackChanBody: settled: readback yaw=-21 pitch=256 (tenths; rest pitch 220)
+I (34645) EidolonVoice: Agent phase -> agent_speaking
+W (34645) EidolonVoice: [dispatch] type=20 wait_ms=1188 run_ms=0 pending=3
+I (34645) StateMachine: State: listening -> speaking
+I (34655) EidolonUiPresenter: visible state=SPEAK scene=9
+W (34655) EidolonVoice: [dispatch] type=21 wait_ms=758 run_ms=0 pending=2
+I (34715) pet: phase 2 -> 4
+I (34715) EidolonVoice: Agent phase -> silent
+W (34715) EidolonVoice: [dispatch] type=20 wait_ms=825 run_ms=2 pending=1
+I (34715) StateMachine: State: speaking -> listening
+I (34725) EidolonVoice: Agent phase -> user_speaking
+I (34725) EidolonUiPresenter: visible state=LISTEN scene=9
+W (34725) EidolonVoice: [dispatch] type=20 wait_ms=272 run_ms=9 pending=0
+I (34785) pet: phase 4 -> 2
+I (34855) EidolonVoice: Agent phase -> silent
+I (35105) EidolonVoice: Audio state seq=3 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (35665) EidolonVoice: Audio state seq=4 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (35775) BUF_MNGR: Set forward tsn 1244
+I (35905) EidolonLKBoard: LiveKit capture gate open
+I (35915) StackChanBody: capture hold: motion paused, servo rail kept
+I (35925) EidolonVoice: Audio state seq=5 mode=auto playback=idle mic_muted=0 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (36615) BUF_MNGR: Set forward tsn 1246
+I (37425) AGENT: 1 Add remote type:2 117.63.16.92:10691
+I (37505) EidolonVoice: Agent phase -> user_speaking
+I (37745) LiveKitSession: Transcription stream closed (6 bytes)
+I (37755) BUF_MNGR: Set forward tsn 1248
+I (38065) LiveKitSession: Transcription stream closed (6 bytes)
+I (38675) LiveKitSession: Transcription stream closed (15 bytes)
+I (38845) BUF_MNGR: Set forward tsn 1250
+I (39175) LiveKitSession: Transcription stream closed (15 bytes)
+I (39445) BUF_MNGR: Set forward tsn 1251
+I (39765) LiveKitSession: Transcription stream closed (21 bytes)
+I (39995) BUF_MNGR: Set forward tsn 1252
+I (40275) LiveKitSession: Transcription stream closed (21 bytes)
+I (40275) LiveKitSession: Transcription stream closed (30 bytes)
+I (40325) EidolonVoice: Agent phase -> silent
+I (40445) BUF_MNGR: Set forward tsn 1253
+I (40565) LiveKitSession: Transcription stream closed (33 bytes)
+I (40595) LiveKitSession: Transcription stream closed (33 bytes)
+I (40625) EidolonVoice: Agent phase -> agent_thinking
+I (40635) EidolonUiPresenter: visible state=THINK scene=9
+I (40645) pet: phase 2 -> 3
+I (41865) pet: stats 30s: fps=8.8 frame_ms avg=35 max=107 draws=480 avg_task_us=3858 max_task_us=96933 mood=calm phase=3 dark=0 led_owner=1 heap_int=43195
+I (42665) BUF_MNGR: Set forward tsn 1257
+I (43295) BUF_MNGR: Set forward tsn 1258
+I (43825) BUF_MNGR: Set forward tsn 1259
+I (43965) SystemInfo: free sram: 43195 minimal sram: 41535
+I (44065) EidolonLKBoard: LiveKit capture gate muted
+I (44065) StackChanBody: capture released: motion allowed
+I (44065) EidolonVoice: Audio state seq=20 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (44085) StackChanBody: settled: readback yaw=-21 pitch=256 (tenths; rest pitch 220)
+I (44085) EidolonVoice: Agent phase -> agent_speaking
+I (44095) LiveKitSession: Control packet received: bytes=751 provider=0 gen=1
+I (44095) StateMachine: State: listening -> speaking
+I (44105) EidolonUiPresenter: visible state=SPEAK scene=9
+I (44105) LiveKitSession: Control packet received: bytes=426 provider=0 gen=1
+I (44145) LiveKitSession: Assistant caption stream opened (incremental)
+I (44155) LiveKitSession: Assistant caption first chunk (3 bytes)
+I (44225) pet: phase 3 -> 4
+W (44265) EidolonVoice: [dispatch] type=11 wait_ms=86 run_ms=80 pending=2
+W (44285) EidolonVoice: [dispatch] type=11 wait_ms=150 run_ms=21 pending=1
+I (44285) StackChanBody: gesture: perk_up
+I (44305) EidolonVoice: head result gesture=perk_up status=started reason=
+I (44625) EidolonVoice: Audio state seq=21 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.027
+I (44925) EidolonVoice: head result gesture=perk_up status=completed reason=SEQUENCE_FINISHED
+I (45185) EidolonVoice: Audio state seq=22 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.056
+I (45765) EidolonVoice: Audio state seq=23 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.181
+I (46365) EidolonVoice: Audio state seq=24 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (46485) BUF_MNGR: Set forward tsn 1270
+I (46865) EidolonVoice: Audio state seq=25 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.098
+I (46965) StackChanBody: settled: readback yaw=-21 pitch=287 (tenths; rest pitch 220)
+I (47445) EidolonVoice: Audio state seq=26 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.002
+I (48005) EidolonVoice: Audio state seq=27 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.237
+I (48155) BUF_MNGR: Set forward tsn 1273
+I (48565) EidolonVoice: Audio state seq=28 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.158
+I (49205) EidolonVoice: Audio state seq=29 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.135
+I (49765) EidolonVoice: Audio state seq=30 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (49865) BUF_MNGR: Set forward tsn 1276
+I (50305) EidolonVoice: Audio state seq=31 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.123
+I (50445) BUF_MNGR: Set forward tsn 1277
+I (50885) EidolonVoice: Audio state seq=32 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.003
+I (51015) BUF_MNGR: Set forward tsn 1278
+I (51445) EidolonVoice: Audio state seq=33 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.053
+I (51875) pet: stats 30s: fps=10.7 frame_ms avg=58 max=183 draws=695 avg_task_us=4265 max_task_us=69141 mood=calm phase=4 dark=0 led_owner=1 heap_int=42411
+I (52005) EidolonVoice: Audio state seq=34 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.003
+I (52115) BUF_MNGR: Set forward tsn 1280
+I (52545) EidolonVoice: Audio state seq=35 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.002
+I (52655) BUF_MNGR: Set forward tsn 1281
+I (53065) EidolonVoice: Audio state seq=36 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.041
+I (53255) BUF_MNGR: Set forward tsn 1282
+I (53605) EidolonVoice: Audio state seq=37 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (53785) BUF_MNGR: Set forward tsn 1283
+I (53965) SystemInfo: free sram: 41679 minimal sram: 35275
+I (54145) EidolonVoice: Audio state seq=38 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.002
+I (54725) EidolonVoice: Audio state seq=39 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.066
+I (54875) BUF_MNGR: Set forward tsn 1285
+I (55265) EidolonVoice: Audio state seq=40 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (55445) BUF_MNGR: Set forward tsn 1286
+I (55785) EidolonVoice: Audio state seq=41 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.001
+I (55905) BUF_MNGR: Set forward tsn 1287
+I (56345) EidolonVoice: Audio state seq=42 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.008
+I (56445) BUF_MNGR: Set forward tsn 1288
+I (56875) EidolonVoice: Audio state seq=43 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.131
+I (56975) BUF_MNGR: Set forward tsn 1289
+I (57445) EidolonVoice: Audio state seq=44 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.075
+I (57615) BUF_MNGR: Set forward tsn 1290
+I (57985) EidolonVoice: Audio state seq=45 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.187
+I (58095) BUF_MNGR: Set forward tsn 1291
+I (58565) EidolonVoice: Audio state seq=46 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.058
+I (58665) BUF_MNGR: Set forward tsn 1292
+I (59125) EidolonVoice: Audio state seq=47 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.037
+I (59275) BUF_MNGR: Set forward tsn 1293
+W (59525) ScsServo: id: 2 invalid current pos: -1, fallback angle: 220
+I (59665) EidolonVoice: Audio state seq=48 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (60235) EidolonVoice: Audio state seq=49 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.077
+I (60445) BUF_MNGR: Set forward tsn 1295
+I (60795) EidolonVoice: Audio state seq=50 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.003
+I (60895) BUF_MNGR: Set forward tsn 1296
+I (61345) EidolonVoice: Audio state seq=51 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.248
+I (61905) PetSensors: touch f/m/b=0/0/0 prox=6 lux=1 |a|=992mg g=-53/755/640 held=0 tilted=0 recal=0 err touch/imu/light=2/1/0 fifo_ovf=3
+I (61925) EidolonVoice: Audio state seq=52 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (61945) pet: stats 30s: fps=11.4 frame_ms avg=51 max=192 draws=584 avg_task_us=4540 max_task_us=62254 mood=calm phase=4 dark=0 led_owner=1 heap_int=41667
+I (62035) BUF_MNGR: Set forward tsn 1298
+I (62085) EidolonVoice: Agent phase -> silent
+I (62085) StateMachine: State: speaking -> listening
+I (62085) EidolonUiPresenter: visible state=LISTEN scene=9
+I (62175) pet: phase 4 -> 2
+I (62325) LiveKitSession: Transcription stream closed (228 bytes)
+I (62465) EidolonVoice: Audio state seq=53 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (63035) EidolonVoice: Audio state seq=54 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (63165) BUF_MNGR: Set forward tsn 1300
+I (63345) EidolonLKBoard: LiveKit capture gate open
+I (63355) StackChanBody: capture hold: motion paused, servo rail kept
+I (63365) EidolonVoice: Audio state seq=55 mode=auto playback=idle mic_muted=0 ptt=0 capture_rms=0.001 playback_rms=0.000
+I (64055) BUF_MNGR: Set forward tsn 1302
+I (64645) BUF_MNGR: Set forward tsn 1303
+I (65195) BUF_MNGR: Set forward tsn 1304
+I (65405) EidolonVoice: Agent phase -> user_speaking
+I (65625) LiveKitSession: Transcription stream closed (3 bytes)
+I (65695) BUF_MNGR: Set forward tsn 1305
+I (65975) LiveKitSession: Transcription stream closed (9 bytes)
+I (65975) LiveKitSession: Transcription stream closed (9 bytes)
+I (66375) LiveKitSession: Transcription stream closed (18 bytes)
+I (66385) BUF_MNGR: Set forward tsn 1306
+I (66775) LiveKitSession: Transcription stream closed (18 bytes)
+I (67095) LiveKitSession: Transcription stream closed (30 bytes)
+I (67415) BUF_MNGR: Set forward tsn 1308
+I (67435) LiveKitSession: Transcription stream closed (30 bytes)
+I (67685) EidolonVoice: Agent phase -> silent
+I (68005) BUF_MNGR: Set forward tsn 1309
+I (68015) LiveKitSession: Transcription stream closed (36 bytes)
+I (68035) LiveKitSession: Transcription stream closed (36 bytes)
+W (68105) EidolonVoice: [dispatch] type=21 wait_ms=87 run_ms=0 pending=1
+I (68105) EidolonVoice: Agent phase -> agent_thinking
+W (68105) EidolonVoice: [dispatch] type=20 wait_ms=89 run_ms=0 pending=0
+I (68105) EidolonUiPresenter: visible state=THINK scene=9
+I (68115) pet: phase 2 -> 3
+I (68895) LiveKitSession: Control packet received: bytes=748 provider=0 gen=1
+I (68905) LiveKitSession: Control packet received: bytes=426 provider=0 gen=1
+I (69105) LiveKitSession: Assistant caption stream opened (incremental)
+I (69105) LiveKitSession: Assistant caption first chunk (3 bytes)
+W (69165) EidolonVoice: [dispatch] type=11 wait_ms=167 run_ms=103 pending=4
+I (69185) EidolonLKBoard: LiveKit capture gate muted
+I (69185) StackChanBody: capture released: motion allowed
+I (69185) EidolonVoice: Audio state seq=65 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.031
+I (69225) StackChanBody: settled: readback yaw=-21 pitch=287 (tenths; rest pitch 220)
+W (69225) EidolonVoice: [dispatch] type=11 wait_ms=322 run_ms=4 pending=3
+W (69245) EidolonVoice: [dispatch] type=21 wait_ms=317 run_ms=0 pending=3
+I (69245) EidolonVoice: Agent phase -> agent_speaking
+W (69245) EidolonVoice: [dispatch] type=20 wait_ms=318 run_ms=0 pending=2
+I (69245) StateMachine: State: listening -> speaking
+I (69255) EidolonUiPresenter: visible state=SPEAK scene=9
+I (69365) pet: phase 3 -> 4
+W (69245) EidolonVoice: [dispatch] type=13 wait_ms=100 run_ms=0 pending=1
+I (69385) EidolonVoice: head result gesture=perk_up status=started reason=
+W (69385) EidolonVoice: [dispatch] type=12 wait_ms=148 run_ms=8 pending=0
+I (69225) StackChanBody: gesture: perk_up
+I (69765) EidolonVoice: Audio state seq=66 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.070
+I (70055) EidolonVoice: head result gesture=perk_up status=completed reason=SEQUENCE_FINISHED
+I (70315) EidolonVoice: Audio state seq=67 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (70445) BUF_MNGR: Set forward tsn 1318
+I (70885) EidolonVoice: Audio state seq=68 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.116
+I (71485) EidolonVoice: Audio state seq=69 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.065
+I (71665) BUF_MNGR: Set forward tsn 1321
+I (72025) pet: stats 30s: fps=9.3 frame_ms avg=52 max=231 draws=613 avg_task_us=4033 max_task_us=78950 mood=calm phase=4 dark=0 led_owner=1 heap_int=41403
+I (72065) EidolonVoice: Audio state seq=70 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.163
+I (72235) StackChanBody: settled: readback yaw=-21 pitch=293 (tenths; rest pitch 220)
+I (72575) EidolonVoice: Audio state seq=71 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (72735) BUF_MNGR: Set forward tsn 1323
+I (73125) EidolonVoice: Audio state seq=72 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.089
+I (73245) BUF_MNGR: Set forward tsn 1324
+I (73615) EidolonVoice: Audio state seq=73 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.216
+I (73725) BUF_MNGR: Set forward tsn 1325
+I (74185) EidolonVoice: Audio state seq=74 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.147
+I (74325) BUF_MNGR: Set forward tsn 1326
+I (74675) EidolonVoice: Audio state seq=75 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (75195) EidolonVoice: Audio state seq=76 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.001
+I (75325) BUF_MNGR: Set forward tsn 1328
+I (75765) EidolonVoice: Audio state seq=77 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.021
+I (75975) BUF_MNGR: Set forward tsn 1329
+I (76315) EidolonVoice: Audio state seq=78 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.007
+I (76435) BUF_MNGR: Set forward tsn 1330
+I (76895) EidolonVoice: Audio state seq=79 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (77065) BUF_MNGR: Set forward tsn 1331
+I (77435) EidolonVoice: Audio state seq=80 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.007
+I (77615) BUF_MNGR: Set forward tsn 1332
+I (78015) EidolonVoice: Audio state seq=81 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.036
+I (78155) BUF_MNGR: Set forward tsn 1333
+I (78585) EidolonVoice: Audio state seq=82 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (78735) BUF_MNGR: Set forward tsn 1334
+I (79025) SystemInfo: free sram: 41679 minimal sram: 34403
+I (79115) EidolonVoice: Audio state seq=83 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.067
+I (79325) BUF_MNGR: Set forward tsn 1335
+I (79675) EidolonVoice: Audio state seq=84 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.003
+I (79775) BUF_MNGR: Set forward tsn 1336
+I (80235) EidolonVoice: Audio state seq=85 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (80285) LiveKitSession: Transcription stream closed (158 bytes)
+I (80355) BUF_MNGR: Set forward tsn 1337
+I (80505) EidolonVoice: Agent phase -> silent
+I (80505) StateMachine: State: speaking -> listening
+I (80505) EidolonUiPresenter: visible state=LISTEN scene=9
+I (80515) pet: phase 4 -> 2
+I (80785) EidolonVoice: Audio state seq=86 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (81025) BUF_MNGR: Set forward tsn 1338
+I (81345) EidolonVoice: Audio state seq=87 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (81745) EidolonLKBoard: LiveKit capture gate open
+I (81755) StackChanBody: capture hold: motion paused, servo rail kept
+I (81755) EidolonVoice: Audio state seq=88 mode=auto playback=idle mic_muted=0 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (82045) pet: stats 30s: fps=11.7 frame_ms avg=42 max=133 draws=573 avg_task_us=3694 max_task_us=59040 mood=calm phase=2 dark=0 led_owner=1 heap_int=41515
+I (82445) BUF_MNGR: Set forward tsn 1341
+I (83025) BUF_MNGR: Set forward tsn 1342
+I (83555) EidolonVoice: Agent phase -> user_speaking
+I (83565) BUF_MNGR: Set forward tsn 1343
+I (83845) LiveKitSession: Transcription stream closed (3 bytes)
+I (84055) LiveKitSession: Transcription stream closed (6 bytes)
+I (84385) LiveKitSession: Transcription stream closed (6 bytes)
+I (84765) LiveKitSession: Transcription stream closed (15 bytes)
+I (84875) EidolonVoice: Agent phase -> silent
+I (85125) LiveKitSession: Transcription stream closed (15 bytes)
+I (85305) BUF_MNGR: Set forward tsn 1346
+I (85325) LiveKitSession: Transcription stream closed (18 bytes)
+I (85345) LiveKitSession: Transcription stream closed (18 bytes)
+I (85375) EidolonVoice: Agent phase -> agent_thinking
+I (85375) EidolonUiPresenter: visible state=THINK scene=9
+I (85385) pet: phase 2 -> 3
+I (85795) BUF_MNGR: Set forward tsn 1347
+I (86445) BUF_MNGR: Set forward tsn 1348
+I (86975) LiveKitSession: Control packet received: bytes=747 provider=0 gen=1
+I (86985) LiveKitSession: Control packet received: bytes=426 provider=0 gen=1
+I (87005) BUF_MNGR: Set forward tsn 1349
+I (87055) EidolonLKBoard: LiveKit capture gate muted
+I (87065) StackChanBody: capture released: motion allowed
+I (87075) EidolonVoice: Audio state seq=98 mode=auto playback=idle mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (87075) StackChanBody: settled: readback yaw=-21 pitch=293 (tenths; rest pitch 220)
+I (87085) StackChanBody: gesture: perk_up
+I (87085) EidolonVoice: head result gesture=perk_up status=started reason=
+I (87215) EidolonVoice: Audio state seq=99 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (87215) EidolonVoice: Agent phase -> agent_speaking
+I (87225) StateMachine: State: listening -> speaking
+I (87225) EidolonUiPresenter: visible state=SPEAK scene=9
+I (87265) pet: phase 3 -> 4
+I (87315) LiveKitSession: Assistant caption stream opened (incremental)
+I (87325) LiveKitSession: Assistant caption first chunk (3 bytes)
+W (87425) EidolonVoice: [dispatch] type=22 wait_ms=-1 run_ms=97 pending=0
+I (87795) EidolonVoice: head result gesture=perk_up status=completed reason=SEQUENCE_FINISHED
+I (87795) EidolonVoice: Audio state seq=100 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.059
+W (87815) EidolonVoice: [dispatch] type=12 wait_ms=7 run_ms=126 pending=0
+I (88305) EidolonVoice: Audio state seq=101 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.136
+I (88445) BUF_MNGR: Set forward tsn 1358
+I (88885) EidolonVoice: Audio state seq=102 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.020
+I (89435) EidolonVoice: Audio state seq=103 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.008
+I (89555) BUF_MNGR: Set forward tsn 1361
+I (89995) EidolonVoice: Audio state seq=104 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (90015) StackChanBody: settled: readback yaw=-21 pitch=293 (tenths; rest pitch 220)
+I (90095) BUF_MNGR: Set forward tsn 1362
+I (90545) EidolonVoice: Audio state seq=105 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.049
+I (90665) BUF_MNGR: Set forward tsn 1363
+I (91115) EidolonVoice: Audio state seq=106 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.083
+I (91305) BUF_MNGR: Set forward tsn 1364
+I (91685) EidolonVoice: Audio state seq=107 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.127
+I (91865) BUF_MNGR: Set forward tsn 1365
+I (91915) PetSensors: touch f/m/b=0/0/0 prox=6 lux=1 |a|=990mg g=-53/756/636 held=0 tilted=0 recal=0 err touch/imu/light=2/1/0 fifo_ovf=3
+I (92095) pet: stats 30s: fps=11.3 frame_ms avg=48 max=167 draws=666 avg_task_us=4246 max_task_us=61486 mood=calm phase=4 dark=0 led_owner=1 heap_int=41355
+I (92235) EidolonVoice: Audio state seq=108 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.004
+I (92355) BUF_MNGR: Set forward tsn 1366
+I (92695) BUF_MNGR: L: 28194
+I (92795) EidolonVoice: Audio state seq=109 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.122
+I (93005) BUF_MNGR: Set forward tsn 1367
+I (93365) EidolonVoice: Audio state seq=110 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.188
+I (93685) LiveKitSession: Transcription stream closed (80 bytes)
+I (93745) EidolonVoice: Agent phase -> silent
+I (93745) StateMachine: State: speaking -> listening
+I (93745) EidolonUiPresenter: visible state=LISTEN scene=9
+I (93815) pet: phase 4 -> 2
+I (93905) EidolonVoice: Audio state seq=111 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (93945) StackChanBody: settled: readback yaw=-21 pitch=293 (tenths; rest pitch 220)
+I (94075) BUF_MNGR: Set forward tsn 1369
+I (94465) EidolonVoice: Audio state seq=112 mode=auto playback=agent_speaking mic_muted=1 ptt=0 capture_rms=0.000 playback_rms=0.000
+I (94685) BUF_MNGR: Set forward tsn 1370
+I (94945) EidolonLKBoard: LiveKit capture gate open
+I (94955) StackChanBody: capture hold: motion paused, servo rail kept
+I (94965) EidolonVoice: Audio state seq=113 mode=auto playback=idle mic_muted=0 ptt=0 capture_rms=0.001 playback_rms=0.000

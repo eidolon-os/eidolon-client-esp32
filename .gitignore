@@ -14,6 +14,9 @@ dependencies.lock
 main/eidolon/eidolon_build_stamp.gen.h
 releases/
 reports/aec_qualification/
+# Servo noise raw recordings and the pre-test firmware backup stay local.
+reports/servo_noise/*/wav/
+reports/servo_noise/backup-*/
 main/assets/lang_config.h
 main/mmap_generate_emoji.h
 .DS_Store

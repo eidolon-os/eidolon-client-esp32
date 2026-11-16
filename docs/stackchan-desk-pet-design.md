@@ -661,7 +661,7 @@ body.ambient.set（Hub → 设备，控制通道，低频，幂等）
 
 每个工况录 10 s 静音 + 10 s 由 Mac 在 50 cm 外放的固定中文语音，算底噪、语音 SNR、主线频率；再读回断电前后的 pitch 位置，量化低垂幅度。
 
-**实测结果（2026-11-15，在线设备，两轮共 14 段）**：诊断构建在 worktree 分支 `diag/servo-noise-qualification`（`main/servo_noise_qualification.cc` + `scripts/servo_noise_qualification/`），数据在 `reports/servo_noise/run-20261115-172041/` 与 `run-20261115-172505-reordered/`，测前按字节备份 ota_0，测后恢复并核对构建指纹一致。
+**实测结果（2026-11-15，在线设备，两轮共 14 段）**：诊断构建存档在分支 `diag/servo-noise-qualification`（提交 `23117ebe`，`main/servo_noise_qualification.cc` + `scripts/servo_noise_qualification/`，不合入 main，复测时检出），数据在 `reports/servo_noise/run-20261115-172041/` 与 `run-20261115-172505-reordered/`（文字结果入库；原始录音 `wav/` 只留在本机、不入库），测前按字节备份 ota_0，测后恢复并核对构建指纹一致。
 
 | 工况 | 第 1 轮（固定顺序） | 第 2 轮（打乱 + 重复） |
 |---|---|---|
@@ -943,7 +943,7 @@ Si12T 驱动（移植来源：出厂 `hal_head_touch.cpp`（MIT）或 ciniml/sta
 10. **回退**：
     - 不满意可设 `CONFIG_EIDOLON_PET_FACE=n`，回到原脸。
     - 采音要断电轨可设 `CONFIG_EIDOLON_STACKCHAN_CAPTURE_CUTS_SERVO_RAIL=y`。
-    - 生产固件备份在 `reports/servo_noise/backup-20261115/`。
+    - 测前的生产固件备份在 `reports/servo_noise/backup-20261115/`（只留本机、不入库；设备此后已多次刷新，备份仅作留档）。
 
 ### 15.4 没做 / 已知限制
 

@@ -1,0 +1,50 @@
+[ready] {"board": "m5stack-stackchan", "sample_rate": 24000, "channels": 1, "head_motion": true, "free_psram": 6498656, "free_internal": 217951}
+[droop] {"yaw_before": 463, "pitch_before": 747, "yaw_after": 461, "pitch_after": 745, "rail_off_ms": 4000, "answered_after_ms": 750, "raw_per_deg": 3.2}
+[cond_start] {"cond": "D1"}
+[readback] {"cond": "D1", "readtorque_yaw": 0, "readtorque_pitch": 0, "readload_yaw": 0, "readload_pitch": 0, "readcur_yaw": 0, "readcur_pitch": 0, "readvolt_yaw": 51, "readvolt_pitch": 52, "readtemp_yaw": 25, "readtemp_pitch": 28, "readpos_yaw": 463, "readpos_pitch": 747}
+[segment] {"seg": "D1_silence", "samples": 144000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -57.103294, "capture_us": 6143057}
+[saved] D1_silence 144000 samples, missing chunks: []
+[segment] {"seg": "D1_speech", "samples": 168000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -45.92458, "capture_us": 7149874}
+[saved] D1_speech 168000 samples, missing chunks: []
+[readback] {"cond": "D1", "readtorque_yaw": 0, "readtorque_pitch": 0, "readload_yaw": 0, "readload_pitch": 0, "readcur_yaw": 0, "readcur_pitch": 0, "readvolt_yaw": 51, "readvolt_pitch": 52, "readtemp_yaw": 25, "readtemp_pitch": 27, "readpos_yaw": 463, "readpos_pitch": 746}
+[cond_start] {"cond": "A1"}
+[segment] {"seg": "A1_silence", "samples": 144000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -58.694705, "capture_us": 6149819}
+[saved] A1_silence 144000 samples, missing chunks: []
+[segment] {"seg": "A1_speech", "samples": 168000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -44.631261, "capture_us": 7149872}
+[saved] A1_speech 168000 samples, missing chunks: []
+[cond_start] {"cond": "C1"}
+[readback] {"cond": "C1", "readtorque_yaw": 256, "readtorque_pitch": 256, "readload_yaw": -90, "readload_pitch": -390, "readcur_yaw": 0, "readcur_pitch": 0, "readvolt_yaw": 50, "readvolt_pitch": 50, "readtemp_yaw": 25, "readtemp_pitch": 28, "readpos_yaw": 455, "readpos_pitch": 739}
+[segment] {"seg": "C1_silence", "samples": 144000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -46.572745, "capture_us": 6142855}
+[saved] C1_silence 144000 samples, missing chunks: []
+[segment] {"seg": "C1_speech", "samples": 168000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -44.287882, "capture_us": 7149874}
+[saved] C1_speech 168000 samples, missing chunks: []
+[readback] {"cond": "C1", "readtorque_yaw": 256, "readtorque_pitch": 256, "readload_yaw": -90, "readload_pitch": -390, "readcur_yaw": 0, "readcur_pitch": 0, "readvolt_yaw": 51, "readvolt_pitch": 50, "readtemp_yaw": 26, "readtemp_pitch": 31, "readpos_yaw": 455, "readpos_pitch": 739}
+[cond_start] {"cond": "B1"}
+[readback] {"cond": "B1", "readtorque_yaw": 0, "readtorque_pitch": 0, "readload_yaw": 0, "readload_pitch": 0, "readcur_yaw": 0, "readcur_pitch": 0, "readvolt_yaw": 51, "readvolt_pitch": 52, "readtemp_yaw": 26, "readtemp_pitch": 31, "readpos_yaw": 455, "readpos_pitch": 738}
+[segment] {"seg": "B1_silence", "samples": 144000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -52.695971, "capture_us": 6142773}
+[saved] B1_silence 144000 samples, missing chunks: []
+[segment] {"seg": "B1_speech", "samples": 168000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -44.465639, "capture_us": 7149871}
+[saved] B1_speech 168000 samples, missing chunks: []
+[readback] {"cond": "B1", "readtorque_yaw": 0, "readtorque_pitch": 0, "readload_yaw": 0, "readload_pitch": 0, "readcur_yaw": 0, "readcur_pitch": 0, "readvolt_yaw": 51, "readvolt_pitch": 52, "readtemp_yaw": 25, "readtemp_pitch": 29, "readpos_yaw": 455, "readpos_pitch": 738}
+[cond_start] {"cond": "D2"}
+[readback] {"cond": "D2", "readtorque_yaw": 0, "readtorque_pitch": 0, "readload_yaw": 0, "readload_pitch": 0, "readcur_yaw": 0, "readcur_pitch": 0, "readvolt_yaw": 51, "readvolt_pitch": 52, "readtemp_yaw": 26, "readtemp_pitch": 30, "readpos_yaw": 455, "readpos_pitch": 739}
+[segment] {"seg": "D2_silence", "samples": 144000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -47.773417, "capture_us": 6143078}
+[saved] D2_silence 144000 samples, missing chunks: []
+[segment] {"seg": "D2_speech", "samples": 168000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -44.160239, "capture_us": 7149876}
+[saved] D2_speech 168000 samples, missing chunks: []
+[readback] {"cond": "D2", "readtorque_yaw": 0, "readtorque_pitch": 0, "readload_yaw": 0, "readload_pitch": 0, "readcur_yaw": 0, "readcur_pitch": 0, "readvolt_yaw": 51, "readvolt_pitch": 52, "readtemp_yaw": 25, "readtemp_pitch": 29, "readpos_yaw": 455, "readpos_pitch": 738}
+[cond_start] {"cond": "A2"}
+[segment] {"seg": "A2_silence", "samples": 144000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -55.601309, "capture_us": 6149820}
+[saved] A2_silence 144000 samples, missing chunks: []
+[segment] {"seg": "A2_speech", "samples": 168000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -44.412964, "capture_us": 7149871}
+[saved] A2_speech 168000 samples, missing chunks: []
+[cond_start] {"cond": "E1"}
+[readback] {"cond": "E1", "readtorque_yaw": 256, "readtorque_pitch": 256, "readload_yaw": -90, "readload_pitch": -315, "readcur_yaw": 0, "readcur_pitch": 0, "readvolt_yaw": 51, "readvolt_pitch": 50, "readtemp_yaw": 25, "readtemp_pitch": 30, "readpos_yaw": 455, "readpos_pitch": 744}
+[segment] {"seg": "E1_silence", "samples": 144000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -55.288382, "capture_us": 6142928}
+[saved] E1_silence 144000 samples, missing chunks: []
+[segment] {"seg": "E1_speech", "samples": 168000, "sample_rate": 24000, "dropouts": 0, "clipped": 0, "rms_dbfs": -44.527045, "capture_us": 7149874}
+[saved] E1_speech 168000 samples, missing chunks: []
+[readback] {"cond": "E1", "readtorque_yaw": 256, "readtorque_pitch": 256, "readload_yaw": -90, "readload_pitch": -315, "readcur_yaw": 0, "readcur_pitch": 0, "readvolt_yaw": 50, "readvolt_pitch": 51, "readtemp_yaw": 27, "readtemp_pitch": 32, "readpos_yaw": 455, "readpos_pitch": 744}
+[droop] {"yaw_before": 455, "pitch_before": 744, "yaw_after": 453, "pitch_after": 742, "rail_off_ms": 4000, "answered_after_ms": 750, "raw_per_deg": 3.2}
+[done] {"free_internal": 217927}
+bad lines: 0; completed: True

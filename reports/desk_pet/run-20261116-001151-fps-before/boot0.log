@@ -1,0 +1,413 @@
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0x15 (USB_UART_CHIP_RESET),boot:0x28 (SPI_FAST_FLASH_BOOT)
+Saved PC:0x40041a76
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x548
+load:0x403c8700,len:0xc3c
+load:0x403cb700,len:0x2d9c
+entry 0x403c8908
+I (34) esp_psram: Found 8MB PSRAM device
+I (34) esp_psram: Speed: 80MHz
+I (269) mmu_psram: Instructions copied and mapped to SPIRAM
+I (269) cpu_start: Multicore app
+I (278) cpu_start: GPIO 44 and 43 are used as console UART I/O pins
+I (278) cpu_start: Pro cpu start user code
+I (278) cpu_start: cpu freq: 240000000 Hz
+I (280) app_init: Application information:
+I (284) app_init: Project name:     eidolon
+I (288) app_init: App version:      1.0.0
+I (292) app_init: Compile time:     Nov 15 2026 22:51:09
+I (297) app_init: ELF file SHA256:  a6fae5718...
+I (301) app_init: ESP-IDF:          v5.5.4
+I (305) efuse_init: Min chip rev:     v0.0
+I (309) efuse_init: Max chip rev:     v0.99 
+I (313) efuse_init: Chip rev:         v0.2
+I (317) heap_init: Initializing. RAM available for dynamic allocation:
+I (323) heap_init: At 3FCACBF0 len 0003CB20 (242 KiB): RAM
+I (328) heap_init: At 3FCE9710 len 00005724 (21 KiB): RAM
+I (333) heap_init: At 600FE000 len 00001FD8 (7 KiB): RTCRAM
+I (338) esp_psram: Adding pool of 6016K of PSRAM memory to heap allocator
+I (346) spi_flash: detected chip: generic
+I (349) spi_flash: flash io: qio
+I (352) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+I (358) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+I (365) main_task: Started on CPU0
+I (375) esp_psram: Reserving pool of 8K of internal memory for DMA/internal allocations
+I (375) main_task: Calling app_main()
+I (405) main: EIDOLON-STORAGE owner_trust=ready bytes=65536
+W (405) Application: EIDOLON-BUILDSTAMP git=unstamped sdk=unknown idf=unknown branch=unknown built=Nov 15 2026 22:52:25
+W (415) Application: EIDOLON-PROFILE mode=half_duplex device_aec=0 capture=raw
+I (415) Board: UUID=dde33fc1-d522-4b86-9d1a-289552f306d5 SKU=m5stack-stackchan
+I (425) M5StackChanBoard: Init AXP2101
+I (435) M5StackChanBoard: Init AW9523
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00: 00 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+20: -- 21 -- 23 -- -- -- -- -- -- -- -- -- -- -- -- 
+30: -- -- -- -- 34 -- 36 -- 38 -- -- -- -- -- -- -- 
+40: 40 41 -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+50: 50 51 -- -- -- -- -- -- 58 -- -- -- -- -- -- -- 
+60: -- -- -- -- -- -- -- -- 68 69 -- -- -- -- -- 6f 
+70: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+I (515) M5StackChanBoard: Init IlI9342
+I (515) ili9341: LCD panel create success, version: 1.2.0
+I (545) M5StackChanBoard: Reset IlI9342
+I (675) Display: Power management not supported
+I (735) LcdDisplay: Turning display on
+I (735) LcdDisplay: Initialize LVGL library
+I (735) LcdDisplay: Use 2MB of PSRAM for image cache
+I (735) LcdDisplay: Initialize LVGL port
+I (745) LcdDisplay: Adding LCD display
+I (745) LVGL: Starting LVGL task
+W (745) lcd_panel.io.spi: Callback on_color_trans_done was already set and now it was overwritten!
+I (785) M5StackChanBoard: Init StackChan servo body
+I (995) PY32IOExpander: Version: 0x41
+I (1445) uart: ESP_INTR_FLAG_IRAM flag not set while CONFIG_UART_ISR_IN_IRAM is enabled, flag updated
+I (1445) ScsServo: id: 1 get zero pos: 460 from settings
+I (1455) ScsServo: id: 2 get zero pos: 620 from settings
+I (1455) StackChanBody: servo body ready
+I (1465) PetSensors: Si12T ready at 0x68
+I (1465) PetSensors: LTR-553 ready at 0x23
+I (1725) PetSensors: BMI270 ready at 0x69
+I (1725) Backlight: Set brightness to 90
+I (1725) StateMachine: State: unknown -> starting
+I (1745) EidolonUiPresenter: visible state=ASSETS scene=1
+I (1835) pet: phase 0 -> 6
+I (1835) Assets: The storage free size is 23616 KB
+I (1835) Assets: The partition size is 7424 KB
+I (1845) pet: power external=1 battery=100%
+I (1915) Assets: The checksum calculation time is 81 ms
+I (1925) CompanionLcdDisplay: Asset text font applied line_height=25
+I (1925) Application: [EIDOLON_UI] local assets applied=1
+I (1925) EidolonUiPresenter: visible state=BOOT scene=0
+I (1935) Application: Hub activation actor created=1 stack=16384 memory=internal free_internal=186743
+I (1945) CoreS3AudioCodec: Audio IOs: mclk: 0, bclk: 34, ws: 33, dout: 13, din: 14
+I (1945) CoreS3AudioCodec: Duplex channels created
+I (1955) ES7210: Work in Slave mode
+I (1965) ES7210: Enable ES7210_INPUT_MIC1
+I (1965) ES7210: Enable ES7210_INPUT_MIC2
+I (1965) ES7210: Enable ES7210_INPUT_MIC3
+I (1975) ES7210: Enable TDM mode
+I (1975) CoreS3AudioCodec: CoreS3AudioCodec initialized
+I (1975) EidolonVoice: Mic enabled=0
+I (1975) MCP: Add tool: self.get_device_status
+I (1975) MCP: Add tool: self.audio_speaker.set_volume
+I (1985) MCP: Add tool: self.screen.set_brightness
+I (1985) MCP: Add tool: self.screen.set_theme
+I (1995) MCP: Add tool: self.get_system_info [user]
+I (1995) MCP: Add tool: self.reboot [user]
+I (2005) MCP: Add tool: self.upgrade_firmware [user]
+I (2005) MCP: Add tool: self.screen.get_info [user]
+I (2005) MCP: Add tool: self.screen.snapshot [user]
+I (2015) MCP: Add tool: self.screen.preview_image [user]
+I (2015) MCP: Add tool: self.assets.set_download_url [user]
+I (2025) WifiManager: Initializing...
+I (2025) pp: pp rom version: e7ae62f
+I (2035) net80211: net80211 rom version: e7ae62f
+I (2045) wifi:wifi driver task: 3fcce3dc, prio:23, stack:6144, core=0
+I (2045) wifi:wifi firmware version: 0947e8b
+I (2045) wifi:wifi certification version: v7.0
+I (2045) wifi:config NVS flash: disabled
+I (2055) wifi:config nano formatting: enabled
+I (2055) wifi:Init data frame dynamic rx buffer num: 6
+I (2065) wifi:Init dynamic rx mgmt buffer num: 5
+I (2065) wifi:Init management short buffer num: 32
+I (2075) wifi:Init static tx buffer num: 16
+I (2075) wifi:Init tx cache buffer num: 32
+I (2075) wifi:Init static tx FG buffer num: 2
+I (2085) wifi:Init static rx buffer size: 1600
+I (2085) wifi:Init static rx buffer num: 3
+I (2095) wifi:Init dynamic rx buffer num: 6
+I (2095) wifi_init: rx ba win: 3
+I (2095) wifi_init: accept mbox: 6
+I (2105) wifi_init: tcpip mbox: 16
+I (2105) wifi_init: udp mbox: 6
+I (2105) wifi_init: tcp mbox: 6
+I (2105) wifi_init: tcp tx win: 5760
+I (2115) wifi_init: tcp rx win: 5760
+I (2115) wifi_init: tcp mss: 1440
+I (2115) wifi_init: WiFi/LWIP prefer SPIRAM
+I (2125) WifiManager: Initialized
+I (2125) WifiBoard: Starting WiFi connection attempt
+I (2135) WifiManager: Starting station
+I (2135) phy_init: phy_version 711,97bcf0a2,Aug 25 2025,19:04:10
+I (2175) wifi:mode : sta (68:ee:8f:d8:4a:04)
+I (2175) wifi:enable tsf
+I (2175) WifiBoard: WiFi scanning
+I (2185) EidolonUiPresenter: visible state=NETWORK scene=2
+I (3135) StackChanBody: settled: readback yaw=18 pitch=256 (tenths; rest pitch 220)
+I (4585) WifiStation: Found AP: <ssid>, BSSID: <bssid>, RSSI: -53, Channel: 6, Authmode: 4
+I (4585) WifiBoard: WiFi connecting to <ssid>
+W (4595) wifi:Password length matches WPA2 standards, authmode threshold changes from OPEN to WPA2
+I (5275) wifi:new:<6,0>, old:<1,0>, ap:<255,255>, sta:<6,0>, prof:1, snd_ch_cfg:0x0
+I (5275) wifi:state: init -> auth (0xb0)
+I (5275) wifi:state: auth -> assoc (0x0)
+I (5295) wifi:state: assoc -> run (0x10)
+I (5315) wifi:connected with <ssid>, aid = 10, channel 6, BW20, bssid = <bssid>
+I (5315) wifi:security: WPA2-PSK, phy: bgn, rssi: -53, cipher(pairwise:0x3, group:0x3), pmf:0
+I (5325) wifi:pm start, type: 1
+
+I (5325) wifi:dp: 1, bi: 102400, li: 10, scale listen interval from 1024000 us to 1024000 us
+I (5335) wifi:set rx beacon pti, rx_bcn_pti: 0, bcn_timeout: 25000, mt_pti: 0, mt_time: 10000
+I (5345) wifi:<ba-add>idx:0 (ifx:0, <bssid>), tid:0, ssn:1, winSize:64
+I (5365) wifi:AP's beacon interval = 102400 us, DTIM period = 1
+I (6355) esp_netif_handlers: sta ip: 192.168.100.8, mask: 255.255.255.0, gw: 192.168.100.1
+I (6355) WifiStation: Got IP: 192.168.100.8
+I (6355) WifiBoard: Connected to WiFi: <ssid>
+I (6355) Application: Network connected
+I (6355) EidolonUiPresenter: visible state=SERVICE scene=6
+I (6395) StateMachine: State: starting -> activating
+I (6405) HubOnboarding: Hub attempt begin mode=activate generation=0
+I (6405) HubOnboarding: Hub step=trust-load elapsed_ms=0
+I (6925) HubOnboarding: Hub step=trust-bundle elapsed_ms=520
+I (6925) HubOnboarding: Hub step=directory-restore elapsed_ms=520
+I (6925) HubOnboarding: Hub step=generation-check elapsed_ms=521
+I (6935) HubOnboarding: Hub step=directory-fetch elapsed_ms=526
+I (6935) mdns_mem: mDNS task will be created from internal RAM
+I (7055) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.12 ms=115
+I (8415) HubOnboarding: Accepted Owner directory owner=owner-0342958c2e259f177f43 revision=2
+I (8415) HubOnboarding: Hub step=claim-restore elapsed_ms=2010
+I (8755) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.12 ms=163
+I (9495) HubOnboarding: Hub step=claim-cleanup elapsed_ms=3092
+I (9495) HubOnboarding: Hub step=configuration-proof elapsed_ms=3093
+I (9655) HubOnboarding: Hub step=configuration-fetch elapsed_ms=3246
+I (9875) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.12 ms=225
+E (10735) Settings: nvs_set_str(eidolon/config) failed: ESP_ERR_NVS_NOT_ENOUGH_SPACE
+W (10735) HubActivator: Hub activation could not be cached; using it for this session
+I (10735) Application: Hub activation actor stack high-water=8920 bytes
+W (10735) StateMachine: Invalid state transition: activating -> connecting
+I (10755) Application: Activation done succeeded=1
+I (10755) SystemInfo: free sram: 81927 minimal sram: 75979
+I (10755) StateMachine: State: activating -> idle
+W (10765) EidolonMem: [mem] activation_done internal free=81927 largest_block=63488 free_blocks=20 allocated=199532 min_free=75979
+W (10775) EidolonMem: [mem] activation_done internal-dma free=74155 largest_block=63488 allocated=199532
+W (10785) EidolonMem: [mem] activation_done psram free=6060988 largest_block=6029312
+W (10795) EidolonMem: [mem] activation_done stack task=main prio=10 unused=5444 bytes
+W (10795) EidolonMem: [mem] activation_done stack task=taskLVGL prio=1 unused=3016 bytes
+W (10805) EidolonMem: [mem] activation_done stack task=IDLE1 prio=0 unused=724 bytes
+W (10815) EidolonMem: [mem] activation_done stack task=IDLE0 prio=0 unused=732 bytes
+W (10825) EidolonMem: [mem] activation_done stack task=stackchan_motio prio=9 unused=2628 bytes
+W (10835) EidolonMem: [mem] activation_done stack task=pet_sensors prio=10 unused=2688 bytes
+W (10835) EidolonMem: [mem] activation_done stack task=mdns prio=1 unused=2804 bytes
+W (10845) EidolonMem: [mem] activation_done stack task=tiT prio=18 unused=1384 bytes
+W (10855) EidolonMem: [mem] activation_done stack task=eidolon_ctrl prio=5 unused=14772 bytes
+W (10865) EidolonMem: [mem] activation_done stack task=sys_evt prio=20 unused=1372 bytes
+W (10875) EidolonMem: [mem] activation_done stack task=ipc0 prio=24 unused=516 bytes
+W (10875) EidolonMem: [mem] activation_done stack task=wifi prio=23 unused=3528 bytes
+W (10885) EidolonMem: [mem] activation_done stack task=ipc1 prio=24 unused=556 bytes
+W (10895) EidolonMem: [mem] activation_done stack task=hub_activation prio=2 unused=8920 bytes
+W (10905) EidolonMem: [mem] activation_done stack task=esp_timer prio=22 unused=2308 bytes
+W (10905) EidolonMem: [mem] activation_done stack task=Tmr Svc prio=1 unused=1404 bytes
+W (10915) EidolonMem: [mem] activation_done stacks internal=16 psram=0 total_tasks=16
+I (10925) Application: [EIDOLON_UI] firmware ready version=1.0.0
+I (10935) WifiStation: Setting WiFi power save level: PERFORMANCE (NONE)
+I (10935) wifi:Set ps type: 0, coexist: 0
+
+I (10945) EidolonVoice: [lifecycle] SetState Idle -> ConfigReady reason=config_activated room_kind=none gen=0
+I (10955) Application: [EIDOLON_UI] queue session_state=ConfigReady
+I (10955) StateMachine: State: idle -> connecting
+I (10955) EidolonVoice: [lifecycle] begin gen=1 room_kind=control (state=ConfigReady)
+I (10965) AudioCodec: Audio codec started
+I (10975) I2S_IF: Paired data: 0x3fcc4ae4, current mode: record, paired in_enable: 0, paired out_enable: 0
+I (10985) I2S_IF: TDM: RX, data_bit: 16, slot_bit: 16, ws_width: 16, total_slot: 2, slot_mask: 0x1
+I (10985) I2S_IF: TDM: RX, sample_rate_hz: 24000, mclk_multiple: 256, clk_src: 6
+I (10995) I2S_IF: STD: TX, data_bit: 16, slot_bit: 16, ws_width: 16, slot_mode: MONO, slot_mask: 0x1
+I (11005) I2S_IF: STD: TX, sample_rate_hz: 24000, mclk_multiple: 256, clk_src: 6
+I (11015) ES7210: Bits 16
+I (11025) ES7210: Enable ES7210_INPUT_MIC1
+I (11025) ES7210: Enable ES7210_INPUT_MIC2
+I (11025) ES7210: Enable ES7210_INPUT_MIC3
+I (11035) ES7210: Enable TDM mode
+I (11035) ES7210: Unmuted
+I (11035) Adev_Codec: Open codec device OK
+I (11045) AudioCodec: Set input enable to true
+I (11045) EidolonAudioIn: Input resampler 24000 -> 16000 Hz
+I (11045) EidolonAudioIn: audio platform ready
+I (11055) AudioCodec: Set output volume to 79
+I (11055) AudioCodec: Audio codec started
+I (11055) EidolonMicCap: Mic capture started topology=raw (codec=24000 Hz, out=16000 Hz, channels=1)
+E (11065) AV_RENDER: Set audio threshold 7200
+I (11075) EidolonLKBoard: LiveKit board media ready (input=24000 Hz, output=24000 Hz)
+I (11075) LiveKitSession: [mem] room_create verdict=sufficient internal free=86531 largest_block=63488 free_blocks=6 need_contiguous=9472 need_total=19712
+I (11095) LiveKitSession: Connecting room=eidolon-device-a978803e4695462a3f6f69f2 identity=device-instance-77abed88aa03ab7963cef8695b562c712c57f90e7c921e4fbab2211e96ea2de7 server=ws://192.168.100.12:7880
+W (11105) EidolonVoice: [dispatch] type=0 wait_ms=0 run_ms=168 pending=0
+I (11105) livekit_signaling: Connecting to server: ws://192.168.100.12:7880/rtc?sdk=esp32&version=0.3.11~1&os=idf&os_version=v5.5.4&device_model=9&auto_subscribe=false&protocol=1
+I (11135) websocket_client: Started
+I (11135) LiveKitSession: [lifecycle] room state=Connecting room_kind=voice identity=device-instance-77abed88aa03ab7963cef8695b562c712c57f90e7c921e4fbab2211e96ea2de7 gen=1
+I (11145) EidolonVoice: [lifecycle] lk_event=Connecting room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=None room=eidolon-device-a978803e4695462a3f6f69f2
+I (11165) DTLS: Init SRTP OK
+I (11425) DTLS: DTLS cipher pref: auto (mbedtls default order)
+I (11425) AGENT: Start agent as Controlling
+I (11425) AGENT: Send STUN binding request
+I (11425) AGENT: Send allocate now
+I (11435) DTLS: DTLS cipher pref: auto (mbedtls default order)
+I (11435) AGENT: Send allocate now
+I (11445) AGENT: 0 Get candidate success user:6ZHeyrqqOTri0TmaeVQQxHNUhVU1sWbPVjWE5kZqhHaadmdmZmd39F psw:1rTPQds06llMfJcHFPSMghoOBBKpfOaVB2hBffwcLScA
+I (11455) livekit_peer.pub: Generated offer:
+v=0
+o=- 7801614086411001801 2 IN IP4 0.0.0.0
+s=-
+t=0 0
+a=msid-semantic: esp-webrtc
+a=group:BUNDLE 0 1
+m=audio 9 UDP/TLS/RTP/SAVPF 111
+c=IN IP4 0.0.0.0
+a=mid:0
+a=msid:esp_stream a0
+a=rtcp-mux
+a=rtpmap:111 opus/48000/2
+a=rtcp-fb:111 goog-remb
+a=ssrc:6 cname:EspSSpbA0
+a=ssrc:6 msid:esp_stream a0
+a=sendonly
+a=fingerprint:sha-256 1D:BC:5B:93:B9:F6:CF:EE:B9:93:F6:C9:F0:57:9E:FB:56:98:5D:7C:73:9B:61:4B:E5:BD:A1:D8:54:B5:74:79
+a=setup:actpass
+a=ice-ufrag:BWbZ
+a=ice-pwd:nrhsnaRH6WFkLdhgkEdbdLmw
+a=candidate:0 1 UDP 2129180415 192.168.100.8 59574 typ host
+a=candidate:1 1 UDP 1692972799 192.168.100.8 59574 typ srflx raddr 0.0.0.0 rport 0
+a=candidate:2 1 UDP 7680255 192.168.100.12 30000 typ relay raddr 0.0.0.0 rport 0
+m=application 50712 UDP/DTLS/SCTP webrtc-datachannel
+a=mid:1
+a=sctp-port:5000
+c=IN IP4 0.0.0.0
+a=max-message-size:262144
+a=fingerprint:sha-256 1D:BC:5B:93:B9:F6:CF:EE:B9:93:F6:C9:F0:57:9E:FB:56:98:5D:7C:73:9B:61:4B:E5:BD:A1:D8:54:B5:74:79
+a=setup:actpass
+a=ice-ufrag:BWbZ
+a=ice-pwd:nrhsnaRH6WFkLdhgkEdbdLmw
+a=candidate:0 1 UDP 2129180415 192.168.100.8 59574 typ host
+a=candidate:1 1 UDP 1692972799 192.168.100.8 59574 typ srflx raddr 0.0.0.0 rport 0
+a=candidate:2 1 UDP 7680255 192.168.100.12 30000 typ relay raddr 0.0.0.0 rport 0
+
+I (11585) PEER_DEF: Get peer role 0
+I (11585) PEER_DEF: Get peer role 0
+I (11585) PEER_DEF: Extract SDP: stream_count=2, audio_mid=255 (dir=2), video_mid=255 (dir=3), data_mid=255, assrc=0, vssrc=0, vrtx_ssrc=0, vfmt=0, vrtx_fmt=0
+I (11595) AGENT: 0 Add remote prflx 192.168.100.12:56122
+I (11605) AGENT: 0 0 PeerBinding recv local0:192.168.100.8:59574 remote0:192.168.100.12:56122
+I (11615) AGENT: 0 0 Send binding response local0:192.168.100.8:59574 remote1:192.168.100.12:56122
+I (11625) AGENT: 0 0 PeerBinding recv local0:192.168.100.8:59574 remote1:192.168.100.12:56122
+I (11625) AGENT: 0 0 Send binding response local0:192.168.100.8:59574 remote1:192.168.100.12:56122
+I (11635) AGENT: 0 0 PeerBinding recv local0:192.168.100.8:59574 remote1:192.168.100.12:56122
+I (11645) AGENT: 0 0 Send binding response local0:192.168.100.8:59574 remote1:192.168.100.12:56122
+I (11655) AGENT: 0 0 PeerBinding recv local0:192.168.100.8:59574 remote1:192.168.100.12:56122
+I (11665) AGENT: 0 0 Send binding response local0:192.168.100.8:59574 remote1:192.168.100.12:56122
+I (11675) AGENT: 0 0 PeerBinding recv local0:192.168.100.8:59574 remote1:192.168.100.12:56122
+I (11675) AGENT: 0 0 Send binding response local0:192.168.100.8:59574 remote1:192.168.100.12:56122
+I (11685) AGENT: 0 0 PeerBinding recv local0:192.168.100.8:59574 remote1:192.168.100.12:56122
+I (11695) AGENT: 0 0 Send binding response local0:192.168.100.8:59574 remote1:192.168.100.12:56122
+I (11705) livekit_peer.pub: State changed: 0 -> 1
+I (11705) livekit_peer.pub: Ignoring TCP ICE candidate: TCP transport disabled
+I (11715) AGENT: 0 0 Send binding request (cand:0) local0:192.168.100.8:59574 remote1:192.168.100.12:56122 id:91181bc41b8061afd1ca2aa7
+I (11735) AGENT: 0 0 PeerBinding recv local0:192.168.100.8:59574 remote1:192.168.100.12:56122
+I (11735) AGENT: 0 0 Send binding response local0:192.168.100.8:59574 remote1:192.168.100.12:56122
+I (11765) AGENT: 0 0 LocalBinding resp 91181bc41b8061afd1ca2aa7 local1
+I (11765) AGENT: 0 Select pair192.168.100.12:56122
+I (11765) AGENT: 0 0 Send binding request (cand:1) local0:192.168.100.8:59574 remote1:192.168.100.12:56122 id:c8f60c087262cc24b16b0097
+I (11775) AGENT: 0 0 PeerBinding recv local0:192.168.100.8:59574 remote1:192.168.100.12:56122
+I (11785) AGENT: 0 0 Send binding response local0:192.168.100.8:59574 remote1:192.168.100.12:56122
+I (11795) AGENT: 0 Add remote prflx 192.168.100.12:50343
+I (11795) AGENT: 0 1 PeerBinding recv local0:192.168.100.8:59574 remote0:192.168.100.12:50343
+I (11805) AGENT: 0 1 Send binding response local0:192.168.100.8:59574 remote1:192.168.100.12:50343
+I (11815) AGENT: 0 1 Send binding request (cand:0) local0:192.168.100.8:59574 remote1:192.168.100.12:50343 id:39c801dad71ddd97f11ee0e0
+I (11825) AGENT: 0 1 PeerBinding recv local0:192.168.100.8:59574 remote1:192.168.100.12:50343
+I (11835) AGENT: 0 1 Send binding response local0:192.168.100.8:59574 remote1:192.168.100.12:50343
+I (11845) AGENT: 0 1 PeerBinding recv local0:192.168.100.8:59574 remote1:192.168.100.12:50343
+I (11855) AGENT: 0 1 Send binding response local0:192.168.100.8:59574 remote1:192.168.100.12:50343
+I (11865) AGENT: 0 1 PeerBinding recv local0:192.168.100.8:59574 remote1:192.168.100.12:50343
+I (11865) AGENT: 0 1 Send binding response local0:192.168.100.8:59574 remote1:192.168.100.12:50343
+I (11875) AGENT: 0 0 LocalBinding resp c8f60c087262cc24b16b0097 local1
+I (11885) AGENT: 0 Candidate responded
+I (11885) AGENT: 0 Connection OK 192.168.100.12:56122
+I (11895) PEER_DEF: Start DTLS role as 1
+I (11895) AGENT: 0 Update remote prflx type:1 192.168.100.12:56122
+I (11905) DTLS: Start to do server handshake
+I (11905) AGENT: 0 Add remote type:2 117.63.16.92:9951
+I (11905) AGENT: 0 1 LocalBinding resp 39c801dad71ddd97f11ee0e0 local1
+I (11895) StackChanBody: settled: readback yaw=18 pitch=256 (tenths; rest pitch 220)
+I (12105) AGENT: 0 Add remote type:2 117.63.16.92:9952
+I (12245) DTLS: SRTP connected OK
+I (12245) DTLS: Server handshake success
+I (12245) DTLS: Negotiated DTLS ciphersuite: TLS-ECDHE-ECDSA-WITH-AES-256-GCM-SHA384
+I (12245) PEER_DEF: DTLS handshake success
+I (12255) PEER_DEF: Sctp role as 0
+I (12255) HubOnboarding: Hub attempt begin mode=resume generation=0
+I (12255) HubOnboarding: Hub step=trust-load elapsed_ms=2
+I (12265) SCTP: 0 Receive chunk 1 SCTP_INIT
+I (12265) SCTP: 0 state 2
+I (12275) SCTP: Support ext 82
+I (12275) SCTP: Support ext c0
+I (12275) SCTP: Send INIT_ACK chunk
+I (12295) SCTP: 0 Receive chunk 10 SCTP_COOKIE_ECHO
+I (12295) SCTP: Send ECHO_ACK chunk
+I (12295) SCTP: 0 state 5
+I (12295) SCTP: Send DCEP _reliable event:3 type:0 si:1
+I (12335) SCTP: Send DCEP _lossy event:3 type:81 si:3
+I (12335) livekit_peer.pub: Channel open: label=_reliable, stream_id=1
+I (12355) livekit_peer.pub: Channel open: label=_lossy, stream_id=3
+I (12355) livekit_peer.pub: State changed: 1 -> 2
+I (12355) AUD_PIPE_NEGO: Negotiate return 0 src_format:541934416 sample_rate:16000
+
+I (12365) AUD_PIPE_NEGO: Path mask 1 select sink:0 format 1398100047
+I (12375) AUD_SRC: Get rate:16000, ch:1, bits:16
+I (12795) ESP_GMF_TASK: Waiting to run... [tsk:aenc_0-0x3fcdebf8, wk:0x3c3a668c, run:0]
+I (12805) LiveKitSession: [lifecycle] room state=Connected room_kind=voice identity=device-instance-77abed88aa03ab7963cef8695b562c712c57f90e7c921e4fbab2211e96ea2de7 gen=1
+I (12805) AUD_SRC: Start to fetch audio src data now
+I (12805) ESP_GMF_TASK: One times job is complete, del[wk:0x3c3a668c, ctx:0x3c3a61c8, label:aud_src_open]
+I (12825) ESP_GMF_PORT: ACQ IN, new self payload:0x3c32a47c, port:0x3c3a62ac, el:0x3c3a61c8-aud_src
+I (12835) ESP_GMF_AENC: Open, type:OPUS, acquire in frame: 640, out frame: 260
+I (12845) ESP_GMF_TASK: One times job is complete, del[wk:0x3c3a59ec, ctx:0x3c3a62ec, label:aud_enc_open]
+I (12805) HubOnboarding: Hub step=trust-bundle elapsed_ms=547
+I (12865) HubOnboarding: Hub step=directory-restore elapsed_ms=610
+I (12865) HubOnboarding: Hub step=claim-restore elapsed_ms=610
+I (13295) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.12 ms=149
+I (14495) HubOnboarding: Hub step=claim-cleanup elapsed_ms=2233
+I (14495) HubOnboarding: Hub step=configuration-proof elapsed_ms=2234
+I (14745) HubOnboarding: Hub step=configuration-fetch elapsed_ms=2484
+I (14935) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.12 ms=194
+I (16205) EidolonVoice: [lifecycle] Owner configuration current gen=1 revision=1
+W (16205) EidolonVoice: [dispatch] type=30 wait_ms=-1 run_ms=3946 pending=2
+I (16205) EidolonVoice: [lifecycle] lk_event=Connected room_kind=control event_gen=1 cur_gen=1 state=ConfigReady switching=0 failure=None room=eidolon-device-a978803e4695462a3f6f69f2
+I (16225) EidolonVoice: [lifecycle] operational_ready=1 reason=channel_connected room_kind=control gen=1
+I (16235) Application: [EIDOLON_UI] queue operational_ready=1
+I (16235) StateMachine: State: connecting -> idle
+W (16235) EidolonVoice: [dispatch] type=10 wait_ms=3397 run_ms=31 pending=1
+I (16245) EidolonUiPresenter: visible state=READY scene=7
+I (16245) HubOnboarding: Hub attempt begin mode=resume generation=0
+I (16255) pet: phase 6 -> 0
+I (16255) HubOnboarding: Hub step=trust-load elapsed_ms=11
+I (16385) StackChanBody: settled: readback yaw=18 pitch=256 (tenths; rest pitch 220)
+I (16615) AGENT: 0 Add remote type:2 117.63.16.92:9950
+I (17085) HubOnboarding: Hub step=trust-bundle elapsed_ms=836
+I (17085) HubOnboarding: Hub step=directory-restore elapsed_ms=838
+I (17085) HubOnboarding: Hub step=claim-restore elapsed_ms=838
+I (17445) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.12 ms=69
+I (18725) HubOnboarding: Hub step=claim-cleanup elapsed_ms=2476
+I (18725) HubOnboarding: Hub step=configuration-proof elapsed_ms=2477
+I (18975) HubOnboarding: Hub step=configuration-fetch elapsed_ms=2722
+I (19135) LocalMdns: resolve name=eidolon-hub-b3c897513cdce96b1f15.local family=0 result=ESP_OK address=192.168.100.12 ms=164
+I (20405) EidolonVoice: [lifecycle] Owner configuration current gen=1 revision=1
+W (20405) EidolonVoice: [dispatch] type=30 wait_ms=-1 run_ms=4152 pending=1
+I (20405) EidolonVoice: [settings] rpc method=eidolon.properties.read.v1 caller=provider ok=1 error=
+W (20415) EidolonVoice: [dispatch] type=17 wait_ms=5153 run_ms=15 pending=0
+I (20535) EidolonVoice: [settings] rpc method=eidolon.properties.read.v1 caller=provider ok=1 error=
+I (25985) SystemInfo: free sram: 55719 minimal sram: 49203
+I (31865) PetSensors: touch f/m/b=0/0/0 prox=6 lux=6 |a|=990mg g=-44/772/618 held=0 tilted=0 recal=0 err touch/imu/light=0/0/0 fifo_ovf=3
+I (31915) pet: head clip p4 keys=2 allowed=1 played=1 ()
+I (31925) pet: stats 30s: fps=2.3 frame_ms avg=127 max=932 draws=1424 avg_task_us=2681 max_task_us=835393 mood=calm phase=0 dark=0 led_owner=1 heap_int=55719
+I (35975) SystemInfo: free sram: 55719 minimal sram: 49203
+I (37165) StackChanBody: settled: readback yaw=-25 pitch=256 (tenths; rest pitch 220)
+I (45985) SystemInfo: free sram: 55719 minimal sram: 49203
+I (55975) SystemInfo: free sram: 55719 minimal sram: 49203
+I (61865) PetSensors: touch f/m/b=0/0/0 prox=2 lux=6 |a|=990mg g=-42/772/618 held=0 tilted=0 recal=0 err touch/imu/light=0/0/0 fifo_ovf=3
+I (61985) pet: stats 30s: fps=5.1 frame_ms avg=100 max=123 draws=3003 avg_task_us=1850 max_task_us=12991 mood=calm phase=0 dark=0 led_owner=1 heap_int=55723
+I (65975) SystemInfo: free sram: 55723 minimal sram: 49203
+I (72245) pet: head clip p4 keys=2 allowed=1 played=1 ()
+I (75975) SystemInfo: free sram: 55895 minimal sram: 49203
+I (77245) StackChanBody: settled: readback yaw=-25 pitch=256 (tenths; rest pitch 220)
+I (86055) SystemInfo: free sram: 55719 minimal sram: 49203
+I (91865) PetSensors: touch f/m/b=0/0/0 prox=3 lux=7 |a|=991mg g=-42/772/618 held=0 tilted=0 recal=0 err touch/imu/light=0/0/0 fifo_ovf=3
+I (92005) pet: stats 30s: fps=4.9 frame_ms avg=100 max=114 draws=2880 avg_task_us=1859 max_task_us=13458 mood=calm phase=0 dark=0 led_owner=1 heap_int=55719
+I (95975) SystemInfo: free sram: 55903 minimal sram: 49203

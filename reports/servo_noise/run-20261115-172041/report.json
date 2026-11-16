@@ -1,0 +1,330 @@
+{
+  "conditions": {
+    "A": {
+      "desc": "电轨断开（现状：采音时断电）",
+      "silence": {
+        "rms_dbfs_80hz": -40.02931163350433,
+        "speech_band_dbfs": -40.80021644560294,
+        "peak_dbfs": -26.269210118877126,
+        "share_4k_plus": 0.12591651307482868,
+        "line_hz": 1831.0546875,
+        "line_prominence_db": 24.16081903091438,
+        "burst_2ms_autocorr": 0.0023893371000710275
+      },
+      "t_since_ready_s": 8.703554,
+      "speech": {
+        "speech_band_dbfs": -40.96293440446412,
+        "snr_speech_band_db": -159.19978355439704
+      },
+      "delta_vs_A_db": 0.0,
+      "speech_band_delta_vs_A_db": 0.0
+    },
+    "B": {
+      "desc": "电轨开，卸力，无总线轮询",
+      "silence": {
+        "rms_dbfs_80hz": -40.35829230598516,
+        "speech_band_dbfs": -41.18842023393316,
+        "peak_dbfs": -25.842675732748212,
+        "share_4k_plus": 0.13082228240181956,
+        "line_hz": 1831.0546875,
+        "line_prominence_db": 23.844424033036358,
+        "burst_2ms_autocorr": 0.3670279587211864
+      },
+      "t_since_ready_s": 26.623551,
+      "speech": {
+        "speech_band_dbfs": -41.362151966297105,
+        "snr_speech_band_db": -158.81157976606684
+      },
+      "delta_vs_A_db": -0.3289806724808315,
+      "speech_band_delta_vs_A_db": -0.38820378833021607
+    },
+    "C": {
+      "desc": "电轨开，持力（home），无总线轮询",
+      "silence": {
+        "rms_dbfs_80hz": -60.99373884950714,
+        "speech_band_dbfs": -69.46856840843222,
+        "peak_dbfs": -44.53834384695757,
+        "share_4k_plus": 0.7270520144322943,
+        "line_hz": 7599.609375,
+        "line_prominence_db": 16.65533662317451,
+        "burst_2ms_autocorr": 0.5533935195716037
+      },
+      "t_since_ready_s": 46.123554,
+      "speech": {
+        "speech_band_dbfs": -57.7990455799726,
+        "snr_speech_band_db": 11.363288571097733
+      },
+      "delta_vs_A_db": -20.96442721600281,
+      "speech_band_delta_vs_A_db": -28.668351962829277
+    },
+    "D": {
+      "desc": "电轨开，生产空闲（自动卸力 + 每 200 ms 读力矩）",
+      "silence": {
+        "rms_dbfs_80hz": -62.34576378514147,
+        "speech_band_dbfs": -72.82076189508084,
+        "peak_dbfs": -46.375111439017054,
+        "share_4k_plus": 0.7937107998692277,
+        "line_hz": 7599.609375,
+        "line_prominence_db": 18.31179907580095,
+        "burst_2ms_autocorr": 0.6475874804375084
+      },
+      "t_since_ready_s": 64.023556,
+      "speech": {
+        "speech_band_dbfs": -57.88482296091388,
+        "snr_speech_band_db": 14.794276637226956
+      },
+      "delta_vs_A_db": -22.316452151637144,
+      "speech_band_delta_vs_A_db": -32.02054544947789
+    },
+    "E": {
+      "desc": "电轨开，持力（home），50 Hz 轮询",
+      "silence": {
+        "rms_dbfs_80hz": -61.32916986473682,
+        "speech_band_dbfs": -73.10158711044835,
+        "peak_dbfs": -45.54073445979277,
+        "share_4k_plus": 0.816035557679519,
+        "line_hz": 7599.609375,
+        "line_prominence_db": 17.547151701186063,
+        "burst_2ms_autocorr": 0.6496569145232891
+      },
+      "t_since_ready_s": 83.52355,
+      "speech": {
+        "speech_band_dbfs": -57.7950139324883,
+        "snr_speech_band_db": 15.176674194048573
+      },
+      "delta_vs_A_db": -21.29985823123249,
+      "speech_band_delta_vs_A_db": -32.30137066484541
+    },
+    "F": {
+      "desc": "电轨开，持力，呼吸式微动 ±2°",
+      "silence": {
+        "rms_dbfs_80hz": -57.597254145494084,
+        "speech_band_dbfs": -60.251964759988454,
+        "peak_dbfs": -40.69930099612485,
+        "share_4k_plus": 0.3541282639111594,
+        "line_hz": 1971.6796875,
+        "line_prominence_db": 11.03344506258364,
+        "burst_2ms_autocorr": 0.575200778023144
+      },
+      "t_since_ready_s": 103.023553,
+      "speech": {
+        "speech_band_dbfs": -56.28737815252468,
+        "snr_speech_band_db": 1.7361953128182208
+      },
+      "delta_vs_A_db": -17.567942511989756,
+      "speech_band_delta_vs_A_db": -19.45174831438551
+    },
+    "G": {
+      "desc": "电轨开，连续点头",
+      "silence": {
+        "rms_dbfs_80hz": -24.613681653518675,
+        "speech_band_dbfs": -31.91472766713883,
+        "peak_dbfs": -2.48333569301797,
+        "share_4k_plus": 0.777552953644566,
+        "line_hz": 5337.890625,
+        "line_prominence_db": 16.11359317969781,
+        "burst_2ms_autocorr": 0.9216887905104986
+      },
+      "t_since_ready_s": 120.933555,
+      "speech": {
+        "speech_band_dbfs": -53.60823558454031,
+        "snr_speech_band_db": -168.08527233286117
+      },
+      "delta_vs_A_db": 15.415629979985653,
+      "speech_band_delta_vs_A_db": 8.885488778464111
+    }
+  },
+  "droop": {
+    "type": "droop",
+    "ts_us": 9563079,
+    "yaw_before": 463,
+    "pitch_before": 758,
+    "yaw_after": -1,
+    "pitch_after": -1,
+    "rail_off_ms": 4000,
+    "raw_per_deg": 3.2
+  },
+  "readbacks": {
+    "B": [
+      {
+        "readtorque_yaw": 0,
+        "readtorque_pitch": 0,
+        "readload_yaw": 0,
+        "readload_pitch": 0,
+        "readcur_yaw": 0,
+        "readcur_pitch": 0,
+        "readvolt_yaw": 51,
+        "readvolt_pitch": 52,
+        "readtemp_yaw": 24,
+        "readtemp_pitch": 25,
+        "readpos_yaw": 462,
+        "readpos_pitch": 757
+      },
+      {
+        "readtorque_yaw": 0,
+        "readtorque_pitch": 0,
+        "readload_yaw": 0,
+        "readload_pitch": 0,
+        "readcur_yaw": 0,
+        "readcur_pitch": 0,
+        "readvolt_yaw": 51,
+        "readvolt_pitch": 52,
+        "readtemp_yaw": 24,
+        "readtemp_pitch": 26,
+        "readpos_yaw": 463,
+        "readpos_pitch": 757
+      }
+    ],
+    "C": [
+      {
+        "readtorque_yaw": 256,
+        "readtorque_pitch": 256,
+        "readload_yaw": 60,
+        "readload_pitch": -105,
+        "readcur_yaw": 0,
+        "readcur_pitch": 0,
+        "readvolt_yaw": 51,
+        "readvolt_pitch": 51,
+        "readtemp_yaw": 25,
+        "readtemp_pitch": 27,
+        "readpos_yaw": 463,
+        "readpos_pitch": 758
+      },
+      {
+        "readtorque_yaw": 256,
+        "readtorque_pitch": 256,
+        "readload_yaw": 60,
+        "readload_pitch": -105,
+        "readcur_yaw": 0,
+        "readcur_pitch": 0,
+        "readvolt_yaw": 51,
+        "readvolt_pitch": 51,
+        "readtemp_yaw": 26,
+        "readtemp_pitch": 28,
+        "readpos_yaw": 463,
+        "readpos_pitch": 758
+      }
+    ],
+    "D": [
+      {
+        "readtorque_yaw": 0,
+        "readtorque_pitch": 0,
+        "readload_yaw": 0,
+        "readload_pitch": 0,
+        "readcur_yaw": 0,
+        "readcur_pitch": 0,
+        "readvolt_yaw": 51,
+        "readvolt_pitch": 52,
+        "readtemp_yaw": 26,
+        "readtemp_pitch": 28,
+        "readpos_yaw": 463,
+        "readpos_pitch": 757
+      },
+      {
+        "readtorque_yaw": 0,
+        "readtorque_pitch": 0,
+        "readload_yaw": 0,
+        "readload_pitch": 0,
+        "readcur_yaw": 0,
+        "readcur_pitch": 0,
+        "readvolt_yaw": 51,
+        "readvolt_pitch": 52,
+        "readtemp_yaw": 25,
+        "readtemp_pitch": 27,
+        "readpos_yaw": 463,
+        "readpos_pitch": 757
+      }
+    ],
+    "E": [
+      {
+        "readtorque_yaw": 256,
+        "readtorque_pitch": 256,
+        "readload_yaw": 60,
+        "readload_pitch": -105,
+        "readcur_yaw": 0,
+        "readcur_pitch": 0,
+        "readvolt_yaw": 51,
+        "readvolt_pitch": 51,
+        "readtemp_yaw": 26,
+        "readtemp_pitch": 28,
+        "readpos_yaw": 463,
+        "readpos_pitch": 758
+      },
+      {
+        "readtorque_yaw": 256,
+        "readtorque_pitch": 256,
+        "readload_yaw": 60,
+        "readload_pitch": -105,
+        "readcur_yaw": 0,
+        "readcur_pitch": 0,
+        "readvolt_yaw": 51,
+        "readvolt_pitch": 51,
+        "readtemp_yaw": 27,
+        "readtemp_pitch": 29,
+        "readpos_yaw": 463,
+        "readpos_pitch": 758
+      }
+    ],
+    "F": [
+      {
+        "readtorque_yaw": 256,
+        "readtorque_pitch": 256,
+        "readload_yaw": 0,
+        "readload_pitch": 0,
+        "readcur_yaw": 0,
+        "readcur_pitch": 0,
+        "readvolt_yaw": 51,
+        "readvolt_pitch": 52,
+        "readtemp_yaw": 27,
+        "readtemp_pitch": 29,
+        "readpos_yaw": 463,
+        "readpos_pitch": 757
+      },
+      {
+        "readtorque_yaw": 256,
+        "readtorque_pitch": 256,
+        "readload_yaw": 0,
+        "readload_pitch": 0,
+        "readcur_yaw": 0,
+        "readcur_pitch": 0,
+        "readvolt_yaw": 51,
+        "readvolt_pitch": 52,
+        "readtemp_yaw": 26,
+        "readtemp_pitch": 28,
+        "readpos_yaw": 463,
+        "readpos_pitch": 757
+      }
+    ],
+    "G": [
+      {
+        "readtorque_yaw": 0,
+        "readtorque_pitch": 0,
+        "readload_yaw": 0,
+        "readload_pitch": 0,
+        "readcur_yaw": 0,
+        "readcur_pitch": 0,
+        "readvolt_yaw": 51,
+        "readvolt_pitch": 52,
+        "readtemp_yaw": 26,
+        "readtemp_pitch": 28,
+        "readpos_yaw": 463,
+        "readpos_pitch": 768
+      },
+      {
+        "readtorque_yaw": 256,
+        "readtorque_pitch": 256,
+        "readload_yaw": 60,
+        "readload_pitch": 195,
+        "readcur_yaw": 0,
+        "readcur_pitch": 0,
+        "readvolt_yaw": 50,
+        "readvolt_pitch": 51,
+        "readtemp_yaw": 26,
+        "readtemp_pitch": 28,
+        "readpos_yaw": 463,
+        "readpos_pitch": 747
+      }
+    ]
+  },
+  "missing_chunks": {}
+}
