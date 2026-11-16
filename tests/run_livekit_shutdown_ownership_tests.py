@@ -35,7 +35,8 @@ struct Resettable {void Clear() {}};
 struct LiveKitSession {
  bool connected_=false, media_board_initialized_=true, using_media_=true;
  void *room_handle_=reinterpret_cast<void*>(1);
- std::mutex peers_mutex_;
+ std::mutex peers_mutex_, rpc_mutex_;
+ void *rpc_send_=nullptr, *rpc_ctx_=nullptr;  // the RPC answer path Disconnect drops
  std::vector<std::string> agent_peers_;
  Resettable pending_session_control_, transcription_stream_;
  std::string identity_="original", provider_identity_="provider";
