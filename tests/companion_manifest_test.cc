@@ -12,7 +12,25 @@ int main() {
     if (!golden.empty() && golden.back()=='\n') golden.pop_back();
     auto legacy=eidolon::CompiledDeviceCapabilities();
     legacy.policy_required=false;
-    assert(eidolon::BuildDeviceManifestJson("esp-box-3",legacy)==golden);
+    // The golden is the SDK's presentation contract. The manifest also states the
+    // microphone processing a build applies (audio.input.*, 267a6e61), which that
+    // contract does not cover; everything else must match it exactly.
+    {
+        auto* expected=cJSON_Parse(golden.c_str());assert(expected);
+        auto* actual=cJSON_Parse(eidolon::BuildDeviceManifestJson("esp-box-3",legacy).c_str());
+        assert(actual);
+        auto* properties=cJSON_GetObjectItemCaseSensitive(actual,"properties");
+        int audio=0;
+        for (int i=cJSON_GetArraySize(properties)-1;i>=0;--i) {
+            const auto* name=cJSON_GetObjectItemCaseSensitive(cJSON_GetArrayItem(properties,i),"name");
+            if (name && !std::strncmp(name->valuestring,"audio.input.",12)) {
+                cJSON_DeleteItemFromArray(properties,i);++audio;
+            }
+        }
+        assert(audio==2);
+        assert(cJSON_Compare(expected,actual,true));
+        cJSON_Delete(expected);cJSON_Delete(actual);
+    }
     const auto declared=eidolon::BuildDeviceManifestJson("esp-box-3",false);
     assert((declared.find("eidolon.outputs.v1")!=std::string::npos)==
         eidolon::CompiledDeviceCapabilities().policy_required);
