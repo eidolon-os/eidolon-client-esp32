@@ -87,7 +87,8 @@ private:
     bool panel_open_ = false;
     uint64_t panel_until_ = 0;
     int32_t bar_press_y_ = 0;
-    void PetAction(pet::HostAction action);
+    // head = a server head motion's receipt (the head ends at rest after it).
+    void PetAction(pet::HostAction action, bool head = false);
     void RenderPetChrome(const EidolonUiModel& model, bool face);
     bool PanelHasActions() const;
     bool PanelPressed() const;

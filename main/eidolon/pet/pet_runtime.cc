@@ -1,5 +1,7 @@
 #include "pet_runtime.h"
 
+#include "pet_head_path.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -55,9 +57,10 @@ struct Reaction {
     bool card;
 };
 constexpr uint32_t kLive = 0xFFFFFFFFu;
-// Head keys: (ms, yaw deg, pitch deg relative to rest, + = up).
-#define K(t, y, p) HeadKey{t, static_cast<int16_t>((y) * 10), static_cast<int16_t>((p) * 10), 300}
-#define KS(t, y, p, s) HeadKey{t, static_cast<int16_t>((y) * 10), static_cast<int16_t>((p) * 10), s}
+// Head keys: (arrival ms, yaw deg, pitch deg relative to rest (+ = up), peak deg/s into it).
+// Reflexes start quick and settle slowly; nothing dips more than 3.5 deg (rest sits 4 deg
+// above the lower stop); a held pose is two equal keys (§4.3).
+#define K(t, y, p, v) HeadKey{t, static_cast<int16_t>((y) * 10), static_cast<int16_t>((p) * 10), v}
 
 enum ReactionId {
     kTapFront, kTapMiddle, kTapBack, kStrokeEndWith, kStrokeEndAgainst, kHold, kRapid, kDoubleTap,
@@ -71,17 +74,17 @@ const Reaction kReactions[kReactionCount] = {
     {"tap_front", 1400, true, false, Mood::Calm, [](float t, Pose& p, ReactionOut&, const LiveState&) {
         p.gaze_y = -.6f; p.scale = t < 160 ? -.15f : .1f; p.open_l = p.open_r = t < 140 ? .15f : 1.f;
         p.ear_l = p.ear_r = 1; p.glint = 1; },
-     {K(0, 0, -5), K(300, 0, 5), K(1000, 0, 1)}, 3, {}, 0, ParticleKind::Heart, 0, LedMode::SkinFlash, Bubble::None, 0, false},
+     {K(150, 0, -3, 60), K(500, 0, 5, 60), K(1400, 0, 0, 30)}, 3, {}, 0, ParticleKind::Heart, 0, LedMode::SkinFlash, Bubble::None, 0, false},
     // kTapMiddle: ears pressed down, then spring up.
     {"tap_middle", 1500, true, false, Mood::Calm, [](float t, Pose& p, ReactionOut&, const LiveState&) {
         if (t < 300) { p.ear_l = p.ear_r = -.8f; p.squash = .25f; p.lid_bottom = .4f; }
         else { p.ear_l = p.ear_r = .9f; p.lid_bottom = .2f; p.gaze_y = -.3f; } },
-     {K(0, 0, -5), K(350, 0, 4), K(1000, 0, 1)}, 3, {}, 0, ParticleKind::Heart, 0, LedMode::SkinFlash, Bubble::None, 0, false},
+     {K(150, 0, -3, 60), K(450, 0, 4, 60), K(1400, 0, 0, 30)}, 3, {}, 0, ParticleKind::Heart, 0, LedMode::SkinFlash, Bubble::None, 0, false},
     // kTapBack: ears swivel back, a glance over the shoulder.
     {"tap_back", 1600, true, false, Mood::Calm, [](float, Pose& p, ReactionOut& o, const LiveState&) {
         p.gaze_x = .45f; p.gaze_y = -.25f; p.ear_l = p.ear_r = -.4f; p.scale = .08f;
         o.emote_set = true; o.emote = Emote::Question; o.twitch = 1; },
-     {K(0, 14, 3), K(1100, 0, 0)}, 2, {}, 0, ParticleKind::Heart, 0, LedMode::SkinFlash, Bubble::None, 0, false},
+     {K(300, 12, 3, 80), K(900, 12, 3, 80), K(1700, 0, 0, 30)}, 3, {}, 0, ParticleKind::Heart, 0, LedMode::SkinFlash, Bubble::None, 0, false},
     // kStrokeEndWith: afterglow of being stroked with the fur.
     {"stroke_with_fur", 900, true, true, Mood::Content, [](float, Pose& p, ReactionOut& o, const LiveState&) {
         o.glyph_set = true; o.glyph = Glyph::Happy; p.ear_l = p.ear_r = -.6f; p.blush = .35f; },
@@ -98,7 +101,7 @@ const Reaction kReactions[kReactionCount] = {
     {"rapid_taps", 2600, true, true, Mood::Grumpy, [](float, Pose& p, ReactionOut& o, const LiveState&) {
         p.lid_top_l = p.lid_top_r = .35f; p.brow_l = p.brow_r = .3f; p.brow_angle = 24; p.ear_l = p.ear_r = -1;
         p.gaze_x = -.45f; p.squash = .12f; o.emote_set = true; o.emote = Emote::Anger; },
-     {K(0, -26, -5), K(2100, 0, 0)}, 2, {}, 0, ParticleKind::Heart, 0, LedMode::Amber2, Bubble::None, 0, false},
+     {K(470, -20, -2, 80), K(1970, -20, -2, 80), K(2970, 0, 0, 40)}, 3, {}, 0, ParticleKind::Heart, 0, LedMode::Amber2, Bubble::None, 0, false},
     // kDoubleTap: glance card; look down at it.
     {"glance_card", 4500, true, false, Mood::Calm, [](float, Pose& p, ReactionOut&, const LiveState&) {
         p.gaze_y = .65f; p.gaze_x = 0; p.ear_l = p.ear_r = .3f; },
@@ -108,21 +111,21 @@ const Reaction kReactions[kReactionCount] = {
         if (t < 900) { p.scale = .45f; p.squash = -.25f; p.glint = 1; p.round = .85f; p.mouth_size = .45f; p.ear_l = p.ear_r = 1;
                        o.mouth_set = true; o.mouth = Mouth::O; o.emote_set = true; o.emote = Emote::Bang; }
         else { p.scale = .15f; p.gaze_x = std::sin(t / 260.f) * .55f; p.ear_l = p.ear_r = -.3f; p.brow_l = p.brow_r = .25f; p.brow_angle = -12; } },
-     {K(0, 0, 17), K(900, 0, 13)}, 2, {}, 0, ParticleKind::Heart, 0, LedMode::Amber2, Bubble::None, 0, false},
+     {K(400, 0, 17, 80), K(1000, 0, 13, 40)}, 2, {}, 0, ParticleKind::Heart, 0, LedMode::Amber2, Bubble::None, 0, false},
     // kPutDown: relief.
     {"put_down", 1900, true, true, Mood::Content, [](float t, Pose& p, ReactionOut&, const LiveState&) {
         if (t < 500) { p.squash = .3f; p.ear_l = p.ear_r = -.2f; } else { p.lid_bottom = .3f; p.squash = .1f; p.ear_l = p.ear_r = -.3f; } },
-     {K(0, 0, -5), K(500, 0, 1)}, 2, {{80, ParticleKind::Dust, 6}}, 1, ParticleKind::Heart, 0, LedMode::Off, Bubble::None, 0, false},
+     {K(300, 0, -3, 40), K(1100, 0, 0, 30)}, 2, {{80, ParticleKind::Dust, 6}}, 1, ParticleKind::Heart, 0, LedMode::Off, Bubble::None, 0, false},
     // kShake: spiral eyes, then X eyes.
     {"shaken", 3600, true, false, Mood::Calm, [](float t, Pose& p, ReactionOut& o, const LiveState&) {
         o.glyph_set = true; o.glyph = t < 2300 ? Glyph::Spiral : (t < 3100 ? Glyph::X : Glyph::None);
         p.ear_l = -.7f + .35f * std::sin(t / 90.f); p.ear_r = -.7f + .35f * std::cos(t / 90.f); },
-     {K(0, 10, 0), K(330, -10, 6), K(660, 10, 0), K(990, -10, -6), K(1320, 0, 0)}, 5, {}, 0, ParticleKind::Heart, 0, LedMode::Marquee, Bubble::None, 0, false},
+     {K(220, 7, 0, 90), K(520, -7, 3, 90), K(820, 7, 0, 90), K(1120, -7, -3, 90), K(1450, 0, 0, 90)}, 5, {}, 0, ParticleKind::Heart, 0, LedMode::Marquee, Bubble::None, 0, false},
     // kKnock: somebody knocked on the desk.
     {"knock", 1600, true, false, Mood::Calm, [](float, Pose& p, ReactionOut& o, const LiveState&) {
         p.scale = .2f; p.glint = 1; p.gaze_y = -.12f; p.gaze_x = 0; p.ear_l = p.ear_r = 1;
         o.emote_set = true; o.emote = Emote::Question; o.twitch = 1; },
-     {K(0, 0, 8), K(900, 0, 1)}, 2, {}, 0, ParticleKind::Heart, 0, LedMode::SkinFlash, Bubble::None, 0, false},
+     {K(250, 0, 7, 60), K(750, 0, 7, 60), K(1550, 0, 0, 30)}, 3, {}, 0, ParticleKind::Heart, 0, LedMode::SkinFlash, Bubble::None, 0, false},
     // kTilt: the head has no roll axis, so the eyes counter-tilt to stay level.
     {"tilted", 3200, false, false, Mood::Calm, [](float, Pose& p, ReactionOut&, const LiveState&) {
         p.roll = .7f; p.gaze_x = .15f; },
@@ -130,12 +133,12 @@ const Reaction kReactions[kReactionCount] = {
     // kHandNear: anticipation: look up before the touch.
     {"hand_near", 1600, true, false, Mood::Calm, [](float, Pose& p, ReactionOut&, const LiveState&) {
         p.gaze_y = -.65f; p.gaze_x = .05f; p.scale = .15f; p.glint = 1; p.ear_l = p.ear_r = .9f; },
-     {K(0, 0, 10), K(1200, 0, 1)}, 2, {}, 0, ParticleKind::Heart, 0, LedMode::Off, Bubble::None, 0, false},
+     {K(350, 0, 6, 60), K(1200, 0, 6, 60), K(2000, 0, 0, 30)}, 3, {}, 0, ParticleKind::Heart, 0, LedMode::Off, Bubble::None, 0, false},
     // kFaceClose: cross-eyed and shy.
     {"face_close", 2600, true, true, Mood::Shy, [](float, Pose& p, ReactionOut& o, const LiveState&) {
         p.cross = .9f; p.blush = .7f; p.ear_l = p.ear_r = -.3f; p.lid_bottom = .2f; p.mouth_size = .3f;
         o.mouth_set = true; o.mouth = Mouth::W; },
-     {K(0, 0, -5), K(2100, 0, 0)}, 2, {}, 0, ParticleKind::Heart, 0, LedMode::PinkBreath, Bubble::None, 0, false},
+     {K(300, 4, -3, 40), K(2100, 4, -3, 40), K(2900, 0, 0, 30)}, 3, {}, 0, ParticleKind::Heart, 0, LedMode::PinkBreath, Bubble::None, 0, false},
     // kCovered: "where did you go?"
     {"covered", 2600, true, false, Mood::Calm, [](float t, Pose& p, ReactionOut& o, const LiveState&) {
         p.gaze_x = std::sin(t / 300.f) * .6f; p.gaze_y = -.1f; p.brow_l = p.brow_r = .3f; p.brow_angle = -14;
@@ -145,12 +148,12 @@ const Reaction kReactions[kReactionCount] = {
     {"uncovered", 1800, true, true, Mood::Happy, [](float, Pose& p, ReactionOut& o, const LiveState&) {
         o.glyph_set = true; o.glyph = Glyph::Star; p.ear_l = p.ear_r = 1; p.scale = .15f; p.mouth_size = .5f;
         o.mouth_set = true; o.mouth = Mouth::V; },
-     {K(0, 0, 10), K(800, 0, 1)}, 2, {{0, ParticleKind::Spark, 10}}, 1, ParticleKind::Heart, 0, LedMode::SkinFlash, Bubble::None, 0, false},
+     {K(250, 0, 8, 60), K(600, 0, 8, 60), K(1400, 0, 0, 30)}, 3, {{0, ParticleKind::Spark, 10}}, 1, ParticleKind::Heart, 0, LedMode::SkinFlash, Bubble::None, 0, false},
     // kLightsOff: a yawn, then off to sleep.
     {"lights_off", 3200, false, true, Mood::Drowsy, [](float t, Pose& p, ReactionOut& o, const LiveState&) {
         p.lid_top_l = p.lid_top_r = std::min(.85f, t / 3200.f); p.ear_l = p.ear_r = -.7f;
         p.mouth_size = t < 1600 ? .8f : 0.f; if (t < 1600) { o.mouth_set = true; o.mouth = Mouth::O; } },
-     {K(0, 0, 7), KS(1400, 0, -15, 120)}, 2, {}, 0, ParticleKind::Heart, 0, LedMode::Off, Bubble::Moon, 3000, false},
+     {K(500, 0, 6, 40), K(1400, 0, 6, 40), K(3200, 0, -3.5f, 20)}, 3, {}, 0, ParticleKind::Heart, 0, LedMode::Off, Bubble::Moon, 3000, false},
     // kLightsOn: squint at the light, wake.
     {"lights_on", 1900, true, true, Mood::Calm, [](float t, Pose& p, ReactionOut&, const LiveState&) {
         p.lid_top_l = p.lid_top_r = .4f; p.lid_bottom = .22f; p.ear_l = p.ear_r = .4f;
@@ -165,7 +168,7 @@ const Reaction kReactions[kReactionCount] = {
     // kReleased: back home with a little shake of the ears.
     {"head_released", 1200, true, false, Mood::Calm, [](float, Pose& p, ReactionOut& o, const LiveState&) {
         p.ear_l = p.ear_r = .3f; o.twitch = -1; },
-     {K(0, 0, 0)}, 1, {}, 0, ParticleKind::Heart, 0, LedMode::Off, Bubble::None, 0, false},
+     {}, 0, {}, 0, ParticleKind::Heart, 0, LedMode::Off, Bubble::None, 0, false},
     // kChargerIn: "dinner".
     {"charger_in", 2600, false, true, Mood::Content, [](float t, Pose& p, ReactionOut& o, const LiveState&) {
         p.lid_bottom = .35f; p.squash = .1f; p.ear_l = p.ear_r = .2f; p.mouth_size = .3f + .15f * std::sin(t / 120.f);
@@ -182,16 +185,16 @@ const Reaction kReactions[kReactionCount] = {
     // kOwnerHome: welcome home.
     {"owner_home", 3200, true, true, Mood::Happy, [](float t, Pose& p, ReactionOut& o, const LiveState&) {
         o.glyph_set = true; o.glyph = Glyph::Happy; p.blush = .4f; p.ear_l = std::sin(t / 100.f); p.ear_r = -std::sin(t / 100.f); },
-     {K(0, 0, 17), K(200, -15, 15), K(340, 15, 15), K(480, -9, 13), K(610, 6, 13), K(740, 0, 0)}, 6,
+     {K(350, 0, 15, 90), K(600, -7, 14, 110), K(850, 7, 14, 110), K(1100, -4, 13, 110), K(1350, 0, 12, 110), K(2200, 0, 0, 30)}, 6,
      {{200, ParticleKind::Heart, 3}, {900, ParticleKind::Heart, 2}}, 2, ParticleKind::Heart, 0, LedMode::Welcome, Bubble::None, 0, false},
     // kOwnerAway.
     {"owner_away", 2600, false, true, Mood::Bored, [](float, Pose& p, ReactionOut&, const LiveState&) {
         p.lid_top_l = p.lid_top_r = .35f; p.lid_angle_l = p.lid_angle_r = -12; p.ear_l = p.ear_r = -.65f; p.gaze_y = .3f; },
-     {K(0, 0, -15), K(1200, 0, 0)}, 2, {}, 0, ParticleKind::Heart, 0, LedMode::Off, Bubble::None, 0, false},
+     {K(800, 0, -3, 20), K(2000, 0, -3, 20)}, 2, {}, 0, ParticleKind::Heart, 0, LedMode::Off, Bubble::None, 0, false},
     // kTapFace: a conversation is opening: perk up.
     {"tap_face", 900, true, false, Mood::Calm, [](float, Pose& p, ReactionOut&, const LiveState&) {
         p.scale = .32f; p.glint = 1; p.ear_l = p.ear_r = 1; },
-     {K(0, 0, 13), K(700, 0, 2)}, 2, {}, 0, ParticleKind::Heart, 0, LedMode::SkinFlash, Bubble::None, 0, false},
+     {K(220, 0, 8, 80), K(550, 0, 4, 40)}, 2, {}, 0, ParticleKind::Heart, 0, LedMode::SkinFlash, Bubble::None, 0, false},
     // kPadLive: hand on the head pad, live.
     {"head_touch", kLive, true, false, Mood::Calm, [](float t, Pose& p, ReactionOut& o, const LiveState& L) {
         if (L.pad_down && L.pad_stroking) {
@@ -261,7 +264,6 @@ const Chirp kReactionChirp[kReactionCount] = {
     Chirp::None,      // kPowerKey
 };
 #undef K
-#undef KS
 
 // face-core-1 recipes in pet form: Attend, Affirm, Ponder, Question, Soften, Delight, Hesitate, Attention.
 void HostRecipe(uint8_t g, Pose& p, ReactionOut& o) {
@@ -323,6 +325,33 @@ int MoodActRow(Mood m) {
     }
 }
 
+// ---- head (docs/跨系统/StackChan自然转动分析-20261116.md §4) ----
+enum Posture : uint8_t { kPostureAwake, kPostureBored, kPostureDrowsy, kPostureAsleep, kPostureListen };
+Posture MoodPosture(Mood m) {
+    switch (m) {
+    case Mood::Bored: return kPostureBored;
+    case Mood::Drowsy: return kPostureDrowsy;
+    case Mood::Asleep: return kPostureAsleep;
+    default: return kPostureAwake;
+    }
+}
+enum HeadAct : uint8_t { kHeadNone, kHeadWaiting, kHeadMoving, kHeadRefused };
+constexpr uint64_t kEyeLeadMs = 80;            // the eyes set off this much before the head
+constexpr int16_t kListenPitchDd = 40;         // listening posture: 4 deg up, facing you (D4)
+constexpr uint64_t kRecentreMs = 180000;       // a held heading drifts home after 3 quiet minutes (D2)
+constexpr uint64_t kClipStaleMs = 1000;         // a moment's move not played by then is dropped
+// A reflex that ends where it started, or one whose last pose is meant to stay.
+bool ReactionHolds(int index) { return index == kLightsOff || index == kOwnerAway || index == kTapFace; }
+// Anticipation: the eyes look up at the hand a moment before the head does.
+uint16_t ReactionHeadDelay(int index) { return index == kHandNear ? 120 : 0; }
+HeadClip OneKeyClip(uint8_t priority, uint16_t at_ms, int16_t yaw, int16_t pitch, uint16_t dps) {
+    HeadClip c;
+    c.count = 1; c.priority = priority; c.hold = true;
+    c.keys[0] = HeadKey{at_ms, yaw, pitch, dps};
+    return c;
+}
+int16_t Dd(float deg) { return static_cast<int16_t>(std::lround(deg * 10)); }
+
 void Mix(Pose& p, const Pose& target, float amt) {
     float* a = F(p); const float* b = F(target);
     for (size_t i = 0; i < kPoseFloats; ++i) a[i] += (b[i] - a[i]) * amt;
@@ -349,6 +378,7 @@ void Runtime::SetMood(Mood mood, uint64_t now_ms) {
     mood_ = mood; mood_since_ = now_ms;
     vel_.scale += 2.2f;   // a new expression pops in
     act_.index = -1;
+    if (mood == Mood::Drowsy) { doze_t0_ = 0; next_glance_ = now_ms + static_cast<uint64_t>(Rand(12000, 30000)); }
 }
 
 void Runtime::ForceMood(Mood mood, uint64_t now_ms) { SetMood(mood, now_ms); Interact(now_ms); }
@@ -365,12 +395,21 @@ void Runtime::StartReaction(int index, uint64_t now_ms) {
     act_.index = -1;
     vel_.scale += 1.2f;
     Interact(now_ms);
-    if (r.head_count && !MicOpen(phase_)) {
-        pending_clip_ = HeadClip{};
-        pending_clip_.count = r.head_count;
-        pending_clip_.priority = 2;
-        for (size_t i = 0; i < r.head_count; ++i) pending_clip_.keys[i] = r.head[i];
-        clip_pending_ = true;
+    if (!MicOpen(phase_)) {
+        HeadClip c;
+        c.priority = 2;
+        if (index == kReleased) {
+            // Let go after being turned by hand: stay a moment, then wander back slowly (§4.3).
+            c = OneKeyClip(2, 1300, 0, 0, 25);
+            if (QueueClip(c, now_ms, 600)) posture_ = kPostureAwake;
+        } else if (r.head_count) {
+            c.count = r.head_count;
+            c.hold = ReactionHolds(index);
+            for (size_t i = 0; i < r.head_count; ++i) c.keys[i] = r.head[i];
+            // A reflex ends at rest (or on its own held pose): the mood's posture is
+            // taken again once it is over.
+            if (QueueClip(c, now_ms, ReactionHeadDelay(index))) posture_ = index == kTapFace ? kPostureListen : kPostureAwake;
+        }
     }
     if (r.bubble != Bubble::None) { bubble_ = r.bubble; bubble_t0_ = now_ms; bubble_until_ = now_ms + r.bubble_ms; }
     if (r.card) card_until_ = now_ms + r.dur_ms;
@@ -382,12 +421,117 @@ bool Runtime::TakeChirp(Chirp& out) {
     out = pending_chirp_; pending_chirp_ = Chirp::None; return true;
 }
 
-void Runtime::QueueSpeakingClip(const HeadKey& a, const HeadKey& b) {
-    if (clip_pending_) return;   // a reaction's clip waiting to play wins
-    pending_clip_ = HeadClip{};
-    pending_clip_.count = 2; pending_clip_.priority = 3;
-    pending_clip_.keys[0] = a; pending_clip_.keys[1] = b;
+// One clip waits at a time; a more urgent one (smaller priority) replaces it, a less
+// urgent one is dropped. Nothing is queued while a still is being taken.
+bool Runtime::QueueClip(const HeadClip& clip, uint64_t now_ms, uint64_t delay_ms) {
+    if (ShutterQuiet(now_ms)) return false;
+    if (clip_pending_ && pending_clip_.priority < clip.priority) return false;
+    if (clip_pending_ && act_.head == kHeadWaiting) act_.head = kHeadRefused;   // a glance lost its head
+    pending_clip_ = clip;
     clip_pending_ = true;
+    clip_taken_ = false;
+    clip_due_ = now_ms + delay_ms;
+    return true;
+}
+
+bool Runtime::ShutterQuiet(uint64_t now_ms) const {
+    return shutter_t0_ != 0 && now_ms >= shutter_t0_ && now_ms - shutter_t0_ < kShutterHeadQuietMs;
+}
+
+// The head may take an idle move or a posture now: nothing else owns the moment.
+bool Runtime::HeadFree(const RuntimeInputs& in, uint64_t now_ms) const {
+    return reaction_.index < 0 && !in.host_active && !pad_down_ && !clip_pending_ && !ShutterQuiet(now_ms);
+}
+
+// A glance the head follows (§4.1): the eyes look first, the head turns 80 ms later and the
+// eyes come back to centre as it arrives, so it is looking, not being turned. 40% of the
+// time it stays on the new heading (D2), drawn back toward the middle so it never wanders
+// off; otherwise it looks back the way it came.
+void Runtime::StartGlance(uint64_t now_ms) {
+    const float h = head_yaw_ / 10.f, hp = head_pitch_ / 10.f;
+    const bool stay = Rand(0, 1) < .4f;
+    float sign = Rand(0, 1) < .5f ? -1.f : 1.f;
+    if (std::fabs(h) > 8 && Rand(0, 1) < .75f) sign = h > 0 ? -1.f : 1.f;
+    auto aim = [&](float sg) {
+        return stay ? Clamp(-.4f * h + sg * Rand(4, 12), -15, 15) : Clamp(h + sg * Rand(6, 13), -20, 20);
+    };
+    float yaw = aim(sign);
+    if (std::fabs(yaw - h) < 6) yaw = aim(-sign);
+    const float pitch = stay ? Clamp(Rand(-1.5f, 3.f), -3, 6) : Clamp(hp + Rand(-2.5f, 4.f), -3, 5);
+    act_ = ActState{};
+    act_.index = kLook; act_.start = now_ms;
+    act_.x = Clamp((yaw - h) / 25.f, -.6f, .6f);
+    act_.y = Clamp(-(pitch - hp) / 20.f, -.4f, .4f);
+    activity_ = kActNames[kLook];
+    if (std::fabs(yaw - h) < 6) {   // too small to bother the head: an eye look on its own
+        act_.dur = static_cast<uint64_t>(Rand(kActDur[kLook][0], kActDur[kLook][1]));
+        return;
+    }
+    HeadClip c = OneKeyClip(4, 450, Dd(yaw), Dd(pitch), 35);
+    const HeadPathStart from{static_cast<float>(head_yaw_), static_cast<float>(head_pitch_), 0, 0};
+    const float out = HeadPathEndMs(c, from);
+    const float linger = Rand(700, 1300);
+    float back = 0;
+    if (!stay) {
+        c.count = 3;
+        c.keys[1] = HeadKey{static_cast<uint16_t>(out + linger), Dd(yaw), Dd(pitch), 35};
+        c.keys[2] = HeadKey{static_cast<uint16_t>(out + linger + 600), head_yaw_, head_pitch_, 25};
+        back = HeadPathEndMs(c, from) - (out + linger);
+    }
+    act_.head = kHeadWaiting;
+    act_.head_out = static_cast<uint16_t>(out);
+    act_.head_ret = static_cast<uint16_t>(out + linger);
+    act_.head_back = static_cast<uint16_t>(back);
+    act_.dur = kEyeLeadMs + static_cast<uint64_t>(out + linger + back) + 150;
+    QueueClip(c, now_ms, kEyeLeadMs);
+}
+
+// The eyes during a glance (`at` ms into the act): on the target first, then handing over to
+// the head along the head's own curve; on the way back they look home first.
+void Runtime::GlanceGaze(float at, float& gx, float& gy) const {
+    const float th = at - static_cast<float>(kEyeLeadMs);   // time on the head's clip
+    gx = act_.x; gy = act_.y;
+    if (act_.head == kHeadRefused) {   // no head after all: an ordinary look of the same length
+        if (th >= act_.head_ret) gx = gy = 0;
+        return;
+    }
+    if (act_.head != kHeadMoving || th <= 0) return;
+    if (th < act_.head_ret || act_.head_back == 0) {
+        const float k = 1 - MinJerk(th / std::max<float>(1, act_.head_out));
+        gx *= k; gy *= k;
+        return;
+    }
+    const float k = 1 - MinJerk((th - act_.head_ret) / std::max<float>(1, act_.head_back));
+    gx = (act_.x > 0 ? -.3f : .3f) * std::min(1.f, std::fabs(act_.x) / .3f) * k;
+    gy = -.5f * act_.y * k;
+}
+
+// Mood postures (§4.2, D3): bored slumps and leans, drowsy lower, asleep lowest and furthest
+// over; waking up returns to rest after the eyes are open. All slow, all held.
+void Runtime::QueuePosture(uint8_t posture, uint64_t now_ms) {
+    if (posture_side_ == 0 || posture == kPostureBored) {
+        posture_side_ = std::abs(head_yaw_) >= 20 ? (head_yaw_ > 0 ? 1 : -1) : (Rand(0, 1) < .5f ? -1 : 1);
+    }
+    const float side = posture_side_;
+    posture_ = posture;
+    if (battery_low_) return;   // D8: on a low battery only the eyes move
+    switch (posture) {
+    case kPostureBored: QueueClip(OneKeyClip(4, 2000, Dd(side * Rand(5, 10)), Dd(-2), 20), now_ms); break;
+    case kPostureDrowsy: QueueClip(OneKeyClip(4, 3000, Dd(side * 6), Dd(-3), 20), now_ms); break;
+    case kPostureAsleep: QueueClip(OneKeyClip(4, 4000, Dd(side * 8), Dd(-3.5f), 20), now_ms); break;
+    default:
+        if (std::abs(head_yaw_) > 20 || std::abs(head_pitch_) > 20) QueueClip(OneKeyClip(4, 1000, 0, 0, 25), now_ms, 300);
+        break;
+    }
+}
+
+// Listening posture (D4): a little up, facing you, still before the microphone opens. It
+// outranks every other local clip and takes over a speaking move half done.
+void Runtime::QueueListen(uint64_t now_ms, uint16_t at_ms) {
+    posture_ = kPostureListen;
+    if (head_yaw_ == 0 && head_pitch_ == kListenPitchDd && now_ms - head_since_ > 3000) return;   // already there
+    HeadClip c = OneKeyClip(1, at_ms, 0, kListenPitchDd, 30);
+    QueueClip(c, now_ms);
 }
 
 void Runtime::OnSense(const SenseEvent& e) {
@@ -472,8 +616,28 @@ void Runtime::OnPower(bool charging, int battery_pct, uint64_t now_ms) {
 }
 
 bool Runtime::TakeHeadClip(HeadClip& out) {
-    if (!clip_pending_) return false;
-    out = pending_clip_; clip_pending_ = false; return true;
+    if (!clip_pending_ || last_ms_ < clip_due_) return false;
+    if (ShutterQuiet(last_ms_)) { clip_pending_ = false; return false; }
+    // The view holds clips back while a start or end is drawn ahead of the runtime. A move
+    // that answers a moment (a reflex, a glance, a speaking move) is stale a second later;
+    // a posture (one held key) is still where the head should be.
+    if (last_ms_ > clip_due_ + kClipStaleMs && !(pending_clip_.count == 1 && pending_clip_.hold)) {
+        clip_pending_ = false;
+        if (act_.head == kHeadWaiting) act_.head = kHeadRefused;
+        return false;
+    }
+    out = pending_clip_; clip_pending_ = false; clip_taken_ = true; return true;
+}
+
+void Runtime::OnHeadClip(bool played, uint64_t now_ms) {
+    if (!clip_taken_) return;
+    clip_taken_ = false;
+    if (played) {
+        const HeadKey& last = pending_clip_.keys[pending_clip_.count - 1];
+        head_yaw_ = last.yaw_dd; head_pitch_ = last.dpitch_dd; head_since_ = now_ms;
+    }
+    if (act_.index == kLook && act_.head == kHeadWaiting && pending_clip_.priority == 4)
+        act_.head = played ? kHeadMoving : kHeadRefused;
 }
 
 bool Runtime::animating() const {
@@ -487,14 +651,20 @@ constexpr uint32_t kTipMuted = 0xE07A7A;
 constexpr uint32_t kTipError = 0xFF6B6B;
 }  // namespace
 
-void Runtime::OnHostAction(HostAction action, uint64_t now_ms) {
+void Runtime::OnHostAction(HostAction action, uint64_t now_ms, bool head) {
     action_ = action;
     action_t0_ = now_ms;
+    if (head && action != HostAction::None) {
+        // A server head move owns the head and ends it at rest; any posture is to be taken again.
+        head_yaw_ = 0; head_pitch_ = 0; head_since_ = now_ms;
+        if (posture_ != kPostureListen) posture_ = kPostureAwake;
+    }
 }
 
 void Runtime::OnCameraShutter(uint64_t now_ms) {
     shutter_ = true;
     shutter_t0_ = now_ms;
+    clip_pending_ = false;   // and nothing queued before it goes out during the still
 }
 
 float Runtime::ShutterLevel(uint64_t now_ms) const {
@@ -626,7 +796,22 @@ const Frame& Runtime::Tick(const RuntimeInputs& in) {
         // since a quick bounce at the frame rate a busy audio path leaves reads as a jump.
         vel_.scale += InSession(last_phase_) && InSession(in.phase) ? .45f : 1.5f;
         if (in.phase == Phase::Responding) { aside_until_ = 0; next_aside_ = now + static_cast<uint64_t>(Rand(1600, 3000)); next_accent_ = now + 250; }
+        const Phase prev = last_phase_;
         last_phase_ = in.phase; phase_t0_ = now;
+        // A speaking move still waiting belongs to the reply that just ended.
+        if (prev == Phase::Responding && clip_pending_ && pending_clip_.priority == 3) clip_pending_ = false;
+        // The head around a conversation (§4.4, D4): take the listening posture as it opens
+        // (the tap that opened it already does) and again as each reply ends, before the
+        // microphone opens; drift home a moment after it closes.
+        if (!InSession(prev) && in.phase == Phase::Opening) {
+            if (reaction_.index == kTapFace) posture_ = kPostureListen; else QueueListen(now, 550);
+        } else if (prev == Phase::Responding && MicOpen(in.phase)) {
+            QueueListen(now, 500);
+        } else if (InSession(prev) && !InSession(in.phase)) {
+            posture_ = kPostureAwake;
+            if (head_yaw_ != 0 || head_pitch_ != 0) QueueClip(OneKeyClip(4, 1000, 0, 0, 20), now, 1500);
+            next_glance_ = std::max<uint64_t>(next_glance_, now + 9500);   // then a quiet spell first
+        }
     }
     UpdateMood(in);
     mic_level_ += ((in.phase == Phase::Listening ? in.mic_level : 0.f) - mic_level_) * .35f;
@@ -643,8 +828,15 @@ const Frame& Runtime::Tick(const RuntimeInputs& in) {
     speech_valley_ = std::min(speech_level_, speech_valley_ + dt * .8f);
     if (in.phase == Phase::Responding && !in.host_active && now >= next_accent_ && speech_level_ - speech_valley_ > .4f) {
         accent_t0_ = now; next_accent_ = now + 1200; speech_valley_ = speech_level_;
-        // Emphasis: a small nod (up about 4 degrees and back), unless the head is turned aside.
-        if (now >= aside_until_) QueueSpeakingClip(HeadKey{0, 0, 40, 160}, HeadKey{280, 0, 0, 140});
+        // Emphasis: a small nod from the listening posture, up 3.5 degrees and back, quick enough
+        // to land on the word and really reaching it (§4.6); not while the head is turned aside.
+        if (now >= aside_until_) {
+            HeadClip c;
+            c.count = 2; c.priority = 3; c.hold = true;
+            c.keys[0] = HeadKey{160, 0, static_cast<int16_t>(kListenPitchDd + 35), 45};
+            c.keys[1] = HeadKey{440, 0, kListenPitchDd, 45};
+            QueueClip(c, now);
+        }
     }
     if (in.host_active && (!host_active_ || in.host_gesture != host_gesture_)) {
         host_t0_ = now;
@@ -677,6 +869,42 @@ const Frame& Runtime::Tick(const RuntimeInputs& in) {
     const int row = MoodActRow(mood_);
     const bool idle_ok = row >= 0 && in.phase == Phase::Ambient && reaction_.index < 0 && !in.host_active && !in.pointer && now >= card_until_;
     if (act_.index >= 0 && now - act_.start > act_.dur) { act_.index = -1; if (reaction_.index < 0) activity_ = ""; }
+    // Idle head (L4). As rare as before (D1: one glance every 25-60 s), half as often in the dark
+    // or on battery, and on a low battery the eyes only (D8). Never with a hand on the head.
+    const bool quieter = in.dark || (power_known_ && !charging_);
+    const float rarer = quieter ? 2.f : 1.f;
+    const bool glance_mood = mood_ == Mood::Calm || mood_ == Mood::Content || mood_ == Mood::Curious;
+    if (idle_ok && act_.index < 0 && glance_mood && now > next_glance_) {
+        next_glance_ = now + static_cast<uint64_t>(Rand(25000, 60000) * rarer);
+        if (!battery_low_ && posture_ == kPostureAwake && HeadFree(in, now)) {
+            StartGlance(now);
+            next_act_ = now + act_.dur + static_cast<uint64_t>(Rand(kActGap[row][0], kActGap[row][1]));
+        }
+    }
+    // Drowsy (§4.2): dozing off and jerking awake at uneven intervals, the head sinking a little
+    // further each time and snapping up on the startle, the only quick move it makes then.
+    if (mood_ == Mood::Drowsy && in.phase == Phase::Ambient && now > next_glance_) {
+        doze_t0_ = now;
+        next_glance_ = now + static_cast<uint64_t>(Rand(12000, 30000) * rarer);
+        if (!battery_low_ && posture_ == kPostureDrowsy && HeadFree(in, now)) {
+            const int16_t y = static_cast<int16_t>(posture_side_ * 60);
+            HeadClip c;
+            c.count = 4; c.priority = 4; c.hold = true;
+            c.keys[0] = HeadKey{2000, y, -35, 20};
+            c.keys[1] = HeadKey{2220, y, 15, 60};
+            c.keys[2] = HeadKey{3020, y, 15, 60};
+            c.keys[3] = HeadKey{5520, y, -30, 20};
+            QueueClip(c, now);
+        }
+    }
+    // The mood's posture, once whatever owns the head now is done with it.
+    if (in.phase == Phase::Ambient && MoodPosture(mood_) != posture_ && HeadFree(in, now)) QueuePosture(MoodPosture(mood_), now);
+    // A heading held for three quiet minutes drifts back to rest (D2).
+    if (in.phase == Phase::Ambient && posture_ == kPostureAwake && (head_yaw_ != 0 || head_pitch_ != 0) && act_.index < 0 &&
+        now - std::max(last_interaction_, head_since_) > kRecentreMs && HeadFree(in, now)) {
+        head_since_ = now;   // once; if it is refused, the next try is three minutes away
+        if (!battery_low_) QueueClip(OneKeyClip(4, 600, 0, 0, 20), now);
+    }
     if (idle_ok && act_.index < 0 && now > next_act_) {
         float total = 0;
         for (int i = 0; i < kActCount; ++i) total += kActWeights[row][i];
@@ -693,16 +921,6 @@ const Frame& Runtime::Tick(const RuntimeInputs& in) {
         const bool near = now - last_interaction_ < 10000;
         next_act_ = now + act_.dur + static_cast<uint64_t>(Rand(kActGap[row][0], kActGap[row][1]) * (near ? .55f : 1.f));
     }
-    // Sparse idle head glance (L4): head motion is expensive and audible, so rare.
-    if (idle_ok && act_.index < 0 && (mood_ == Mood::Calm || mood_ == Mood::Content || mood_ == Mood::Curious) && now > next_glance_) {
-        next_glance_ = now + static_cast<uint64_t>(Rand(25000, 60000));
-        const int16_t yaw = static_cast<int16_t>(Rand(80, 150) * (Rand(0, 1) < .5f ? -1 : 1));
-        pending_clip_ = HeadClip{};
-        pending_clip_.count = 2; pending_clip_.priority = 4;
-        pending_clip_.keys[0] = HeadKey{0, yaw, static_cast<int16_t>(Rand(-20, 60)), 180};
-        pending_clip_.keys[1] = HeadKey{1600, 0, 0, 160};
-        clip_pending_ = true;
-    }
     // Ear twitch.
     if (idle_ok && now > next_twitch_) { twitch_side_ = Rand(0, 1) < .5f ? -1 : 1; twitch_t0_ = now; next_twitch_ = now + static_cast<uint64_t>(Rand(7000, 15000)); }
 
@@ -710,9 +928,10 @@ const Frame& Runtime::Tick(const RuntimeInputs& in) {
     Pose p;
     Glyph glyph = Glyph::None; Mouth mouth = Mouth::None; Emote emote = Emote::None;
     MoodRecipe(mood_, p, glyph, emote);
-    if (mood_ == Mood::Drowsy) {   // occasional startle-awake
-        const float ph = std::fmod(static_cast<float>(now - mood_since_) / 1000.f, 7.5f);
-        if (ph > 6.3f && ph < 7.f) { p.lid_top_l = p.lid_top_r = .06f; p.scale = .12f; p.gaze_y = 0; p.glint = .6f; p.ear_l = p.ear_r = .6f; }
+    if (mood_ == Mood::Drowsy && doze_t0_) {   // a doze: lids sink, then a startle-awake (with the head's, above)
+        const uint64_t dz = now - doze_t0_;
+        if (dz < 2000) { p.lid_top_l = p.lid_top_r = std::min(.85f, p.lid_top_l + .18f * static_cast<float>(dz) / 2000.f); }
+        else if (dz < 2800) { p.lid_top_l = p.lid_top_r = .06f; p.scale = .12f; p.gaze_y = 0; p.glint = .6f; p.ear_l = p.ear_r = .6f; }
     }
     switch (in.phase) {
     case Phase::Opening: p.scale = .3f; p.glint = 1; p.ear_l = p.ear_r = 1; glyph = Glyph::None; break;
@@ -729,10 +948,17 @@ const Frame& Runtime::Tick(const RuntimeInputs& in) {
             const uint64_t dur = static_cast<uint64_t>(Rand(700, 1400));
             aside_until_ = now + dur;
             next_aside_ = aside_until_ + static_cast<uint64_t>(Rand(2200, 4800));
-            // The head follows the glance a little (eyes lead, head follows) and comes back.
-            if (!in.host_active)
-                QueueSpeakingClip(HeadKey{0, static_cast<int16_t>(aside_x_ * 300), static_cast<int16_t>(-aside_y_ * 150), 140},
-                                  HeadKey{static_cast<uint16_t>(dur), 0, 0, 140});
+            // The head follows the glance a little: the eyes set off first, the head turns 4-7 deg,
+            // stays while the eyes are away and comes back to the listening posture (§4.6).
+            if (!in.host_active) {
+                const int16_t ay = Dd(aside_x_ * 35), ap = static_cast<int16_t>(kListenPitchDd + Dd(-aside_y_ * 15));
+                HeadClip c;
+                c.count = 3; c.priority = 3; c.hold = true;
+                c.keys[0] = HeadKey{450, ay, ap, 30};
+                c.keys[1] = HeadKey{static_cast<uint16_t>(dur), ay, ap, 30};
+                c.keys[2] = HeadKey{static_cast<uint16_t>(dur + 500), 0, kListenPitchDd, 30};
+                QueueClip(c, now, kEyeLeadMs);
+            }
         }
         if (now < aside_until_) { p.gaze_x = aside_x_; p.gaze_y = aside_y_; }
         if (accent_t0_ && now - accent_t0_ < 300) {
@@ -751,7 +977,7 @@ const Frame& Runtime::Tick(const RuntimeInputs& in) {
         const float at = static_cast<float>(now - act_.start), d = static_cast<float>(act_.dur);
         Pose t = p;
         switch (act_.index) {
-        case kLook: t.gaze_x = act_.x; t.gaze_y = act_.y; break;
+        case kLook: if (act_.head) GlanceGaze(at, t.gaze_x, t.gaze_y); else { t.gaze_x = act_.x; t.gaze_y = act_.y; } break;
         case kDblBlink: if (at > 230 && !act_.done2) { act_.done2 = true; blink_next_ = now; blink_start_ = 0; } break;
         case kTiltHead: t.roll = act_.s * .45f; t.scale = .08f; (act_.s < 0 ? t.open_l : t.open_r) = .85f; t.gaze_x = act_.s * .2f;
                         t.ear_l = act_.s < 0 ? .95f : .1f; t.ear_r = act_.s > 0 ? .95f : .1f; break;

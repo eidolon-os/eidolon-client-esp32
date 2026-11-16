@@ -22,6 +22,7 @@
 #include "eidolon/livekit_board.h"
 #include "eidolon/pet/pet_sense.h"
 #include "eidolon/pet/pet_chirp_player.h"
+#include <esp_random.h>
 LV_FONT_DECLARE(font_awesome_30_4);
 #endif
 namespace eidolon {
@@ -316,8 +317,13 @@ void CompanionFaceView::ShowNotification(const char* text,int duration_ms) {
 void CompanionFaceView::ShowCameraCapture() {
 #if CONFIG_EIDOLON_PET_FACE
     if (!display_) return;
-    DisplayLockGuard lock(display_);
-    pet_.OnCameraShutter(NowMs());
+    {
+        DisplayLockGuard lock(display_);
+        pet_.OnCameraShutter(NowMs());
+    }
+    // A moving head blurs the still: a local move stops where it is, and the runtime
+    // queues none until the camera is done.
+    Board::GetInstance().SettlePetHead();
 #endif
     // Only the pet takes stills today (the boards that declare camera.capture);
     // a companion face that gains a camera gets its shutter with it.
@@ -328,9 +334,10 @@ void CompanionFaceView::SetMotionDiagnostic(const char* name,const char* status,
     {
         DisplayLockGuard lock(display_);
         const char* st=status ? status : "";
-        if (!std::strcmp(st,"COMPLETED")) PetAction(pet::HostAction::Done);
-        else if (!std::strcmp(st,"ACCEPTED") || !std::strcmp(st,"STARTED") || !std::strcmp(st,"RUNNING")) PetAction(pet::HostAction::Running);
-        else PetAction(pet::HostAction::Failed);
+        // A server head motion: the runtime also learns the head is no longer where it left it.
+        if (!std::strcmp(st,"COMPLETED")) PetAction(pet::HostAction::Done,true);
+        else if (!std::strcmp(st,"ACCEPTED") || !std::strcmp(st,"STARTED") || !std::strcmp(st,"RUNNING")) PetAction(pet::HostAction::Running,true);
+        else PetAction(pet::HostAction::Failed,true);
     }
     return;   // no F:/M: text on the pet
 #endif
@@ -682,9 +689,9 @@ void CompanionFaceView::Render(const EidolonUiModel& model) {
         }
     }
     if (phase!=pet_phase_) ESP_LOGI("pet","phase %d -> %d",static_cast<int>(pet_phase_),static_cast<int>(phase));
-    // It stopped speaking: the microphone opens about a second from now, and from then on
-    // nothing may move. Bring the head home now rather than leave a speaking move half done.
-    if (pet_phase_==pet::Phase::Responding && phase!=pet::Phase::Responding) Board::GetInstance().SettlePetHead();
+    // When it stops speaking the microphone opens about a second later, and from then on
+    // nothing may move: the runtime sees the phase change and sends the head to its
+    // listening posture (a clip that takes over a speaking move half done).
     pet_phase_=phase;
     pet_request_pending_=model.session_request_pending;
 #endif
@@ -843,14 +850,15 @@ void CompanionFaceView::OnPanelButton(lv_event_t* event) {
     ESP_LOGI("pet","control panel action %d",static_cast<int>(intent));
     DispatchEidolonUiIntent(intent);
 }
-void CompanionFaceView::PetAction(pet::HostAction action) {
-    pet_.OnHostAction(action,NowMs());
+void CompanionFaceView::PetAction(pet::HostAction action,bool head) {
+    pet_.OnHostAction(action,NowMs(),head);
 }
 void CompanionFaceView::BuildPet(const BuildContext& ctx) {
     pet_skin_.Build(ctx.parent,ctx.font);
     for (auto code : {LV_EVENT_PRESSED,LV_EVENT_PRESSING,LV_EVENT_RELEASED,LV_EVENT_PRESS_LOST})
         lv_obj_add_event_cb(pet_skin_.obj(),OnPetTouch,code,this);
     pet_senses_=xQueueCreate(24,sizeof(pet::SenseEvent));
+    pet_.Reseed(esp_random());   // a different idle life after every boot
 }
 void CompanionFaceView::PostSense(const pet::SenseEvent& event) {
     if (pet_senses_) xQueueSend(pet_senses_,&event,0);   // drop when full: senses are lossy by design
@@ -933,15 +941,18 @@ void CompanionFaceView::PetOutputs(uint64_t now) {
         ESP_LOGI(kPetTag,"chirp %s idle=%d allowed=%d played=%d",pet::ChirpName(chirp),idle,allowed,played);
     }
     pet::HeadClip clip;
-    if (pet_.TakeHeadClip(clip)) {
+    // While a start or end is drawn ahead of the runtime the microphone may still be
+    // open: a clip waits in the runtime until it is confirmed (the listening posture of
+    // a conversation just opened then still plays).
+    if (!pet_request_pending_ && pet_.TakeHeadClip(clip)) {
         // Local life moves the head only where the Owner allows motion (inside a
         // session: the session plan). The body still refuses while capture holds it
-        // or a server motion owns the head, and waits while a start or end is
-        // drawn ahead of the runtime.
-        const bool allowed=!pet_request_pending_ && CurrentOutputGate().AllowsAmbient(presentation::Output::Motion);
+        // or a server motion owns the head.
+        const bool allowed=CurrentOutputGate().AllowsAmbient(presentation::Output::Motion);
         const bool played=allowed && board.PlayPetHeadClip(clip);
-        ESP_LOGI(kPetTag,"head clip p%u keys=%u allowed=%d played=%d (%s)",clip.priority,
-                 static_cast<unsigned>(clip.count),allowed,played,pet_.activity());
+        pet_.OnHeadClip(played,now);
+        ESP_LOGI(kPetTag,"head clip p%u keys=%u hold=%d allowed=%d played=%d (%s)",clip.priority,
+                 static_cast<unsigned>(clip.count),clip.hold,allowed,played,pet_.activity());
     }
     if (now>=pet_next_stats_ms_) {
         // Self-check line: how often the face redrew and what it cost the LVGL task.

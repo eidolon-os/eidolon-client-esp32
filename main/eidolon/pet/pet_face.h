@@ -50,11 +50,14 @@ struct Particle {
 // One keyframe of a local head clip, in deci-degrees relative to the body's rest pose
 // (yaw 0 = centred; dpitch 0 = rest, positive = up). The body places it in its own
 // mechanical range, so the pet never needs to know where rest sits on a given head.
+// at_ms is when the head arrives at the key; max_dps caps the peak speed of the move
+// into it (the move is stretched to fit). Two equal keys in a row hold the pose.
+// The path between keys is pet_head_path.h.
 struct HeadKey {
     uint16_t at_ms = 0;
     int16_t yaw_dd = 0;
     int16_t dpitch_dd = 0;
-    uint16_t speed = 300;
+    uint16_t max_dps = 30;
 };
 
 // Face centre on the 320x240 pet screen. The status bar owns the top 32 px, so the
@@ -65,7 +68,13 @@ constexpr size_t kMaxHeadKeys = 10;
 struct HeadClip {
     std::array<HeadKey, kMaxHeadKeys> keys{};
     size_t count = 0;
-    uint8_t priority = 0;   // 2 reflex, 3 attention, 4 idle (server commands always win)
+    // 1 posture before the microphone opens, 2 reflex, 3 attention (speaking), 4 idle.
+    // Server commands always win.
+    uint8_t priority = 0;
+    // The last key is where the head should stay (a new heading, a mood's posture, the
+    // listening posture): the body does not take it home afterwards. Sits in what was
+    // padding, so the clip keeps its size.
+    bool hold = false;
 };
 
 // Everything the renderer needs for one frame.

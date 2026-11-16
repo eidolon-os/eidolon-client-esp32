@@ -1,11 +1,13 @@
 // Host tests for the pet runtime (main/eidolon/pet/pet_runtime.*).
 #include "eidolon/pet/pet_runtime.h"
+#include "eidolon/pet/pet_head_path.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <vector>
 
 using namespace eidolon::pet;
 
@@ -21,13 +23,25 @@ bool Finite(const Frame& f) {
     return true;
 }
 
+struct Played { uint64_t t; HeadClip c; HeadPathStart from; };
 struct Sim {
     Runtime rt{42};
     RuntimeInputs in;
     uint64_t now = 1000;
     const Frame* last = nullptr;
+    // play: act as the view and body do, taking every clip as it falls due and reporting
+    // whether it played (accept); the clips are kept with the pose each started from.
+    bool play = false, accept = true;
+    std::vector<Played> clips;
     void Run(uint64_t ms, uint64_t step = 20) {
-        for (uint64_t t = 0; t < ms; t += step) { now += step; in.now_ms = now; last = &rt.Tick(in); CHECK(Finite(*last)); }
+        for (uint64_t t = 0; t < ms; t += step) {
+            now += step; in.now_ms = now; last = &rt.Tick(in); CHECK(Finite(*last));
+            HeadClip c;
+            while (play && rt.TakeHeadClip(c)) {
+                clips.push_back({now, c, HeadPathStart{static_cast<float>(rt.head_yaw_dd()), static_cast<float>(rt.head_pitch_dd()), 0, 0}});
+                rt.OnHeadClip(accept, now);
+            }
+        }
     }
     void Sense(SenseKind k, float value = 0, int8_t dir = 0) { rt.OnSense({k, now, value, dir}); }
 };
@@ -240,7 +254,8 @@ void TestHeadStillWhileTheMicIsOpen() {
 }
 
 // Speaking: the head nods a little on emphasis and follows the eyes' glances aside, always
-// small, always ending back home, and never while the Host drives the face.
+// small, always from and back to the listening posture it keeps while it talks, and never
+// while the Host drives the face.
 void TestSpeakingMovesTheHeadGently() {
     Sim s; s.in.phase = Phase::Responding; s.Run(300);
     HeadClip c; int clips = 0;
@@ -248,10 +263,10 @@ void TestSpeakingMovesTheHeadGently() {
         s.in.speech_dbfs = (t % 360) < 160 ? -18.f : -50.f; s.Run(40, 40);
         while (s.rt.TakeHeadClip(c)) {
             ++clips;
-            CHECK(c.priority == 3 && c.count == 2);
-            for (size_t k = 0; k < c.count; ++k) { CHECK(std::abs(c.keys[k].yaw_dd) <= 60); CHECK(std::abs(c.keys[k].dpitch_dd) <= 50); }
-            CHECK(c.keys[1].yaw_dd == 0 && c.keys[1].dpitch_dd == 0);   // ends at home
-            CHECK(c.keys[1].at_ms <= 1400);
+            CHECK(c.priority == 3 && (c.count == 2 || c.count == 3) && c.hold);
+            for (size_t k = 0; k < c.count; ++k) { CHECK(std::abs(c.keys[k].yaw_dd) <= 70); CHECK(c.keys[k].dpitch_dd >= 30 && c.keys[k].dpitch_dd <= 80); }
+            CHECK(c.keys[c.count - 1].yaw_dd == 0 && c.keys[c.count - 1].dpitch_dd == 40);   // ends on the listening posture
+            CHECK(c.keys[c.count - 1].at_ms <= 2000);
         }
     }
     CHECK(clips >= 4 && clips <= 16);   // 12 s of speech: a nod or glance every second or two
@@ -259,6 +274,305 @@ void TestSpeakingMovesTheHeadGently() {
     int host_clips = 0;
     for (uint64_t t = 0; t < 8000; t += 40) { h.in.speech_dbfs = (t % 360) < 160 ? -18.f : -50.f; h.Run(40, 40); while (h.rt.TakeHeadClip(c)) ++host_clips; }
     CHECK(host_clips == 0);   // a Host plan owns the moment
+}
+
+// The emphasis nod really reaches its height now (it used to be cut off at ~1.7 deg).
+void TestSpeakingNodReaches() {
+    Sim s; s.in.phase = Phase::Responding; s.Run(300);
+    HeadClip c; int nods = 0;
+    for (uint64_t t = 0; t < 12000; t += 40) {
+        s.in.speech_dbfs = (t % 360) < 160 ? -18.f : -50.f; s.Run(40, 40);
+        while (s.rt.TakeHeadClip(c)) {
+            if (c.count != 2) continue;
+            ++nods;
+            const HeadPathStart from{0, 40, 0, 0};
+            float top = 0;
+            for (float u = 0; u <= HeadPathEndMs(c, from); u += 2) top = std::fmax(top, SampleHeadPath(c, from, u).pitch);
+            CHECK(top - 40 >= 30);                      // at least 3 deg above the posture
+            CHECK(HeadPathEndMs(c, from) <= 600);       // and back within the word
+        }
+    }
+    CHECK(nods >= 2);
+}
+
+// The eyes look first and hand over to the head: as the head is let go they have already
+// moved toward where it turns, and once it arrives they are back near the middle. If the
+// body refuses the clip, the eyes simply hold the look.
+void TestEyesLeadHead() {
+    for (bool accept : {true, false}) {
+        Sim s; s.accept = accept;
+        int glances = 0, led = 0, centred = 0, held = 0;
+        float gaze_before = 0;
+        for (int i = 0; i < 18 * 60 * 50; ++i) {
+            const float g_prev = s.last ? s.last->pose.gaze_x : 0.f;
+            s.Run(20);
+            HeadClip c;
+            if (!s.rt.TakeHeadClip(c)) { gaze_before = g_prev; continue; }
+            if (c.priority != 4 || c.keys[0].max_dps != 35) { s.rt.OnHeadClip(accept, s.now); continue; }
+            const int16_t from = s.rt.head_yaw_dd();
+            s.rt.OnHeadClip(accept, s.now);
+            ++glances;
+            const float dir = c.keys[0].yaw_dd > from ? 1.f : -1.f;
+            if ((s.last->pose.gaze_x - gaze_before) * dir > .02f) ++led;
+            const float arrive = HeadPathKeyMs(c, HeadPathStart{static_cast<float>(from), 0, 0, 0}, 0);
+            s.Run(static_cast<uint64_t>(arrive) + 200);
+            if (std::fabs(s.last->pose.gaze_x) < .15f) ++centred; else ++held;
+        }
+        CHECK(glances >= 12);
+        CHECK(led * 10 >= glances * 8);   // the eyes were already on their way
+        if (accept) CHECK(centred * 10 >= glances * 8);   // and handed over to the head
+        else CHECK(held * 10 >= glances * 6);             // no head: the look holds
+    }
+}
+
+// D1: idle glances stay as rare as before, one every 25-60 s, never two within 25 s.
+void TestIdleHeadRate() {
+    Sim s; s.play = true; s.Run(18ull * 60 * 1000, 100);
+    std::vector<uint64_t> at;
+    for (const auto& p : s.clips) if (p.c.priority == 4 && p.c.keys[0].max_dps == 35) at.push_back(p.t);
+    CHECK(at.size() >= 14 && at.size() <= 45);
+    for (size_t i = 1; i < at.size(); ++i) CHECK(at[i] - at[i - 1] >= 25000);
+}
+
+// D2: a glance that stays leaves the head within +-15 deg, a passing one within +-20 deg,
+// pitch inside the level band; after three quiet minutes on a heading it drifts home.
+void TestHoldShiftsStayWithinBounds() {
+    Sim s; s.play = true; s.Run(18ull * 60 * 1000, 100);
+    int shifts = 0;
+    for (const auto& p : s.clips) {
+        if (p.c.priority != 4 || p.c.keys[0].max_dps != 35) continue;
+        const auto& k = p.c.keys[0];
+        CHECK(k.dpitch_dd >= -30 && k.dpitch_dd <= 60);
+        if (p.c.count == 1) { ++shifts; CHECK(std::abs(k.yaw_dd) <= 150); }
+        else { CHECK(std::abs(k.yaw_dd) <= 200); CHECK(p.c.keys[2].yaw_dd == static_cast<int16_t>(p.from.yaw)); }
+        CHECK(p.c.hold);
+    }
+    CHECK(shifts >= 3);
+    // A finger resting on the screen keeps the idle glances away but is no reason to move:
+    // the held heading goes home three minutes after it was taken.
+    Sim r; r.play = true;
+    while (r.rt.head_yaw_dd() == 0 && r.now < 30ull * 60 * 1000) r.Run(100, 100);
+    CHECK(r.rt.head_yaw_dd() != 0);
+    const uint64_t since = r.now;
+    r.in.pointer = true;
+    const size_t before = r.clips.size();
+    r.Run(4ull * 60 * 1000, 100);
+    CHECK(r.clips.size() == before + 1);
+    if (r.clips.size() == before + 1) {
+        const auto& home = r.clips.back();
+        CHECK(home.c.keys[0].yaw_dd == 0 && home.c.keys[0].dpitch_dd == 0 && home.c.keys[0].max_dps <= 20);
+        CHECK(home.t >= since + 175000);
+    }
+    CHECK(r.rt.head_yaw_dd() == 0);
+}
+
+// Drowsy: it dozes and jerks awake at uneven intervals of 12-30 s (it used to be a fixed 7.5 s);
+// the startle is the only quick move it makes then.
+void TestDrowsyNodsAreIrregular() {
+    Sim s; s.play = true; s.Run(500); s.rt.ForceMood(Mood::Drowsy, s.now);
+    s.Run(6ull * 60 * 1000, 100);
+    std::vector<uint64_t> at;
+    bool posture = false;
+    for (const auto& p : s.clips) {
+        float peak = 0;
+        for (float u = 0; u <= HeadPathEndMs(p.c, p.from); u += 2) {
+            const auto x = SampleHeadPath(p.c, p.from, u);
+            peak = std::fmax(peak, std::fmax(std::fabs(x.vyaw), std::fabs(x.vpitch)) * 100);
+        }
+        if (p.c.count == 4) { at.push_back(p.t); CHECK(peak > 25 && peak <= 60.5f); }
+        else { CHECK(peak <= 25.5f); if (p.c.count == 1 && p.c.keys[0].dpitch_dd == -30 && std::abs(p.c.keys[0].yaw_dd) == 60) posture = true; }
+    }
+    CHECK(posture);   // first it settles low and leans over (D3)
+    CHECK(at.size() >= 10);
+    bool uneven = false;
+    for (size_t i = 1; i < at.size(); ++i) {
+        CHECK(at[i] - at[i - 1] >= 12000 && at[i] - at[i - 1] <= 30200);
+        if (i > 1 && at[i] - at[i - 1] != at[i - 1] - at[i - 2]) uneven = true;
+    }
+    CHECK(uneven);
+}
+
+// Asleep: low and leaning over, then completely still; touched awake, the eyes open first and
+// the head comes back up after.
+void TestAsleepHeadStill() {
+    Sim s; s.play = true; s.Run(500); s.rt.ForceMood(Mood::Asleep, s.now);
+    s.Run(5000);
+    CHECK(s.clips.size() == 1);
+    if (!s.clips.empty()) { CHECK(s.clips[0].c.keys[0].dpitch_dd == -35 && std::abs(s.clips[0].c.keys[0].yaw_dd) == 80 && s.clips[0].c.hold); }
+    s.Run(30ull * 60 * 1000, 100);
+    CHECK(s.clips.size() == 1);
+    const uint64_t touched = s.now;
+    s.Sense(SenseKind::TouchHold);   // a hand resting on it: wakes it, no head move of its own
+    s.Run(40);
+    CHECK(s.rt.mood() == Mood::Calm);
+    s.Run(3000);
+    CHECK(s.clips.size() == 2);
+    if (s.clips.size() == 2) {
+        CHECK(s.clips[1].c.keys[0].yaw_dd == 0 && s.clips[1].c.keys[0].dpitch_dd == 0 && s.clips[1].c.keys[0].max_dps <= 25);
+        CHECK(s.clips[1].t >= touched + 1200 + 300);   // after the reaction, eyes open first
+    }
+}
+
+// Lights off: a yawn, then the head stays down (it used to pop back up 2.5 s later), and the
+// drowsy posture follows.
+void TestLightsOffDoesNotPopBack() {
+    Sim s; s.play = true; s.Run(500);
+    s.Sense(SenseKind::LightsOff);
+    s.Run(200);
+    CHECK(s.clips.size() == 1);
+    if (!s.clips.empty()) { CHECK(s.clips[0].c.hold); CHECK(s.clips[0].c.keys[s.clips[0].c.count - 1].dpitch_dd == -35); }
+    s.Run(5000);
+    CHECK(s.rt.mood() == Mood::Drowsy);
+    CHECK(s.clips.size() == 2 && s.clips.back().c.keys[0].dpitch_dd == -30);
+}
+
+// D4: the head is in its listening posture (+4 deg, facing you) before the microphone opens,
+// both when the tap opens the conversation and after every reply; home after it ends.
+void TestListeningPostureBeforeMicOpens() {
+    Sim s; s.play = true; s.Run(500);
+    s.rt.OnScreenTap(s.now); s.in.phase = Phase::Opening; s.Run(100);
+    CHECK(s.clips.size() == 1);
+    if (!s.clips.empty()) {
+        const auto& c = s.clips[0].c;
+        CHECK(c.hold && c.keys[c.count - 1].yaw_dd == 0 && c.keys[c.count - 1].dpitch_dd == 40);
+        CHECK(HeadPathEndMs(c, HeadPathStart{}) <= 600);
+    }
+    s.Run(800); s.in.phase = Phase::Listening; s.Run(3000);
+    CHECK(s.clips.size() == 1);   // nothing while it listens
+    s.in.phase = Phase::Responding;
+    for (int i = 0; i < 100; ++i) { s.in.speech_dbfs = (i % 9) < 4 ? -18.f : -50.f; s.Run(40, 40); }
+    const size_t spoken = s.clips.size();
+    s.in.phase = Phase::Listening; s.Run(40, 40);
+    CHECK(s.clips.size() == spoken + 1);
+    if (s.clips.size() == spoken + 1) {
+        const auto& c = s.clips.back().c;
+        CHECK(c.priority == 1 && c.hold && c.keys[0].yaw_dd == 0 && c.keys[0].dpitch_dd == 40);
+        CHECK(HeadPathEndMs(c, HeadPathStart{60, 40, 0, 0}) <= 600);
+    }
+    s.Run(5000);
+    const size_t listened = s.clips.size();
+    s.in.phase = Phase::Ambient; s.Run(1400);
+    CHECK(s.clips.size() == listened);   // a moment first
+    s.Run(400);
+    CHECK(s.clips.size() == listened + 1 && s.clips.back().c.keys[0].dpitch_dd == 0);
+    // Opened without the tap (a button, a wake word): the posture comes on its own.
+    Sim b; b.play = true; b.Run(500); b.in.phase = Phase::Opening; b.Run(100);
+    CHECK(b.clips.size() == 1 && b.clips[0].c.priority == 1 && b.clips[0].c.keys[0].dpitch_dd == 40);
+}
+
+// D8: half as many idle glances in the dark or on battery; none on a low battery.
+void TestNoIdleHeadInDarkOrLowBattery() {
+    auto glances = [](Sim& s) { int n = 0; for (const auto& p : s.clips) if (p.c.priority == 4 && p.c.keys[0].max_dps == 35) ++n; return n; };
+    Sim light; light.play = true; light.rt.OnPower(true, 80, light.now); light.Run(18ull * 60 * 1000, 100);
+    Sim battery; battery.play = true; battery.rt.OnPower(false, 80, battery.now); battery.Run(18ull * 60 * 1000, 100);
+    Sim low; low.play = true; low.rt.OnPower(false, 5, low.now); low.Run(18ull * 60 * 1000, 100);
+    const int l = glances(light), b = glances(battery), w = glances(low);
+    CHECK(l >= 14);
+    CHECK(b * 10 <= l * 7 && b >= 4);
+    CHECK(w == 0);
+    // Dark: a dark room also tires it sooner (bored at 5 min); count the first five minutes.
+    Sim dark; dark.play = true; dark.rt.OnPower(true, 80, dark.now); dark.in.dark = true; dark.Run(4ull * 60 * 1000 + 50000, 100);
+    Sim lit; lit.play = true; lit.rt.OnPower(true, 80, lit.now); lit.Run(4ull * 60 * 1000 + 50000, 100);
+    CHECK(glances(dark) < glances(lit));
+}
+
+// While a still is being taken nothing moves the head: clips waiting are dropped, and none is
+// queued until the camera is done.
+void TestShutterPausesHead() {
+    Sim s; s.Run(500);
+    s.Sense(SenseKind::TouchTapFront);
+    s.rt.OnCameraShutter(s.now);
+    HeadClip c;
+    CHECK(!s.rt.TakeHeadClip(c));
+    s.Run(300);
+    s.Sense(SenseKind::Knock);
+    s.Run(100);
+    CHECK(!s.rt.TakeHeadClip(c));
+    s.Run(Runtime::kShutterHeadQuietMs);
+    s.Sense(SenseKind::Knock);
+    s.Run(40);
+    CHECK(s.rt.TakeHeadClip(c));
+}
+
+// Every reflex stays gentle and inside the range: nothing dips past -3.5 deg (rest is 4 deg
+// above the stop), nothing peaks above 110 deg/s, and the swings really reach their size.
+void TestReflexClipsAreGentleAndInRange() {
+    const SenseKind kinds[] = {SenseKind::TouchTapFront, SenseKind::TouchTapMiddle, SenseKind::TouchTapBack, SenseKind::TouchRapid,
+                               SenseKind::PickedUp, SenseKind::PutDown, SenseKind::Shaken, SenseKind::Knock, SenseKind::HandNear,
+                               SenseKind::FaceClose, SenseKind::Uncovered, SenseKind::LightsOff, SenseKind::HeadReleased};
+    int checked = 0;
+    for (int i = 0; i < static_cast<int>(sizeof(kinds) / sizeof(kinds[0])) + 3; ++i) {
+        Sim s; s.Run(500);
+        if (i < static_cast<int>(sizeof(kinds) / sizeof(kinds[0]))) s.Sense(kinds[i]);
+        else if (i == static_cast<int>(sizeof(kinds) / sizeof(kinds[0]))) s.rt.OnPresence(true, s.now);
+        else if (i == static_cast<int>(sizeof(kinds) / sizeof(kinds[0])) + 1) s.rt.OnPresence(false, s.now);
+        else s.rt.OnScreenTap(s.now);
+        s.Run(700);
+        HeadClip c;
+        if (!s.rt.TakeHeadClip(c)) { std::fprintf(stderr, "no clip for reflex %d\n", i); CHECK(false); continue; }
+        ++checked;
+        const HeadPathStart from;
+        float peak = 0, lo = 0, hi = 0, ylo = 0, yhi = 0;
+        for (float u = 0; u <= HeadPathEndMs(c, from); u += 1) {
+            const auto x = SampleHeadPath(c, from, u);
+            peak = std::fmax(peak, std::fmax(std::fabs(x.vyaw), std::fabs(x.vpitch)) * 100);
+            lo = std::fmin(lo, x.pitch); hi = std::fmax(hi, x.pitch); ylo = std::fmin(ylo, x.yaw); yhi = std::fmax(yhi, x.yaw);
+        }
+        CHECK(lo >= -35.01f);
+        CHECK(peak <= 110.5f);
+        CHECK(HeadPathEndMs(c, from) <= 3500);
+        if (i == 6) CHECK(ylo <= -69.9f && yhi >= 69.9f);   // shaken: +-7 deg, for real
+    }
+    CHECK(checked == 16);
+}
+
+// A speaking move still waiting when the reply ends (the view holds clips while a hang-up
+// is drawn ahead of the runtime) is dropped, not played after the conversation.
+void TestReplyEndDropsItsSpeakingMoves() {
+    int stale = 0, pending_seen = 0;
+    for (int trial = 0; trial < 300; ++trial) {
+        Sim s; s.in.phase = Phase::Responding; s.Run(300);
+        HeadClip c;
+        const int steps = 20 + trial;
+        for (int i = 0; i < steps; ++i) {
+            s.in.speech_dbfs = (i % 9) < 4 ? -18.f : -50.f; s.Run(40, 40);
+            if (i + 1 < steps) while (s.rt.TakeHeadClip(c)) {}
+        }
+        // Whatever is still waiting now (an aside's eye lead) must not outlive the reply.
+        s.in.phase = Phase::Ambient; s.Run(40, 40);
+        if (s.rt.TakeHeadClip(c)) { ++pending_seen; if (c.priority == 3) ++stale; }
+        s.Run(3000);
+        while (s.rt.TakeHeadClip(c)) if (c.priority == 3) ++stale;
+    }
+    CHECK(stale == 0);
+    (void)pending_seen;
+}
+
+// While the view holds clips back (a start or end drawn ahead of the runtime), a reflex is
+// dropped once it is a second stale; a posture still goes out when the hold ends.
+void TestStaleClipsExpire() {
+    Sim s; s.Run(500);
+    s.Sense(SenseKind::TouchTapFront);
+    s.Run(1100);
+    HeadClip c;
+    CHECK(!s.rt.TakeHeadClip(c));   // the tap was 1.1 s ago
+    Sim p; p.Run(500);
+    p.rt.ForceMood(Mood::Asleep, p.now);
+    p.Run(5000);
+    CHECK(p.rt.TakeHeadClip(c) && c.count == 1 && c.hold && c.keys[0].dpitch_dd == -35);
+}
+
+// A server head move ends at rest: the runtime stops assuming its own held heading.
+void TestServerHeadMoveResetsHeading() {
+    Sim s; s.play = true;
+    while (s.rt.head_yaw_dd() == 0 && s.now < 30ull * 60 * 1000) s.Run(100, 100);
+    CHECK(s.rt.head_yaw_dd() != 0);
+    s.rt.OnHostAction(HostAction::Running, s.now, true);
+    CHECK(s.rt.head_yaw_dd() == 0 && s.rt.head_pitch_dd() == 0);
+    Sim f; f.play = true;
+    while (f.rt.head_yaw_dd() == 0 && f.now < 30ull * 60 * 1000) f.Run(100, 100);
+    f.rt.OnHostAction(HostAction::Done, f.now);   // a face plan's receipt: the head did not move
+    CHECK(f.rt.head_yaw_dd() != 0);
 }
 
 // Each touch has its own sound; frequent ambient senses stay quiet.
@@ -371,6 +685,20 @@ int main() {
     TestIdleGlanceIsRareAndLowPriority();
     TestHeadStillWhileTheMicIsOpen();
     TestSpeakingMovesTheHeadGently();
+    TestSpeakingNodReaches();
+    TestEyesLeadHead();
+    TestIdleHeadRate();
+    TestHoldShiftsStayWithinBounds();
+    TestDrowsyNodsAreIrregular();
+    TestAsleepHeadStill();
+    TestLightsOffDoesNotPopBack();
+    TestListeningPostureBeforeMicOpens();
+    TestNoIdleHeadInDarkOrLowBattery();
+    TestShutterPausesHead();
+    TestReflexClipsAreGentleAndInRange();
+    TestServerHeadMoveResetsHeading();
+    TestReplyEndDropsItsSpeakingMoves();
+    TestStaleClipsExpire();
     TestReactionsChirp();
     TestPattingKeepsItAnnoyed();
     TestNoBreathingInConversation();

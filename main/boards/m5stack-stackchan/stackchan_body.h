@@ -13,6 +13,7 @@
 #include <string>
 
 #include "SCSCL.h"
+#include "local_head_player.h"
 
 namespace m5 {
 class PY32IOExpander_Class;
@@ -47,9 +48,12 @@ public:
     // expires, so no caller can leave it turned off-center indefinitely.
     void LookAtNormalized(float x, float y, int speed = 500, int ttl_ms = 0);
     void GoHome(int speed = 500);
-    // Emergency stop (safety.stop): preempt any running gesture and cut servo torque so
-    // the head goes limp. Highest motion priority. The next command re-engages torque.
-    void Stop();
+    // Stop: preempt any running gesture and cut servo torque so the head goes limp.
+    // Highest motion priority. The next command re-engages torque. latch=true is the
+    // explicit safety.stop: the pet's own clips then stay off until the next server head
+    // command or the end of the session (design §6.2 rule 1). The session-close and
+    // timeout stops pass false, and a plain stop also ends an earlier latch.
+    void Stop(bool latch = false);
 
     // Mic-capture quiet gate. quiet=true cuts the servo power rail (PY32 VM EN) so the
     // servo DC-DC/PWM switching whine can't couple into the on-board mic during uplink
@@ -80,13 +84,15 @@ public:
     // RgbMarquee / RgbOff from the legacy presence reflex are ignored.
     // rgb: 12 triples, left column top->bottom then right column top->bottom.
     void SetPetLedFrame(const uint8_t rgb[36]);
-    // Local head clip (pet reflex / attention / idle glance). Lower priority than every
-    // server command: refused while a server gesture runs, a look_at hold is armed, a
-    // server move happened in the last 2 s, capture holds the head, or a clip of higher
-    // priority (smaller number) is playing. Any server command cancels a running clip.
+    // Local head clip (pet reflex / attention / idle glance / posture), played as a smooth
+    // path (eidolon/pet/pet_head_path.h). Lower priority than every server command: refused
+    // while a server gesture runs, a look_at hold is armed, a server move happened in the
+    // last 2 s, capture holds the head, a clip of higher priority (smaller number) is
+    // playing, or after a safety.stop (see Stop). Any server command cancels a running clip.
+    // The arbitration is LocalHeadPlayer (host-tested).
     bool PlayLocalClip(const eidolon::pet::HeadClip& clip);
-    // Cancels a local clip (or its pending return) and drives home now. Server gestures
-    // and a hot microphone are left alone.
+    // Stops a local clip right where it is and cancels its return home: nothing moves (a
+    // still is being taken). Server gestures and a hot microphone are left alone.
     void SettleLocalClip();
     // Called from the update task when someone turns the head by hand (pushed=true,
     // dir = sign of the yaw offset) and when they let go (pushed=false).
@@ -142,13 +148,10 @@ private:
     // Absolute esp_timer deadline (us) for a look_at TTL hold; 0 = disarmed. Enforced on
     // the 50 Hz update tick so the guardrail can't be bypassed by any caller.
     volatile int64_t look_at_deadline_us_ = 0;
-    // Local clip state (guarded by motion_mutex_).
-    bool local_clip_active_ = false;
-    eidolon::pet::HeadClip local_clip_{};
-    size_t local_clip_next_ = 0;
-    int64_t local_clip_start_us_ = 0;
-    int64_t local_home_due_us_ = 0;       // return home after a clip left the head off-centre
-    int64_t last_server_motion_us_ = 0;
+    // Local clips (guarded by motion_mutex_).
+    stackchan::LocalHeadPlayer local_;
+    void StartLocalLocked(const eidolon::pet::HeadClip* clip, int64_t now_us);
+    void DriveLocalLocked(const stackchan::HeadPose& pose);
     std::atomic<int64_t> last_motion_us_{0};
     std::atomic<bool> head_level_{false};
     std::function<void(int64_t)> motion_observer_;

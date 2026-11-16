@@ -117,6 +117,10 @@ public:
     }
     // Emergency stop: cut head-servo torque and preempt any running gesture.
     virtual void HeadStop() {}
+    // The explicit safety.stop command. Like HeadStop, and a board with its own local
+    // head motion keeps that off until the next server head command or the end of the
+    // session (a plain HeadStop).
+    virtual void HeadSafetyStop() { HeadStop(); }
 
     // Mic-capture noise gate for boards whose motor/servo power rail whines into
     // the on-board mic (e.g. StackChan). `quiet=true` while the mic is hot for
@@ -141,7 +145,7 @@ public:
     virtual void SetPetLeds(const uint8_t rgb[36]) { (void)rgb; }
     // Local head clip; the board refuses it whenever a server motion owns the head.
     virtual bool PlayPetHeadClip(const eidolon::pet::HeadClip& clip) { (void)clip; return false; }
-    // End any local head move now and go home (the microphone is about to open).
+    // Stop any local head move right where it is (a still is being taken).
     virtual void SettlePetHead() {}
     // Battery for the pet's periodic poll. Unlike GetBatteryLevel() it must never
     // abort on a bus error: false = no reading this time.

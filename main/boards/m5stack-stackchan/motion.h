@@ -155,6 +155,15 @@ public:
      */
     void lookAtPoint(float x, float y, float z, int speed = 500);
 
+    /**
+     * @brief Write a pose from a path the caller computes (no spring, no bus read).
+     */
+    void followAngles(int yawAngle, int pitchAngle);
+    /**
+     * @brief The pose last commanded, without a bus read.
+     */
+    uitk::Vector2i getCommandedAngles();
+
     bool isMoving();
     uitk::Vector2i getCurrentAngles();
     int getCurrentYawAngle();

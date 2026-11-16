@@ -3554,7 +3554,7 @@ void EidolonVoiceController::HandleSafetyStopCommand(const std::string& command_
         return;
     }
     ESP_LOGW(TAG, "Control command -> safety.stop (cut head torque)");
-    board.HeadStop();
+    board.HeadSafetyStop();
     AckCommand(command, "completed", "OK");
 }
 

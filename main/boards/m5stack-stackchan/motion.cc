@@ -97,6 +97,17 @@ void Motion::lookAtPoint(float x, float y, float z, int speed)
     moveWithSpeed(angles.yaw, angles.pitch, speed);
 }
 
+void Motion::followAngles(int yawAngle, int pitchAngle)
+{
+    _yaw_servo->followAngle(yawAngle);
+    _pitch_servo->followAngle(pitchAngle);
+}
+
+uitk::Vector2i Motion::getCommandedAngles()
+{
+    return uitk::Vector2i(_yaw_servo->commandedAngle(), _pitch_servo->commandedAngle());
+}
+
 bool Motion::isMoving()
 {
     return _yaw_servo->isMoving() || _pitch_servo->isMoving();

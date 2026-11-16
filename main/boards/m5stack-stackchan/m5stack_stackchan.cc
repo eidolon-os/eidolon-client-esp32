@@ -495,6 +495,9 @@ public:
     void HeadStop() override {
         if (body_) body_->Stop();
     }
+    void HeadSafetyStop() override {
+        if (body_) body_->Stop(true);
+    }
     // Mic-capture noise gate: while the mic is hot, cut the servo power rail so its
     // switching whine can't corrupt the uplink (head goes limp during capture).
     void SetCaptureQuiet(bool quiet) override {
@@ -536,15 +539,9 @@ public:
         if (body_) body_->SetPetLedFrame(rgb);
     }
     bool PlayPetHeadClip(const eidolon::pet::HeadClip& clip) override {
-        if (!body_ || !body_->PlayLocalClip(clip)) return false;
-        // The head is about to move: the IMU must not read that as being handled.
-        if (sensors_ && clip.count > 0)
-            sensors_->SuppressMotionArtifacts(static_cast<uint64_t>(esp_timer_get_time() / 1000) +
-                                              clip.keys[clip.count - 1].at_ms + 900);
-        if (sensors_ && clip.count > 0)
-            sensors_->IgnoreLightUntil(static_cast<uint64_t>(esp_timer_get_time() / 1000) +
-                                       clip.keys[clip.count - 1].at_ms + 900);
-        return true;
+        // The body tells the motion observer (set above) how long the path moves, so the
+        // IMU and light sensor ignore the head for exactly that long plus a short tail.
+        return body_ && body_->PlayLocalClip(clip);
     }
     void SettlePetHead() override {
         if (body_) body_->SettleLocalClip();

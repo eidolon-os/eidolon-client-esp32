@@ -75,6 +75,25 @@ public:
     }
 
     /**
+     * @brief Follow a path the caller computes (the pet's local head clips): drop the
+     *        spring and write `angle` on the next update tick, without reading the bus
+     *        first. Called every tick while the path runs, so the torque stays on until
+     *        the path ends and the usual release-at-rest follows.
+     */
+    void followAngle(int angle)
+    {
+        stop_motion_at_angle(angle);
+    }
+
+    /**
+     * @brief The angle last commanded (the animation's value), without a bus read.
+     */
+    int commandedAngle()
+    {
+        return static_cast<int>(_angle_anim.directValue());
+    }
+
+    /**
      * @brief Get servo current angle
      *
      * @return int

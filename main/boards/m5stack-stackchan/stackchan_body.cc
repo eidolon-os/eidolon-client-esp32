@@ -50,12 +50,22 @@ constexpr bool kCaptureCutsRail = false;
 // 0..5 on one side and 6..11 on the other; adjust here if the device disagrees.
 constexpr uint8_t kPetLedMap[kLedCount] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
 constexpr int64_t kLedFlushPeriodUs = 80 * 1000;       // <= 12.5 Hz, only on change
-constexpr int64_t kServerQuietUs = 2000 * 1000;       // local clips wait after a server move
-constexpr int64_t kLocalHomeDelayUs = 2500 * 1000;
+// IMU and light readings stay suspect this long after a local path stops moving.
+constexpr int64_t kLocalSuspectTailUs = 900 * 1000;
 constexpr int kPushThresholdDd = 90;                   // 9 degrees off the rest pose
 constexpr int64_t kPushSamplePeriodUs = 200 * 1000;
 constexpr int64_t kRestSettleUs = 400 * 1000;
 constexpr int64_t kPushReleaseStableUs = 1200 * 1000;
+
+// The range a local path stays inside, relative to the rest pose (deci-degrees).
+const eidolon::pet::HeadPathLimits kLocalLimits = [] {
+    eidolon::pet::HeadPathLimits l;
+    l.yaw_lo = SERVO_YAW_MIN_DEG * 10.0f;
+    l.yaw_hi = SERVO_YAW_MAX_DEG * 10.0f;
+    l.pitch_lo = (kPitchFloorDeg - kHomePitchDeg) * 10.0f;
+    l.pitch_hi = (kPitchTopDeg - kHomePitchDeg) * 10.0f;
+    return l;
+}();
 
 class MutexGuard {
 public:
@@ -70,7 +80,7 @@ private:
 };
 }  // namespace
 
-StackChanBody::StackChanBody(i2c_master_bus_handle_t i2c_bus) : i2c_bus_(i2c_bus) {
+StackChanBody::StackChanBody(i2c_master_bus_handle_t i2c_bus) : i2c_bus_(i2c_bus), local_(kLocalLimits) {
     motion_mutex_ = xSemaphoreCreateMutex();
 }
 
@@ -204,8 +214,7 @@ void StackChanBody::SetCaptureQuiet(bool quiet) {
             // Mic went hot: stop wherever the head is and keep the rail up. Nothing new
             // moves until capture closes (motion commands check capture_quiet_).
             look_at_deadline_us_ = 0;
-            local_clip_active_ = false;
-            local_home_due_us_ = 0;
+            local_.Cancel();
             rest_baseline_valid_ = false;
             if (motion_) motion_->stop();
             ESP_LOGI(TAG, "capture hold: motion paused, servo rail kept");
@@ -268,12 +277,16 @@ void StackChanBody::GoHome(int speed) {
     SetHeadAngles(kHomeYawDeg, kHomePitchDeg, speed);  // clears the TTL hold via SetHeadAngles
 }
 
-void StackChanBody::Stop() {
+void StackChanBody::Stop(bool latch) {
     if (!ready_) return;
     gesture_abort_ = true;  // set before the lock so a mid-step gesture bails out
     MutexGuard lock(motion_mutex_);
     look_at_deadline_us_ = 0;
-    ServerMotionLocked();
+    ServerMotionLocked();   // also ends an earlier latch
+    if (latch) {
+        local_.SafetyStop(esp_timer_get_time());
+        ESP_LOGW(TAG, "safety stop: local head clips off until the next server head command or session end");
+    }
     // While quiet the rail is down and the head is already limp; skip the bus write.
     if (!capture_quiet_ && motion_) {
         motion_->freeze();  // freeze animation + cut torque -> head limp (safety.stop = 断使能)
@@ -464,11 +477,9 @@ void StackChanBody::SetMotionObserver(std::function<void(int64_t until_us)> obse
 }
 
 void StackChanBody::ServerMotionLocked() {
-    local_clip_active_ = false;
-    local_home_due_us_ = 0;
     rest_baseline_valid_ = false;
     const int64_t now = esp_timer_get_time();
-    last_server_motion_us_ = now;
+    local_.ServerMotion(now);
     NoteMotionLocked(now, 1500 * 1000);
 }
 
@@ -477,63 +488,59 @@ bool StackChanBody::PlayLocalClip(const eidolon::pet::HeadClip& clip) {
     if (capture_quiet_ || gesture_busy_) return false;
     MutexGuard lock(motion_mutex_);
     const int64_t now = esp_timer_get_time();
-    if (capture_quiet_ || gesture_busy_ || look_at_deadline_us_ != 0) return false;
-    if (now - last_server_motion_us_ < kServerQuietUs && last_server_motion_us_ != 0) return false;
-    if (now < power_ready_us_.load()) return false;
-    if (local_clip_active_ && clip.priority > local_clip_.priority) return false;
-    local_clip_ = clip;
-    local_clip_next_ = 0;
-    local_clip_start_us_ = now;
-    local_clip_active_ = true;
-    local_home_due_us_ = 0;
-    rest_baseline_valid_ = false;
+    stackchan::LocalHeadPlayer::Body body;
+    body.capture_quiet = capture_quiet_;
+    body.gesture_busy = gesture_busy_;
+    body.look_at_armed = look_at_deadline_us_ != 0;
+    body.power_ready = now >= power_ready_us_.load();
+    if (const char* refusal = local_.Refusal(clip, now, body)) {
+        ESP_LOGD(TAG, "local clip p%u refused: %s", clip.priority, refusal);
+        return false;
+    }
+    StartLocalLocked(&clip, now);
     return true;
+}
+
+// Starts `clip` (nullptr: the return home the player asked for). Reads the servos once,
+// only here: the player decides whether to start from them or from the last command.
+void StackChanBody::StartLocalLocked(const eidolon::pet::HeadClip* clip, int64_t now_us) {
+    const auto commanded = motion_->getCommandedAngles();
+    const auto readback = motion_->getCurrentAngles();
+    const int rest = static_cast<int>(kHomePitchDeg * 10);
+    const stackchan::HeadPose c{static_cast<float>(commanded.x), static_cast<float>(commanded.y - rest)};
+    const stackchan::HeadPose r{static_cast<float>(readback.x), static_cast<float>(readback.y - rest)};
+    if (clip) local_.Start(*clip, now_us, c, r);
+    else local_.StartHome(now_us, c, r);
+    NoteMotionLocked(now_us, static_cast<int64_t>(local_.path_ms() * 1000.0f) + kLocalSuspectTailUs);
+    rest_baseline_valid_ = false;
+}
+
+void StackChanBody::DriveLocalLocked(const stackchan::HeadPose& pose) {
+    motion_->followAngles(static_cast<int>(std::lround(pose.yaw)),
+                          static_cast<int>(std::lround(pose.pitch + kHomePitchDeg * 10.0f)));
 }
 
 void StackChanBody::SettleLocalClip() {
     if (!ready_ || !motion_) return;
     MutexGuard lock(motion_mutex_);
-    if (capture_quiet_ || gesture_busy_ || (!local_clip_active_ && local_home_due_us_ == 0)) return;
-    local_clip_active_ = false;
-    local_home_due_us_ = 0;
-    const int64_t now = esp_timer_get_time();
-    motion_->moveWithSpeed(static_cast<int>(kHomeYawDeg * 10), static_cast<int>(kHomePitchDeg * 10), 300);
-    NoteMotionLocked(now, 900 * 1000);
-    rest_baseline_valid_ = false;
-    ESP_LOGI(TAG, "local clip settled home before the mic opens");
+    if (capture_quiet_ || gesture_busy_) return;
+    stackchan::HeadPose held;
+    if (!local_.Hold(esp_timer_get_time(), held)) return;
+    DriveLocalLocked(held);   // the pose already written; keeps the servos from finishing a spring
+    ESP_LOGI(TAG, "local clip held in place (yaw=%d dpitch=%d tenths)", static_cast<int>(held.yaw),
+             static_cast<int>(held.pitch));
 }
 
 void StackChanBody::StepLocalClipLocked(int64_t now_us) {
-    if (local_clip_active_) {
-        const int64_t elapsed_ms = (now_us - local_clip_start_us_) / 1000;
-        while (local_clip_next_ < local_clip_.count && local_clip_.keys[local_clip_next_].at_ms <= elapsed_ms) {
-            const auto& k = local_clip_.keys[local_clip_next_++];
-            motion_->moveWithSpeed(k.yaw_dd, static_cast<int>(std::lround(RestPitch(k.dpitch_dd / 10.0f) * 10.0f)), k.speed);
-            NoteMotionLocked(now_us, 1200 * 1000);
-        }
-        if (local_clip_next_ >= local_clip_.count) {
-            const int64_t last_at = local_clip_.keys[local_clip_.count - 1].at_ms;
-            if (elapsed_ms >= last_at + 600) {
-                local_clip_active_ = false;
-                const auto& k = local_clip_.keys[local_clip_.count - 1];
-                const bool home = std::abs(k.yaw_dd) <= 20 && std::abs(k.dpitch_dd) <= 40;
-                local_home_due_us_ = home ? 0 : now_us + kLocalHomeDelayUs;
-            }
-        }
-        return;
-    }
-    if (local_home_due_us_ != 0 && now_us >= local_home_due_us_) {
-        local_home_due_us_ = 0;
-        motion_->moveWithSpeed(static_cast<int>(kHomeYawDeg * 10), static_cast<int>(kHomePitchDeg * 10), 200);
-        NoteMotionLocked(now_us, 1500 * 1000);
-        rest_baseline_valid_ = false;
-    }
+    const auto step = local_.Tick(now_us);
+    if (step.drive) DriveLocalLocked(step.pose);
+    if (step.home_due) StartLocalLocked(nullptr, now_us);
 }
 
 void StackChanBody::SensePushLocked(int64_t now_us) {
     if (!push_cb_ || now_us < next_push_sample_us_) return;
     next_push_sample_us_ = now_us + kPushSamplePeriodUs;
-    if (local_clip_active_ || gesture_busy_ || motion_->isMoving()) {
+    if (local_.active() || gesture_busy_ || motion_->isMoving()) {
         NoteMotionLocked(now_us, 600 * 1000);
         rest_baseline_valid_ = false;
         rest_since_us_ = 0;

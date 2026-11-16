@@ -9,6 +9,15 @@
 // reaction) -> micro saccade -> blink. Local reactions never produce receipts and
 // never contend with Host plans: the view stops feeding a reaction while a Host
 // plan is playing.
+//
+// Head (docs/跨系统/StackChan自然转动分析-20261116.md §4; decisions D1–D8 of 11-16):
+// clips are paths through keys (pet_head_path.h). The eyes look first and the head
+// follows; a glance may leave the head on a new heading (back to rest after 3 quiet
+// minutes); bored, drowsy and asleep each have a posture; the head takes a listening
+// posture before the microphone opens and speaks from it. Idle glances stay as rare
+// as before (D1), twice as rare in the dark or on battery and off on a low battery
+// (D8). Nothing moves while the microphone is open, and the Owner's motion permission
+// and the body still decide whether a clip plays.
 
 #include <cstdint>
 
@@ -38,6 +47,8 @@ enum class HostAction : uint8_t { None, Running, Done, Failed };
 class Runtime {
 public:
     explicit Runtime(uint32_t seed = 0x5EED1234u);
+    // A fresh random sequence (the device seeds it once from its hardware RNG).
+    void Reseed(uint32_t seed) { rng_ = seed ? seed : 1u; }
 
     // Local senses (touch pad, IMU, light, servo readback, power).
     void OnSense(const SenseEvent& event);
@@ -50,18 +61,25 @@ public:
     // charging = external power connected. The first call only records the state.
     void OnPower(bool charging, int battery_pct, uint64_t now_ms);
     void ForceMood(Mood mood, uint64_t now_ms);
-    void OnHostAction(HostAction action, uint64_t now_ms);
+    // head = the action was a server head motion: the head ends at rest after it.
+    void OnHostAction(HostAction action, uint64_t now_ms, bool head = false);
     // A still is being taken for the Host (camera.capture): the eyes narrow as
     // if focusing and the antenna tips flash white. The camera only runs for a
     // still, so this is the moment a picture leaves the device, and no mood,
     // phase or quiet hour hides it.
     void OnCameraShutter(uint64_t now_ms);
     static constexpr uint64_t kShutterMs = 450;
+    // No local head clip goes out for this long after the shutter: the camera opens and
+    // takes its frames in that time, and a moving head blurs them.
+    static constexpr uint64_t kShutterHeadQuietMs = 1500;
 
     const Frame& Tick(const RuntimeInputs& in);
     // A local head clip that wants to play now. The caller decides whether motion
-    // is allowed (permission, capture) and drops it otherwise.
+    // is allowed (permission, capture) and drops it otherwise, then reports what
+    // happened with OnHeadClip.
     bool TakeHeadClip(HeadClip& out);
+    // Whether the clip just taken plays (the eyes only hand over to a head that moves).
+    void OnHeadClip(bool played, uint64_t now_ms);
     // The chirp the latest reaction asked for (taken once); the caller decides if it may play.
     bool TakeChirp(Chirp& out);
     // 12 RGB triples (left column top->bottom, then right column top->bottom).
@@ -70,6 +88,9 @@ public:
     Mood mood() const { return mood_; }
     // What drives the transient layer right now (for diagnostics), "" when idle.
     const char* activity() const { return activity_; }
+    // Where the head was last sent (deci-degrees from rest), by clips that played.
+    int16_t head_yaw_dd() const { return head_yaw_; }
+    int16_t head_pitch_dd() const { return head_pitch_; }
     float speech_level() const { return speech_level_; }   // 0..1, relative to the voice's recent peak
     // True while a local reaction or idle act is animating (redraw needed).
     bool animating() const;
@@ -88,6 +109,10 @@ private:
         uint64_t start = 0, dur = 0;
         float x = 0, y = 0, s = 1;
         bool done2 = false;
+        // A look the head follows (§4.0 E2): 0 none, then HeadAct. Times in ms from the
+        // clip's start: arrival, departure back, length of the way back (0 = it stays).
+        uint8_t head = 0;
+        uint16_t head_out = 0, head_ret = 0, head_back = 0;
     };
 
     void StartReaction(int index, uint64_t now_ms);
@@ -157,9 +182,19 @@ private:
     uint64_t accent_t0_ = 0, next_accent_ = 0, next_aside_ = 0, aside_until_ = 0;
     float aside_x_ = 0, aside_y_ = 0, gaze_tx_ = 0, gaze_ty_ = 0;
     HeadClip pending_clip_;
-    bool clip_pending_ = false;
+    bool clip_pending_ = false, clip_taken_ = false;
+    uint8_t posture_ = 0;          // Posture the head was last sent to (pet_runtime.cc)
+    int8_t posture_side_ = 0;      // which way bored, drowsy and asleep lean (-1 / +1)
+    int16_t head_yaw_ = 0, head_pitch_ = 0;
+    uint64_t clip_due_ = 0, head_since_ = 0, doze_t0_ = 0;
     Chirp pending_chirp_ = Chirp::None;
-    void QueueSpeakingClip(const HeadKey& a, const HeadKey& b);
+    bool QueueClip(const HeadClip& clip, uint64_t now_ms, uint64_t delay_ms = 0);
+    bool HeadFree(const RuntimeInputs& in, uint64_t now_ms) const;
+    bool ShutterQuiet(uint64_t now_ms) const;
+    void StartGlance(uint64_t now_ms);
+    void GlanceGaze(float at, float& gx, float& gy) const;
+    void QueuePosture(uint8_t posture, uint64_t now_ms);
+    void QueueListen(uint64_t now_ms, uint16_t at_ms);
     const char* activity_ = "";
 };
 
