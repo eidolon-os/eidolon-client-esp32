@@ -15,6 +15,10 @@
 #include <cstring>
 #include "esp_video.h"
 #include "stackchan_body.h"
+#if CONFIG_EIDOLON_PET_FACE
+#include "eidolon/pet/pet_sense.h"
+#include "pet_sensors.h"
+#endif
 
 #if CONFIG_EIDOLON_HUB_MODE
 #include "display/lvgl_display/lvgl_theme.h"
@@ -53,7 +57,15 @@ public:
 
     void SetBrightness(uint8_t brightness) {
         brightness = ((brightness + 641) >> 5);
-        WriteReg(0x99, brightness);
+        // Non-fatal: the bus is shared with the body sensors and LEDs, and a backlight
+        // step lost to a busy bus must not reboot the device.
+        const uint8_t buffer[2] = {0x99, brightness};
+        const esp_err_t err = i2c_master_transmit(i2c_device_, buffer, sizeof(buffer), 100);
+        if (err != ESP_OK) ESP_LOGW(TAG, "backlight write failed: %s", esp_err_to_name(err));
+    }
+
+    bool TryReadReg(uint8_t reg, uint8_t& value) {
+        return i2c_master_transmit_receive(i2c_device_, &reg, 1, &value, 1, 50) == ESP_OK;
     }
 };
 
@@ -145,6 +157,12 @@ private:
     EspVideo* camera_ = nullptr;
     esp_timer_handle_t touchpad_timer_;
     StackChanBody* body_ = nullptr;
+    bool battery_known_ = false, battery_charging_ = false, battery_discharging_ = false;
+    int battery_level_ = 0;
+#if CONFIG_EIDOLON_PET_FACE
+    StackChanSensors* sensors_ = nullptr;
+    PetSenseSink pet_sink_;
+#endif
 
     // No PowerSaveTimer: StackChan is a full_duplex always-on companion, so it
     // must never dim/sleep or auto-power-off (matches the esp-box-3 reference).
@@ -363,6 +381,27 @@ private:
         }
     }
 
+#if CONFIG_EIDOLON_PET_FACE
+    // Head-top touch, IMU and proximity/light share the I2C bus with the codec, PMIC,
+    // screen touch and PY32. Missing chips are skipped; the pet just has fewer senses.
+    void InitializePetSensors() {
+        sensors_ = new StackChanSensors();
+        sensors_->Init(i2c_bus_);
+    }
+    // Every local sense passes through here: drops the IMU's view of the body's own
+    // head motion, then hands the event to the pet view's queue.
+    void DeliverPetSense(const eidolon::pet::SenseEvent& event) {
+        using K = eidolon::pet::SenseKind;
+        // The IMU is in the head: "tilted" only describes the desk at the home pitch.
+        if (body_ && (event.kind == K::Tilted || event.kind == K::Level) && !body_->head_level()) return;
+        if (body_ && (event.kind == K::Knock || event.kind == K::Shaken || event.kind == K::Tilted ||
+                      event.kind == K::PickedUp || event.kind == K::PutDown)) {
+            if (esp_timer_get_time() - body_->last_motion_us() < 700 * 1000) return;
+        }
+        if (pet_sink_) pet_sink_(event);
+    }
+#endif
+
 public:
     M5StackChanBoard() {
         InitializeI2c();
@@ -376,6 +415,9 @@ public:
 #endif
         InitializeFt6336TouchPad();
         InitializeServoBody();
+#if CONFIG_EIDOLON_PET_FACE
+        InitializePetSensors();
+#endif
         GetBacklight()->RestoreBrightness();
     }
 
@@ -402,12 +444,35 @@ public:
         return camera_;
     }
 
+    // Polled every second by the status bar. The PMIC shares the bus with the codec,
+    // touch, PY32 and body sensors; one read lost to a busy bus keeps the last value
+    // instead of aborting (Axp2101's reads ESP_ERROR_CHECK every transfer).
     virtual bool GetBatteryLevel(int &level, bool& charging, bool& discharging) override {
-        charging = pmic_->IsCharging();
-        discharging = pmic_->IsDischarging();
-        level = pmic_->GetBatteryLevel();
+        uint8_t status = 0, percent = 0;
+        if (pmic_->TryReadReg(0x01, status) && pmic_->TryReadReg(0xA4, percent)) {
+            const int direction = (status & 0b01100000) >> 5;   // Axp2101::GetBatteryCurrentDirection
+            battery_charging_ = direction == 1;
+            battery_discharging_ = direction == 2;
+            battery_level_ = percent;
+            battery_known_ = true;
+        }
+        charging = battery_charging_;
+        discharging = battery_discharging_;
+        level = battery_level_;
+        return battery_known_;
+    }
+
+#if CONFIG_EIDOLON_PET_FACE
+    bool GetPetPower(int& level, bool& charging) override {
+        // "On the charger" is VBUS present (STATUS1 0x00 bit 5), not the charge state:
+        // a full battery on USB stops charging but the pet is still at dinner.
+        uint8_t status1 = 0, percent = 0;
+        if (!pmic_->TryReadReg(0x00, status1) || !pmic_->TryReadReg(0xA4, percent)) return false;
+        charging = (status1 & (1 << 5)) != 0;
+        level = percent;
         return true;
     }
+#endif
 
     virtual Backlight *GetBacklight() override {
         static CustomBacklight backlight(pmic_);
@@ -443,6 +508,48 @@ public:
             body_->RgbMarquee();  // "wake" / default
         }
     }
+#if CONFIG_EIDOLON_PET_FACE
+    void SetPetSenseSink(PetSenseSink sink) override {
+        pet_sink_ = std::move(sink);
+        auto deliver = [this](const eidolon::pet::SenseEvent& event) { DeliverPetSense(event); };
+        if (body_) {
+            body_->SetPushCallback([deliver](bool pushed, int dir) {
+                eidolon::pet::SenseEvent event{};
+                event.kind = pushed ? eidolon::pet::SenseKind::HeadPushed : eidolon::pet::SenseKind::HeadReleased;
+                event.t_ms = static_cast<uint64_t>(esp_timer_get_time() / 1000);
+                event.dir = static_cast<int8_t>(dir);
+                deliver(event);
+            });
+        }
+        if (body_ && sensors_) {
+            body_->SetMotionObserver([this](int64_t until_us) {
+                // A moving head moves both sensors in it: the IMU feels the servos and
+                // the light sensor sees another part of the room (looking down from
+                // a lamp reads as lights off). Both relearn their rest once it stops.
+                sensors_->SuppressMotionArtifacts(static_cast<uint64_t>(until_us / 1000));
+                sensors_->IgnoreLightUntil(static_cast<uint64_t>(until_us / 1000));
+            });
+        }
+        if (sensors_) sensors_->Start(deliver);
+    }
+    void SetPetLeds(const uint8_t rgb[36]) override {
+        if (body_) body_->SetPetLedFrame(rgb);
+    }
+    bool PlayPetHeadClip(const eidolon::pet::HeadClip& clip) override {
+        if (!body_ || !body_->PlayLocalClip(clip)) return false;
+        // The head is about to move: the IMU must not read that as being handled.
+        if (sensors_ && clip.count > 0)
+            sensors_->SuppressMotionArtifacts(static_cast<uint64_t>(esp_timer_get_time() / 1000) +
+                                              clip.keys[clip.count - 1].at_ms + 900);
+        if (sensors_ && clip.count > 0)
+            sensors_->IgnoreLightUntil(static_cast<uint64_t>(esp_timer_get_time() / 1000) +
+                                       clip.keys[clip.count - 1].at_ms + 900);
+        return true;
+    }
+    void SettlePetHead() override {
+        if (body_) body_->SettleLocalClip();
+    }
+#endif
     void AvatarExpress(const char* emotion, int ttl_ms) override {
 #if CONFIG_EIDOLON_HUB_MODE
         if (display_) static_cast<CompanionLcdDisplay*>(display_)->PulseAvatar(emotion, ttl_ms);

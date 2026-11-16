@@ -48,6 +48,7 @@ enum class PowerSaveLevel {
 using NetworkEventCallback = std::function<void(NetworkEvent event, const std::string& data)>;
 
 void* create_board();
+namespace eidolon::pet { struct SenseEvent; struct HeadClip; }
 class AudioCodec;
 class Display;
 class Board {
@@ -125,6 +126,22 @@ public:
     // (marquee) / "off". `emotion`: a short-lived face pulse for ttl_ms.
     virtual void RgbEffect(const char* effect) { (void)effect; }
     virtual void AvatarExpress(const char* emotion, int ttl_ms) { (void)emotion; (void)ttl_ms; }
+
+    // Desk-pet hooks (CONFIG_EIDOLON_PET_FACE). The pet view owns the local life; the
+    // board only carries signals. No-ops on boards without the hardware.
+    // Local senses (head touch, IMU, light, servo readback) go to `sink`, called from
+    // a board task: the sink must only enqueue.
+    using PetSenseSink = std::function<void(const eidolon::pet::SenseEvent&)>;
+    virtual void SetPetSenseSink(PetSenseSink sink) { (void)sink; }
+    // 12 RGB triples for the base ring (left column top->bottom, then right).
+    virtual void SetPetLeds(const uint8_t rgb[36]) { (void)rgb; }
+    // Local head clip; the board refuses it whenever a server motion owns the head.
+    virtual bool PlayPetHeadClip(const eidolon::pet::HeadClip& clip) { (void)clip; return false; }
+    // End any local head move now and go home (the microphone is about to open).
+    virtual void SettlePetHead() {}
+    // Battery for the pet's periodic poll. Unlike GetBatteryLevel() it must never
+    // abort on a bus error: false = no reading this time.
+    virtual bool GetPetPower(int& level, bool& charging) { (void)level; (void)charging; return false; }
 };
 
 #define DECLARE_BOARD(BOARD_CLASS_NAME) \

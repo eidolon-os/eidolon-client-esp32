@@ -4,7 +4,10 @@
 #include <esp_timer.h>
 #include <freertos/task.h>
 
+#include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 
 #include "config.h"
 #include "PY32IOExpander_Class.hpp"
@@ -18,11 +21,41 @@ using stackchan::motion::ScsServo;
 using stackchan::motion::ServoConfig_t;
 
 namespace {
-// Rest pose (degrees). Yaw centered; pitch mid-range (limits are 3deg..87deg).
+// Rest pose (degrees). Yaw centred; pitch near the bottom of the reachable range
+// (see config.h for the measurement). Gestures and pet clips are placed relative to
+// it and inside [SERVO_PITCH_MIN_DEG, SERVO_PITCH_MAX_DEG].
 constexpr float kHomeYawDeg = 0.0f;
-constexpr float kHomePitchDeg = 45.0f;
+constexpr float kHomePitchDeg = SERVO_PITCH_REST_DEG;
+constexpr float kPitchFloorDeg = SERVO_PITCH_MIN_DEG;
+constexpr float kPitchTopDeg = SERVO_PITCH_MAX_DEG;
+// Pitch for a lift relative to rest (+ up), kept inside the reachable range.
+float RestPitch(float lift_deg) {
+    return std::clamp(kHomePitchDeg + lift_deg, kPitchFloorDeg, kPitchTopDeg);
+}
 constexpr int kDefaultSpeed = 500;
 constexpr int kLedCount = 12;  // RGB ring on the PY32 IO-expander
+// 2026-11-15 on-device measurement (docs/stackchan-desk-pet-design.md §6.6): the
+// microphone noise floor did not track the servo rail (rail off −63…−40 dBFS, rail
+// on −62…−48 dBFS, an intermittent drifting 1.8–2.8 kHz tone either way), while a
+// moving head is loud (−25 dBFS) and a re-powered servo needs ~750 ms to answer.
+// So capture holds the head still on a powered rail; the rail cut stays available.
+#if CONFIG_EIDOLON_STACKCHAN_CAPTURE_CUTS_SERVO_RAIL
+constexpr bool kCaptureCutsRail = true;
+#else
+constexpr bool kCaptureCutsRail = false;
+#endif
+
+// Pet ring mapping: runtime order is left column top->bottom, then right column
+// top->bottom; value = physical PY32 LED index. Factory order is assumed to be
+// 0..5 on one side and 6..11 on the other; adjust here if the device disagrees.
+constexpr uint8_t kPetLedMap[kLedCount] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+constexpr int64_t kLedFlushPeriodUs = 80 * 1000;       // <= 12.5 Hz, only on change
+constexpr int64_t kServerQuietUs = 2000 * 1000;       // local clips wait after a server move
+constexpr int64_t kLocalHomeDelayUs = 2500 * 1000;
+constexpr int kPushThresholdDd = 90;                   // 9 degrees off the rest pose
+constexpr int64_t kPushSamplePeriodUs = 200 * 1000;
+constexpr int64_t kRestSettleUs = 400 * 1000;
+constexpr int64_t kPushReleaseStableUs = 1200 * 1000;
 
 class MutexGuard {
 public:
@@ -116,7 +149,10 @@ bool StackChanBody::Init() {
     // 5) Drive the spring animation at 50 Hz on the app CPU.
     xTaskCreatePinnedToCore(
         [](void* arg) { static_cast<StackChanBody*>(arg)->UpdateLoop(); },
-        "stackchan_motion", 4096, this, 4, nullptr, 1);
+        // Priority 9: this loop holds the shared I2C bus while it flushes the LED ring;
+        // starved mid-transfer by the network stack (a DTLS handshake keeps core 1
+        // busy for 100+ ms) it would make every other bus user time out.
+        "stackchan_motion", 4096, this, 9, nullptr, 1);
 
     ESP_LOGI(TAG, "servo body ready");
     GoHome();
@@ -132,8 +168,16 @@ void StackChanBody::UpdateLoop() {
             // now would write to unpowered servos and can stall the UART). capture_quiet_
             // is read under the mutex so it stays consistent with the rail state set in
             // SetCaptureQuiet().
-            if (motion_ && !capture_quiet_) motion_->update();
+            // Legacy rail-cut policy: the servos are unpowered while the mic is hot, so the
+            // bus must stay quiet. Hold policy: the rail stays up and only motion pauses.
+            const int64_t now_us = esp_timer_get_time();
+            if (motion_ && !capture_quiet_) {
+                StepLocalClipLocked(now_us);
+                SensePushLocked(now_us);
+            }
+            if (motion_ && (!capture_quiet_ || !kCaptureCutsRail)) motion_->update();
         }
+        FlushPetLeds();
         // Guardrail: a look_at with ttl_ms returns home when its hold expires. Enforced
         // here (not in the caller) so no motion source can hold the head off-center past
         // its TTL. GoHome takes the mutex itself, so call it outside the block above.
@@ -154,6 +198,22 @@ void StackChanBody::SetCaptureQuiet(bool quiet) {
     MutexGuard lock(motion_mutex_);
     if (quiet == capture_quiet_) return;
     capture_quiet_ = quiet;
+    if (!kCaptureCutsRail) {
+        gesture_abort_ = quiet ? true : gesture_abort_.load();
+        if (quiet) {
+            // Mic went hot: stop wherever the head is and keep the rail up. Nothing new
+            // moves until capture closes (motion commands check capture_quiet_).
+            look_at_deadline_us_ = 0;
+            local_clip_active_ = false;
+            local_home_due_us_ = 0;
+            rest_baseline_valid_ = false;
+            if (motion_) motion_->stop();
+            ESP_LOGI(TAG, "capture hold: motion paused, servo rail kept");
+        } else {
+            ESP_LOGI(TAG, "capture released: motion allowed");
+        }
+        return;
+    }
     if (quiet) {
         gesture_abort_ = true;
         // Mic went hot: cut torque (head limp) while the rail is still up, then drop the
@@ -183,6 +243,7 @@ void StackChanBody::SetHeadAngles(float yaw_deg, float pitch_deg, int speed) {
     if (!ready_ || capture_quiet_) return;  // rail down during capture -> head limp
     look_at_deadline_us_ = 0;  // any explicit angle move supersedes a look_at TTL hold
     MutexGuard lock(motion_mutex_);
+    ServerMotionLocked();
     motion_->moveWithSpeed(static_cast<int>(std::lround(yaw_deg * 10.0f)),
                            static_cast<int>(std::lround(pitch_deg * 10.0f)), speed);
 }
@@ -190,7 +251,15 @@ void StackChanBody::SetHeadAngles(float yaw_deg, float pitch_deg, int speed) {
 void StackChanBody::LookAtNormalized(float x, float y, int speed, int ttl_ms) {
     if (!ready_ || capture_quiet_) return;  // rail down during capture -> head limp
     MutexGuard lock(motion_mutex_);
-    motion_->lookAtNormalized(x, y, speed);
+    ServerMotionLocked();
+    // y = 0 looks at rest height (as it did when rest was mid-range); the halves
+    // below and above rest each span to their own limit.
+    const float yc = std::clamp(y, -1.0f, 1.0f);
+    const float pitch = yc >= 0 ? kHomePitchDeg + yc * (kPitchTopDeg - kHomePitchDeg)
+                                : kHomePitchDeg + yc * (kHomePitchDeg - kPitchFloorDeg);
+    const float yaw = std::clamp(x, -1.0f, 1.0f) * SERVO_YAW_MAX_DEG;
+    motion_->moveWithSpeed(static_cast<int>(std::lround(yaw * 10.0f)),
+                           static_cast<int>(std::lround(pitch * 10.0f)), speed);
     // Arm the return-home guardrail; 0 = hold until the next command moves the head.
     look_at_deadline_us_ = ttl_ms > 0 ? esp_timer_get_time() + static_cast<int64_t>(ttl_ms) * 1000 : 0;
 }
@@ -204,6 +273,7 @@ void StackChanBody::Stop() {
     gesture_abort_ = true;  // set before the lock so a mid-step gesture bails out
     MutexGuard lock(motion_mutex_);
     look_at_deadline_us_ = 0;
+    ServerMotionLocked();
     // While quiet the rail is down and the head is already limp; skip the bus write.
     if (!capture_quiet_ && motion_) {
         motion_->freeze();  // freeze animation + cut torque -> head limp (safety.stop = 断使能)
@@ -217,12 +287,13 @@ void StackChanBody::SetAllLeds(uint8_t r, uint8_t g, uint8_t b) {
 }
 
 void StackChanBody::RgbOff() {
+    if (pet_leds_) return;   // the pet runtime owns the ring
     rgb_abort_ = true;  // preempt any running marquee before clearing
     SetAllLeds(0, 0, 0);
 }
 
 void StackChanBody::RgbMarquee() {
-    if (!ioe_ || rgb_busy_) return;  // drop if the IO-expander is absent or one is running
+    if (!ioe_ || rgb_busy_ || pet_leds_) return;  // absent, running, or owned by the pet
     rgb_abort_ = false;
     rgb_busy_ = true;
     xTaskCreate(
@@ -263,8 +334,8 @@ void StackChanBody::SelfTest() {
     SetHeadAngles(30.0f, kHomePitchDeg);      vTaskDelay(pdMS_TO_TICKS(kSettleMs));  // right
     SetHeadAngles(-30.0f, kHomePitchDeg);     vTaskDelay(pdMS_TO_TICKS(kSettleMs));  // left
     SetHeadAngles(kHomeYawDeg, kHomePitchDeg); vTaskDelay(pdMS_TO_TICKS(kSettleMs)); // center
-    SetHeadAngles(kHomeYawDeg, 60.0f);        vTaskDelay(pdMS_TO_TICKS(kSettleMs));  // up
-    SetHeadAngles(kHomeYawDeg, 30.0f);        vTaskDelay(pdMS_TO_TICKS(kSettleMs));  // down
+    SetHeadAngles(kHomeYawDeg, RestPitch(15.0f)); vTaskDelay(pdMS_TO_TICKS(kSettleMs));  // up
+    SetHeadAngles(kHomeYawDeg, RestPitch(-4.0f)); vTaskDelay(pdMS_TO_TICKS(kSettleMs));  // down
     GoHome();                                 vTaskDelay(pdMS_TO_TICKS(kSettleMs));
     // Gesture demo — verifies the gesture sequences on boot (reuses RunGesture; safe
     // here because no async gesture runs during the boot self-test).
@@ -297,6 +368,10 @@ void StackChanBody::HeadGesture(const std::string& name, int times, float x, flo
     if (!gesture_busy_.compare_exchange_strong(idle,true)) {
         if (observer) observer({S::Rejected,"BUSY"});
         return;
+    }
+    {
+        MutexGuard lock(motion_mutex_);
+        ServerMotionLocked();   // a server gesture preempts any local clip at once
     }
     gesture_observer_=std::move(observer);
     gesture_.name = name;
@@ -343,8 +418,9 @@ void StackChanBody::RunGesture() {
         GestureContinue(650);
     } else if (g.name == "nod") {  // pitch oscillation (yes)
         for (int i = 0; i < times; ++i) {
-            SetHeadAngles(0.0f, kHomePitchDeg - 12.0f); if (!GestureContinue(280)) return;
-            SetHeadAngles(0.0f, kHomePitchDeg + 10.0f); if (!GestureContinue(280)) return;
+            // Rest is near the lower stop: a nod is a lift and a dip back past rest.
+            SetHeadAngles(0.0f, RestPitch(12.0f)); if (!GestureContinue(280)) return;
+            SetHeadAngles(0.0f, RestPitch(-3.0f)); if (!GestureContinue(280)) return;
         }
         GoHome();
     } else if (g.name == "shake") {  // yaw oscillation (no)
@@ -354,22 +430,197 @@ void StackChanBody::RunGesture() {
         }
         GoHome();
     } else if (g.name == "perk_up") {  // wake: look up, then settle
-        SetHeadAngles(0.0f, 72.0f); if (!GestureContinue(g.hold_ms > 0 ? g.hold_ms : 800)) return;
+        SetHeadAngles(0.0f, RestPitch(22.0f)); if (!GestureContinue(g.hold_ms > 0 ? g.hold_ms : 800)) return;
         GoHome();
     } else if (g.name == "droop") {  // fatigue mirror: droop low, hold, recover
-        SetHeadAngles(0.0f, 8.0f); if (!GestureContinue(g.hold_ms > 0 ? g.hold_ms : 1200)) return;
+        SetHeadAngles(0.0f, kPitchFloorDeg); if (!GestureContinue(g.hold_ms > 0 ? g.hold_ms : 1200)) return;
         GoHome();
     } else if (g.name == "glance") {  // look toward target, then return
         LookAtNormalized(g.x, g.y); if (!GestureContinue(g.return_ms > 0 ? g.return_ms : 800)) return;
         GoHome();
     } else if (g.name == "wake_wobble") {  // cute wake: perk up, quick side-to-side wiggle, settle
-        SetHeadAngles(0.0f, 62.0f);   if (!GestureContinue(200)) return;
-        SetHeadAngles(-15.0f, 60.0f); if (!GestureContinue(140)) return;
-        SetHeadAngles(15.0f, 60.0f);  if (!GestureContinue(140)) return;
-        SetHeadAngles(-9.0f, 58.0f);  if (!GestureContinue(130)) return;
-        SetHeadAngles(6.0f, 58.0f);   if (!GestureContinue(130)) return;
+        SetHeadAngles(0.0f, RestPitch(17.0f));   if (!GestureContinue(200)) return;
+        SetHeadAngles(-15.0f, RestPitch(15.0f)); if (!GestureContinue(140)) return;
+        SetHeadAngles(15.0f, RestPitch(15.0f));  if (!GestureContinue(140)) return;
+        SetHeadAngles(-9.0f, RestPitch(13.0f));  if (!GestureContinue(130)) return;
+        SetHeadAngles(6.0f, RestPitch(13.0f));   if (!GestureContinue(130)) return;
         GoHome();
     } else {
         ESP_LOGW(TAG, "unknown gesture: %s", g.name.c_str());
     }
+}
+
+// ---- Desk pet ---------------------------------------------------------------------------
+
+void StackChanBody::NoteMotionLocked(int64_t now_us, int64_t suspect_us) {
+    last_motion_us_ = now_us;
+    head_level_ = false;
+    if (motion_observer_) motion_observer_(now_us + suspect_us);
+}
+
+void StackChanBody::SetMotionObserver(std::function<void(int64_t until_us)> observer) {
+    MutexGuard lock(motion_mutex_);
+    motion_observer_ = std::move(observer);
+}
+
+void StackChanBody::ServerMotionLocked() {
+    local_clip_active_ = false;
+    local_home_due_us_ = 0;
+    rest_baseline_valid_ = false;
+    const int64_t now = esp_timer_get_time();
+    last_server_motion_us_ = now;
+    NoteMotionLocked(now, 1500 * 1000);
+}
+
+bool StackChanBody::PlayLocalClip(const eidolon::pet::HeadClip& clip) {
+    if (!ready_ || !motion_ || clip.count == 0 || clip.count > clip.keys.size()) return false;
+    if (capture_quiet_ || gesture_busy_) return false;
+    MutexGuard lock(motion_mutex_);
+    const int64_t now = esp_timer_get_time();
+    if (capture_quiet_ || gesture_busy_ || look_at_deadline_us_ != 0) return false;
+    if (now - last_server_motion_us_ < kServerQuietUs && last_server_motion_us_ != 0) return false;
+    if (now < power_ready_us_.load()) return false;
+    if (local_clip_active_ && clip.priority > local_clip_.priority) return false;
+    local_clip_ = clip;
+    local_clip_next_ = 0;
+    local_clip_start_us_ = now;
+    local_clip_active_ = true;
+    local_home_due_us_ = 0;
+    rest_baseline_valid_ = false;
+    return true;
+}
+
+void StackChanBody::SettleLocalClip() {
+    if (!ready_ || !motion_) return;
+    MutexGuard lock(motion_mutex_);
+    if (capture_quiet_ || gesture_busy_ || (!local_clip_active_ && local_home_due_us_ == 0)) return;
+    local_clip_active_ = false;
+    local_home_due_us_ = 0;
+    const int64_t now = esp_timer_get_time();
+    motion_->moveWithSpeed(static_cast<int>(kHomeYawDeg * 10), static_cast<int>(kHomePitchDeg * 10), 300);
+    NoteMotionLocked(now, 900 * 1000);
+    rest_baseline_valid_ = false;
+    ESP_LOGI(TAG, "local clip settled home before the mic opens");
+}
+
+void StackChanBody::StepLocalClipLocked(int64_t now_us) {
+    if (local_clip_active_) {
+        const int64_t elapsed_ms = (now_us - local_clip_start_us_) / 1000;
+        while (local_clip_next_ < local_clip_.count && local_clip_.keys[local_clip_next_].at_ms <= elapsed_ms) {
+            const auto& k = local_clip_.keys[local_clip_next_++];
+            motion_->moveWithSpeed(k.yaw_dd, static_cast<int>(std::lround(RestPitch(k.dpitch_dd / 10.0f) * 10.0f)), k.speed);
+            NoteMotionLocked(now_us, 1200 * 1000);
+        }
+        if (local_clip_next_ >= local_clip_.count) {
+            const int64_t last_at = local_clip_.keys[local_clip_.count - 1].at_ms;
+            if (elapsed_ms >= last_at + 600) {
+                local_clip_active_ = false;
+                const auto& k = local_clip_.keys[local_clip_.count - 1];
+                const bool home = std::abs(k.yaw_dd) <= 20 && std::abs(k.dpitch_dd) <= 40;
+                local_home_due_us_ = home ? 0 : now_us + kLocalHomeDelayUs;
+            }
+        }
+        return;
+    }
+    if (local_home_due_us_ != 0 && now_us >= local_home_due_us_) {
+        local_home_due_us_ = 0;
+        motion_->moveWithSpeed(static_cast<int>(kHomeYawDeg * 10), static_cast<int>(kHomePitchDeg * 10), 200);
+        NoteMotionLocked(now_us, 1500 * 1000);
+        rest_baseline_valid_ = false;
+    }
+}
+
+void StackChanBody::SensePushLocked(int64_t now_us) {
+    if (!push_cb_ || now_us < next_push_sample_us_) return;
+    next_push_sample_us_ = now_us + kPushSamplePeriodUs;
+    if (local_clip_active_ || gesture_busy_ || motion_->isMoving()) {
+        NoteMotionLocked(now_us, 600 * 1000);
+        rest_baseline_valid_ = false;
+        rest_since_us_ = 0;
+        return;
+    }
+    const auto a = motion_->getCurrentAngles();   // physical readback (tenths of a degree)
+    if (!rest_baseline_valid_) {
+        // The animation is done; let the servos settle before taking the rest pose.
+        if (rest_since_us_ == 0) { rest_since_us_ = now_us; return; }
+        if (now_us - rest_since_us_ < kRestSettleUs) return;
+        rest_yaw_ = a.x; rest_pitch_ = a.y; rest_baseline_valid_ = true;
+        // The head sags up to ~7 deg below its target under its own weight.
+        head_level_ = std::abs(a.y - static_cast<int>(kHomePitchDeg * 10)) <= 100;
+        // Readback vs rest: tells a sagging/blocked head from a tilted base when the
+        // IMU's head angle looks off (PetSensors logs gravity every 30 s).
+        ESP_LOGI(TAG, "settled: readback yaw=%d pitch=%d (tenths; rest pitch %d)", a.x, a.y,
+                 static_cast<int>(kHomePitchDeg * 10));
+        push_hits_ = 0; push_last_yaw_ = a.x;
+        return;
+    }
+    const int dy = a.x - rest_yaw_, dp = a.y - rest_pitch_;
+    const bool off = std::abs(dy) > kPushThresholdDd || std::abs(dp) > kPushThresholdDd;
+    if (!pushed_) {
+        push_hits_ = off ? push_hits_ + 1 : 0;
+        if (push_hits_ >= 2) {
+            pushed_ = true;
+            push_stable_since_us_ = now_us;
+            push_last_yaw_ = a.x;
+            NoteMotionLocked(now_us, 1500 * 1000);
+            ESP_LOGI(TAG, "head pushed by hand (dyaw=%d dpitch=%d)", dy, dp);
+            push_cb_(true, dy >= 0 ? 1 : -1);
+        }
+        return;
+    }
+    // Pushed: released once the head stops moving (hand let go, or settled where it was put).
+    if (std::abs(a.x - push_last_yaw_) > 15) { push_stable_since_us_ = now_us; NoteMotionLocked(now_us, 1000 * 1000); }
+    push_last_yaw_ = a.x;
+    if (now_us - push_stable_since_us_ >= kPushReleaseStableUs) {
+        pushed_ = false;
+        push_hits_ = 0;
+        rest_baseline_valid_ = false;
+        rest_since_us_ = 0;
+        ESP_LOGI(TAG, "head released");
+        push_cb_(false, 0);
+    }
+}
+
+void StackChanBody::SetPushCallback(std::function<void(bool pushed, int dir)> callback) {
+    MutexGuard lock(motion_mutex_);
+    push_cb_ = std::move(callback);
+}
+
+void StackChanBody::SetPetLedFrame(const uint8_t rgb[36]) {
+    if (!ioe_) return;
+    if (!pet_leds_) {
+        pet_leds_ = true;
+        rgb_abort_ = true;   // stop a legacy marquee; it checks the flag every step
+    }
+    portENTER_CRITICAL(&led_mux_);
+    std::memcpy(led_pending_.data(), rgb, led_pending_.size());
+    led_dirty_ = true;
+    portEXIT_CRITICAL(&led_mux_);
+}
+
+void StackChanBody::FlushPetLeds() {
+    if (!pet_leds_ || !ioe_ || rgb_busy_) return;
+    const int64_t now = esp_timer_get_time();
+    if (now < next_led_flush_us_) return;
+    std::array<uint8_t, 36> frame;
+    bool dirty;
+    portENTER_CRITICAL(&led_mux_);
+    dirty = led_dirty_;
+    frame = led_pending_;
+    led_dirty_ = false;
+    portEXIT_CRITICAL(&led_mux_);
+    if (!dirty || (led_written_valid_ && frame == led_written_)) return;
+    uint8_t ram[kLedCount * 2];
+    for (int i = 0; i < kLedCount; ++i) {
+        const uint8_t r = frame[i * 3], g = frame[i * 3 + 1], b = frame[i * 3 + 2];
+        const uint16_t v = static_cast<uint16_t>(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3));
+        ram[kPetLedMap[i] * 2] = static_cast<uint8_t>(v & 0xFF);
+        ram[kPetLedMap[i] * 2 + 1] = static_cast<uint8_t>(v >> 8);
+    }
+    // Two short transactions on the shared bus (data, then refresh); no read-back.
+    ioe_->setLedData(ram, sizeof(ram));
+    ioe_->refreshLeds(kLedCount);
+    led_written_ = frame;
+    led_written_valid_ = true;
+    next_led_flush_us_ = now + kLedFlushPeriodUs;
 }

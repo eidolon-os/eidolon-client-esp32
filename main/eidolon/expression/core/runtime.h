@@ -49,6 +49,9 @@ public:
     FacePose Tick(uint64_t now_ms);
     Event Presented();
     bool active() const { return active_; }
+    // The step on screen at now_ms and its envelope (0..1, same ramp Tick() uses), so
+    // another renderer can draw the same gesture its own way. False between steps.
+    bool Current(uint64_t now_ms, Gesture& gesture, float& amount) const;
     uint64_t token() const { return plan_.token; }
 private:
     FacePose Base(uint64_t now_ms) const;

@@ -369,6 +369,9 @@ private:
     void StopAudioStatePublisher();
     static void AudioTimerCb(void* arg);
     void PublishClientAudioState(bool playback_active);
+    // The only place the microphone gate and the servo noise gate are applied, so
+    // no path can close one and leave the other behind (StackChan defect A).
+    void ApplyCaptureGate(bool capture_on);
     bool PlaybackActiveRecently() const;
     bool AgentOutputActiveRecently() const;
     void UpdateLocalPlaybackPhase(bool playback_active);

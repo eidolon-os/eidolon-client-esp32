@@ -5,6 +5,7 @@
 
 #include "board.h"
 #include "output_policy.h"
+#include "capture_gate.h"
 #include "eidolon/generated/device_settings_catalog.h"
 #include "backlight.h"
 #include "audio_codec.h"
@@ -4236,7 +4237,13 @@ void EidolonVoiceController::SuspendConversationAudio()
     // as the device sits in standby — which is most of its life. Whether anyone
     // can still be told about it is a separate question from whether it closes.
     StopAudioStatePublisher();
-    eidolon_livekit_board_set_capture_enabled(false);
+    ApplyCaptureGate(false);
+}
+
+void EidolonVoiceController::ApplyCaptureGate(bool capture_on)
+{
+    eidolon_livekit_board_set_capture_enabled(capture_on);
+    Board::GetInstance().SetCaptureQuiet(capture_on);
 }
 
 void EidolonVoiceController::StartAudioStatePublisher()
@@ -4305,43 +4312,25 @@ void EidolonVoiceController::PublishClientAudioState(bool playback_active)
     int64_t now_us = esp_timer_get_time();
     uint32_t client_ts_ms = static_cast<uint32_t>(now_us / 1000);
 
-    bool ptt_held = ptt_mode_ && ptt_active_;
-    bool mic_muted;
-    bool capture_on;
-    if (ptt_mode_) {
-        // Push-to-talk: the mic is open while held and during the short release
-        // tail. Closed otherwise, so playback is not recorded and the ptt=false
-        // edge remains the explicit "I'm done" turn boundary.
-        capture_on = mic_enabled_ && ptt_active_;
-        mic_muted = !capture_on;
-    } else if (half_duplex_mode_ || !CurrentOutputGate().AllowsAny(kAudioOutputs)) {
-        // Half-duplex: auto open-mic, but CLOSED while the agent is speaking (and
-        // the playback hangover). This board has no device AEC, so muting the mic
-        // during playback is what stops it recording its own output / self-
-        // interrupting. When the agent is idle the mic is open and the server EOT
-        // decides the turn — no barge-in.
-        capture_on = mic_enabled_ && !playback_active;
-        mic_muted = !capture_on;
-    } else {
-        // Full-duplex: keep capture open during playback so device-side AEC can
-        // support barge-in.
-        capture_on = mic_enabled_;
-        mic_muted = !mic_enabled_;
-    }
-
-    if (!CurrentOutputGate().AllowsMicrophone()) {
-        capture_on=false;mic_muted=true;ptt_held=false;
-    }
     if (head_deadline_us_ && now_us>=head_deadline_us_) {
         Board::GetInstance().HeadStop();
         DoHeadMotionResult(head_token_,{HeadMotionStatus::Failed,"MOTION_TIMEOUT"});
     }
-    if (head_deadline_us_ && (half_duplex_mode_ || ptt_mode_)) {
-        capture_on=false;mic_muted=true;
-    }
-    // One owner derives both microphone and servo-noise gates from actual capture.
-    eidolon_livekit_board_set_capture_enabled(capture_on);
-    Board::GetInstance().SetCaptureQuiet(capture_on);
+    // The capture decision lives in one host-tested function (capture_gate.h).
+    CaptureInputs inputs;
+    inputs.ptt_mode = ptt_mode_;
+    inputs.half_duplex_mode = half_duplex_mode_;
+    inputs.mic_enabled = mic_enabled_;
+    inputs.ptt_active = ptt_active_;
+    inputs.playback_active = playback_active;
+    inputs.audio_outputs_allowed = CurrentOutputGate().AllowsAny(kAudioOutputs);
+    inputs.microphone_allowed = CurrentOutputGate().AllowsMicrophone();
+    inputs.motion_window = head_deadline_us_ != 0;
+    const CaptureGate gate = DeriveCaptureGate(inputs);
+    const bool capture_on = gate.capture_on;
+    const bool mic_muted = gate.mic_muted;
+    const bool ptt_held = gate.ptt_held;
+    ApplyCaptureGate(capture_on);
     uint32_t capture_rms_ppm = eidolon_livekit_board_recent_capture_rms_ppm();
     if (mic_muted) {
         capture_rms_ppm = 0;
@@ -4464,7 +4453,7 @@ void EidolonVoiceController::DoSetMicEnabled(bool enabled)
     if (session_.IsConnected() && !standby_) {
         PublishClientAudioState(AgentOutputActiveRecently());
     } else {
-        eidolon_livekit_board_set_capture_enabled(enabled && CurrentOutputGate().AllowsMicrophone());
+        ApplyCaptureGate(enabled && CurrentOutputGate().AllowsMicrophone());
     }
     ESP_LOGI(TAG, "Mic enabled=%d", enabled ? 1 : 0);
 }
@@ -4580,7 +4569,7 @@ void EidolonVoiceController::FinalizePttRelease(const char* reason)
     } else {
         ESP_LOGI(TAG, "[ptt] release: mic closed without publish (%s)",
                  reason ? reason : "not_connected");
-        eidolon_livekit_board_set_capture_enabled(false);
+        ApplyCaptureGate(false);
     }
     UpdateIdleAutoLeave();  // turn done: start the idle countdown (if agent silent)
 }

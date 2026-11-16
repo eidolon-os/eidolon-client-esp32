@@ -72,6 +72,9 @@ public:
     void setLedColor(uint8_t index, uint32_t color);
     void setLedData(const uint8_t* data, size_t len);
     void refreshLeds();
+    // Refresh without the read-modify-write of LED_CFG (one transaction instead of
+    // two) when the caller knows the configured count. Returns false on a bus error.
+    bool refreshLeds(uint8_t count);
 
 private:
     i2c_master_dev_handle_t _i2c_dev;

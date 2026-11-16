@@ -354,6 +354,11 @@ void PY32IOExpander_Class::setLedData(const uint8_t* data, size_t len)
     writeRegister(REG_LED_RAM_START, data, len);
 }
 
+bool PY32IOExpander_Class::refreshLeds(uint8_t count)
+{
+    return writeRegister8(REG_LED_CFG, static_cast<uint8_t>((count & 0x3F) | (1 << 6))) == ESP_OK;
+}
+
 void PY32IOExpander_Class::refreshLeds()
 {
     uint8_t val = readRegister8(REG_LED_CFG);

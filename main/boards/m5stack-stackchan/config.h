@@ -90,10 +90,20 @@
 #define SERVO_RAW_PER_DEG    3.2f
 
 // Mechanical angle limits (degrees). Pitch avoids its mechanical extremes.
+// Pitch was measured on a StackChan with the default zero (620) by reading gravity
+// from the IMU in the head while stepping the servo (reports/desk_pet/*-pitchsweep,
+// 2026-11-15): commands up to ~16 deg all rest on the lower stop, where the screen
+// already faces ~25 deg above level; the servo stalls on the upper stop at ~51 deg
+// (~60 deg up). The factory 3..87 is mostly unreachable and every move past the
+// stops tripped stall protection, so the limits keep a 2 deg margin inside them.
 #define SERVO_YAW_MIN_DEG    (-128.0f)
 #define SERVO_YAW_MAX_DEG    ( 128.0f)
-#define SERVO_PITCH_MIN_DEG  (   3.0f)
-#define SERVO_PITCH_MAX_DEG  (  87.0f)
+#define SERVO_PITCH_MIN_DEG  (  18.0f)
+#define SERVO_PITCH_MAX_DEG  (  49.0f)
+// Rest pitch. Like Reachy Mini's rest (a little above level, toward a face across
+// the desk) but on this head's higher floor: ~31 deg up, 4 deg above the lower limit
+// so a droop still reads, 27 deg below the upper one for looking up.
+#define SERVO_PITCH_REST_DEG (  22.0f)
 
 // Final raw safety clamp (hardware is 0..1023; factory clamps 0..1000).
 #define SERVO_RAW_MIN        0

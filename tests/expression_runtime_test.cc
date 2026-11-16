@@ -10,6 +10,12 @@ int main() {
     assert(r.Submit(p,1000).status==Status::Accepted);
     assert(r.Submit(p,1001).reason==Reason::Busy);
     assert(r.active());
+    {
+        Gesture g; float a=0;
+        assert(r.Current(1600,g,a) && g==Gesture::Affirm && a>.7f && a<=1.f);   // mid-step full envelope
+        assert(r.Current(1001,g,a) && a<.1f);                                   // ramping in
+        assert(!r.Current(2300,g,a));                                           // after the plan
+    }
     auto pose=r.Tick(1600);assert(pose.left_open<.7f);
     assert(r.Presented().status==Status::Started);
     r.SetBase(BaseState::Listening);pose=r.Tick(2300);

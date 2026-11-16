@@ -1220,6 +1220,21 @@ if(CONFIG_EIDOLON_HUB_MODE)
             "${CMAKE_CURRENT_SOURCE_DIR}/eidolon/third_party/smooth_ui_toolkit/src"
             "${CMAKE_CURRENT_SOURCE_DIR}/eidolon/third_party/smooth_ui_toolkit/src/lvgl"
         )
+        if(CONFIG_EIDOLON_PET_FACE)
+            # Desk pet (docs/stackchan-desk-pet-design.md): pure runtime + recognizers
+            # (host-tested under tests/pet_*) and the LVGL skin. Board drivers live
+            # in boards/m5stack-stackchan/ and are picked up with the board sources.
+            list(APPEND SOURCES
+                "eidolon/pet/pet_runtime.cc"
+                "eidolon/pet/pet_sense.cc"
+                "eidolon/pet/pet_touch.cc"
+                "eidolon/pet/pet_motion.cc"
+                "eidolon/pet/pet_light.cc"
+                "eidolon/pet/pet_sound.cc"
+                "eidolon/pet/pet_chirp_player.cc"
+                "eidolon/views/pet_face_skin.cc"
+            )
+        endif()
     else()
         list(APPEND SOURCES "eidolon/views/amoled_206_ptt_view.cc")
     endif()

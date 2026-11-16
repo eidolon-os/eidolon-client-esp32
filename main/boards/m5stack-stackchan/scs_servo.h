@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdlib>
 
 // SCSCL-backed Servo implementation, ported from the factory StackChan firmware
 // (main/hal/hal_servo.cpp) and de-hosted for eidolon:
@@ -127,13 +128,19 @@ private:
     int _zero_pos = 0;
 
     static constexpr uint32_t kStallFeedbackIntervalMs = 50;
-    static constexpr int kStallMinTargetDeltaRaw = 8;
+    // The head sags ~20 raw below its target under its own weight while holding
+    // (IMU-checked 2026-11-15); a smaller threshold reads every new command from a
+    // sagging rest as a stall.
+    static constexpr int kStallMinTargetDeltaRaw = 24;
     static constexpr int kStallMaxPositionDeltaRaw = 1;
     static constexpr int kStallCurrentRiseThreshold = 80;
     static constexpr int kStallLoadRiseThreshold = 150;
     static constexpr int kStallCurrentAbsThreshold = 350;
     static constexpr int kStallLoadAbsThreshold = 650;
-    static constexpr int kStallConfirmSamples = 2;
+    static constexpr int kStallConfirmSamples = 4;
+    // Configured limits sit inside the measured mechanical stops, so only a stall
+    // this close to a configured limit can be a stop worth learning.
+    static constexpr int kStallLearnEdgeTenths = 40;
 
     uint32_t _last_stall_check_tick = 0;
     int _last_stall_raw_pos = 0;
@@ -217,12 +224,22 @@ private:
         if (_stall_confirm_count < kStallConfirmSamples) {
             return false;
         }
-        handle_stall(current_raw_pos, direction, current_abs, load_abs);
-        return true;
+        // Ignored mid-range stalls keep this write going; a learned stop holds instead.
+        return handle_stall(current_raw_pos, direction, current_abs, load_abs);
     }
 
-    void handle_stall(int raw_pos, int direction, int current_abs, int load_abs) {
-        int angle = uitk::clamp(raw_pos_to_angle(raw_pos), _config.angleLimit.x, _config.angleLimit.y);
+    bool handle_stall(int raw_pos, int direction, int current_abs, int load_abs) {
+        const int raw_angle = raw_pos_to_angle(raw_pos);
+        const int edge = direction > 0 ? _config.angleLimit.y : _config.angleLimit.x;
+        if (std::abs(raw_angle - edge) > kStallLearnEdgeTenths) {
+            // Mid-range: a hand on the head or a false reading. Learning a limit here
+            // would shrink the range for the rest of the boot; keep driving instead.
+            reset_stall_detection();
+            ESP_LOGW(TAG, "id: %d stall inside range ignored: raw=%d angle=%d dir=%d cur=%d load=%d",
+                     _config.id, raw_pos, raw_angle, direction, current_abs, load_abs);
+            return false;
+        }
+        int angle = uitk::clamp(raw_angle, _config.angleLimit.x, _config.angleLimit.y);
         auto angle_limit = getAngleLimit();
         if (direction > 0) {
             if (raw_pos < _runtime_raw_pos_limit.y) _runtime_raw_pos_limit.y = raw_pos;
@@ -237,6 +254,7 @@ private:
         _bus.WritePos(_config.id, raw_pos, 20, 0);
         ESP_LOGW(TAG, "id: %d stall: raw=%d angle=%d dir=%d cur=%d load=%d limit=[%d,%d]",
                  _config.id, raw_pos, angle, direction, current_abs, load_abs, angle_limit.x, angle_limit.y);
+        return true;
     }
 };
 

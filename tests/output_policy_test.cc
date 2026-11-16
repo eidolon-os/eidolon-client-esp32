@@ -22,6 +22,31 @@ int main() {
 #endif
     DeviceOutputGate gate(false);
     assert(!gate.Allows(Output::Speech));
+    {
+        // Ambient local life: Owner policy outside a session, the plan inside one.
+        const auto motion=OutputBit(Output::Motion);
+        DeviceOutputGate ambient(false);
+        assert(!ambient.AllowsAmbient(Output::Motion));            // unknown policy, strict profile
+        DeviceOutputPolicy owner{true,1,motion|OutputBit(Output::Speech),true,true};
+        assert(ambient.Bind(owner));
+        assert(ambient.AllowsAmbient(Output::Motion));             // no session: standing policy
+        assert(!ambient.Allows(Output::Motion));                   // session-scoped path unchanged
+        SessionOutputPlan quiet{"q",1,OutputBit(Output::Speech),false,true};
+        assert(ambient.Start(quiet,"q"));
+        assert(!ambient.AllowsAmbient(Output::Motion));            // the plan narrows it
+        ambient.Suspend();
+        assert(!ambient.AllowsAmbient(Output::Motion));
+        ambient.Close();
+        assert(ambient.AllowsAmbient(Output::Motion));
+        DeviceOutputPolicy no_motion{true,2,OutputBit(Output::Speech),true,true};
+        assert(ambient.Bind(no_motion));
+        assert(!ambient.AllowsAmbient(Output::Motion));            // Owner revoked it
+        DeviceOutputGate unsupported(false, OutputBit(Output::Speech));
+        assert(unsupported.Bind(owner));
+        assert(!unsupported.AllowsAmbient(Output::Motion));        // not installed
+        DeviceOutputGate legacy(true);
+        assert(legacy.AllowsAmbient(Output::Speech)==legacy.Allows(Output::Speech));
+    }
     const auto expression=OutputBit(Output::Expression);
     const auto speech=OutputBit(Output::Speech);
     DeviceOutputGate input_gate(false);

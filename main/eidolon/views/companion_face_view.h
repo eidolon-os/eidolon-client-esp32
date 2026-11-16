@@ -5,6 +5,12 @@
 #include <string>
 #include "eidolon/eidolon_view.h"
 #include "eidolon/expression/core/runtime.h"
+#if CONFIG_EIDOLON_PET_FACE
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+#include "eidolon/pet/pet_runtime.h"
+#include "pet_face_skin.h"
+#endif
 class Display;
 namespace stackchan::avatar { class DefaultAvatar; }
 namespace eidolon {
@@ -32,7 +38,60 @@ public:
     uint32_t prepared_frame() const { return prepared_frame_; }
     using Observer = std::function<void(expression::Event)>;
     void SetObserver(Observer observer) override;
+#if CONFIG_EIDOLON_PET_FACE
+    // Board sense sink; any task. Only enqueues.
+    void PostSense(const pet::SenseEvent& event);
+#endif
 private:
+#if CONFIG_EIDOLON_PET_FACE
+    void BuildPet(const BuildContext& ctx);
+    // Advances the pet's life. host_frame=true while a face-core-1 plan is on screen:
+    // the skin then always produces a flush so the receipt has a frame boundary.
+    void AdvancePet(uint64_t now, bool host_frame);
+    void PetSenses(uint64_t now);
+    void PetOutputs(uint64_t now);
+    static void OnPetTouch(lv_event_t* event);
+    PetFaceSkin pet_skin_;
+    pet::Runtime pet_;
+    pet::Phase pet_phase_ = pet::Phase::Ambient;
+    QueueHandle_t pet_senses_ = nullptr;
+    bool pet_sink_registered_ = false;
+    bool pet_dark_ = false;
+    bool pet_pointer_ = false;
+    float pet_px_ = 160, pet_py_ = 120, pet_travel_ = 0;
+    lv_point_t pet_last_point_{};
+    uint64_t pet_press_ms_ = 0;
+    uint64_t pet_next_power_ms_ = 0, pet_next_led_ms_ = 0, pet_last_show_ms_ = 0, pet_next_stats_ms_ = 0;
+    // Frames and frame time per phase over the stats window (index = pet::Phase).
+    uint32_t pet_phase_frames_[7] = {}, pet_seen_frames_ = 0;
+    uint64_t pet_phase_us_[7] = {}, pet_seen_us_ = 0;
+    bool pet_card_shown_ = false;
+    bool pet_charging_ = false;
+    int pet_battery_ = -1;
+    pet::Mood pet_logged_mood_ = pet::Mood::Calm;
+    // The status bar shows state only (the antenna tips carry the session state);
+    // every action lives in a pull-down control panel with large targets: tap the
+    // bar, or drag down from it. Outside taps or 5 s idle close it.
+    struct PanelButton { lv_obj_t* obj = nullptr; lv_obj_t* icon = nullptr; UiIntent intent = UiIntent::None; };
+    lv_obj_t* bar_hit_ = nullptr;     // transparent target over the whole bar
+    lv_obj_t* handle_ = nullptr;      // grab handle at the top centre
+    lv_obj_t* scrim_ = nullptr;
+    lv_obj_t* panel_ = nullptr;
+    PanelButton call_btn_, mic_btn_, setup_btn_;
+    UiIntent session_button_intent_ = UiIntent::None;
+    bool pet_muted_ = false;
+    bool panel_open_ = false;
+    uint64_t panel_until_ = 0;
+    int32_t bar_press_y_ = 0;
+    void PetAction(pet::HostAction action);
+    void RenderPetChrome(const EidolonUiModel& model, bool face);
+    bool PanelHasActions() const;
+    void OpenPanel();
+    void ClosePanel();
+    static void OnBar(lv_event_t* event);
+    static void OnScrim(lv_event_t* event);
+    static void OnPanelButton(lv_event_t* event);
+#endif
 #if CONFIG_EIDOLON_COMPANION_BENCHMARK
     void Benchmark(uint64_t now);
     unsigned bench_submitted_=0,bench_completed_=0,bench_failed_=0;
