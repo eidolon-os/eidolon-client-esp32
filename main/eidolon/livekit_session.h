@@ -15,6 +15,7 @@
 #include "hub_types.h"
 #include "session_memory_admission_core.h"
 #include "pending_session_control.h"
+#include "policy_announcement.h"
 #include "transcription_stream.h"
 
 namespace eidolon {
@@ -30,7 +31,10 @@ enum class LiveKitConnectionState {
 class LiveKitSession {
 public:
     using StateCallback = std::function<void(LiveKitConnectionState, uint32_t generation)>;
-    using ConfigurationCallback = std::function<void(uint32_t generation)>;
+    // This device's own participant changed; `announcement` is the Owner policy
+    // revision the update carries, if the Host writes one.
+    using ConfigurationCallback = std::function<void(uint32_t generation,
+                                                     PolicyAnnouncement announcement)>;
     using TranscriptionCallback = std::function<void(const TranscriptionEvent& event)>;
     using AgentPlaybackCallback = std::function<void(bool speaking, uint32_t generation)>;
     using AgentPhaseCallback = std::function<void(AgentPhase phase)>;

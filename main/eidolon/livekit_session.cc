@@ -165,6 +165,8 @@ void LiveKitSession::OnParticipantInfo(const livekit_participant_info_t* info, v
         // The official callback delivers local ParticipantUpdate too. It does
         // not expose permissions, so this is only a hint to compare fresh
         // authenticated Owner configuration, never a reason to reopen media.
+        // The policy revision it may announce lets the controller tell a
+        // change from a restatement of what it already holds.
         configuration_hint = info->state == LIVEKIT_PARTICIPANT_STATE_ACTIVE &&
             !session->identity_.empty() && session->identity_ == info->identity;
         for (auto& peer:session->agent_peers_) {
@@ -181,7 +183,15 @@ void LiveKitSession::OnParticipantInfo(const livekit_participant_info_t* info, v
             info->identity,registered,generation,esp_timer_get_time()/1000);
     }
     if (configuration_hint && session->on_configuration_invalidated_) {
-        session->on_configuration_invalidated_(generation);
+        const PolicyAnnouncement announcement =
+            FindPolicyAnnouncement(info->attributes, info->attributes_count);
+        if (announcement.announced) {
+            ESP_LOGI(TAG, "Own participant updated; Owner policy revision %lu announced",
+                     static_cast<unsigned long>(announcement.revision));
+        } else {
+            ESP_LOGI(TAG, "Own participant updated; no Owner policy revision announced");
+        }
+        session->on_configuration_invalidated_(generation, announcement);
     }
     if (!pending.empty() && session->on_session_control_) {
         ESP_LOGI(TAG,"Delivering session control after Agent signalling confirmation");

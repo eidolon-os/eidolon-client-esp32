@@ -594,9 +594,24 @@ void EidolonVoiceController::Dispatch(const Event& ev)
     case EventType::LiveKitState:
         DoLiveKitState(ev.lk_state, ev.generation);
         break;
-    case EventType::ConfigurationInvalidated:
+    case EventType::ConfigurationInvalidated: {
+        // Every (re)join brings one or two updates that only restate the
+        // revision fetched just before it. Fetching again held this loop for
+        // 3 s each time (reconnect to session_started took 12 s, 2026-11-16).
+        const ConfigurationHintLatch::Taken hint = configuration_hints_.Take();
+        // A fetch that failed earlier left nothing held worth comparing.
+        if (!config_refresh_required_ &&
+            !HintCallsForConfiguration(hint, config_.output_policy.revision)) {
+            if (hint.pending) {
+                ESP_LOGI(TAG, "[lifecycle] Owner policy revision %lu already held gen=%lu",
+                         static_cast<unsigned long>(hint.revision),
+                         static_cast<unsigned long>(ev.generation));
+            }
+            break;
+        }
         DoConfigurationInvalidated(ev.generation);
         break;
+    }
 #if CONFIG_EIDOLON_GUARD_SERVICE
     case EventType::GuardObservation:
         DoGuardObservation(ev.guard_observation, ev.generation);
@@ -3744,7 +3759,9 @@ void EidolonVoiceController::DoActivation(const Esp32HubConfig& config)
         ev.generation = generation;
         Enqueue(ev);
     });
-    session_.SetOnConfigurationInvalidated([this](uint32_t generation) {
+    session_.SetOnConfigurationInvalidated([this](uint32_t generation,
+                                                  PolicyAnnouncement announcement) {
+        configuration_hints_.Note(announcement);
         Event ev;
         ev.type = EventType::ConfigurationInvalidated;
         ev.generation = generation;
