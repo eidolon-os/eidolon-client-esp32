@@ -2605,14 +2605,14 @@ void EidolonVoiceController::DoStillTaken(StillShot& shot)
         [&](const StillRoute& kept) { return kept.execution_id == shot.execution_id; });
     const int64_t worker_ms = (esp_timer_get_time() - shot.queued_us) / 1000;
     ESP_LOGI(TAG, "[camera] still taken execution=%s error=%s size=%dx%d bytes=%u open_ms=%lu "
-             "frames_ms=%lu dropped=%u encode_ms=%lu total_ms=%lld stack_unused=%lu "
+             "frames_ms=%lu dropped=%u encode_ms=%lu total_ms=%ld stack_unused=%lu "
              "internal_free=%u internal_min=%u psram_free=%u",
              shot.execution_id.c_str(), StillErrorCode(shot.error), shot.image.width,
              shot.image.height, static_cast<unsigned>(shot.image.size),
              static_cast<unsigned long>(shot.image.open_ms),
              static_cast<unsigned long>(shot.image.frames_ms),
              static_cast<unsigned>(shot.image.frames_dropped),
-             static_cast<unsigned long>(shot.image.encode_ms), worker_ms,
+             static_cast<unsigned long>(shot.image.encode_ms), static_cast<long>(worker_ms),
              static_cast<unsigned long>(shot.worker_stack_unused),
              static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
              static_cast<unsigned>(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL)),

@@ -815,8 +815,9 @@ esp_err_t LiveKitSession::SendByteStream(uint32_t generation, const char* topic,
     // The trailer is sent even after a failed write: the receiver then knows
     // the stream ended instead of waiting for the rest of it.
     if (livekit_room_data_stream_close(room_handle_, stream) != LIVEKIT_ERR_NONE) result = ESP_FAIL;
-    ESP_LOGI(TAG, "[stream] topic=%s bytes=%u elapsed_ms=%lld ok=%d", topic,
-             static_cast<unsigned>(size), (esp_timer_get_time() - started_us) / 1000,
+    // %ld: the firmware's printf has no long long.
+    ESP_LOGI(TAG, "[stream] topic=%s bytes=%u elapsed_ms=%ld ok=%d", topic,
+             static_cast<unsigned>(size), static_cast<long>((esp_timer_get_time() - started_us) / 1000),
              result == ESP_OK);
     return result;
 }

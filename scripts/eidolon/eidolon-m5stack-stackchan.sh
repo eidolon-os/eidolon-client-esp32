@@ -427,6 +427,12 @@ ensure_eidolon_trim_sdkconfig() {
   set_sdkconfig_bool CAMERA_GC0308_DVP_YUV422_YUYV_640X480_16FPS y
   set_sdkconfig_bool CAMERA_GC0308_DVP_DEFAULT_FMT_YUV422_320X240_20FPS n
   set_sdkconfig_bool CAMERA_GC0308_DVP_DEFAULT_FMT_YUV422_YUYV_640X480_16FPS y
+  # esp_cam_sensor's DVP driver bounces every frame through a 32 KB internal
+  # DMA buffer allocated when the stream starts; a conversation has no 32 KB
+  # internal block to give it ("no mem for CAM DVP DMA receive buffer",
+  # 2026-11-16). IDF's own DVP driver DMAs straight into the PSRAM frame
+  # buffers and needs only its descriptors (~2 KB) internally.
+  set_sdkconfig_bool CAM_CTRL_DVP_ENABLE n
 }
 
 ensure_board_sdkconfig() {
@@ -482,6 +488,7 @@ CONFIG_CAMERA_GC0308_AUTO_DETECT_DVP_INTERFACE_SENSOR=y
 CONFIG_CAMERA_GC0308_DVP_YUV422_320X240_20FPS=y
 CONFIG_CAMERA_GC0308_DVP_YUV422_YUYV_640X480_16FPS=y
 CONFIG_CAMERA_GC0308_DVP_DEFAULT_FMT_YUV422_YUYV_640X480_16FPS=y
+CONFIG_CAM_CTRL_DVP_ENABLE=n
 EOF
   ensure_eidolon_trim_sdkconfig
 }
