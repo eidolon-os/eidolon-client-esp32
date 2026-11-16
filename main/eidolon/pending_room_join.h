@@ -36,6 +36,8 @@ public:
     }
 
     bool active() const { return command_.has_value(); }
+    // The session intent the join was asked with; empty for a person's request.
+    const std::string& intent() const { return intent_; }
 
     bool Matches(uint32_t generation) const
     {

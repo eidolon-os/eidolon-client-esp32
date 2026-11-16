@@ -441,6 +441,9 @@ private:
     // the token fetch as X-Device-Session-Intent. Empty for a normal user JOIN.
     // Controller-task only.
     std::string pending_session_intent_;
+    // One automatic join after a session was refused for a stale Owner policy;
+    // cleared when a session starts.
+    bool stale_policy_rejoined_ = false;
     std::string conversation_control_request_id_;
     std::string pending_session_flow_id_;
     // Connected to the channel, but not in a conversation. It intentionally

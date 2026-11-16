@@ -569,7 +569,12 @@ void EidolonVoiceController::Dispatch(const Event& ev)
         DoSharedDeadline();
         break;
     case EventType::Join:
-        DoJoinRoom();
+        // A join that fails before any session starts answers a remote request
+        // it carried (a retry after a stale Owner policy), so no receipt is left
+        // open to refuse the next start as busy.
+        if (const esp_err_t err = DoJoinRoom(); err != ESP_OK && pending_room_join_.active()) {
+            CompletePendingRoomJoinCommand("failed", JoinBlockedCode(), esp_err_to_name(err));
+        }
         break;
     case EventType::Leave:
         DoLeaveRoom();
@@ -2376,6 +2381,23 @@ void EidolonVoiceController::DoSessionControl(const std::string& payload, uint32
             const bool parsed = ParseSessionOutputPlan(plan_json,plan);
             if (!agent || !parsed ||
                 !CurrentOutputGate().Start(plan,current_conversation_id_)) {
+                // The Host planned this session under an Owner policy newer than
+                // the one this device holds: a change it was never told about.
+                // Its only notice is its own LiveKit participant update, which a
+                // change leaving publish permissions alone (a camera use on a
+                // board without a video track, 2026-11-16) never produces.
+                const bool stale_policy = agent && parsed && config_.output_policy.known &&
+                    plan.session_id == current_conversation_id_ &&
+                    plan.policy_revision > config_.output_policy.revision;
+                // A person asked: a tap here, or a plain start from the Owner's
+                // app. Proactive and presence starts are the Host's to retry.
+                const bool asked_by_person = !pending_room_join_.active() ||
+                    (pending_room_join_.intent().empty() &&
+                     pending_room_join_.control_request_id().empty());
+                const bool rejoin = stale_policy && asked_by_person && !stale_policy_rejoined_;
+                // The app's receipt is answered by the retry, not failed by this end.
+                std::optional<ControlCommand> remote_join;
+                if (rejoin && pending_room_join_.active()) remote_join = pending_room_join_.Complete();
                 cJSON_Delete(root);
                 CurrentOutputGate().Close();
                 ESP_LOGW(TAG,"Rejecting output plan agent=%d parsed=%d policy=%lu/%lu "
@@ -2387,10 +2409,29 @@ void EidolonVoiceController::DoSessionControl(const std::string& payload, uint32
                          static_cast<unsigned long>(CompiledDeviceCapabilities().OutputMask()),
                          plan.session_id==current_conversation_id_);
                 HandleSessionEnd(EndReason::Error);
+                if (stale_policy) {
+                    // Nothing opens again on the stale policy: the next join
+                    // fetches the Owner's current one first. A person's request
+                    // is asked for once more, so whoever tapped or pressed start
+                    // still gets the conversation.
+                    config_refresh_required_ = true;
+                    ESP_LOGW(TAG, "[lifecycle] Owner policy is stale here (%lu < %lu); refreshing%s",
+                             static_cast<unsigned long>(config_.output_policy.revision),
+                             static_cast<unsigned long>(plan.policy_revision),
+                             rejoin ? " and joining again" : "");
+                    if (rejoin) {
+                        stale_policy_rejoined_ = true;
+                        if (remote_join) pending_room_join_.Begin(*remote_join, std::string{});
+                        Event join;
+                        join.type = EventType::Join;
+                        Enqueue(join);
+                    }
+                }
                 return;
             }
         }
         cJSON_Delete(root);
+        stale_policy_rejoined_ = false;
         standby_ = false;
         conversation_confirmed_ = true;
         channel_recovery_.OnConversationStarted(esp_timer_get_time() / 1000);

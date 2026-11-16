@@ -34,6 +34,7 @@ code = r'''
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <optional>
 #include <string>
 #include <cJSON.h>
 #include "eidolon/output_policy.h"
@@ -65,7 +66,15 @@ void eidolon_livekit_board_set_capture_enabled(bool enabled) { capture=enabled; 
 struct Board { static Board& GetInstance() { static Board b;return b; } void HeadStop() {} };
 struct View { void SetMotionDiagnostic(const char*,const char*,const char*) {} };
 View* GetEidolonView() { return nullptr; }
-struct Pending { bool active() const { return false; } bool Matches(uint32_t) const { return false; } };
+using ControlCommand = int;
+struct Pending {
+  bool remote=false; std::string intent_; int completed=0, begun=0;
+  bool active() const { return remote; } bool Matches(uint32_t) const { return false; }
+  const std::string& intent() const { return intent_; }
+  std::string control_request_id() const { return {}; }
+  std::optional<int> Complete() { if (!remote) return std::nullopt; remote=false; ++completed; return 1; }
+  void Begin(int, const std::string& intent) { remote=true; intent_=intent; ++begun; }
+};
 struct Visit { struct Lease { bool OnConnected(int64_t) { return true; }
     int64_t deadline_us() { return 0; } } lease; int command=0; };
 class EidolonVoiceController {
@@ -79,6 +88,10 @@ public:
  ChannelRecovery channel_recovery_;
  Esp32HubConfig config_;
  Pending pending_room_join_;
+ bool config_refresh_required_=false, stale_policy_rejoined_=false;
+ enum class EventType { Join }; struct Event { EventType type; };
+ int joins=0;
+ void Enqueue(Event e) { if (e.type==EventType::Join) ++joins; }
  void* reconnect_timer_=nullptr;
  void* ambient_presence_timer_=nullptr;
  void* onboarding_poll_timer_=nullptr;
@@ -112,10 +125,14 @@ public:
  void StartAudioStatePublisher() { publisher=true;++opens; }
  void StopAudioStatePublisher() { publisher=false; }
  void CloseStills() {}
+ void ApplyCaptureGate(bool enabled) { if (!enabled) capture=false; }
  void PublishClientAudioState(bool) { capture=CurrentOutputGate().AllowsMicrophone(); }
  bool AgentOutputActiveRecently() { return false; }
  const char* VoiceStateName(VoiceSessionState) { return "test"; }
- void CompletePendingRoomJoinCommand(const char*,const char*,const char* = "",const char* = "") {}
+ int failed_joins=0;
+ void CompletePendingRoomJoinCommand(const char* status,const char*,const char* = "",const char* = "") {
+   if (pending_room_join_.active() && std::string(status)=="failed") { ++failed_joins; pending_room_join_.remote=false; }
+ }
  enum class PresenceWakePhase { Idle };
  void SetPresenceWakePhase(PresenceWakePhase) {}
  void FinishSharedVisit(const char*,bool=true) {}
@@ -229,7 +246,50 @@ int main() {
  network.standby_=true;network.session_.connected=true;
  network.DoLiveKitState(LiveKitConnectionState::Connected,2);
  assert(capture && network.current_conversation_id_=="same-session");
- puts("PASS: 100 reconnect cycles, watchdog, stale/offline/duplicate/untrusted controls, policy change, input-off, leave, open timeout, send failure and refused starts");
+ // A session planned under a newer Owner policy than the device holds: the
+ // device was never told of the change. Nothing opens on the stale policy; it
+ // is fetched before the next join, and a tap here is asked for once more.
+ {
+   EidolonVoiceController stale;
+   stale.config_.output_policy={true,4,speech,true,true};
+   assert(gate.Bind(stale.config_.output_policy));
+   stale.current_conversation_id_="stale";stale.state_=VoiceSessionState::Opening;
+   stale.DoSessionControl(ack("stale",5,true),1,true);
+   assert(stale.current_conversation_id_.empty() && !capture && !gate.Allows(presentation::Output::Speech));
+   assert(stale.config_refresh_required_ && stale.joins==1 && stale.stale_policy_rejoined_);
+   // Still stale after that: no loop of automatic joins.
+   stale.current_conversation_id_="stale-again";stale.state_=VoiceSessionState::Opening;
+   stale.DoSessionControl(ack("stale-again",5,true),1,true);
+   assert(stale.joins==1 && stale.config_refresh_required_);
+   // A session that starts on the current policy allows the next automatic join.
+   stale.current_conversation_id_="current";stale.state_=VoiceSessionState::Opening;
+   stale.DoSessionControl(ack("current",4,true),1,true);
+   assert(stale.state_==VoiceSessionState::InRoom && !stale.stale_policy_rejoined_);
+   stale.HandleSessionEnd(EndReason::UserLeft);
+   // An older plan is not this: it is refused without refreshing.
+   EidolonVoiceController older;
+   older.config_.output_policy={true,4,speech,true,true};
+   older.current_conversation_id_="older";older.state_=VoiceSessionState::Opening;
+   older.DoSessionControl(ack("older",3,true),1,true);
+   assert(!older.config_refresh_required_ && older.joins==0);
+   // A person's start from the app is asked for again too, and its receipt
+   // waits for that retry instead of being failed by this end.
+   EidolonVoiceController app;
+   app.config_.output_policy={true,4,speech,true,true};
+   app.pending_room_join_.remote=true;
+   app.current_conversation_id_="app";app.state_=VoiceSessionState::Opening;
+   app.DoSessionControl(ack("app",5,true),1,true);
+   assert(app.config_refresh_required_ && app.joins==1 && app.failed_joins==0);
+   assert(app.pending_room_join_.active() && app.pending_room_join_.begun==1);
+   // A proactive start is the Host's to retry: refreshed, failed, not joined.
+   EidolonVoiceController proactive;
+   proactive.config_.output_policy={true,4,speech,true,true};
+   proactive.pending_room_join_.remote=true;proactive.pending_room_join_.intent_="proactive";
+   proactive.current_conversation_id_="proactive";proactive.state_=VoiceSessionState::Opening;
+   proactive.DoSessionControl(ack("proactive",5,true),1,true);
+   assert(proactive.config_refresh_required_ && proactive.joins==0 && proactive.failed_joins==1);
+ }
+ puts("PASS: 100 reconnect cycles, watchdog, stale/offline/duplicate/untrusted controls, policy change, input-off, leave, open timeout, send failure and refused starts, stale Owner policy");
 }
 '''.replace('\nMETHODS\n', '\n'+methods+'\n')
 flags=shlex.split(subprocess.check_output(['pkg-config','--cflags','--libs','libcjson'],text=True))
