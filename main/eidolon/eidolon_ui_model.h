@@ -81,6 +81,10 @@ struct EidolonUiModel {
     bool show_mute_icon = false;
     bool show_setup_action = false;
     bool touch_navigation = false;
+    // The scene shows a person's start or end ahead of the voice side's report.
+    // While ending is drawn the microphone may still be open, so a view keeps
+    // its own local sounds and motion for after the runtime confirms.
+    bool session_request_pending = false;
 };
 
 }  // namespace eidolon

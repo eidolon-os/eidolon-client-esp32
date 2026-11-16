@@ -686,6 +686,7 @@ void CompanionFaceView::Render(const EidolonUiModel& model) {
     // nothing may move. Bring the head home now rather than leave a speaking move half done.
     if (pet_phase_==pet::Phase::Responding && phase!=pet::Phase::Responding) Board::GetInstance().SettlePetHead();
     pet_phase_=phase;
+    pet_request_pending_=model.session_request_pending;
 #endif
     touch_navigation_=model.touch_navigation;
     const char* detail=model.detail_text ? model.detail_text : "";
@@ -784,6 +785,13 @@ void CompanionFaceView::RenderPetChrome(const EidolonUiModel& model, bool face) 
 }
 bool CompanionFaceView::PanelHasActions() const {
     return call_btn_.intent!=UiIntent::None || mic_btn_.intent!=UiIntent::None || setup_btn_.intent!=UiIntent::None;
+}
+// A finger is on a panel button: the idle close waits, or it would take the
+// button away mid-press and the tap would do nothing.
+bool CompanionFaceView::PanelPressed() const {
+    for (const auto* b : {&call_btn_,&mic_btn_,&setup_btn_})
+        if (b->obj && lv_obj_has_state(b->obj,LV_STATE_PRESSED)) return true;
+    return false;
 }
 void CompanionFaceView::OpenPanel() {
     if (!panel_ || !PanelHasActions()) return;
@@ -916,8 +924,10 @@ void CompanionFaceView::PetOutputs(uint64_t now) {
     if (pet_.TakeChirp(chirp)) {
         // Chirps only outside a conversation: while it listens or thinks the microphone is
         // open (a chirp would be heard as speech), and while it speaks the speaker is its
-        // voice's. Then the Owner's standing permission for audio cues decides.
-        const bool idle=pet_phase_==pet::Phase::Ambient;
+        // voice's. An end drawn ahead of the runtime is not idle yet: the microphone
+        // may still be open until it confirms. Then the Owner's standing permission
+        // for audio cues decides.
+        const bool idle=pet_phase_==pet::Phase::Ambient && !pet_request_pending_;
         const bool allowed=idle && CurrentOutputGate().AllowsAmbient(presentation::Output::AudioCue);
         const bool played=allowed && pet::PlayChirp(chirp,pet_dark_ ? .45f : 1.f);
         ESP_LOGI(kPetTag,"chirp %s idle=%d allowed=%d played=%d",pet::ChirpName(chirp),idle,allowed,played);
@@ -926,8 +936,9 @@ void CompanionFaceView::PetOutputs(uint64_t now) {
     if (pet_.TakeHeadClip(clip)) {
         // Local life moves the head only where the Owner allows motion (inside a
         // session: the session plan). The body still refuses while capture holds it
-        // or a server motion owns the head.
-        const bool allowed=CurrentOutputGate().AllowsAmbient(presentation::Output::Motion);
+        // or a server motion owns the head, and waits while a start or end is
+        // drawn ahead of the runtime.
+        const bool allowed=!pet_request_pending_ && CurrentOutputGate().AllowsAmbient(presentation::Output::Motion);
         const bool played=allowed && board.PlayPetHeadClip(clip);
         ESP_LOGI(kPetTag,"head clip p%u keys=%u allowed=%d played=%d (%s)",clip.priority,
                  static_cast<unsigned>(clip.count),allowed,played,pet_.activity());
@@ -986,7 +997,7 @@ void CompanionFaceView::AdvancePet(uint64_t now, bool host_frame) {
     in.pointer=pet_pointer_;in.pointer_x=pet_px_;in.pointer_y=pet_py_;
     in.dark=pet_dark_;
     in.muted=pet_muted_;
-    if (panel_open_ && now>=panel_until_) ClosePanel();
+    if (panel_open_ && now>=panel_until_ && !PanelPressed()) ClosePanel();
     pet::Frame frame=pet_.Tick(in);
     const bool card=pet_.card_requested(now);
     if (card && !pet_card_shown_) {

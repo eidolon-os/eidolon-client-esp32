@@ -2312,9 +2312,10 @@ esp_err_t EidolonVoiceController::PublishSessionRequest(
     }
     const esp_err_t err = session_.PublishData(kSessionControlTopic, printed, /*reliable=*/true);
     cJSON_free(printed);
-    ESP_LOGI(TAG, "[lifecycle] sent %s conversation_id=%s err=%s gen=%lu action_to_send_ms=%lld",
+    // %ld: the device's nano printf has no %lld (it printed a literal "ld").
+    ESP_LOGI(TAG, "[lifecycle] sent %s conversation_id=%s err=%s gen=%lu action_to_send_ms=%ld",
              type, conversation_id.c_str(), esp_err_to_name(err),
-             static_cast<unsigned long>(session_generation_), action_to_send_ms);
+             static_cast<unsigned long>(session_generation_), static_cast<long>(action_to_send_ms));
     return err;
 }
 
@@ -4042,9 +4043,9 @@ esp_err_t EidolonVoiceController::DoJoinRoom()
             return refresh_err;
         }
     }
-    ESP_LOGI(TAG, "[lifecycle] join prepared reuse_channel=%d elapsed_ms=%lld",
+    ESP_LOGI(TAG, "[lifecycle] join prepared reuse_channel=%d elapsed_ms=%ld",
              reuse_channel ? 1 : 0,
-             static_cast<long long>((esp_timer_get_time() - prepare_started_us) / 1000));
+             static_cast<long>((esp_timer_get_time() - prepare_started_us) / 1000));
     if (!HasActiveConfig()) {
         ESP_LOGW(TAG, "Join blocked: config status=%s",
                  HubConfigStatusToString(config_.status));

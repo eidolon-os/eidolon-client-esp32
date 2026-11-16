@@ -7,11 +7,12 @@ public:
     DeviceState GetDeviceState() const { return state_; }
     void SetDeviceState(DeviceState state) { state_=state; }
     void RequestVoiceJoin() { ++joins; }
-    void RequestVoiceLeave() {}
+    void RequestVoiceLeave() { ++leaves; }
     void PttPress() {}
     void PttRelease() {}
     void ToggleMicrophone() {}
     int joins=0;
+    int leaves=0;
 private:
     DeviceState state_=kDeviceStateIdle;
 };

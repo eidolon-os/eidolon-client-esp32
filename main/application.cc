@@ -849,7 +849,11 @@ void Application::Run() {
             clock_ticks_++;
             auto display = Board::GetInstance().GetDisplay();
             display->UpdateStatusBar();
-        
+#if CONFIG_EIDOLON_HUB_MODE
+            // A start or end drawn ahead of the runtime is taken down if unanswered.
+            if (ui_presenter_) ui_presenter_->Tick();
+#endif
+
             // Print debug info every 10 seconds
             if (clock_ticks_ % 10 == 0) {
                 SystemInfo::PrintHeapStats();

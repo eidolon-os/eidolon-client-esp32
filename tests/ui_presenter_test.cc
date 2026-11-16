@@ -5,7 +5,130 @@
 #include "eidolon/eidolon_ui_presenter.h"
 #include "eidolon/ui_state_mapper.h"
 #include "eidolon/voice_runtime_projector.h"
+#include "esp_timer.h"
 using namespace eidolon;
+
+// A person's start or end is drawn at once and kept only while the runtime
+// still offers that choice; the runtime's report, or a time limit, takes it down.
+static void TestSessionRequests() {
+    Application app;
+    EidolonUiPresenter p(app);
+    SetEidolonTouchAvailable(true);
+    p.SetRuntimePhase(RuntimePhase::Normal);
+    auto report=[](VoiceSessionState session, EndReason end=EndReason::None) {
+        return VoiceRuntimeProjector::Project({.session=session,.enrollment=EnrollmentPhase::ClaimActive,
+            .end_reason=end,.operational_ready=true});
+    };
+    auto shown=[&]() { return UiStateProjector::Project(p.runtime_status(),CurrentUiInputProfile()); };
+    auto later=[](int ms) { FakeTimeUs()+=static_cast<int64_t>(ms)*1000; };
+    const auto ready=report(VoiceSessionState::ConfigReady);
+    p.ApplyVoiceStatus(ready);
+    assert(shown().scene==UiScene::Ready && !shown().session_request_pending);
+
+    // T1: a start is drawn as the opening the runtime is about to report.
+    DispatchEidolonUiIntent(UiIntent::OpenConversation);
+    assert(app.joins==1);
+    assert(shown().scene==UiScene::OpeningConversation && shown().session_request_pending);
+    assert(shown().end_allowed);   // the opening can be cancelled
+    // Only the screen moved: the device's own state is still the runtime's.
+    assert(UiStateProjector::ProjectLegacyDeviceState(p.runtime_status(),kDeviceStateIdle)==kDeviceStateIdle);
+    // T2: a report that has not answered it yet leaves it drawn; a second start is not offered.
+    p.ApplyVoiceStatus(ready);
+    assert(shown().scene==UiScene::OpeningConversation);
+    DispatchEidolonUiIntent(UiIntent::OpenConversation);
+    assert(app.joins==1);
+    // T3: the runtime answers, and its report is the screen from then on.
+    p.ApplyVoiceStatus(report(VoiceSessionState::Opening));
+    assert(p.runtime_status().session_request==SessionRequest::None);
+    assert(shown().scene==UiScene::OpeningConversation && !shown().session_request_pending);
+
+    // T4: a start the runtime never answers is taken down after five seconds.
+    p.ApplyVoiceStatus(ready);
+    later(1000);
+    DispatchEidolonUiIntent(UiIntent::OpenConversation);
+    assert(app.joins==2 && shown().scene==UiScene::OpeningConversation);
+    later(4000);p.Tick();
+    assert(shown().scene==UiScene::OpeningConversation);
+    later(1100);p.Tick();
+    assert(shown().scene==UiScene::Ready && !shown().session_request_pending);
+
+    // T8: an end within half a second of the start is the same finger twice;
+    // after that it cancels the opening.
+    later(1000);
+    DispatchEidolonUiIntent(UiIntent::OpenConversation);
+    assert(app.joins==3);
+    later(300);
+    DispatchEidolonUiIntent(UiIntent::CloseConversation);
+    assert(app.leaves==0 && shown().scene==UiScene::OpeningConversation);
+    later(300);
+    DispatchEidolonUiIntent(UiIntent::CloseConversation);
+    assert(app.leaves==1);
+    // Nothing was open yet, so the end is already true and nothing is drawn ahead.
+    assert(p.runtime_status().session_request==SessionRequest::None && shown().scene==UiScene::Ready);
+
+    // T5: an end is drawn at once: no turn, no caption, and no start until confirmed.
+    p.ApplyVoiceStatus(report(VoiceSessionState::InRoom));
+    p.OnAgentPhase(AgentPhase::AgentSpeaking);
+    p.OnTranscription({TranscriptionSource::Agent,"Hello",true});
+    assert(shown().scene==UiScene::Conversation);
+    later(1000);
+    DispatchEidolonUiIntent(UiIntent::CloseConversation);
+    assert(app.leaves==2);
+    {
+        const auto m=shown();
+        assert(m.scene==UiScene::Ended && m.end_reason==EndReason::UserLeft && m.severity==UiSeverity::Normal);
+        assert(m.turn==TurnPhase::Idle && !*m.subtitle && m.session_request_pending);
+        assert(m.primary_intent==UiIntent::None && !m.primary_enabled && !m.end_allowed && !m.show_end_action);
+        assert(m.session_intent==UiIntent::None);
+        assert(!UiStateProjector::AllowsIntent(p.runtime_status(),UiIntent::OpenConversation));
+    }
+    // The device is still in the conversation until the runtime ends it.
+    if (!IsPushToTalk(CurrentInteractionMode()))
+        assert(UiStateProjector::ProjectLegacyDeviceState(p.runtime_status(),kDeviceStateSpeaking)==kDeviceStateSpeaking);
+    // T6: the conversation's own news while the end is pending does not bring it back.
+    p.OnAgentPhase(AgentPhase::AgentThinking);
+    p.OnTranscription({TranscriptionSource::Agent,"More",true});
+    assert(shown().scene==UiScene::Ended && !*shown().subtitle);
+    DispatchEidolonUiIntent(UiIntent::OpenConversation);
+    assert(app.joins==3);
+    // T7: the runtime confirms; a start in the same half second is the same finger.
+    later(100);
+    p.ApplyVoiceStatus(report(VoiceSessionState::ConfigReady,EndReason::UserLeft));
+    assert(p.runtime_status().session_request==SessionRequest::None);
+    assert(shown().scene==UiScene::Ended && shown().primary_intent==UiIntent::OpenConversation);
+    DispatchEidolonUiIntent(UiIntent::OpenConversation);
+    assert(app.joins==3);
+    later(500);
+    DispatchEidolonUiIntent(UiIntent::OpenConversation);
+    assert(app.joins==4 && shown().scene==UiScene::OpeningConversation);
+
+    // T9: an end the runtime never answers is taken down after ten seconds.
+    p.ApplyVoiceStatus(report(VoiceSessionState::InRoom));
+    assert(p.runtime_status().session_request==SessionRequest::None);
+    later(1000);
+    DispatchEidolonUiIntent(UiIntent::CloseConversation);
+    assert(app.leaves==3 && shown().scene==UiScene::Ended);
+    later(9000);p.Tick();
+    assert(shown().scene==UiScene::Ended);
+    later(1100);p.Tick();
+    assert(shown().scene==UiScene::Conversation && !shown().session_request_pending);
+
+    // T10: setup taking over is the runtime moving on; the start is not drawn back after it.
+    p.ApplyVoiceStatus(ready);
+    later(1000);
+    DispatchEidolonUiIntent(UiIntent::OpenConversation);
+    assert(app.joins==5 && shown().scene==UiScene::OpeningConversation);
+    p.SetRuntimePhase(RuntimePhase::Commissioning,"Ready for secure device setup");
+    assert(shown().scene==UiScene::Commissioning && p.runtime_status().session_request==SessionRequest::None);
+    p.SetRuntimePhase(RuntimePhase::Normal);
+    assert(shown().scene==UiScene::Ready);
+
+    // T11: the physical session button is drawn ahead the same way.
+    later(1000);
+    DispatchEidolonUiInput(UiInputSource::SessionButton,UiInputGesture::Click);
+    assert(app.joins==6 && shown().scene==UiScene::OpeningConversation && shown().session_request_pending);
+}
+
 int main() {
     Application app;
     EidolonUiPresenter presenter(app);
@@ -109,4 +232,5 @@ int main() {
         removed.ApplyVoiceStatus(revoked);
         assert(removed.runtime_status().enrollment_detail=="Removed from this Owner. Hold BOOT to claim it again");
     }
+    TestSessionRequests();
 }

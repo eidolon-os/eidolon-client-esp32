@@ -1,6 +1,7 @@
 #ifndef EIDOLON_UI_PRESENTER_H_
 #define EIDOLON_UI_PRESENTER_H_
 
+#include <cstdint>
 #include <string>
 
 #include "agent_session_tracker.h"
@@ -26,6 +27,9 @@ public:
     void OnPttTurnStatus(const std::string& outcome);
     void OnPresenceWakePhase(PresenceWakePhase phase);
     void SetPttRecording(bool recording);
+    // Once a second on the Application task: a start or end the runtime has not
+    // answered in time is taken down, and the screen returns to its report.
+    void Tick();
 
     const EidolonRuntimeStatus& runtime_status() const { return status_; }
     AgentSessionTracker& tracker() { return tracker_; }
@@ -35,11 +39,16 @@ private:
     void ApplyModel(const EidolonUiModel& model);
     void SyncLegacyDeviceState();
     void HandleIntent(UiIntent intent);
+    bool BeginSessionRequest(UiIntent intent);
+    void SettleSessionRequest();
 
     Application& app_;
     AgentSessionTracker tracker_;
     EidolonRuntimeStatus status_;
     std::string last_visible_state_;
+    uint64_t session_request_ms_ = 0;          // when the request now drawn was made
+    UiIntent last_request_ = UiIntent::None;   // the last start or end asked for
+    uint64_t last_request_ms_ = 0;
 };
 
 }  // namespace eidolon

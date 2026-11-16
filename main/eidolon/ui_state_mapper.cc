@@ -30,9 +30,40 @@ UiScene RuntimeScene(RuntimePhase phase)
     }
 }
 
+// A person's start or end is drawn before the voice side reports it: start as
+// the opening the runtime is about to report, end as the end. Only the
+// conversation is drawn ahead; every other fact (setup, removal, service)
+// stays the runtime's and outranks it in SelectScene. The presenter keeps a
+// request only while the runtime still offers the choice it answered.
+ConversationPhase ShownConversation(const EidolonRuntimeStatus& status)
+{
+    switch (status.session_request) {
+    case SessionRequest::Open:
+        return ConversationPhase::Opening;
+    case SessionRequest::Close:
+        return ConversationPhase::Ended;
+    case SessionRequest::None:
+    default:
+        return status.conversation;
+    }
+}
+
+EndReason ShownEndReason(const EidolonRuntimeStatus& status)
+{
+    switch (status.session_request) {
+    case SessionRequest::Open:
+        return EndReason::None;
+    case SessionRequest::Close:
+        return EndReason::UserLeft;
+    case SessionRequest::None:
+    default:
+        return status.end_reason;
+    }
+}
+
 UiScene ConversationScene(const EidolonRuntimeStatus& status)
 {
-    switch (status.conversation) {
+    switch (ShownConversation(status)) {
     case ConversationPhase::Opening:
         return UiScene::OpeningConversation;
     case ConversationPhase::Active:
@@ -189,7 +220,7 @@ void ResolveRecoveryPresentation(const EidolonRuntimeStatus& status,
                                  EidolonUiModel& model)
 {
     if (model.scene != UiScene::Reconnecting ||
-        status.conversation == ConversationPhase::Reconnecting) {
+        ShownConversation(status) == ConversationPhase::Reconnecting) {
         return;
     }
     model.state_label = "RETRY";
@@ -208,6 +239,9 @@ void ResolveActions(const EidolonRuntimeStatus& status, EidolonUiModel& model)
     switch (model.scene) {
     case UiScene::Ready:
     case UiScene::Ended:
+        // An end drawn ahead offers no start until the runtime confirms it:
+        // a second tap landing where the end control was must not reopen.
+        if (status.session_request == SessionRequest::Close) break;
         model.primary_intent = UiIntent::OpenConversation;
         model.primary_label = "JOIN";
         model.primary_enabled = true;
@@ -218,7 +252,7 @@ void ResolveActions(const EidolonRuntimeStatus& status, EidolonUiModel& model)
         break;
     case UiScene::Reconnecting:
         model.primary_label = "...";
-        model.end_allowed = status.conversation == ConversationPhase::Reconnecting;
+        model.end_allowed = ShownConversation(status) == ConversationPhase::Reconnecting;
         break;
     case UiScene::Conversation:
         model.end_allowed = true;
@@ -247,8 +281,9 @@ const std::string* DetailOverride(const EidolonRuntimeStatus& status,
     if (scene == UiScene::WaitingApproval || scene == UiScene::Removed) {
         return &status.enrollment_detail;
     }
-    if (status.conversation == ConversationPhase::Closed ||
-        status.conversation == ConversationPhase::Failed) {
+    const ConversationPhase conversation = ShownConversation(status);
+    if (conversation == ConversationPhase::Closed ||
+        conversation == ConversationPhase::Failed) {
         return &status.service_detail;
     }
     return nullptr;
@@ -307,14 +342,16 @@ EidolonUiModel UiStateProjector::Project(const EidolonRuntimeStatus& status,
     model.scene = SelectScene(status);
     model.interaction_mode = status.interaction_mode;
     model.mode_label = InteractionModeLabel(status.interaction_mode);
-    model.turn = NormalizeTurnPhase(status.interaction_mode, status.turn);
-    model.end_reason = status.end_reason;
+    model.turn = NormalizeTurnPhase(status.interaction_mode,
+        status.session_request == SessionRequest::Close ? TurnPhase::Idle : status.turn);
+    model.end_reason = ShownEndReason(status);
+    model.session_request_pending = status.session_request != SessionRequest::None;
     model.show_mute_icon = !status.mic_enabled;
     model.state_label = UiSceneLabel(model.scene);
     model.status_text = UiSceneStatus(model.scene);
     const std::string* detail = DetailOverride(status, model.scene);
     model.detail_text = detail == nullptr || detail->empty()
-                            ? UiSceneDetail(model.scene, status.end_reason)
+                            ? UiSceneDetail(model.scene, model.end_reason)
                             : detail->c_str();
     model.emotion = UiSceneEmotion(model.scene);
 

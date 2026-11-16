@@ -1,6 +1,7 @@
 #include "eidolon_ui_presenter.h"
 
 #include <esp_log.h>
+#include <esp_timer.h>
 #include <cstring>
 
 #include "application.h"
@@ -14,6 +15,33 @@
 #define TAG "EidolonUiPresenter"
 
 namespace eidolon {
+
+namespace {
+// How long a start or end is drawn without the runtime answering it. A start
+// is normally answered within tens of milliseconds (the controller reports
+// Opening before any network work); an end waits behind the controller's queue
+// and its teardown, so it is given longer.
+constexpr uint64_t kOpenRequestMs = 5000;
+constexpr uint64_t kCloseRequestMs = 10000;
+// A request that reverses the previous one this soon is the same finger landing
+// twice where the control changed meaning, not a change of mind.
+constexpr uint64_t kReverseGuardMs = 500;
+
+uint64_t NowMs() { return static_cast<uint64_t>(esp_timer_get_time() / 1000); }
+
+[[maybe_unused]] const char* RequestName(SessionRequest request)
+{
+    switch (request) {
+    case SessionRequest::Open:
+        return "open";
+    case SessionRequest::Close:
+        return "close";
+    case SessionRequest::None:
+    default:
+        return "none";
+    }
+}
+}  // namespace
 
 EidolonUiPresenter::EidolonUiPresenter(Application& app) : app_(app)
 {
@@ -219,11 +247,17 @@ void EidolonUiPresenter::HandleIntent(UiIntent intent)
         return;
     }
     switch (intent) {
+    // A start or end is drawn at once and only then waits for the runtime:
+    // the request reaches the controller first (a queue post), then the screen.
     case UiIntent::OpenConversation:
+        if (!BeginSessionRequest(intent)) return;
         app_.RequestVoiceJoin();
+        Reapply();
         break;
     case UiIntent::CloseConversation:
+        if (!BeginSessionRequest(intent)) return;
         app_.RequestVoiceLeave();
+        Reapply();
         break;
     case UiIntent::BeginTalk:
         app_.PttPress();
@@ -243,8 +277,57 @@ void EidolonUiPresenter::HandleIntent(UiIntent intent)
     }
 }
 
+bool EidolonUiPresenter::BeginSessionRequest(UiIntent intent)
+{
+    const uint64_t now = NowMs();
+    const UiIntent reverse = intent == UiIntent::OpenConversation
+        ? UiIntent::CloseConversation : UiIntent::OpenConversation;
+    if (last_request_ == reverse && now - last_request_ms_ < kReverseGuardMs) {
+        ESP_LOGI(TAG, "[session-request] ignored intent=%d %lu ms after the reverse",
+                 static_cast<int>(intent), static_cast<unsigned long>(now - last_request_ms_));
+        return false;
+    }
+    last_request_ = intent;
+    last_request_ms_ = now;
+    status_.session_request = intent == UiIntent::OpenConversation
+        ? SessionRequest::Open : SessionRequest::Close;
+    session_request_ms_ = now;
+    ESP_LOGI(TAG, "[session-request] shown %s", RequestName(status_.session_request));
+    return true;
+}
+
+// The runtime's own projection decides: a request stays drawn only while the
+// runtime still offers the choice it answered (start while nothing is open, end
+// while one is) and not past its time. Whatever moved the runtime (the request
+// done or refused, or setup or a removal taking over), its report is the screen.
+void EidolonUiPresenter::SettleSessionRequest()
+{
+    const SessionRequest shown = status_.session_request;
+    if (shown == SessionRequest::None) return;
+    status_.session_request = SessionRequest::None;
+    const bool open = shown == SessionRequest::Open;
+    const uint64_t age = NowMs() - session_request_ms_;
+    const bool offered = UiStateProjector::AllowsIntent(
+        status_, open ? UiIntent::OpenConversation : UiIntent::CloseConversation);
+    if (offered && age < (open ? kOpenRequestMs : kCloseRequestMs)) {
+        status_.session_request = shown;
+        return;
+    }
+    ESP_LOGI(TAG, "[session-request] dropped %s reason=%s age_ms=%lu", RequestName(shown),
+             offered ? "timeout" : "answered", static_cast<unsigned long>(age));
+}
+
+void EidolonUiPresenter::Tick()
+{
+    const SessionRequest before = status_.session_request;
+    if (before == SessionRequest::None) return;
+    SettleSessionRequest();
+    if (status_.session_request != before) Reapply();
+}
+
 void EidolonUiPresenter::Reapply()
 {
+    SettleSessionRequest();
     SyncLegacyDeviceState();
     ApplyModel(UiStateProjector::Project(status_,CurrentUiInputProfile()));
 }

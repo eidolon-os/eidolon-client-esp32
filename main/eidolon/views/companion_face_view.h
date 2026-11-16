@@ -81,12 +81,16 @@ private:
     PanelButton call_btn_, mic_btn_, setup_btn_;
     UiIntent session_button_intent_ = UiIntent::None;
     bool pet_muted_ = false;
+    // A start or end is drawn ahead of the runtime: until it confirms, the
+    // microphone may still be open, so local chirps and head moves wait.
+    bool pet_request_pending_ = false;
     bool panel_open_ = false;
     uint64_t panel_until_ = 0;
     int32_t bar_press_y_ = 0;
     void PetAction(pet::HostAction action);
     void RenderPetChrome(const EidolonUiModel& model, bool face);
     bool PanelHasActions() const;
+    bool PanelPressed() const;
     void OpenPanel();
     void ClosePanel();
     static void OnBar(lv_event_t* event);

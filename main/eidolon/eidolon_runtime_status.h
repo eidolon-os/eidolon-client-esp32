@@ -75,6 +75,16 @@ enum class EndReason {
     Busy,
 };
 
+// What a person last asked of the conversation, drawn before the voice side
+// reports it. The presenter keeps a request only while the runtime still offers
+// the choice it answered (start while nothing is open, end while one is), and
+// for a bounded time; the runtime's own report replaces it the moment it moves.
+enum class SessionRequest {
+    None,
+    Open,
+    Close,
+};
+
 struct VoiceRuntimeStatus {
     EnrollmentPhase enrollment = EnrollmentPhase::Unknown;
     ServicePhase service = ServicePhase::Unavailable;
@@ -95,6 +105,8 @@ struct EidolonRuntimeStatus {
     TurnPhase turn = TurnPhase::Idle;
     EndReason end_reason = EndReason::None;
     PresenceWakePhase presence_wake = PresenceWakePhase::Idle;
+    // UI only: the projection draws it; the legacy DeviceState never reads it.
+    SessionRequest session_request = SessionRequest::None;
     InteractionMode interaction_mode = CurrentInteractionMode();
     bool mic_enabled = true;
     std::string runtime_detail;
