@@ -11,6 +11,9 @@ esp_err_t PlayRollCallFeedback();
 // Played locally on owner-presence wake (body.presence.set awake) as the audible
 // half of StackChan's cute wake reaction. Synthesized PCM (no asset file).
 esp_err_t PlayStartupCue();
+// Volume confirmation: one short soft note, heard at the volume just set
+// (device_settings_core.h ShouldConfirmVolume says when).
+esp_err_t PlayVolumeCue();
 
 }  // namespace eidolon
 

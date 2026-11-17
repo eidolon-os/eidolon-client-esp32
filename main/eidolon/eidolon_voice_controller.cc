@@ -331,8 +331,18 @@ EidolonVoiceController::EidolonVoiceController(GuardService* guard_service)
         // Whatever changed the value — a command, a button, a restore — the
         // observer only hands it to this task, which reports it.
         if (codec != nullptr) {
+            esp_timer_create_args_t cue_args = {};
+            cue_args.callback = &EidolonVoiceController::VolumeCueCb;
+            cue_args.arg = this;
+            cue_args.dispatch_method = ESP_TIMER_TASK;
+            cue_args.name = "volume_cue";
+            if (esp_timer_create(&cue_args, &volume_cue_timer_) != ESP_OK) volume_cue_timer_ = nullptr;
+            // The codec calls this only when the value really changed, so a restore
+            // of the saved volume is silent; the first boot's default is the one
+            // restore that is a change.
             codec->SetOutputVolumeObserver([this](int volume) {
                 ReportPropertyChange(device_settings::kVolumeProperty, volume);
+                ScheduleVolumeCue();
             });
         }
         if (backlight != nullptr) {
@@ -385,7 +395,7 @@ EidolonVoiceController::~EidolonVoiceController()
     for (esp_timer_handle_t* t :
          {&audio_timer_, &reconnect_timer_, &connect_watchdog_, &idle_leave_timer_,
           &full_duplex_idle_timer_, &ptt_release_tail_timer_,
-          &ambient_presence_timer_, &onboarding_poll_timer_}) {
+          &ambient_presence_timer_, &onboarding_poll_timer_, &volume_cue_timer_}) {
         if (*t != nullptr) {
             esp_timer_stop(*t);
             esp_timer_delete(*t);
@@ -664,6 +674,9 @@ void EidolonVoiceController::Dispatch(const Event& ev)
         if (ev.payload != nullptr) {
             DoPropertyChanged(*ev.payload);
         }
+        break;
+    case EventType::VolumeCue:
+        DoVolumeCue();
         break;
     case EventType::StillTaken:
         if (ev.still != nullptr) {
@@ -2507,6 +2520,44 @@ void EidolonVoiceController::ReportPropertyChange(const char* property, int valu
     ev.type = EventType::PropertyChanged;
     ev.payload = new (std::nothrow) std::string(*payload);
     if (ev.payload != nullptr) Enqueue(ev);
+}
+
+void EidolonVoiceController::ScheduleVolumeCue()
+{
+    // Any task: restarting one esp_timer is safe, and a dragged slider keeps
+    // pushing the cue back until it settles.
+    if (volume_cue_timer_ == nullptr) return;
+    esp_timer_stop(volume_cue_timer_);
+    esp_timer_start_once(volume_cue_timer_,
+                         static_cast<uint64_t>(device_settings::kVolumeCueSettleMs) * 1000);
+}
+
+void EidolonVoiceController::VolumeCueCb(void* arg)
+{
+    auto* self = static_cast<EidolonVoiceController*>(arg);
+    Event ev;
+    ev.type = EventType::VolumeCue;
+    self->Enqueue(ev);
+}
+
+void EidolonVoiceController::DoVolumeCue()
+{
+    AudioCodec* codec = Board::GetInstance().GetAudioCodec();
+    if (codec == nullptr) return;
+    const bool legacy = !(config_.output_policy.known || kOutputPolicyRequired);
+    device_settings::VolumeCueContext context;
+    context.volume = codec->output_volume();
+    context.in_conversation =
+        state_ == VoiceSessionState::Opening || state_ == VoiceSessionState::InRoom;
+    context.playback_active = agent_phase_ != AgentPhase::Silent || local_playback_ui_active_ ||
+                              PlaybackActiveRecently();
+    context.audio_cue_allowed =
+        legacy || CurrentOutputGate().Allows(presentation::Output::AudioCue);
+    const bool play = device_settings::ShouldConfirmVolume(context);
+    ESP_LOGI(TAG, "[settings] volume cue volume=%d play=%d conversation=%d playback=%d allowed=%d",
+             context.volume, play, context.in_conversation, context.playback_active,
+             context.audio_cue_allowed);
+    if (play) PlayVolumeCue();
 }
 
 void EidolonVoiceController::DoPropertyChanged(const std::string& payload)

@@ -257,4 +257,10 @@ void Runtime::Remember(Entry entry)
     next_ = (next_ + 1) % kLedgerSize;
 }
 
+bool ShouldConfirmVolume(const VolumeCueContext& context)
+{
+    return context.volume > 0 && !context.in_conversation && !context.playback_active &&
+           context.audio_cue_allowed;
+}
+
 }  // namespace eidolon::device_settings

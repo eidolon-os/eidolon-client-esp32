@@ -308,6 +308,26 @@ void PropertiesAreReadAndReported()
     assert(!Runtime::IsMethod("eidolon.capability.invoke.v2"));
 }
 
+// The volume cue confirms a change only where nothing else does.
+void TheVolumeCueConfirmsOnlyWhenIdle()
+{
+    const VolumeCueContext idle{.volume = 60, .audio_cue_allowed = true};
+    assert(ShouldConfirmVolume(idle));
+    VolumeCueContext c = idle;
+    c.volume = 0;
+    assert(!ShouldConfirmVolume(c));            // silence is the answer
+    c = idle;
+    c.in_conversation = true;
+    assert(!ShouldConfirmVolume(c));            // the voice already carries the new level
+    c = idle;
+    c.playback_active = true;
+    assert(!ShouldConfirmVolume(c));
+    c = idle;
+    c.audio_cue_allowed = false;
+    assert(!ShouldConfirmVolume(c));            // the Owner's output policy says no cues
+    static_assert(kVolumeCueSettleMs >= 200 && kVolumeCueSettleMs <= 600);
+}
+
 }  // namespace
 
 int main()
@@ -321,5 +341,6 @@ int main()
     TheLedgerIsBounded();
     DeadlinesAndArguments();
     PropertiesAreReadAndReported();
+    TheVolumeCueConfirmsOnlyWhenIdle();
     return 0;
 }

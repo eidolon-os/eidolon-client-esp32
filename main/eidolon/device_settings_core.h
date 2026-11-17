@@ -97,4 +97,22 @@ std::string DeclaredProperties(bool volume, bool brightness);
 // Exposed for tests: the bound a ledger keeps before overwriting the oldest.
 inline constexpr size_t kLedgerSize = 16;
 
+// Volume confirmation: after the volume changes (from the Owner's app, a voice
+// request or the board's own keys), a device with a speaker plays one short cue
+// at the new level, kVolumeCueSettleMs after the last change, so a dragged
+// slider sounds once at its final value. It plays only where it confirms
+// something: not at 0 (silence is the answer), not during a conversation or
+// while anything is playing (that sound already carries the new level), and
+// not when the Owner's output policy allows no audio cue.
+inline constexpr uint32_t kVolumeCueSettleMs = 300;
+
+struct VolumeCueContext {
+    int volume = 0;
+    bool in_conversation = false;
+    bool playback_active = false;
+    bool audio_cue_allowed = false;
+};
+
+bool ShouldConfirmVolume(const VolumeCueContext& context);
+
 }  // namespace eidolon::device_settings

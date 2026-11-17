@@ -96,6 +96,16 @@ std::vector<int16_t> BuildStartupCue(int sample_rate)
     return pcm;
 }
 
+// Volume confirmation: a single short G5 with its soft octave, ~110 ms. Short
+// enough to sit under a slider drag's settle time, plain enough for any board.
+std::vector<int16_t> BuildVolumeCue(int sample_rate)
+{
+    std::vector<int16_t> pcm;
+    pcm.reserve(static_cast<size_t>(sample_rate) * 110 / 1000);
+    AppendRichTone(pcm, sample_rate, 783.99f, 110, 0.24f);
+    return pcm;
+}
+
 esp_err_t PlayPcmLocked(AudioCodec* codec, std::vector<int16_t>& pcm, const char* what)
 {
     if (codec == nullptr) {
@@ -155,6 +165,20 @@ esp_err_t PlayStartupCue()
     }
 
     return PlayStartupCueLocked(Board::GetInstance().GetAudioCodec());
+}
+
+esp_err_t PlayVolumeCue()
+{
+    auto& audio = EidolonAudioInput::Instance();
+    AudioCodec* codec = audio.IsReady() ? audio.Codec() : Board::GetInstance().GetAudioCodec();
+    const int sample_rate =
+        (codec && codec->output_sample_rate() > 0) ? codec->output_sample_rate() : 16000;
+    auto pcm = BuildVolumeCue(sample_rate);
+    if (audio.IsReady()) {
+        std::lock_guard<std::mutex> lock(audio.Mutex());
+        return PlayPcmLocked(codec, pcm, "Volume cue");
+    }
+    return PlayPcmLocked(codec, pcm, "Volume cue");
 }
 
 esp_err_t PlayRollCallFeedback()

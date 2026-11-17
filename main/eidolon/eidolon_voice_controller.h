@@ -151,6 +151,7 @@ private:
         PublishDeviceEvent,
         DeviceRpc,
         PropertyChanged,
+        VolumeCue,
         StillTaken,
 #if CONFIG_EIDOLON_SMARTHOME_PANEL
         PanelRequest,
@@ -390,6 +391,13 @@ private:
     std::unique_ptr<device_settings::Runtime> settings_;
     void DoDeviceRpc(const LiveKitSession::RpcCall& call);
     void DoPropertyChanged(const std::string& payload);
+    // Volume confirmation (device_settings::ShouldConfirmVolume): every volume
+    // change restarts one timer from whatever task changed it; when it fires,
+    // this task decides and plays the cue.
+    esp_timer_handle_t volume_cue_timer_ = nullptr;
+    void ScheduleVolumeCue();
+    static void VolumeCueCb(void* arg);
+    void DoVolumeCue();
     // camera.capture: what the execution means lives in stills_, the camera is
     // the board's, and taking a still runs on a short-lived worker task so this
     // task never waits on the sensor or the encoder. The still comes back here
