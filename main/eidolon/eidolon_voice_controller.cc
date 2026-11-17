@@ -2544,15 +2544,15 @@ void EidolonVoiceController::DoVolumeCue()
 {
     AudioCodec* codec = Board::GetInstance().GetAudioCodec();
     if (codec == nullptr) return;
-    const bool legacy = !(config_.output_policy.known || kOutputPolicyRequired);
     device_settings::VolumeCueContext context;
     context.volume = codec->output_volume();
     context.in_conversation =
         state_ == VoiceSessionState::Opening || state_ == VoiceSessionState::InRoom;
     context.playback_active = agent_phase_ != AgentPhase::Silent || local_playback_ui_active_ ||
                               PlaybackActiveRecently();
-    context.audio_cue_allowed =
-        legacy || CurrentOutputGate().Allows(presentation::Output::AudioCue);
+    // Outside a conversation the Owner's standing policy decides (Allows() is the
+    // session's grant and is closed then; 11-17 device test: allowed=0 every time).
+    context.audio_cue_allowed = CurrentOutputGate().AllowsAmbient(presentation::Output::AudioCue);
     const bool play = device_settings::ShouldConfirmVolume(context);
     ESP_LOGI(TAG, "[settings] volume cue volume=%d play=%d conversation=%d playback=%d allowed=%d",
              context.volume, play, context.in_conversation, context.playback_active,
