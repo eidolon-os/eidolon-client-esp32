@@ -292,4 +292,17 @@ int main() {
     assert(settings_gate.Resume("talk"));
     settings_gate.Close();
     assert(settings_gate.CapabilityBinding().session_id.empty());
+
+    // A device's tool restriction narrows the plan without a new policy
+    // revision (the device is never told to refetch its policy for it): a plan
+    // listing fewer capabilities under the revision it holds still opens, and
+    // binds only what it lists, so the device refuses the rest as unplanned.
+    SessionOutputPlan narrowed = with_settings;
+    narrowed.session_id = "talk-2";
+    narrowed.device_capabilities = {"audio.volume.adjust"};
+    assert(settings_gate.Start(narrowed,"talk-2"));
+    const auto narrowed_binding=settings_gate.CapabilityBinding();
+    assert(narrowed_binding.policy_revision==1);
+    assert((narrowed_binding.capabilities==std::vector<std::string>{"audio.volume.adjust"}));
+    settings_gate.Close();
 }
