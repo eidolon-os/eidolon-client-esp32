@@ -95,8 +95,21 @@ void TestSafetyStopLatches() {
     // The session ending (a plain stop) ends the latch too.
     LocalHeadPlayer q(Limits());
     q.SafetyStop(1000 * kMs);
-    q.ServerMotion(2000 * kMs);   // StackChanBody::Stop(latch = false), the session-close path
+    q.PlainStop();   // StackChanBody::Stop(latch = false), the session-close path
     CHECK(!q.stop_latched());
+    CHECK(q.Refusal(c, 3100 * kMs, {}) == nullptr);   // past the safety.stop's own 2 s, not latched
+}
+
+// The session-close stop is not a server move: the drift home the runtime queues ~1.5 s after
+// a session ends must not fall in a quiet window (11-17 device test: refused every time).
+void TestPlainStopOpensNoQuietWindow() {
+    LocalHeadPlayer p(Limits());
+    const HeadClip listen = Clip(1, true, {K(500, 0, 40)});
+    const HeadClip home = Clip(4, true, {K(1000, 0, 0)});
+    p.Start(listen, 1000 * kMs, {}, {});
+    p.PlainStop();
+    CHECK(!p.active() && !p.home_pending());
+    CHECK(p.Refusal(home, 1000 * kMs + 1500 * kMs, {}) == nullptr);
 }
 
 // A held clip stays where it ends; one that ends off-centre without hold goes home 2.5 s later.
@@ -192,6 +205,7 @@ int main() {
     TestGatesStillRefuse();
     TestPriority();
     TestSafetyStopLatches();
+    TestPlainStopOpensNoQuietWindow();
     TestHoldAndReturnHome();
     TestWhereThePathStarts();
     TestHoldForShutter();

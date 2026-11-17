@@ -282,10 +282,16 @@ void StackChanBody::Stop(bool latch) {
     gesture_abort_ = true;  // set before the lock so a mid-step gesture bails out
     MutexGuard lock(motion_mutex_);
     look_at_deadline_us_ = 0;
-    ServerMotionLocked();   // also ends an earlier latch
     if (latch) {
+        ServerMotionLocked();
         local_.SafetyStop(esp_timer_get_time());
         ESP_LOGW(TAG, "safety stop: local head clips off until the next server head command or session end");
+    } else {
+        // Not a server move: no quiet window, so the drift home after a session plays.
+        const int64_t now = esp_timer_get_time();
+        rest_baseline_valid_ = false;
+        local_.PlainStop();   // also ends an earlier latch
+        NoteMotionLocked(now, 1500 * 1000);
     }
     // While quiet the rail is down and the head is already limp; skip the bus write.
     if (!capture_quiet_ && motion_) {

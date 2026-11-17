@@ -122,7 +122,7 @@ public:
     }
 
     // Server motion (L1) owns the head now: drop the local clip and any return home. It
-    // also ends a safety.stop latch, as does the end of a session (a plain stop).
+    // also ends a safety.stop latch, as does a plain stop.
     void ServerMotion(int64_t now_us) {
         active_ = false;
         home_due_us_ = 0;
@@ -150,6 +150,14 @@ public:
     void Cancel() {
         active_ = false;
         home_due_us_ = 0;
+    }
+    // A plain stop (the session closed, a server move timed out): drop the local clip and
+    // end a safety.stop latch, but open no quiet window. A stop is not a server move, nothing
+    // of the server's is left to settle, and the drift home ~1.5 s after a session must play
+    // (11-17 device test: as a server move it was refused after every conversation).
+    void PlainStop() {
+        Cancel();
+        stop_latched_ = false;
     }
 
     bool active() const { return active_; }
